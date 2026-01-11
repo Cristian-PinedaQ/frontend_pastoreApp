@@ -1,6 +1,6 @@
 // 👥 MembersPage - Gestión de miembros
-// ✅ VERSIÓN RESPONSIVE CON LÍDER AUTOCOMPLETE
-import React, { useState, useEffect } from "react";
+// ✅ VERSIÓN RESPONSIVA CON LÍDER AUTOCOMPLETE + ORDEN ALFABÉTICO + SCROLL
+import React, { useState, useEffect, useRef } from "react";
 import apiService from "../apiService";
 import { useAuth } from "../AuthContext";
 import { MemberDetailModal } from "../components/MemberDetailModal";
@@ -24,6 +24,9 @@ export const MembersPage = () => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  // ✅ NUEVO: Ref para el formulario (para scroll)
+  const formRef = useRef(null);
+
   // ✅ NUEVO: Estados para líder autocomplete
   const [leaderSearchTerm, setLeaderSearchTerm] = useState("");
   const [filteredLeaders, setFilteredLeaders] = useState([]);
@@ -44,6 +47,7 @@ export const MembersPage = () => {
     birthdate: "",
     employmentStatus: "",
     leader: null,
+    district: "",
   });
 
   useEffect(() => {
@@ -154,6 +158,7 @@ export const MembersPage = () => {
         birthdate: formData.birthdate,
         employmentStatus: formData.employmentStatus,
         leader: selectedLeader ? { id: selectedLeader.id } : null,
+        district: formData.district,
       };
 
       if (editingId) {
@@ -185,6 +190,7 @@ export const MembersPage = () => {
       birthdate: member.birthdate || "",
       employmentStatus: member.employmentStatus || "",
       leader: member.leader || null,
+      district: member.district || "",
     });
 
     if (member.leader) {
@@ -194,6 +200,16 @@ export const MembersPage = () => {
 
     setEditingId(member.id);
     setShowForm(true);
+
+    // ✅ NUEVO: Scroll al formulario después de mostrar
+    setTimeout(() => {
+      if (formRef.current) {
+        formRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }, 100);
   };
 
   const handleDelete = async (id) => {
@@ -265,6 +281,7 @@ export const MembersPage = () => {
       birthdate: "",
       employmentStatus: "",
       leader: null,
+      district: "",
     });
     setSelectedLeader(null);
     setLeaderSearchTerm("");
@@ -273,13 +290,27 @@ export const MembersPage = () => {
     setShowForm(false);
   };
 
+  // ✅ NUEVO: Función para ordenar alfabéticamente
+  const sortByName = (membersArray) => {
+    return [...membersArray].sort((a, b) => {
+      const nameA = (a.name || "").toLowerCase().trim();
+      const nameB = (b.name || "").toLowerCase().trim();
+      return nameA.localeCompare(nameB, "es", { numeric: true });
+    });
+  };
+
   const filteredMembers = allMembers.filter(
     (member) =>
       member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const displayMembers = searchTerm.trim() === "" ? members : filteredMembers;
+  // ✅ NUEVO: Aplicar orden alfabético
+  const displayMembers =
+    searchTerm.trim() === ""
+      ? sortByName(members)
+      : sortByName(filteredMembers);
+
   const isSearching = searchTerm.trim() !== "";
 
   const canEdit = hasAnyRole(["ROLE_PASTORES", "ROLE_GANANDO"]);
@@ -303,6 +334,17 @@ export const MembersPage = () => {
             onClick={() => {
               resetForm();
               setShowForm(!showForm);
+              // ✅ Si abre nuevo formulario, scroll al formulario
+              if (!showForm) {
+                setTimeout(() => {
+                  if (formRef.current) {
+                    formRef.current.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }
+                }, 100);
+              }
             }}
             className="w-full sm:w-auto bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
           >
@@ -320,9 +362,12 @@ export const MembersPage = () => {
 
       {/* Formulario */}
       {showForm && canEdit && (
-        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
+        <div
+          ref={formRef}
+          className="bg-white rounded-lg shadow-lg p-4 sm:p-6 animate-slide-in-up"
+        >
           <h2 className="text-lg sm:text-xl font-bold mb-4">
-            {editingId ? "Editar Miembro" : "Nuevo Miembro"}
+            {editingId ? "✏️ Editar Miembro" : "➕ Nuevo Miembro"}
           </h2>
           <form
             onSubmit={handleSubmit}
@@ -373,7 +418,7 @@ export const MembersPage = () => {
               />
             </div>
 
-            {/* ✅ NUEVO: CAMPO LÍDER CON AUTOCOMPLETE */}
+            {/* ✅ CAMPO LÍDER CON AUTOCOMPLETE */}
             <div className="sm:col-span-2 relative">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Líder
@@ -425,12 +470,12 @@ export const MembersPage = () => {
 
                 {/* Mostrar líder seleccionado */}
                 {selectedLeader && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200 animate-fade-in">
                     <p className="text-sm font-semibold text-blue-900">
                       ✅ {selectedLeader.name}
                     </p>
                     <p className="text-xs text-blue-600">
-                      {selectedLeader.email}
+                      Distrito: {selectedLeader.district}
                     </p>
                   </div>
                 )}
@@ -438,6 +483,24 @@ export const MembersPage = () => {
             </div>
 
             {/* CAMPOS ADICIONALES */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Distrito
+              </label>
+              <select
+                name="district"
+                value={formData.district}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="">Seleccionar</option>
+                <option value="D1">Distrito 1</option>
+                <option value="D2">Distrito 2</option>
+                <option value="D3">Distrito 3</option>
+                <option value="Pastores">Pastores</option>
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Tipo de Documento
@@ -673,7 +736,7 @@ export const MembersPage = () => {
                               className="w-16 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-xs font-semibold"
                               title="Ver detalles"
                             >
-                              ✚
+                              👁️
                             </button>
                             <button
                               onClick={() => handleEdit(member)}
@@ -698,10 +761,10 @@ export const MembersPage = () => {
                             </button>
                             <button
                               onClick={() => handleDelete(member.id)}
-                              className="w-8 py-1 bg-red-600 text-white rounded hover:bg-red-600 transition text-s font-semibold"
+                              className="w-16 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition text-xs font-semibold"
                               title="Eliminar"
                             >
-                              ⌦
+                              🗑️
                             </button>
                           </div>
                         </td>

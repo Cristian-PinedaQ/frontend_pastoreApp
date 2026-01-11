@@ -1,6 +1,5 @@
 // 🔌 Servicio API centralizado - VERSIÓN LIMPIA SIN DUPLICADOS
 // Este archivo maneja TODAS las comunicaciones con el backend
-
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 class ApiService {
@@ -27,7 +26,6 @@ class ApiService {
     try {
       const response = await fetch(url, config);
 
-      // Si el token expira (401), limpiar y redirigir al login
       if (response.status === 401) {
         this.logout();
         window.location.href = '/login';
@@ -35,16 +33,65 @@ class ApiService {
       }
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || `Error ${response.status}`);
+        let errorData = {};
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { message: `Error ${response.status}` };
+        }
+
+        // ✅ REGISTRAR EL ERROR COMPLETO
+        console.error('❌ ERROR DEL SERVIDOR - JSON COMPLETO:', JSON.stringify(errorData, null, 2));
+        console.log('TIPO DE errorData.message:', typeof errorData.message);
+        console.log('errorData.message valor:', errorData.message);
+
+        // ✅ MEJOR CONVERSIÓN A STRING
+        let errorMessage = '';
+
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.message) {
+          // Si message es objeto, convertir a JSON, si es string, usar directamente
+          if (typeof errorData.message === 'string') {
+            errorMessage = errorData.message;
+          } else if (typeof errorData.message === 'object') {
+            errorMessage = JSON.stringify(errorData.message);
+          } else {
+            errorMessage = String(errorData.message);
+          }
+        } else if (errorData.error) {
+          if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else {
+            errorMessage = JSON.stringify(errorData.error);
+          }
+        } else if (errorData.details) {
+          if (typeof errorData.details === 'string') {
+            errorMessage = errorData.details;
+          } else {
+            errorMessage = JSON.stringify(errorData.details);
+          }
+        } else if (errorData.errors) {
+          if (typeof errorData.errors === 'string') {
+            errorMessage = errorData.errors;
+          } else {
+            errorMessage = JSON.stringify(errorData.errors);
+          }
+        } else {
+          errorMessage = `Error ${response.status}: ${JSON.stringify(errorData)}`;
+        }
+
+        console.error('❌ MENSAJE DE ERROR FINAL:', errorMessage);
+        throw new Error(errorMessage);
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error en API:', error);
+      console.error('🔴 Error en API:', error.message);
       throw error;
     }
   }
+
 
   // ========== 🔐 AUTENTICACIÓN ==========
   async login(username, password) {
@@ -152,51 +199,95 @@ class ApiService {
     return this.request(`/member/enrollment-history/${id}`);
   }
 
-  // ========== 📋 COHORTES (ENROLLMENTS) ==========
+  // ========== 📋 COHORTES (ENROLLMENTS) - CORREGIDO ==========
   /**
-   * Obtener cohortes/enrollments con paginación
-   * GET /api/v1/enrollment?page=0&limit=10
+   * ✅ CORRECCIÓN: Obtener TODAS las cohortes
+   * GET /api/v1/enrollment/cohorts/findAll
+   * Retorna: EnrollmentDTO[] (array de cohortes)
    */
-  async getEnrollments(page = 0, limit = 10) {
+  async getEnrollments() {
+    return this.request('/enrollment/cohorts/findAll');
+  }
+
+  /**
+   * Obtener cohortes con paginación (StudentEnrollment)
+   * GET /api/v1/enrollment?page=0&limit=10
+   * ⚠️ NOTA: Este retorna StudentEnrollment (inscripciones de estudiantes)
+   */
+  async getEnrollmentsPaginated(page = 0, limit = 10) {
     return this.request(`/enrollment?page=${page}&limit=${limit}`);
   }
 
   /**
-   * Obtener una cohorte por ID
+   * ✅ CORRECCIÓN: Obtener una cohorte específica por ID con todos sus detalles
    * GET /api/v1/enrollment/cohorts/find/{id}
+   * Retorna: EnrollmentDTO con detalles completos
    */
   async getEnrollmentById(id) {
     return this.request(`/enrollment/cohorts/find/${id}`);
   }
 
   /**
-   * Obtener cohortes disponibles por nivel
+   * ✅ CORRECCIÓN: Obtener cohortes disponibles por nivel
    * GET /api/v1/enrollment/available-cohorts/{level}
+   * 
+   * @param {string} level - Ej: "PREENCUENTRO", "ENCUENTRO", "EDIRD_1", etc.
    */
-  async getAvailableCohorts(level) {
+  async getAvailableCohortsByLevel(level) {
     return this.request(`/enrollment/available-cohorts/${level}`);
   }
 
   /**
-   * Crear nueva cohorte
-   * POST /api/v1/enrollment
+   * ✅ CORRECCIÓN: Crear nueva cohorte CON TODOS LOS CAMPOS REQUERIDOS
+   * POST /api/v1/enrollment/create-cohort
+   * 
+   * El enrollmentData debe contener:
+   * {
+   *   "level": "PREENCUENTRO",                    // Requerido: enum LevelEnrollment
+   *   "startDate": "2025-01-20",                  // Requerido: LocalDate (YYYY-MM-DD)
+   *   "endDate": "2025-03-20",                    // Requerido: LocalDate (YYYY-MM-DD)
+   *   "maxStudents": 30,                          // Requerido: Integer (1-500)
+   *   "minAttendancePercentage": 80,              // Requerido: Double (0-100)
+   *   "minAverageScore": 3.0                      // Requerido: Double (0-5.0)
+   * }
    */
   async createEnrollment(enrollmentData) {
-    return this.request('/enrollment', {
+    return this.request('/enrollment/create-cohort', {
       method: 'POST',
       body: JSON.stringify(enrollmentData),
     });
   }
 
   /**
-   * Actualizar cohorte
-   * PUT /api/v1/enrollment/{id}
+   * ✅ CORRECCIÓN: Actualizar ESTADO de una cohorte
+   * PUT /api/v1/enrollment/cohort/{id}/status?status=ACTIVE
+   * 
+   * Estados válidos: ACTIVE, INACTIVE, PAUSED, COMPLETED, CANCELLED
+   * 
+   * @param {string} id - ID de la cohorte
+   * @param {string} status - Nuevo estado
+   */
+  async updateEnrollmentStatus(id, status) {
+    return this.request(`/enrollment/cohort/${id}/status?status=${status}`, {
+      method: 'PUT',
+    });
+  }
+
+  /**
+   * ⚠️ DEPRECADO: No existe PUT /enrollment/{id} en el backend
+   * Este método era incorrecto. Usa updateEnrollmentStatus() para cambiar estados.
+   * 
+   * @deprecated Usa updateEnrollmentStatus() en su lugar
    */
   async updateEnrollment(id, enrollmentData) {
-    return this.request(`/enrollment/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(enrollmentData),
-    });
+    console.warn('⚠️ updateEnrollment() está DEPRECADO');
+    console.warn('✅ Usa updateEnrollmentStatus(id, status) para cambiar el estado');
+
+    if (enrollmentData.status) {
+      return this.updateEnrollmentStatus(id, enrollmentData.status);
+    }
+
+    throw new Error('El endpoint PUT /enrollment/{id} no existe. Usa updateEnrollmentStatus(id, status)');
   }
 
   // ========== 🎓 INSCRIPCIONES DE ESTUDIANTES ==========
@@ -242,12 +333,12 @@ class ApiService {
     let url = `/student-enrollment/${id}?`;
     const params = [];
     if (updateData.status) params.push(`status=${updateData.status}`);
-    if (updateData.finalAttendancePercentage !== undefined) 
+    if (updateData.finalAttendancePercentage !== undefined)
       params.push(`finalAttendancePercentage=${updateData.finalAttendancePercentage}`);
     if (updateData.passed !== undefined) params.push(`passed=${updateData.passed}`);
-    
+
     url += params.join('&');
-    
+
     return this.request(url, {
       method: 'PUT',
     });
