@@ -441,7 +441,7 @@ tr:hover {
   box-shadow: var(--shadow-xl);
 }
 
-/* Contenedor máximo ancho */
+/* Contenedor mÃ¡ximo ancho */
 .container {
   max-width: 1280px;
   margin: 0 auto;
@@ -467,7 +467,7 @@ tr:hover {
   border-width: 0;
 }
 
-/* Focus visible para navegación por teclado */
+/* Focus visible para navegaciÃ³n por teclado */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -477,7 +477,7 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-/* ========== MEDIA QUERIES ÚTILES ========== */
+/* ========== MEDIA QUERIES ÃšTILES ========== */
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
@@ -544,4 +544,59 @@ textarea:focus-visible {
   .grid-auto {
     grid-template-columns: 1fr;
   }
+}
+
+/* ========== ENROLLMENTS PAGE CUSTOM CLASSES ========== */
+
+.enrollment-item {
+  @apply bg-white border-2 border-gray-200 rounded-lg p-4 cursor-pointer transition-all duration-300;
+}
+
+.enrollment-item:hover {
+  @apply border-blue-500 shadow-lg translate-x-1;
+}
+
+.enrollment-item.selected {
+  @apply bg-gradient-to-br from-blue-50 to-green-50 border-blue-500 shadow-lg;
+}
+
+.status-badge {
+  @apply inline-block px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap;
+}
+
+.status-active {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-inactive {
+  @apply bg-red-100 text-red-800;
+}
+
+.status-paused {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-completed {
+  @apply bg-blue-100 text-blue-800;
+}
+
+.status-cancelled {
+  @apply bg-red-200 text-red-900;
+}
+
+/* Scrollbar personalizado para listados */
+.scrollbar-custom::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+  @apply bg-gray-100 rounded;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 rounded;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-600;
 }

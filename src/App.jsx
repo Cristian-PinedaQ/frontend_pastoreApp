@@ -8,7 +8,7 @@ import { RegisterPage } from './RegisterPage';
 import { DashboardLayout } from './DashboardLayout';
 import { DashboardHome } from './pages/DashboardHome';
 import { MembersPage } from './pages/MembersPage';
-import { EnrollmentsPage } from './pages/EnrollmentsPage';
+import  EnrollmentsPage  from './pages/EnrollmentsPage';
 import {
   StudentsPage,
   LessonsPage,
@@ -18,7 +18,12 @@ import {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter
+      future={{
+        v7_relativeSplatPath: true,
+        v7_startTransition: true
+      }}
+    >
       <AuthProvider>
         <Routes>
           {/* 🔓 Rutas Públicas */}
