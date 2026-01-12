@@ -1,9 +1,10 @@
 // 👥 MembersPage - Gestión de miembros
-// ✅ VERSIÓN RESPONSIVA CON LÍDER AUTOCOMPLETE + ORDEN ALFABÉTICO + SCROLL
+// ✅ CON MODAL DE HISTORIAL DE INSCRIPCIONES
 import React, { useState, useEffect, useRef } from "react";
 import apiService from "../apiService";
 import { useAuth } from "../AuthContext";
 import { MemberDetailModal } from "../components/MemberDetailModal";
+import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal";
 
 export const MembersPage = () => {
   const { hasAnyRole } = useAuth();
@@ -24,10 +25,15 @@ export const MembersPage = () => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // ✅ NUEVO: Ref para el formulario (para scroll)
+  // ✅ NUEVO: Estados para modal de historial
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [enrollmentHistory, setEnrollmentHistory] = useState([]);
+  const [historyMemberName, setHistoryMemberName] = useState("");
+
+  // Ref para el formulario (para scroll)
   const formRef = useRef(null);
 
-  // ✅ NUEVO: Estados para líder autocomplete
+  // Estados para líder autocomplete
   const [leaderSearchTerm, setLeaderSearchTerm] = useState("");
   const [filteredLeaders, setFilteredLeaders] = useState([]);
   const [showLeaderDropdown, setShowLeaderDropdown] = useState(false);
@@ -99,7 +105,7 @@ export const MembersPage = () => {
     }));
   };
 
-  // ✅ NUEVO: Manejar búsqueda de líder
+  // Manejar búsqueda de líder
   const handleLeaderSearch = (value) => {
     setLeaderSearchTerm(value);
     setShowLeaderDropdown(true);
@@ -114,10 +120,10 @@ export const MembersPage = () => {
         member.name?.toLowerCase().includes(value.toLowerCase()) ||
         member.email?.toLowerCase().includes(value.toLowerCase())
     );
-    setFilteredLeaders(filtered.slice(0, 5)); // Mostrar máximo 5 resultados
+    setFilteredLeaders(filtered.slice(0, 5));
   };
 
-  // ✅ NUEVO: Seleccionar líder
+  // Seleccionar líder
   const handleSelectLeader = (leader) => {
     setSelectedLeader(leader);
     setFormData((prev) => ({
@@ -129,7 +135,7 @@ export const MembersPage = () => {
     setFilteredLeaders([]);
   };
 
-  // ✅ NUEVO: Limpiar líder
+  // Limpiar líder
   const handleClearLeader = () => {
     setSelectedLeader(null);
     setFormData((prev) => ({
@@ -143,7 +149,6 @@ export const MembersPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Preparar datos para enviar
       const memberData = {
         name: formData.name,
         email: formData.email,
@@ -201,7 +206,7 @@ export const MembersPage = () => {
     setEditingId(member.id);
     setShowForm(true);
 
-    // ✅ NUEVO: Scroll al formulario después de mostrar
+    // Scroll al formulario
     setTimeout(() => {
       if (formRef.current) {
         formRef.current.scrollIntoView({
@@ -230,7 +235,8 @@ export const MembersPage = () => {
     setShowDetailModal(true);
   };
 
-  const handleViewEnrollment = async (id) => {
+  // ✅ NUEVO: Mostrar historial en modal en lugar de alert
+  const handleViewEnrollment = async (id, memberName) => {
     try {
       const response = await apiService.getMemberEnrollmentHistory(id);
       const history = response || [];
@@ -240,16 +246,9 @@ export const MembersPage = () => {
         return;
       }
 
-      const historyText = history
-        .map(
-          (e, idx) =>
-            `${idx + 1}. Nivel: ${e.level || "N/A"} | Cohorte: ${
-              e.cohort || "N/A"
-            } | Estado: ${e.status || "N/A"}`
-        )
-        .join("\n");
-
-      alert("📋 Historial de Inscripciones:\n\n" + historyText);
+      setEnrollmentHistory(history);
+      setHistoryMemberName(memberName);
+      setShowHistoryModal(true);
     } catch (err) {
       alert("❌ Error: " + err.message);
       console.error("Error en historial:", err);
@@ -290,7 +289,7 @@ export const MembersPage = () => {
     setShowForm(false);
   };
 
-  // ✅ NUEVO: Función para ordenar alfabéticamente
+  // Función para ordenar alfabéticamente
   const sortByName = (membersArray) => {
     return [...membersArray].sort((a, b) => {
       const nameA = (a.name || "").toLowerCase().trim();
@@ -305,11 +304,9 @@ export const MembersPage = () => {
       member.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // ✅ NUEVO: Aplicar orden alfabético
-  const displayMembers =
-    searchTerm.trim() === ""
-      ? sortByName(members)
-      : sortByName(filteredMembers);
+  const displayMembers = searchTerm.trim() === "" 
+    ? sortByName(members) 
+    : sortByName(filteredMembers);
 
   const isSearching = searchTerm.trim() !== "";
 
@@ -334,7 +331,6 @@ export const MembersPage = () => {
             onClick={() => {
               resetForm();
               setShowForm(!showForm);
-              // ✅ Si abre nuevo formulario, scroll al formulario
               if (!showForm) {
                 setTimeout(() => {
                   if (formRef.current) {
@@ -362,10 +358,7 @@ export const MembersPage = () => {
 
       {/* Formulario */}
       {showForm && canEdit && (
-        <div
-          ref={formRef}
-          className="bg-white rounded-lg shadow-lg p-4 sm:p-6 animate-slide-in-up"
-        >
+        <div ref={formRef} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 animate-slide-in-up">
           <h2 className="text-lg sm:text-xl font-bold mb-4">
             {editingId ? "✏️ Editar Miembro" : "➕ Nuevo Miembro"}
           </h2>
@@ -418,7 +411,7 @@ export const MembersPage = () => {
               />
             </div>
 
-            {/* ✅ CAMPO LÍDER CON AUTOCOMPLETE */}
+            {/* CAMPO LÍDER CON AUTOCOMPLETE */}
             <div className="sm:col-span-2 relative">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
                 Líder
@@ -435,7 +428,6 @@ export const MembersPage = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
 
-                {/* Botón para limpiar líder seleccionado */}
                 {selectedLeader && (
                   <button
                     type="button"
@@ -447,7 +439,6 @@ export const MembersPage = () => {
                   </button>
                 )}
 
-                {/* Dropdown de búsqueda */}
                 {showLeaderDropdown && filteredLeaders.length > 0 && (
                   <div className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
                     {filteredLeaders.map((leader) => (
@@ -468,7 +459,6 @@ export const MembersPage = () => {
                   </div>
                 )}
 
-                {/* Mostrar líder seleccionado */}
                 {selectedLeader && (
                   <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200 animate-fade-in">
                     <p className="text-sm font-semibold text-blue-900">
@@ -733,10 +723,10 @@ export const MembersPage = () => {
                           <div className="flex gap-1 justify-center flex-wrap">
                             <button
                               onClick={() => handleViewDetails(member)}
-                              className="w-16 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-xs font-semibold"
+                              className="w-16 py-1 bg-green-500 text-white rounded hover:bg-indigo-600 transition text-xs font-semibold"
                               title="Ver detalles"
                             >
-                              👁️
+                            📇
                             </button>
                             <button
                               onClick={() => handleEdit(member)}
@@ -746,7 +736,7 @@ export const MembersPage = () => {
                               ✏️
                             </button>
                             <button
-                              onClick={() => handleViewEnrollment(member.id)}
+                              onClick={() => handleViewEnrollment(member.id, member.name)}
                               className="w-16 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 transition text-xs font-semibold"
                               title="Historial"
                             >
@@ -754,17 +744,17 @@ export const MembersPage = () => {
                             </button>
                             <button
                               onClick={() => handleEnrollNext(member.id)}
-                              className="w-16 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition text-xs font-semibold"
+                              className="w-16 py-1 bg-indigo-600 text-white rounded hover:bg-green-600 transition text-xs font-semibold"
                               title="Siguiente"
                             >
                               📈
                             </button>
                             <button
                               onClick={() => handleDelete(member.id)}
-                              className="w-16 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition text-xs font-semibold"
+                              className="w-16 py-1 bg-gray-900 text-white rounded hover:bg-red-700 transition text-xs font-semibold"
                               title="Eliminar"
                             >
-                              🗑️
+                              ❌
                             </button>
                           </div>
                         </td>
@@ -818,7 +808,7 @@ export const MembersPage = () => {
                         <span className="hidden sm:block">Editar</span>
                       </button>
                       <button
-                        onClick={() => handleViewEnrollment(member.id)}
+                        onClick={() => handleViewEnrollment(member.id, member.name)}
                         className="py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition text-xs font-semibold flex flex-col items-center gap-1"
                         title="Historial"
                       >
@@ -877,7 +867,15 @@ export const MembersPage = () => {
         </div>
       )}
 
-      {/* Modal */}
+      {/* ✅ NUEVO: Modal de Historial de Inscripciones */}
+      <EnrollmentHistoryModal
+        isOpen={showHistoryModal}
+        history={enrollmentHistory}
+        memberName={historyMemberName}
+        onClose={() => setShowHistoryModal(false)}
+      />
+
+      {/* Modal de Detalles */}
       {showDetailModal && selectedMember && (
         <MemberDetailModal
           member={selectedMember}

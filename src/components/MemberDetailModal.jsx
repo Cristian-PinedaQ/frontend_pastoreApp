@@ -7,13 +7,9 @@ export const MemberDetailModal = ({ member, onClose, onUpdated }) => {
   const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [showEnrollForm, setShowEnrollForm] = useState(false);
-  const [availableCohorts, setAvailableCohorts] = useState([]);
-  const [selectedCohort, setSelectedCohort] = useState(null);
   const [activeTab, setActiveTab] = useState("info");
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
   const [enrollmentDetail, setEnrollmentDetail] = useState(null);
-  const [enrollLoading, setEnrollLoading] = useState(false);
 
   useEffect(() => {
     console.log("✅ Modal abierto para:", member.name);
@@ -35,57 +31,6 @@ export const MemberDetailModal = ({ member, onClose, onUpdated }) => {
       setError(err.message || "Error al cargar inscripciones");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadAvailableCohorts = async () => {
-    try {
-      setError(null);
-      const level = member.currentLevel || "NIVEL_1";
-      console.log("📥 Cargando cohortes disponibles para nivel:", level);
-      const response = await apiService.getAvailableCohorts(level);
-      console.log("✅ Cohortes cargadas:", response);
-      setAvailableCohorts(response || []);
-    } catch (err) {
-      console.error("❌ Error al cargar cohortes:", err);
-      setError("Error al cargar cohortes disponibles");
-    }
-  };
-
-  const handleOpenEnrollForm = () => {
-    console.log("📝 Abriendo formulario de inscripción");
-    loadAvailableCohorts();
-    setShowEnrollForm(true);
-  };
-
-  const handleEnroll = async () => {
-    if (!selectedCohort) {
-      alert("❌ Selecciona una cohorte");
-      return;
-    }
-
-    try {
-      setEnrollLoading(true);
-      console.log(
-        "📝 Inscribiendo memberId:",
-        member.id,
-        "en enrollmentId:",
-        selectedCohort.cohortId
-      );
-      await apiService.createStudentEnrollment(
-        member.id,
-        selectedCohort.cohortId
-      );
-      alert("✅ Inscripción creada exitosamente");
-      setShowEnrollForm(false);
-      setSelectedCohort(null);
-      loadEnrollments();
-      if (onUpdated) onUpdated();
-    } catch (err) {
-      console.error("❌ Error al inscribir:", err);
-      alert("❌ Error: " + (err.message || err));
-    } finally {
-      setEnrollLoading(false);
     }
   };
 
@@ -317,93 +262,6 @@ export const MemberDetailModal = ({ member, onClose, onUpdated }) => {
           {/* TAB: Inscripciones */}
           {activeTab === "enrollments" && (
             <div>
-              {/* Botón para nueva inscripción */}
-              {!showEnrollForm && (
-                <button
-                  onClick={handleOpenEnrollForm}
-                  className="mb-6 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold"
-                >
-                  ➕ Nueva Inscripción
-                </button>
-              )}
-
-              {/* Formulario de inscripción */}
-              {showEnrollForm && (
-                <div className="bg-green-50 border-2 border-green-300 rounded-lg p-6 mb-6">
-                  <h3 className="text-lg font-bold mb-4">
-                    Inscribir en Cohorte
-                  </h3>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-semibold mb-2">
-                      Seleccionar Cohorte *
-                    </label>
-                    <select
-                      value={selectedCohort?.cohortId || ""}
-                      onChange={(e) => {
-                        const cohort = availableCohorts.find(
-                          (c) => c.cohortId === parseInt(e.target.value)
-                        );
-                        setSelectedCohort(cohort);
-                      }}
-                      className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    >
-                      <option value="">-- Seleccionar cohorte --</option>
-                      {availableCohorts.map((cohort) => (
-                        <option key={cohort.cohortId} value={cohort.cohortId}>
-                          {cohort.cohortName} ({cohort.currentStudents}/
-                          {cohort.maxStudents} estudiantes)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {selectedCohort && (
-                    <div className="bg-white p-4 rounded-lg mb-4 border-l-4 border-green-600">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600 font-semibold">Nivel</p>
-                          <p>{selectedCohort.levelDisplay}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600 font-semibold">
-                            Capacidad
-                          </p>
-                          <p>
-                            {selectedCohort.currentStudents}/
-                            {selectedCohort.maxStudents}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600 font-semibold">Inicio</p>
-                          <p>{selectedCohort.startDate}</p>
-                        </div>
-                        <div>
-                          <p className="text-gray-600 font-semibold">Fin</p>
-                          <p>{selectedCohort.endDate}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleEnroll}
-                      disabled={!selectedCohort || enrollLoading}
-                      className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-                    >
-                      {enrollLoading ? "⏳ Inscribiendo..." : "✅ Inscribir"}
-                    </button>
-                    <button
-                      onClick={() => setShowEnrollForm(false)}
-                      className="flex-1 bg-gray-400 text-white px-4 py-2 rounded-lg hover:bg-gray-500 transition font-semibold"
-                    >
-                      ✕ Cancelar
-                    </button>
-                  </div>
-                </div>
-              )}
-
               {/* Lista de inscripciones */}
               {loading ? (
                 <div className="text-center py-8">
