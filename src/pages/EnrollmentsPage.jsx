@@ -1,5 +1,6 @@
-// 📋 EnrollmentsPage.jsx - Versión v3 con Modal de Detalle de Asistencia
+// 📋 EnrollmentsPage.jsx - Versión v4 con Campo TEACHER (Maestro)
 // Gestión de cohortes con vistas modales independientes + Modal de asistencia por lección
+// ✅ NUEVO: Campo para seleccionar maestro al crear cohorte
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
@@ -38,12 +39,17 @@ const EnrollmentsPage = () => {
     maxStudents: 30,
     minAttendancePercentage: 80,
     minAverageScore: 3.0,
+    teacher: null,  // ✅ NUEVO: Campo para maestro
   });
 
   // ========== DATOS CARGADOS DINÁMICAMENTE ==========
   const [lessons, setLessons] = useState([]);
   const [students, setStudents] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState([]);
+  const [availableTeachers, setAvailableTeachers] = useState([]);  // ✅ NUEVO
+  const [filteredTeachers, setFilteredTeachers] = useState([]);    // ✅ NUEVO
+  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false); // ✅ NUEVO
+  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');   // ✅ NUEVO
 
   const LEVELS = [
     { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
@@ -70,6 +76,7 @@ const EnrollmentsPage = () => {
   // ========== EFECTOS ==========
   useEffect(() => {
     fetchEnrollments();
+    loadTeachers();  // ✅ NUEVO: Cargar maestros
   }, []);
 
   useEffect(() => {
@@ -77,6 +84,58 @@ const EnrollmentsPage = () => {
       loadTabData(activeTab);
     }
   }, [activeTab, selectedEnrollment]);
+
+  // ========== FUNCIONES PARA CARGAR MAESTROS ========== ✅ NUEVO
+  const loadTeachers = async () => {
+    try {
+      console.log('📚 Cargando maestros disponibles...');
+      const members = await apiService.getAllMembers();
+      setAvailableTeachers(members || []);
+      console.log(`✅ ${members?.length || 0} maestros cargados`);
+    } catch (err) {
+      console.error('Error cargando maestros:', err);
+    }
+  };
+
+  // ========== FUNCIONES DE BÚSQUEDA DE MAESTRO ========== ✅ NUEVO
+  const handleTeacherSearch = (value) => {
+    setTeacherSearchTerm(value);
+    setShowTeacherDropdown(true);
+
+    if (value.trim() === '') {
+      setFilteredTeachers([]);
+      return;
+    }
+
+    const filtered = availableTeachers.filter(
+      (teacher) =>
+        teacher.name?.toLowerCase().includes(value.toLowerCase()) ||
+        teacher.email?.toLowerCase().includes(value.toLowerCase())
+    );
+    setFilteredTeachers(filtered.slice(0, 5));
+  };
+
+  // ========== SELECCIONAR MAESTRO ========== ✅ NUEVO
+  const handleSelectTeacher = (teacher) => {
+    setFormData((prev) => ({
+      ...prev,
+      teacher: { id: teacher.id, name: teacher.name },
+    }));
+    setTeacherSearchTerm(teacher.name);
+    setShowTeacherDropdown(false);
+    setFilteredTeachers([]);
+    console.log('✅ Maestro seleccionado:', teacher.name);
+  };
+
+  // ========== LIMPIAR MAESTRO ========== ✅ NUEVO
+  const handleClearTeacher = () => {
+    setFormData((prev) => ({
+      ...prev,
+      teacher: null,
+    }));
+    setTeacherSearchTerm('');
+    setFilteredTeachers([]);
+  };
 
   // ========== FUNCIONES PRINCIPALES ==========
   const fetchEnrollments = async () => {
@@ -247,6 +306,11 @@ const EnrollmentsPage = () => {
         return;
       }
 
+      if (!formData.teacher) {
+        alert('Por favor selecciona un maestro');
+        return;
+      }
+
       if (new Date(formData.startDate) >= new Date(formData.endDate)) {
         alert('La fecha de inicio debe ser anterior a la fecha de fin');
         return;
@@ -259,6 +323,7 @@ const EnrollmentsPage = () => {
         maxStudents: parseInt(formData.maxStudents),
         minAttendancePercentage: parseFloat(formData.minAttendancePercentage),
         minAverageScore: parseFloat(formData.minAverageScore),
+        teacher: formData.teacher,  // ✅ NUEVO: Incluir maestro
       };
 
       console.log('📤 Creando cohorte:', enrollmentData);
@@ -280,7 +345,10 @@ const EnrollmentsPage = () => {
       maxStudents: 30,
       minAttendancePercentage: 80,
       minAverageScore: 3.0,
+      teacher: null,  // ✅ NUEVO
     });
+    setTeacherSearchTerm('');
+    setFilteredTeachers([]);
   };
 
   const getLevelLabel = (levelValue) => {
@@ -365,6 +433,55 @@ const EnrollmentsPage = () => {
                 />
               </div>
 
+              {/* ✅ NUEVO: Campo Maestro */}
+              <div className="form-field form-field-full">
+                <label>Maestro / Profesor *</label>
+                <div className="teacher-search-container">
+                  <input
+                    type="text"
+                    placeholder="Busca un maestro por nombre o email..."
+                    value={teacherSearchTerm}
+                    onChange={(e) => handleTeacherSearch(e.target.value)}
+                    onFocus={() => teacherSearchTerm && setShowTeacherDropdown(true)}
+                    className="teacher-search-input"
+                    required={!formData.teacher}
+                  />
+
+                  {formData.teacher && (
+                    <button
+                      type="button"
+                      onClick={handleClearTeacher}
+                      className="teacher-clear-btn"
+                      title="Limpiar selección"
+                    >
+                      ✕
+                    </button>
+                  )}
+
+                  {showTeacherDropdown && filteredTeachers.length > 0 && (
+                    <div className="teacher-dropdown">
+                      {filteredTeachers.map((teacher) => (
+                        <button
+                          key={teacher.id}
+                          type="button"
+                          onClick={() => handleSelectTeacher(teacher)}
+                          className="teacher-option"
+                        >
+                          <div className="teacher-name">{teacher.name}</div>
+                          <div className="teacher-email">{teacher.email}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {formData.teacher && (
+                    <div className="teacher-selected">
+                      <p className="teacher-selected-name">✅ {formData.teacher.name}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="form-field">
                 <label>Máx. Estudiantes *</label>
                 <input
@@ -406,7 +523,7 @@ const EnrollmentsPage = () => {
                 />
               </div>
 
-              <button type="submit" className="btn-primary">
+              <button type="submit" className="btn-primary form-field-full">
                 ✅ Crear Cohorte
               </button>
             </form>
@@ -488,6 +605,10 @@ const EnrollmentsPage = () => {
                   <p><strong>Inicio:</strong> {new Date(enrollment.startDate).toLocaleDateString('es-CO')}</p>
                   <p><strong>Fin:</strong> {new Date(enrollment.endDate).toLocaleDateString('es-CO')}</p>
                   <p><strong>Estudiantes:</strong> {enrollment.maxStudents} máx</p>
+                  {/* ✅ NUEVO: Mostrar maestro en la tarjeta */}
+                  {enrollment.maestro && (
+                    <p><strong>👨‍🏫 Maestro:</strong> {enrollment.maestro.name || enrollment.maestro}</p>
+                  )}
                 </div>
               </div>
             ))
@@ -560,6 +681,13 @@ const EnrollmentsPage = () => {
                         </span>
                       </p>
                     </div>
+                    {/* ✅ NUEVO: Mostrar maestro en detalles */}
+                    <div>
+                      <p className="detail-label">👨‍🏫 Maestro</p>
+                      <p className="detail-value">
+                        {selectedEnrollment.maestro?.name || selectedEnrollment.teacher?.name || '—'}
+                      </p>
+                    </div>
                     <div>
                       <p className="detail-label">Inicio</p>
                       <p className="detail-value">{new Date(selectedEnrollment.startDate).toLocaleDateString('es-CO')}</p>
@@ -580,11 +708,11 @@ const EnrollmentsPage = () => {
                     </div>
                     <div>
                       <p className="detail-label">% Asistencia Min.</p>
-                      <p className="detail-value">{selectedEnrollment.minAttendancePercentage}%</p>
+                      <p className="detail-value">{selectedEnrollment.minAttendancePercentage * 100 } %</p>
                     </div>
                     <div>
                       <p className="detail-label">Calificación Min.</p>
-                      <p className="detail-value">{selectedEnrollment.minAverageScore}</p>
+                      <p className="detail-value">{selectedEnrollment.minAverageScore.toFixed(2)}</p>
                     </div>
                   </div>
 
@@ -765,6 +893,120 @@ const EnrollmentsPage = () => {
       )}
 
       <style jsx>{`
+        /* ✅ NUEVOS ESTILOS PARA MAESTRO */
+        .form-field-full {
+          grid-column: 1 / -1;
+        }
+
+        .teacher-search-container {
+          position: relative;
+        }
+
+        .teacher-search-input {
+          width: 100%;
+          padding: 8px 12px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 14px;
+          transition: all 0.2s ease;
+        }
+
+        .teacher-search-input:focus {
+          outline: none;
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .teacher-clear-btn {
+          position: absolute;
+          right: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #999;
+          cursor: pointer;
+          font-size: 18px;
+          padding: 4px 8px;
+        }
+
+        .teacher-clear-btn:hover {
+          color: #333;
+        }
+
+        .teacher-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          background: white;
+          border: 1px solid #ccc;
+          border-top: none;
+          border-radius: 0 0 4px 4px;
+          max-height: 200px;
+          overflow-y: auto;
+          z-index: 10;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .teacher-option {
+          width: 100%;
+          padding: 8px 12px;
+          text-align: left;
+          border: none;
+          background: none;
+          cursor: pointer;
+          border-bottom: 1px solid #eee;
+          transition: background-color 0.2s ease;
+        }
+
+        .teacher-option:hover {
+          background-color: #f3f4f6;
+        }
+
+        .teacher-option:last-child {
+          border-bottom: none;
+        }
+
+        .teacher-name {
+          font-weight: 500;
+          color: #333;
+          font-size: 14px;
+        }
+
+        .teacher-email {
+          color: #666;
+          font-size: 12px;
+        }
+
+        .teacher-selected {
+          margin-top: 8px;
+          padding: 8px 12px;
+          background-color: #dbeafe;
+          border: 1px solid #93c5fd;
+          border-radius: 4px;
+          animation: slideIn 0.2s ease;
+        }
+
+        .teacher-selected-name {
+          color: #1e40af;
+          font-weight: 500;
+          font-size: 14px;
+          margin: 0;
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-5px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        /* ✅ ESTILOS EXISTENTES */
         .attendance-item.clickable {
           cursor: pointer;
           transition: all 0.2s ease;
