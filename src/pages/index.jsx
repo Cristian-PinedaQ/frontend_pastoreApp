@@ -1,17 +1,5 @@
 // 🎓 StudentsPage - Gestión de estudiantes
-export const StudentsPage = () => (
-  <div className="space-y-6">
-    <h1 className="text-3xl font-bold text-gray-800">🎓 Inscripciones de Estudiantes</h1>
-    <div className="bg-white rounded-lg shadow-lg p-8">
-      <p className="text-gray-600 text-center py-12">
-        Gestiona las inscripciones de estudiantes en cursos y cohortes.
-      </p>
-      <div className="text-center">
-        <p className="text-gray-500">Próximamente: Formulario de gestión de estudiantes</p>
-      </div>
-    </div>
-  </div>
-);
+
 
 // 📖 LessonsPage - Gestión de lecciones
 export const LessonsPage = () => (

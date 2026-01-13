@@ -9,8 +9,8 @@ import { DashboardLayout } from './DashboardLayout';
 import { DashboardHome } from './pages/DashboardHome';
 import { MembersPage } from './pages/MembersPage';
 import  EnrollmentsPage  from './pages/EnrollmentsPage';
+import  StudentsPage  from './pages/StudentsPage';
 import {
-  StudentsPage,
   LessonsPage,
   AttendancePage,
   UsersPage,
