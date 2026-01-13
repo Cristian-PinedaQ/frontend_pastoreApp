@@ -129,7 +129,7 @@ export const DashboardLayout = () => {
         {/* Top Bar */}
         <div className="bg-white shadow-sm p-4 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
-            {user?.name || 'Dashboard'}
+            {user?.name || 'IGLESIA RAIZ DE DAVID'}
           </h2>
           <div className="text-sm text-gray-600">
             Bienvenido, {user?.username?.split(' ')[0]}
