@@ -1,5 +1,5 @@
-// 🔌 Servicio API centralizado - VERSIÓN LIMPIA SIN DUPLICADOS
-// Este archivo maneja TODAS las comunicaciones con el backend
+// 🔌 Servicio API centralizado - VERSIÓN CORREGIDA PARA ESTUDIANTES POR COHORTE
+// ✅ Rutas de endpoint corregidas
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 class ApiService {
@@ -40,48 +40,24 @@ class ApiService {
           errorData = { message: `Error ${response.status}` };
         }
 
-        // ✅ REGISTRAR EL ERROR COMPLETO
-        console.error('❌ ERROR DEL SERVIDOR - JSON COMPLETO:', JSON.stringify(errorData, null, 2));
-        console.log('TIPO DE errorData.message:', typeof errorData.message);
-        console.log('errorData.message valor:', errorData.message);
+        console.error('❌ ERROR DEL SERVIDOR:', JSON.stringify(errorData, null, 2));
 
-        // ✅ MEJOR CONVERSIÓN A STRING
         let errorMessage = '';
-
         if (typeof errorData === 'string') {
           errorMessage = errorData;
         } else if (errorData.message) {
-          // Si message es objeto, convertir a JSON, si es string, usar directamente
-          if (typeof errorData.message === 'string') {
-            errorMessage = errorData.message;
-          } else if (typeof errorData.message === 'object') {
-            errorMessage = JSON.stringify(errorData.message);
-          } else {
-            errorMessage = String(errorData.message);
-          }
+          errorMessage = typeof errorData.message === 'string'
+            ? errorData.message
+            : JSON.stringify(errorData.message);
         } else if (errorData.error) {
-          if (typeof errorData.error === 'string') {
-            errorMessage = errorData.error;
-          } else {
-            errorMessage = JSON.stringify(errorData.error);
-          }
-        } else if (errorData.details) {
-          if (typeof errorData.details === 'string') {
-            errorMessage = errorData.details;
-          } else {
-            errorMessage = JSON.stringify(errorData.details);
-          }
-        } else if (errorData.errors) {
-          if (typeof errorData.errors === 'string') {
-            errorMessage = errorData.errors;
-          } else {
-            errorMessage = JSON.stringify(errorData.errors);
-          }
+          errorMessage = typeof errorData.error === 'string'
+            ? errorData.error
+            : JSON.stringify(errorData.error);
         } else {
           errorMessage = `Error ${response.status}: ${JSON.stringify(errorData)}`;
         }
 
-        console.error('❌ MENSAJE DE ERROR FINAL:', errorMessage);
+        console.error('❌ MENSAJE DE ERROR:', errorMessage);
         throw new Error(errorMessage);
       }
 
@@ -91,7 +67,6 @@ class ApiService {
       throw error;
     }
   }
-
 
   // ========== 🔐 AUTENTICACIÓN ==========
   async login(username, password) {
@@ -125,34 +100,18 @@ class ApiService {
   }
 
   // ========== 👥 MIEMBROS ==========
-  /**
-   * Obtener miembros con paginación
-   * GET /api/v1/member?page=0&limit=10
-   */
   async getMembers(page = 0, limit = 10) {
     return this.request(`/member?page=${page}&limit=${limit}`);
   }
 
-  /**
-   * Obtener un miembro por ID
-   * GET /api/v1/member/find/{id}
-   */
   async getMemberById(id) {
     return this.request(`/member/find/${id}`);
   }
 
-  /**
-   * Obtener todos los miembros sin paginación
-   * GET /api/v1/member/findAll
-   */
   async getAllMembers() {
     return this.request('/member/findAll');
   }
 
-  /**
-   * Crear nuevo miembro
-   * POST /api/v1/member/save
-   */
   async createMember(memberData) {
     return this.request('/member/save', {
       method: 'POST',
@@ -160,10 +119,6 @@ class ApiService {
     });
   }
 
-  /**
-   * Actualizar miembro existente
-   * PATCH /api/v1/member/patch/{id}
-   */
   async updateMember(id, memberData) {
     return this.request(`/member/patch/${id}`, {
       method: 'PATCH',
@@ -171,85 +126,53 @@ class ApiService {
     });
   }
 
-  /**
-   * Eliminar miembro
-   * DELETE /api/v1/member/delete/{id}
-   */
   async deleteMember(id) {
     return this.request(`/member/delete/${id}`, {
       method: 'DELETE',
     });
   }
 
-  /**
-   * Inscribir miembro en siguiente nivel
-   * POST /api/v1/member/enroll-next-level/{id}
-   */
   async enrollMemberInNextLevel(id) {
     return this.request(`/member/enroll-next-level/${id}`, {
       method: 'POST',
     });
   }
 
-  /**
-   * Obtener historial de inscripciones de un miembro
-   * GET /api/v1/member/enrollment-history/{id}
-   */
   async getMemberEnrollmentHistory(id) {
     return this.request(`/member/enrollment-history/${id}`);
   }
 
-  // ========== 📋 COHORTES (ENROLLMENTS) - CORREGIDO ==========
+  // ========== 📋 COHORTES (ENROLLMENTS) ==========
   /**
-   * ✅ CORRECCIÓN: Obtener TODAS las cohortes
-   * GET /api/v1/enrollment/cohorts/findAll
-   * Retorna: EnrollmentDTO[] (array de cohortes)
+   * ✅ Obtener TODAS las cohortes
    */
   async getEnrollments() {
     return this.request('/enrollment/cohorts/findAll');
   }
 
   /**
-   * Obtener cohortes con paginación (StudentEnrollment)
-   * GET /api/v1/enrollment?page=0&limit=10
-   * ⚠️ NOTA: Este retorna StudentEnrollment (inscripciones de estudiantes)
+   * Obtener cohortes con paginación
    */
   async getEnrollmentsPaginated(page = 0, limit = 10) {
     return this.request(`/enrollment?page=${page}&limit=${limit}`);
   }
 
   /**
-   * ✅ CORRECCIÓN: Obtener una cohorte específica por ID con todos sus detalles
-   * GET /api/v1/enrollment/cohorts/find/{id}
-   * Retorna: EnrollmentDTO con detalles completos
+   * ✅ Obtener una cohorte específica por ID
    */
   async getEnrollmentById(id) {
     return this.request(`/enrollment/cohorts/find/${id}`);
   }
 
   /**
-   * ✅ CORRECCIÓN: Obtener cohortes disponibles por nivel
-   * GET /api/v1/enrollment/available-cohorts/{level}
-   * 
-   * @param {string} level - Ej: "PREENCUENTRO", "ENCUENTRO", "EDIRD_1", etc.
+   * Obtener cohortes disponibles por nivel
    */
   async getAvailableCohortsByLevel(level) {
     return this.request(`/enrollment/available-cohorts/${level}`);
   }
 
   /**
-   * ✅ CORRECCIÓN: Crear nueva cohorte CON TODOS LOS CAMPOS REQUERIDOS
-   * POST /api/v1/enrollment/create-cohort
-   * 
-   * El enrollmentData debe contener:
-   * {
-   *   "level": "PREENCUENTRO",                    // Requerido: enum LevelEnrollment
-   *   "startDate": "2025-01-20",                  // Requerido: LocalDate (YYYY-MM-DD)
-   *   "endDate": "2025-03-20",                    // Requerido: LocalDate (YYYY-MM-DD)
-   *   "maxStudents": 30,                          // Requerido: Integer (1-500)
-   *   "minAttendancePercentage": 80,              // Requerido: Double (0-100)
-   *   "minAverageScore": 3.0                      // Requerido: Double (0-5.0)
-   * }
+   * ✅ Crear nueva cohorte
    */
   async createEnrollment(enrollmentData) {
     return this.request('/enrollment/create-cohort', {
@@ -259,13 +182,7 @@ class ApiService {
   }
 
   /**
-   * ✅ CORRECCIÓN: Actualizar ESTADO de una cohorte
-   * PUT /api/v1/enrollment/cohort/{id}/status?status=ACTIVE
-   * 
-   * Estados válidos: ACTIVE, INACTIVE, PAUSED, COMPLETED, CANCELLED
-   * 
-   * @param {string} id - ID de la cohorte
-   * @param {string} status - Nuevo estado
+   * ✅ Actualizar ESTADO de una cohorte
    */
   async updateEnrollmentStatus(id, status) {
     return this.request(`/enrollment/cohort/${id}/status?status=${status}`, {
@@ -273,51 +190,74 @@ class ApiService {
     });
   }
 
-  /**
-   * ⚠️ DEPRECADO: No existe PUT /enrollment/{id} en el backend
-   * Este método era incorrecto. Usa updateEnrollmentStatus() para cambiar estados.
-   * 
-   * @deprecated Usa updateEnrollmentStatus() en su lugar
-   */
-  async updateEnrollment(id, enrollmentData) {
-    console.warn('⚠️ updateEnrollment() está DEPRECADO');
-    console.warn('✅ Usa updateEnrollmentStatus(id, status) para cambiar el estado');
-
-    if (enrollmentData.status) {
-      return this.updateEnrollmentStatus(id, enrollmentData.status);
-    }
-
-    throw new Error('El endpoint PUT /enrollment/{id} no existe. Usa updateEnrollmentStatus(id, status)');
-  }
-
   // ========== 🎓 INSCRIPCIONES DE ESTUDIANTES ==========
   /**
-   * Obtener inscripciones de estudiantes con paginación
-   * GET /api/v1/student-enrollment?page=0&limit=10
+   * ✅ Obtener todas las inscripciones
    */
   async getStudentEnrollments(page = 0, limit = 10) {
     return this.request(`/student-enrollment?page=${page}&limit=${limit}`);
   }
 
   /**
-   * Obtener detalles de una inscripción específica
-   * GET /api/v1/student-enrollment/{id}
+   * Obtener inscripción por ID
    */
   async getStudentEnrollmentById(id) {
     return this.request(`/student-enrollment/${id}`);
   }
 
   /**
+   * ✅ CORREGIDO: Obtener estudiantes de una cohorte específica
+   * Ruta correcta: /api/v1/student-enrollment/by-cohort/{enrollmentId}
+   */
+  async getStudentEnrollmentsByEnrollment(enrollmentId) {
+    try {
+      console.log('📡 [Intento 1] Obteniendo estudiantes de cohorte ID:', enrollmentId);
+
+      // ✅ RUTA CORRECTA: /student-enrollment/by-cohort/{id}
+      const response = await this.request(`/student-enrollment/by-cohort/${enrollmentId}`);
+
+      console.log('✅ [Intento 1] Estudiantes obtenidos:', response?.length || 0);
+      console.log('   Datos:', response);
+
+      return response;
+    } catch (error) {
+      console.warn('⚠️ [Intento 1] Error:', error.message);
+
+      // Alternativa 2: Si el endpoint anterior no existe, intentar obtener desde enrollment
+      try {
+        console.log('📡 [Intento 2] Intentando obtener estudiantes desde enrollment...');
+        const enrollment = await this.request(`/enrollment/${enrollmentId}`);
+        const students = enrollment?.studentEnrollments || [];
+        console.log('✅ [Intento 2] Estudiantes obtenidos (alternativa):', students.length);
+        return students;
+      } catch (err2) {
+        console.error('❌ [Intento 2] Error:', err2.message);
+
+        // Alternativa 3: Obtener todos los student enrollments y filtrar
+        try {
+          console.log('📡 [Intento 3] Intentando obtener todos los student enrollments...');
+          const allStudentEnrollments = await this.request('/student-enrollment');
+          const filtered = allStudentEnrollments?.filter(se => se.enrollmentId === enrollmentId) || [];
+          console.log('✅ [Intento 3] Estudiantes obtenidos (alternativa 2):', filtered.length);
+          return filtered;
+        } catch (err3) {
+          console.error('❌ [Intento 3] Error:', err3.message);
+          console.error('❌ NO SE PUDO OBTENER ESTUDIANTES DE NINGUNA FORMA');
+          return [];
+        }
+      }
+    }
+  }
+
+  /**
    * Obtener inscripciones de un miembro específico
-   * GET /api/v1/student-enrollment/by-member/{memberId}
    */
   async getStudentEnrollmentsByMember(memberId) {
     return this.request(`/student-enrollment/by-member/${memberId}`);
   }
 
   /**
-   * Crear nueva inscripción de estudiante en una cohorte
-   * POST /api/v1/student-enrollment?memberId=X&enrollmentId=Y
+   * Crear nueva inscripción de estudiante
    */
   async createStudentEnrollment(memberId, enrollmentId) {
     return this.request(`/student-enrollment?memberId=${memberId}&enrollmentId=${enrollmentId}`, {
@@ -327,7 +267,6 @@ class ApiService {
 
   /**
    * Actualizar inscripción de estudiante
-   * PUT /api/v1/student-enrollment/{id}?status=X&finalAttendancePercentage=Y&passed=Z
    */
   async updateStudentEnrollment(id, updateData) {
     let url = `/student-enrollment/${id}?`;
@@ -345,8 +284,7 @@ class ApiService {
   }
 
   /**
-   * Dar de baja a un estudiante (cambiar estado a CANCELLED)
-   * POST /api/v1/student-enrollment/{id}/withdraw
+   * Dar de baja a un estudiante
    */
   async withdrawStudentFromCohort(id) {
     return this.request(`/student-enrollment/${id}/withdraw`, {
@@ -356,7 +294,6 @@ class ApiService {
 
   /**
    * Eliminar inscripción
-   * DELETE /api/v1/student-enrollment/{id}
    */
   async deleteStudentEnrollment(id) {
     return this.request(`/student-enrollment/${id}`, {
@@ -366,7 +303,6 @@ class ApiService {
 
   /**
    * Obtener reporte detallado de una inscripción
-   * GET /api/v1/student-enrollment/{id}/detailed-report
    */
   async getStudentDetailedReport(id) {
     return this.request(`/student-enrollment/${id}/detailed-report`);
@@ -374,8 +310,7 @@ class ApiService {
 
   // ========== 📖 LECCIONES ==========
   /**
-   * Obtener lecciones con paginación
-   * GET /api/v1/lesson?page=0&limit=10
+   * ✅ Obtener lecciones con paginación
    */
   async getLessons(page = 0, limit = 10) {
     return this.request(`/lesson?page=${page}&limit=${limit}`);
@@ -383,23 +318,20 @@ class ApiService {
 
   /**
    * Obtener una lección por ID
-   * GET /api/v1/lesson/{id}
    */
   async getLessonById(id) {
     return this.request(`/lesson/${id}`);
   }
 
   /**
-   * Obtener lecciones de una cohorte
-   * GET /api/v1/lesson/enrollment/{enrollmentId}
+   * ✅ Obtener lecciones de una cohorte específica
    */
   async getLessonsByEnrollment(enrollmentId) {
     return this.request(`/lesson/enrollment/${enrollmentId}`);
   }
 
   /**
-   * Crear nueva lección
-   * POST /api/v1/lesson
+   * ✅ Crear nueva lección
    */
   async createLesson(lessonData) {
     return this.request('/lesson', {
@@ -409,8 +341,17 @@ class ApiService {
   }
 
   /**
+   * ✅ Crear plan de lecciones predeterminado por nivel
+   * Solo PASTORES y AREAS pueden crear
+   */
+  async createDefaultLessonPlan(enrollmentId) {
+    return this.request(`/lesson/create-plan/${enrollmentId}`, {
+      method: 'POST',
+    });
+  }
+
+  /**
    * Actualizar lección
-   * PUT /api/v1/lesson/{id}
    */
   async updateLesson(id, lessonData) {
     return this.request(`/lesson/${id}`, {
@@ -421,7 +362,6 @@ class ApiService {
 
   /**
    * Eliminar lección
-   * DELETE /api/v1/lesson/{id}
    */
   async deleteLesson(id) {
     return this.request(`/lesson/${id}`, {
@@ -431,19 +371,78 @@ class ApiService {
 
   // ========== ✅ ASISTENCIAS ==========
   /**
-   * Registrar asistencia de un estudiante
-   * POST /api/v1/attendance/record
+   * ✅ Registrar asistencia de un estudiante
+   * 🔴 IMPORTANTE: El backend espera JSON en el body (@RequestBody)
+   * NO parámetros en la URL
+   * 
+   * Formato esperado por el backend:
+   * {
+   *   "studentEnrollmentId": 15,
+   *   "lessonId": 17,
+   *   "present": true,
+   *   "recordedBy": "admin",
+   *   "score": "POCA_PARTICIPACION"
+   * }
    */
   async recordAttendance(attendanceData) {
-    return this.request('/attendance/record', {
-      method: 'POST',
-      body: JSON.stringify(attendanceData),
-    });
+    console.log('📤 [recordAttendance] INICIANDO');
+    console.log('  📋 Datos recibidos:', attendanceData);
+
+    try {
+      // Validaciones
+      if (!attendanceData.studentEnrollmentId) throw new Error('studentEnrollmentId requerido');
+      if (!attendanceData.lessonId) throw new Error('lessonId requerido');
+      if (!attendanceData.recordedBy) throw new Error('recordedBy requerido');
+      if (attendanceData.present === undefined && attendanceData.present === null) throw new Error('present requerido');
+      if (!attendanceData.score) throw new Error('score requerido');
+
+      // Construir el body JSON exactamente como espera el backend
+      const bodyData = {
+        studentEnrollmentId: Number(attendanceData.studentEnrollmentId),
+        lessonId: Number(attendanceData.lessonId),
+        present: attendanceData.present === true,  // boolean true/false
+        recordedBy: String(attendanceData.recordedBy),
+        score: String(attendanceData.score)  // Nombre del enum: POCA_PARTICIPACION, etc
+      };
+
+      console.log('📋 JSON a enviar en el body:');
+      console.log(JSON.stringify(bodyData, null, 2));
+
+      console.log('📤 Enviando POST request con JSON en el body...');
+
+      // Enviar como JSON en el body (NO parámetros URL)
+      const response = await this.request('/attendance/record', {
+        method: 'POST',
+        body: JSON.stringify(bodyData)  // ✅ JSON en el body
+      });
+
+      console.log('✅ [recordAttendance] EXITOSA');
+      console.log('   Respuesta:', response);
+      return response;
+
+    } catch (error) {
+      console.error('❌ [recordAttendance] ERROR:');
+      console.error('   Mensaje:', error.message);
+      console.error('   Datos intentados:', {
+        studentEnrollmentId: attendanceData.studentEnrollmentId,
+        lessonId: attendanceData.lessonId,
+        present: attendanceData.present,
+        recordedBy: attendanceData.recordedBy,
+        score: attendanceData.score
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener asistencias de una lección
+   */
+  async getAttendancesByLesson(lessonId) {
+    return this.request(`/attendance/lesson/${lessonId}`);
   }
 
   /**
    * Inicializar asistencias para una lección
-   * POST /api/v1/attendance/lesson/{lessonId}/initialize
    */
   async initializeLessonAttendance(lessonId) {
     return this.request(`/attendance/lesson/${lessonId}/initialize`, {
@@ -452,16 +451,7 @@ class ApiService {
   }
 
   /**
-   * Obtener asistencias de una lección
-   * GET /api/v1/attendance/lesson/{lessonId}
-   */
-  async getAttendancesByLesson(lessonId) {
-    return this.request(`/attendance/lesson/${lessonId}`);
-  }
-
-  /**
    * Obtener reporte de asistencia de un estudiante
-   * GET /api/v1/attendance/student/{studentId}/report
    */
   async getStudentAttendanceReport(studentId) {
     return this.request(`/attendance/student/${studentId}/report`);
@@ -469,7 +459,6 @@ class ApiService {
 
   /**
    * Actualizar asistencia
-   * PUT /api/v1/attendance/{id}
    */
   async updateAttendance(id, attendanceData) {
     return this.request(`/attendance/${id}`, {
@@ -481,7 +470,6 @@ class ApiService {
   // ========== 👤 USUARIOS ==========
   /**
    * Obtener todos los usuarios
-   * GET /api/v1/users
    */
   async getUsers() {
     return this.request('/users');
@@ -489,7 +477,6 @@ class ApiService {
 
   /**
    * Actualizar usuario
-   * PUT /api/v1/users/{id}
    */
   async updateUser(id, userData) {
     return this.request(`/users/${id}`, {
@@ -500,7 +487,6 @@ class ApiService {
 
   /**
    * Eliminar usuario
-   * DELETE /api/v1/users/{id}
    */
   async deleteUser(id) {
     return this.request(`/users/${id}`, {
@@ -509,4 +495,5 @@ class ApiService {
   }
 }
 
-export default new ApiService();
+const apiService = new ApiService();
+export default apiService;

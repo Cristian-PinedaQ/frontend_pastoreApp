@@ -1,28 +1,49 @@
-// 📊 EnrollmentPage - Gestión de Cohortes
-// ✅ VERSIÓN CORREGIDA CON ENDPOINTS CORRECTOS
+// 📋 EnrollmentsPage.jsx - Versión v3 con Modal de Detalle de Asistencia
+// Gestión de cohortes con vistas modales independientes + Modal de asistencia por lección
+
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
-
+import ModalCreateLesson from '../components/ModalCreateLesson';
+import ModalRecordAttendance from '../components/ModalRecordAttendance';
+import ModalLessonAttendanceDetail from '../components/ModalLessonAttendanceDetail';
+import '../css/EnrollmentsPage.css';
 
 const EnrollmentsPage = () => {
+  // ========== ESTADO PRINCIPAL ==========
   const [enrollments, setEnrollments] = useState([]);
   const [filteredEnrollments, setFilteredEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [filterLevel, setFilterLevel] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  // ========== ESTADO DEL MODAL DE COHORTE ==========
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
+  const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
 
+  // ========== ESTADO DE MODALES SECUNDARIOS ==========
+  const [showCreateLessonModal, setShowCreateLessonModal] = useState(false);
+  const [showRecordAttendanceModal, setShowRecordAttendanceModal] = useState(false);
+
+  // ========== ESTADO DEL MODAL DE DETALLE DE ASISTENCIA ==========
+  const [showLessonAttendanceDetailModal, setShowLessonAttendanceDetailModal] = useState(false);
+  const [selectedLesson, setSelectedLesson] = useState(null);
+
+  // ========== ESTADO DEL FORMULARIO DE CREAR COHORTE ==========
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
-    level: 'Selecciona un nivel',
+    level: 'PREENCUENTRO',
     startDate: '',
     endDate: '',
     maxStudents: 30,
     minAttendancePercentage: 80,
     minAverageScore: 3.0,
   });
+
+  // ========== DATOS CARGADOS DINÁMICAMENTE ==========
+  const [lessons, setLessons] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [attendanceSummary, setAttendanceSummary] = useState([]);
 
   const LEVELS = [
     { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
@@ -46,16 +67,28 @@ const EnrollmentsPage = () => {
     { value: 'CANCELLED', label: 'Cancelada' },
   ];
 
+  // ========== EFECTOS ==========
+  useEffect(() => {
+    fetchEnrollments();
+  }, []);
+
+  useEffect(() => {
+    if (showEnrollmentModal && selectedEnrollment) {
+      loadTabData(activeTab);
+    }
+  }, [activeTab, selectedEnrollment]);
+
+  // ========== FUNCIONES PRINCIPALES ==========
   const fetchEnrollments = async () => {
     try {
       setLoading(true);
       const data = await apiService.getEnrollments();
-      console.log('📥 Cohortes obtenidas del backend:', data);
-      
+      console.log('📥 Cohortes obtenidas:', data);
+
       const sorted = data.sort((a, b) => {
         return new Date(b.startDate) - new Date(a.startDate);
       });
-      
+
       setEnrollments(sorted);
       applyFilters(sorted, filterLevel, filterStatus);
     } catch (err) {
@@ -66,29 +99,53 @@ const EnrollmentsPage = () => {
     }
   };
 
+  const loadTabData = async (tab) => {
+    if (!selectedEnrollment) return;
+
+    try {
+      switch (tab) {
+        case 'lessons':
+          console.log('📚 Cargando lecciones...');
+          const lessonsData = await apiService.getLessonsByEnrollment(selectedEnrollment.id);
+          setLessons(lessonsData || []);
+          break;
+
+        case 'students':
+          console.log('👥 Cargando estudiantes...');
+          const studentsData = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
+          setStudents(studentsData || []);
+          break;
+
+        case 'attendance':
+          console.log('📊 Cargando resumen de asistencias...');
+          // Cargar lecciones para mostrar resumen
+          const lessonsForAttendance = await apiService.getLessonsByEnrollment(selectedEnrollment.id);
+          setAttendanceSummary(lessonsForAttendance || []);
+          break;
+
+        default:
+          break;
+      }
+    } catch (err) {
+      console.error(`Error cargando ${tab}:`, err);
+      alert(`Error al cargar ${tab}: ${err.message}`);
+    }
+  };
+
   const applyFilters = (data, level, status) => {
-    console.log('🔍 Aplicando filtros:', { level, status, dataLength: data.length });
-    
+    console.log('🔍 Aplicando filtros:', { level, status });
+
     let filtered = data;
 
     if (level && level.trim() !== '') {
-      console.log(`Filtrando por nivel: "${level}"`);
       filtered = filtered.filter(e => {
-        // ✅ CAMBIO CLAVE: Usar levelEnrollment en lugar de level
         const enrollmentLevel = e.levelEnrollment || e.level;
-        const match = enrollmentLevel === level;
-        console.log(`  Comparando: "${enrollmentLevel}" === "${level}" → ${match}`);
-        return match;
+        return enrollmentLevel === level;
       });
     }
 
     if (status && status.trim() !== '') {
-      console.log(`Filtrando por estado: "${status}"`);
-      filtered = filtered.filter(e => {
-        const match = e.status === status;
-        console.log(`  Comparando: "${e.status}" === "${status}" → ${match}`);
-        return match;
-      });
+      filtered = filtered.filter(e => e.status === status);
     }
 
     console.log(`✅ Resultado: ${filtered.length} cohortes`);
@@ -96,8 +153,6 @@ const EnrollmentsPage = () => {
   };
 
   const handleFilterChange = (type, value) => {
-    console.log(`Cambio de filtro: ${type} = "${value}"`);
-    
     if (type === 'level') {
       setFilterLevel(value);
       applyFilters(enrollments, value, filterStatus);
@@ -107,14 +162,72 @@ const EnrollmentsPage = () => {
     }
   };
 
+  const handleOpenEnrollmentModal = (enrollment) => {
+    setSelectedEnrollment(enrollment);
+    setActiveTab('details');
+    setShowEnrollmentModal(true);
+  };
+
+  const handleCloseEnrollmentModal = () => {
+    setSelectedEnrollment(null);
+    setShowEnrollmentModal(false);
+    setActiveTab('details');
+    setLessons([]);
+    setStudents([]);
+    setAttendanceSummary([]);
+  };
+
   const handleStatusChange = async (enrollmentId, newStatus) => {
     try {
       await apiService.updateEnrollmentStatus(enrollmentId, newStatus);
       alert('✅ Estado actualizado exitosamente');
       fetchEnrollments();
-      setSelectedEnrollment(null);
+      handleCloseEnrollmentModal();
     } catch (err) {
       alert('❌ Error al actualizar estado: ' + err.message);
+    }
+  };
+
+  const handleCreateLesson = async () => {
+    setShowCreateLessonModal(true);
+  };
+
+  const handleLessonCreated = async () => {
+    // Recargar lecciones
+    if (selectedEnrollment) {
+      await loadTabData('lessons');
+    }
+  };
+
+  const handleRecordAttendance = async () => {
+    setShowRecordAttendanceModal(true);
+  };
+
+  const handleAttendanceRecorded = async () => {
+    // Recargar asistencias
+    if (selectedEnrollment) {
+      await loadTabData('attendance');
+    }
+  };
+
+  // ========== FUNCIONES DEL MODAL DE DETALLE DE ASISTENCIA ==========
+  const handleOpenLessonAttendanceDetail = (lesson) => {
+    console.log('📖 Abriendo detalle de asistencia para lección:', lesson.lessonName);
+    setSelectedLesson(lesson);
+    setShowLessonAttendanceDetailModal(true);
+  };
+
+  const handleCloseLessonAttendanceDetail = () => {
+    console.log('📖 Cerrando detalle de asistencia');
+    setSelectedLesson(null);
+    setShowLessonAttendanceDetailModal(false);
+  };
+
+  const handleLessonAttendanceRecorded = async () => {
+    console.log('✅ Asistencia registrada, recargando datos...');
+    // Recargar el resumen de asistencias
+    if (selectedEnrollment) {
+      await loadTabData('attendance');
     }
   };
 
@@ -148,8 +261,7 @@ const EnrollmentsPage = () => {
         minAverageScore: parseFloat(formData.minAverageScore),
       };
 
-      console.log('📤 Enviando:', enrollmentData);
-
+      console.log('📤 Creando cohorte:', enrollmentData);
       await apiService.createEnrollment(enrollmentData);
       alert('✅ Cohorte creada exitosamente');
       setShowForm(false);
@@ -157,7 +269,6 @@ const EnrollmentsPage = () => {
       fetchEnrollments();
     } catch (err) {
       alert('❌ Error: ' + err.message);
-      console.error('Error:', err);
     }
   };
 
@@ -172,10 +283,6 @@ const EnrollmentsPage = () => {
     });
   };
 
-  useEffect(() => {
-    fetchEnrollments();
-  }, []);
-
   const getLevelLabel = (levelValue) => {
     return LEVELS.find(l => l.value === levelValue)?.label || levelValue;
   };
@@ -187,334 +294,509 @@ const EnrollmentsPage = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'ACTIVE': return 'status-active';
-      case 'INACTIVE': return 'status-inactive';
-      case 'PAUSED': return 'status-paused';
+      case 'SUSPENDED': return 'status-inactive';
+      case 'PENDING': return 'status-paused';
       case 'COMPLETED': return 'status-completed';
       case 'CANCELLED': return 'status-cancelled';
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100';
     }
   };
 
+  // ========== RENDER ==========
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8">
-        
-        {/* ========== ENCABEZADO ========== */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 text-center mb-2">📋 Gestión de Cohortes</h1>
-          <p className="text-center text-gray-600 text-sm sm:text-base">Crea y gestiona cohortes de formación</p>
+    <div className="enrollments-page">
+      <div className="page-container">
+        {/* Header */}
+        <div className="page-header">
+          <h1>📋 Gestión de Cohortes</h1>
+          <p>Crea y gestiona cohortes de formación</p>
         </div>
 
-        {/* ========== BOTÓN CREAR ========== */}
-        <div className="flex justify-center mb-6 sm:mb-8">
-          <button 
+        {/* Botón crear */}
+        <div className="button-group">
+          <button
             onClick={() => setShowForm(!showForm)}
-            className="btn-primary px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold text-sm sm:text-base"
+            className="btn-primary"
           >
             {showForm ? '✖️ Cerrar' : '➕ Nueva Cohorte'}
           </button>
         </div>
 
-        {/* ========== FORMULARIO ========== */}
+        {/* Formulario */}
         {showForm && (
-          <div className="bg-gray-50 p-4 sm:p-6 lg:p-8 rounded-xl border-l-4 border-blue-500 mb-6 sm:mb-8 animate-slide-in-up">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Crear Nueva Cohorte</h2>
-            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Nivel *</label>
-                  <select
-                    name="level"
-                    value={formData.level}
-                    onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
-                    required
-                  >
-                    {LEVELS.map(level => (
-                      <option key={level.value} value={level.value}>
-                        {level.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Fecha Inicio *</label>
-                  <input
-                    type="date"
-                    name="startDate"
-                    value={formData.startDate}
-                    onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Fecha Fin *</label>
-                  <input
-                    type="date"
-                    name="endDate"
-                    value={formData.endDate}
-                    onChange={handleInputChange}
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Máx. Estudiantes *</label>
-                  <input
-                    type="number"
-                    name="maxStudents"
-                    value={formData.maxStudents}
-                    onChange={handleInputChange}
-                    min="1"
-                    max="500"
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">% Asistencia *</label>
-                  <input
-                    type="number"
-                    name="minAttendancePercentage"
-                    value={formData.minAttendancePercentage}
-                    onChange={handleInputChange}
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Calificación Min. *</label>
-                  <input
-                    type="number"
-                    name="minAverageScore"
-                    value={formData.minAverageScore}
-                    onChange={handleInputChange}
-                    min="0"
-                    max="5"
-                    step="0.1"
-                    className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-sm"
-                    required
-                  />
-                </div>
+          <div className="form-section animate-slide-in-up">
+            <h2>Crear Nueva Cohorte</h2>
+            <form onSubmit={handleSubmit} className="form-grid">
+              <div className="form-field">
+                <label>Nivel *</label>
+                <select
+                  name="level"
+                  value={formData.level}
+                  onChange={handleInputChange}
+                  required
+                >
+                  {LEVELS.map(level => (
+                    <option key={level.value} value={level.value}>
+                      {level.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              <button type="submit" className="btn-primary w-full rounded-lg font-semibold py-2 sm:py-3 text-sm sm:text-base">
+              <div className="form-field">
+                <label>Fecha Inicio *</label>
+                <input
+                  type="date"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label>Fecha Fin *</label>
+                <input
+                  type="date"
+                  name="endDate"
+                  value={formData.endDate}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label>Máx. Estudiantes *</label>
+                <input
+                  type="number"
+                  name="maxStudents"
+                  value={formData.maxStudents}
+                  onChange={handleInputChange}
+                  min="1"
+                  max="500"
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label>% Asistencia *</label>
+                <input
+                  type="number"
+                  name="minAttendancePercentage"
+                  value={formData.minAttendancePercentage}
+                  onChange={handleInputChange}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  required
+                />
+              </div>
+
+              <div className="form-field">
+                <label>Calificación Min. *</label>
+                <input
+                  type="number"
+                  name="minAverageScore"
+                  value={formData.minAverageScore}
+                  onChange={handleInputChange}
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn-primary">
                 ✅ Crear Cohorte
               </button>
             </form>
           </div>
         )}
 
-        {/* ========== FILTROS ========== */}
-        <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 sm:p-6 rounded-xl border-2 border-gray-200 mb-6 sm:mb-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
-            {/* Filtro Nivel */}
-            <div>
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">📌 Filtrar por Nivel</label>
-              <select
-                value={filterLevel}
-                onChange={(e) => handleFilterChange('level', e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs sm:text-sm"
-              >
-                <option value="">Todos los niveles</option>
-                {LEVELS.map(level => (
-                  <option key={level.value} value={level.value}>
-                    {level.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filtro Estado */}
-            <div>
-              <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">⚡ Filtrar por Estado</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full px-3 sm:px-4 py-2 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 text-xs sm:text-sm"
-              >
-                <option value="">Todos los estados</option>
-                {STATUSES.map(status => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Botón Limpiar */}
-            <div className="flex items-end">
-              <button
-                onClick={() => {
-                  setFilterLevel('');
-                  setFilterStatus('');
-                  applyFilters(enrollments, '', '');
-                }}
-                className="btn-secondary w-full rounded-lg font-semibold py-2 text-xs sm:text-sm"
-              >
-                🔄 Limpiar Filtros
-              </button>
-            </div>
+        {/* Filtros */}
+        <div className="filters-section">
+          <div className="filter-group">
+            <label>📌 Filtrar por Nivel</label>
+            <select
+              value={filterLevel}
+              onChange={(e) => handleFilterChange('level', e.target.value)}
+            >
+              <option value="">Todos los niveles</option>
+              {LEVELS.map(level => (
+                <option key={level.value} value={level.value}>
+                  {level.label}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <p className="text-xs sm:text-sm text-gray-600">
-            Mostrando <strong>{filteredEnrollments.length}</strong> de <strong>{enrollments.length}</strong> cohortes
-          </p>
+          <div className="filter-group">
+            <label>⚡ Filtrar por Estado</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => handleFilterChange('status', e.target.value)}
+            >
+              <option value="">Todos los estados</option>
+              {STATUSES.map(status => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => {
+              setFilterLevel('');
+              setFilterStatus('');
+              applyFilters(enrollments, '', '');
+            }}
+            className="btn-secondary"
+          >
+            🔄 Limpiar Filtros
+          </button>
         </div>
 
-        {/* ========== CONTENEDOR PRINCIPAL ========== */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
-          
-          {/* ========== LISTADO ========== */}
-          <div className="bg-gray-50 p-4 sm:p-6 rounded-xl border-2 border-gray-200">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4">📊 Cohortes ({filteredEnrollments.length})</h2>
-            
-            {loading ? (
-              <p className="text-center text-gray-500 py-8 text-sm">Cargando cohortes...</p>
-            ) : filteredEnrollments.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <p className="text-sm">No hay cohortes que coincidan</p>
-                <p className="text-xs text-gray-400 mt-2">Intenta cambiar los filtros</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-96 sm:max-h-[500px] overflow-y-auto scrollbar-custom">
-                {filteredEnrollments.map(enrollment => (
-                  <div
-                    key={enrollment.id}
-                    onClick={() => setSelectedEnrollment(enrollment)}
-                    className={`enrollment-item ${selectedEnrollment?.id === enrollment.id ? 'selected' : ''}`}
-                  >
-                    <div className="flex justify-between items-start mb-2 gap-2">
-                      <h3 className="font-semibold text-gray-900 text-sm sm:text-base flex-1 min-w-0">
-                        {enrollment.cohortName || getLevelLabel(enrollment.levelEnrollment || enrollment.level)}
-                      </h3>
-                      <span className={`status-badge ${getStatusColor(enrollment.status)} flex-shrink-0`}>
-                        {getStatusLabel(enrollment.status)}
-                      </span>
-                    </div>
-                    <div className="space-y-1 text-xs sm:text-sm text-gray-600">
-                      <p><strong>Nivel:</strong> {getLevelLabel(enrollment.levelEnrollment || enrollment.level)}</p>
-                      <p><strong>Inicio:</strong> {new Date(enrollment.startDate).toLocaleDateString('es-CO')}</p>
-                      <p><strong>Fin:</strong> {new Date(enrollment.endDate).toLocaleDateString('es-CO')}</p>
-                      <p><strong>Est.:</strong> {enrollment.maxStudents} máx</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+        <p className="filter-info">
+          Mostrando <strong>{filteredEnrollments.length}</strong> de <strong>{enrollments.length}</strong> cohortes
+        </p>
 
-          {/* ========== DETALLES ========== */}
-          {selectedEnrollment && (
-            <div className="bg-gray-50 p-4 sm:p-6 rounded-xl border-2 border-gray-200 animate-slide-in-up">
-              <div className="bg-white rounded-lg overflow-hidden shadow-lg">
-                <div className="bg-gradient-to-r from-blue-500 to-green-500 text-white p-4 sm:p-6 flex justify-between items-center gap-4">
-                  <h2 className="text-base sm:text-xl font-bold min-w-0 truncate">
-                    {selectedEnrollment.cohortName || getLevelLabel(selectedEnrollment.levelEnrollment || selectedEnrollment.level)}
-                  </h2>
-                  <button
-                    onClick={() => setSelectedEnrollment(null)}
-                    className="text-white text-2xl font-bold hover:bg-white hover:bg-opacity-20 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                  >
-                    ✕
-                  </button>
+        {/* Grid de cohortes */}
+        <div className="enrollments-grid">
+          {loading ? (
+            <p className="loading-message">Cargando cohortes...</p>
+          ) : filteredEnrollments.length === 0 ? (
+            <div className="empty-message">
+              <p>No hay cohortes que coincidan</p>
+              <p>Intenta cambiar los filtros</p>
+            </div>
+          ) : (
+            filteredEnrollments.map(enrollment => (
+              <div
+                key={enrollment.id}
+                className="enrollment-card"
+                onClick={() => handleOpenEnrollmentModal(enrollment)}
+              >
+                <div className="card-header">
+                  <h3>{enrollment.cohortName || getLevelLabel(enrollment.levelEnrollment || enrollment.level)}</h3>
+                  <span className={`status-badge ${getStatusColor(enrollment.status)}`}>
+                    {getStatusLabel(enrollment.status)}
+                  </span>
                 </div>
+                <div className="card-body">
+                  <p><strong>Nivel:</strong> {getLevelLabel(enrollment.levelEnrollment || enrollment.level)}</p>
+                  <p><strong>Inicio:</strong> {new Date(enrollment.startDate).toLocaleDateString('es-CO')}</p>
+                  <p><strong>Fin:</strong> {new Date(enrollment.endDate).toLocaleDateString('es-CO')}</p>
+                  <p><strong>Estudiantes:</strong> {enrollment.maxStudents} máx</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
-                <div className="p-4 sm:p-6 space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+      {/* ========== MODAL DE COHORTE (PRINCIPAL) ========== */}
+      {showEnrollmentModal && selectedEnrollment && (
+        <div className="modal-overlay" onClick={handleCloseEnrollmentModal}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="modal-header">
+              <h2>{selectedEnrollment.cohortName || getLevelLabel(selectedEnrollment.levelEnrollment)}</h2>
+              <button
+                className="modal-close-btn"
+                onClick={handleCloseEnrollmentModal}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Pestañas */}
+            <div className="modal-tabs">
+              <button
+                className={`tab-btn ${activeTab === 'details' ? 'active' : ''}`}
+                onClick={() => setActiveTab('details')}
+              >
+                📋 Detalles
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'lessons' ? 'active' : ''}`}
+                onClick={() => setActiveTab('lessons')}
+              >
+                📚 Lecciones
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
+                onClick={() => setActiveTab('students')}
+              >
+                👥 Estudiantes
+              </button>
+              <button
+                className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}
+                onClick={() => setActiveTab('attendance')}
+              >
+                ✅ Asistencias
+              </button>
+            </div>
+
+            {/* Contenido de pestañas */}
+            <div className="modal-body">
+              {/* PESTAÑA: Detalles */}
+              {activeTab === 'details' && (
+                <div className="tab-content">
+                  <div className="details-grid">
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">ID</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900 truncate">{selectedEnrollment.id}</p>
+                      <p className="detail-label">ID</p>
+                      <p className="detail-value">{selectedEnrollment.id}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Nivel</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900 truncate">{getLevelLabel(selectedEnrollment.levelEnrollment || selectedEnrollment.level)}</p>
+                      <p className="detail-label">Nivel</p>
+                      <p className="detail-value">{getLevelLabel(selectedEnrollment.levelEnrollment || selectedEnrollment.level)}</p>
                     </div>
-                    <div className="col-span-2 sm:col-span-1">
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Estado</p>
-                      <p className="mt-1">
-                        <span className={`status-badge ${getStatusColor(selectedEnrollment.status)} text-xs`}>
+                    <div>
+                      <p className="detail-label">Estado</p>
+                      <p className="detail-value">
+                        <span className={`status-badge ${getStatusColor(selectedEnrollment.status)}`}>
                           {getStatusLabel(selectedEnrollment.status)}
                         </span>
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Inicio</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900">{new Date(selectedEnrollment.startDate).toLocaleDateString('es-CO')}</p>
+                      <p className="detail-label">Inicio</p>
+                      <p className="detail-value">{new Date(selectedEnrollment.startDate).toLocaleDateString('es-CO')}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Fin</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900">{new Date(selectedEnrollment.endDate).toLocaleDateString('es-CO')}</p>
+                      <p className="detail-label">Fin</p>
+                      <p className="detail-value">{new Date(selectedEnrollment.endDate).toLocaleDateString('es-CO')}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Duración</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900">
-                        {Math.ceil((new Date(selectedEnrollment.endDate) - new Date(selectedEnrollment.startDate)) / (1000 * 60 * 60 * 24))} d
+                      <p className="detail-label">Duración</p>
+                      <p className="detail-value">
+                        {Math.ceil((new Date(selectedEnrollment.endDate) - new Date(selectedEnrollment.startDate)) / (1000 * 60 * 60 * 24))} días
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Máx. Est.</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900">{selectedEnrollment.maxStudents}</p>
+                      <p className="detail-label">Máx. Estudiantes</p>
+                      <p className="detail-value">{selectedEnrollment.maxStudents}</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">% Asist.</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900">{selectedEnrollment.minAttendancePercentage}%</p>
+                      <p className="detail-label">% Asistencia Min.</p>
+                      <p className="detail-value">{selectedEnrollment.minAttendancePercentage}%</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Calif. Min</p>
-                      <p className="text-sm sm:text-lg font-semibold text-gray-900">{selectedEnrollment.minAverageScore}</p>
+                      <p className="detail-label">Calificación Min.</p>
+                      <p className="detail-value">{selectedEnrollment.minAverageScore}</p>
+                    </div>
+                  </div>
+
+                  {/* Acciones de estado */}
+                  <div className="actions-section">
+                    <h3>🎯 Cambiar Estado</h3>
+                    <div className="actions-grid">
+                      {selectedEnrollment.status !== 'ACTIVE' && (
+                        <button
+                          onClick={() => handleStatusChange(selectedEnrollment.id, 'ACTIVE')}
+                          className="action-btn btn-success"
+                        >
+                          ▶️ Activar
+                        </button>
+                      )}
+                      {selectedEnrollment.status !== 'SUSPENDED' && (
+                        <button
+                          onClick={() => handleStatusChange(selectedEnrollment.id, 'SUSPENDED')}
+                          className="action-btn btn-warning"
+                        >
+                          ⏸️ Pausar
+                        </button>
+                      )}
+                      {selectedEnrollment.status !== 'COMPLETED' && (
+                        <button
+                          onClick={() => handleStatusChange(selectedEnrollment.id, 'COMPLETED')}
+                          className="action-btn btn-info"
+                        >
+                          ✅ Completar
+                        </button>
+                      )}
+                      {selectedEnrollment.status !== 'CANCELLED' && (
+                        <button
+                          onClick={() => handleStatusChange(selectedEnrollment.id, 'CANCELLED')}
+                          className="action-btn btn-danger"
+                        >
+                          ❌ Cancelar
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
+              )}
 
-                <div className="bg-gray-50 p-4 sm:p-6 border-t-2 border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                  {selectedEnrollment.status !== 'ACTIVE' && (
+              {/* PESTAÑA: Lecciones */}
+              {activeTab === 'lessons' && (
+                <div className="tab-content">
+                  <div className="tab-actions">
                     <button
-                      onClick={() => handleStatusChange(selectedEnrollment.id, 'ACTIVE')}
-                      className="btn-secondary rounded-lg font-semibold py-2 text-xs sm:text-sm"
+                      onClick={handleCreateLesson}
+                      className="btn-primary"
                     >
-                      ▶️ Activar
+                      ➕ Nueva Lección
                     </button>
-                  )}
-                  {selectedEnrollment.status !== 'PAUSED' && (
-                    <button
-                      onClick={() => handleStatusChange(selectedEnrollment.id, 'PAUSED')}
-                      className="bg-yellow-500 text-white rounded-lg font-semibold py-2 text-xs sm:text-sm hover:bg-yellow-600"
-                    >
-                      ⏸️ Pausar
-                    </button>
-                  )}
-                  {selectedEnrollment.status !== 'COMPLETED' && (
-                    <button
-                      onClick={() => handleStatusChange(selectedEnrollment.id, 'COMPLETED')}
-                      className="bg-blue-500 text-white rounded-lg font-semibold py-2 text-xs sm:text-sm hover:bg-blue-600"
-                    >
-                      ✅ Completar
-                    </button>
-                  )}
-                  {selectedEnrollment.status !== 'CANCELLED' && (
-                    <button
-                      onClick={() => handleStatusChange(selectedEnrollment.id, 'CANCELLED')}
-                      className="btn-danger rounded-lg font-semibold py-2 text-xs sm:text-sm"
-                    >
-                      ❌ Cancelar
-                    </button>
+                  </div>
+
+                  {lessons.length === 0 ? (
+                    <p className="empty-message">No hay lecciones creadas</p>
+                  ) : (
+                    <div className="lessons-list">
+                      {lessons.map(lesson => (
+                        <div key={lesson.id} className="lesson-item">
+                          <div className="lesson-header">
+                            <h4>📖 {lesson.lessonNumber}. {lesson.lessonName}</h4>
+                            {lesson.isMandatory && <span className="badge-mandatory">🔴 Obligatoria</span>}
+                          </div>
+                          <div className="lesson-info">
+                            <p>📅 {new Date(lesson.lessonDate).toLocaleDateString('es-CO')}</p>
+                            <p>⏱️ {lesson.durationMinutes} min</p>
+                            <p>✅ {lesson.attendanceCount || 0} asistencias</p>
+                          </div>
+                          {lesson.description && <p className="lesson-description">{lesson.description}</p>}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
+
+              {/* PESTAÑA: Estudiantes */}
+              {activeTab === 'students' && (
+                <div className="tab-content">
+                  {students.length === 0 ? (
+                    <p className="empty-message">No hay estudiantes inscritos</p>
+                  ) : (
+                    <div className="students-list">
+                      {students.map(student => (
+                        <div key={student.id} className="student-item">
+                          <div className="student-header">
+                            <h4>👤 {student.memberName || `Estudiante ${student.memberId}`}</h4>
+                            <span className={`status-badge ${getStatusColor(student.status)}`}>
+                              {getStatusLabel(student.status)}
+                            </span>
+                          </div>
+                          <div className="student-info">
+                            <p>📅 Inscrito: {new Date(student.enrollmentDate).toLocaleDateString('es-CO')}</p>
+                            {student.finalAttendancePercentage && (
+                              <p>📊 Asistencia: {student.finalAttendancePercentage.toFixed(1)}%</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PESTAÑA: Asistencias - MEJORADA CON CLICK EN LECCIONES */}
+              {activeTab === 'attendance' && (
+                <div className="tab-content">
+                  <div className="tab-actions">
+                    <button
+                      onClick={handleRecordAttendance}
+                      className="btn-primary"
+                    >
+                      ➕ Registrar Asistencia
+                    </button>
+                  </div>
+
+                  {attendanceSummary.length === 0 ? (
+                    <p className="empty-message">No hay lecciones disponibles</p>
+                  ) : (
+                    <div className="attendance-summary">
+                      {attendanceSummary.map(lesson => (
+                        <div 
+                          key={lesson.id} 
+                          className="attendance-item clickable"
+                          onClick={() => handleOpenLessonAttendanceDetail(lesson)}
+                          title="Click para ver detalles de asistencia"
+                        >
+                          <div className="attendance-header">
+                            <h4>📖 {lesson.lessonNumber}. {lesson.lessonName}</h4>
+                            <span className="view-details-badge">👁️ Ver detalles</span>
+                          </div>
+                          <div className="attendance-info">
+                            <p>📅 {new Date(lesson.lessonDate).toLocaleDateString('es-CO')}</p>
+                            <p>✅ {lesson.attendanceCount || 0} registros de asistencia</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ========== MODAL DE DETALLE DE ASISTENCIA POR LECCIÓN ========== */}
+      {selectedLesson && selectedEnrollment && (
+        <ModalLessonAttendanceDetail
+          isOpen={showLessonAttendanceDetailModal}
+          onClose={handleCloseLessonAttendanceDetail}
+          lesson={selectedLesson}
+          enrollment={selectedEnrollment}
+          onAttendanceRecorded={handleLessonAttendanceRecorded}
+        />
+      )}
+
+      {/* ========== MODALES SECUNDARIOS ========== */}
+      {selectedEnrollment && (
+        <>
+          <ModalCreateLesson
+            isOpen={showCreateLessonModal}
+            onClose={() => setShowCreateLessonModal(false)}
+            enrollmentId={selectedEnrollment.id}
+            onLessonCreated={handleLessonCreated}
+          />
+
+          <ModalRecordAttendance
+            isOpen={showRecordAttendanceModal}
+            onClose={() => setShowRecordAttendanceModal(false)}
+            enrollmentId={selectedEnrollment.id}
+            onAttendanceRecorded={handleAttendanceRecorded}
+          />
+        </>
+      )}
+
+      <style jsx>{`
+        .attendance-item.clickable {
+          cursor: pointer;
+          transition: all 0.2s ease;
+          position: relative;
+        }
+
+        .attendance-item.clickable:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 16px rgba(37, 99, 235, 0.15);
+          background-color: #f0f9ff;
+        }
+
+        .view-details-badge {
+          display: inline-block;
+          background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
+          color: white;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 };
