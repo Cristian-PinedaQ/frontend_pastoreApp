@@ -1,6 +1,6 @@
 // 🔐 AuthContext - Maneja toda la lógica de autenticación
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import apiService from './apiService';
+import apiService from '../apiService';
 
 const AuthContext = createContext();
 

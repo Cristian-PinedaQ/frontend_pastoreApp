@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
-import { useAuth } from '../AuthContext';
+import { useAuth } from '../context/AuthContext';
 
 export const DashboardHome = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     totalMembers: 0,
     totalEnrollments: 0,
-    totalLessons: 0,
-    totalAttendance: 0,
+    totalLeaders: 0,
+    totalCbi: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,7 +20,7 @@ export const DashboardHome = () => {
         setError(null);
 
         const membersRes = await apiService.getMembers(0, 1);
-        const enrollmentsRes = await apiService.getEnrollments(0, 1);
+        const enrollmentsRes = await apiService.getEnrollmentsCard(0, 1);
 
         const totalMembers = membersRes?.totalElements || 0;
         const totalEnrollments = enrollmentsRes?.totalElements || 0;
@@ -73,7 +73,7 @@ export const DashboardHome = () => {
         <StatCard title="Miembros" value={stats.totalMembers} icon="👥" color="bg-blue-500" />
         <StatCard title="Cohortes" value={stats.totalEnrollments} icon="🗂️" color="bg-green-400" />
         <StatCard title="CBI" value={stats.totalLessons} icon="🏘️" color="bg-purple-500" />
-        <StatCard title="Asistencias" value={stats.totalAttendance} icon="✅" color="bg-orange-500" />
+        <StatCard title="LIDERAZGO" value={stats.totalAttendance} icon="🦺" color="bg-orange-300" />
       </div>
 
       <div className="bg-white rounded-lg shadow-lg p-8">

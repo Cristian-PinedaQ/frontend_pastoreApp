@@ -1,7 +1,7 @@
 // 🔓 LoginPage - Formulario de Login
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAuth } from './context/AuthContext';
 
 export const LoginPage = () => {
   const navigate = useNavigate();

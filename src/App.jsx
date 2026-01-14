@@ -1,7 +1,7 @@
 // ✅ App.jsx - Configuración de rutas y providers
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './AuthContext';
+import { AuthProvider } from './context/AuthContext';  // ✅ CORRECTO
 import { ProtectedRoute, UnauthorizedPage } from './ProtectedRoute';
 import { LoginPage } from './LoginPage';
 import { RegisterPage } from './RegisterPage';
@@ -10,10 +10,10 @@ import { DashboardHome } from './pages/DashboardHome';
 import { MembersPage } from './pages/MembersPage';
 import  EnrollmentsPage  from './pages/EnrollmentsPage';
 import  StudentsPage  from './pages/StudentsPage';
+import  UsersPage  from './pages/UsersPage';
 import {
   LessonsPage,
   AttendancePage,
-  UsersPage,
 } from './pages/index';
 
 function App() {
@@ -58,7 +58,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<EnrollmentsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_PROFESORES']}
                 />
               }
             />
