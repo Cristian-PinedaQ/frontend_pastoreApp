@@ -33,7 +33,7 @@ export const generatePDF = (data, filename = 'reporte') => {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
-    doc.text('📚 REPORTE DE ESTUDIANTES', pageWidth / 2, 12, { align: 'center' });
+    doc.text('REPORTE DE ESTUDIANTES', pageWidth / 2, 12, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');

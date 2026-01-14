@@ -259,6 +259,17 @@ const StudentsPage = () => {
         {/* Controles */}
         <div className="students-page__controls">
           <div className="students-page__controls-grid">
+
+            {/* Búsqueda */}
+            <div className="students-page__filter-item">
+              <label>🔍 Buscar Estudiante</label>
+              <input
+                type="text"
+                placeholder="Nombre del estudiante..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
             {/* Filtro de Nivel */}
             <div className="students-page__filter-item">
               <label>📌 Filtrar por Nivel</label>
@@ -279,17 +290,6 @@ const StudentsPage = () => {
                   );
                 })}
               </select>
-            </div>
-
-            {/* Búsqueda */}
-            <div className="students-page__filter-item">
-              <label>🔍 Buscar Estudiante</label>
-              <input
-                type="text"
-                placeholder="Nombre del estudiante..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-              />
             </div>
 
             {/* Checkbox Reprobados */}

@@ -144,7 +144,9 @@ const EnrollmentsPage = () => {
       const data = await apiService.getEnrollments();
       console.log('📥 Cohortes obtenidas:', data);
 
-      const sorted = data.sort((a, b) => {
+      // ✅ FIX: Acceder a data.content si existe (paginación), sino usar data directamente
+      const enrollmentsArray = data.content || data;
+      const sorted = enrollmentsArray.sort((a, b) => {
         return new Date(b.startDate) - new Date(a.startDate);
       });
 
@@ -708,11 +710,11 @@ const EnrollmentsPage = () => {
                     </div>
                     <div>
                       <p className="detail-label">% Asistencia Min.</p>
-                      <p className="detail-value">{selectedEnrollment.minAttendancePercentage * 100 } %</p>
+                      <p className="detail-value">{selectedEnrollment.minAttendancePercentage ? (selectedEnrollment.minAttendancePercentage * 100) : 0} %</p>
                     </div>
                     <div>
                       <p className="detail-label">Calificación Min.</p>
-                      <p className="detail-value">{selectedEnrollment.minAverageScore.toFixed(2)}</p>
+                      <p className="detail-value">{(selectedEnrollment.minAverageScore || 0).toFixed(2)}</p>
                     </div>
                   </div>
 
@@ -809,7 +811,7 @@ const EnrollmentsPage = () => {
                           </div>
                           <div className="student-info">
                             <p>📅 Inscrito: {new Date(student.enrollmentDate).toLocaleDateString('es-CO')}</p>
-                            {student.finalAttendancePercentage && (
+                            {student.finalAttendancePercentage !== undefined && student.finalAttendancePercentage !== null && (
                               <p>📊 Asistencia: {student.finalAttendancePercentage.toFixed(1)}%</p>
                             )}
                           </div>

@@ -2,7 +2,7 @@
 // ✅ CON MODAL DE HISTORIAL DE INSCRIPCIONES
 import React, { useState, useEffect, useRef } from "react";
 import apiService from "../apiService";
-import { useAuth } from "../AuthContext";
+import { useAuth } from '../context/AuthContext';
 import { MemberDetailModal } from "../components/MemberDetailModal";
 import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal";
 

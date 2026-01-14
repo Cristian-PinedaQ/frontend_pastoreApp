@@ -149,6 +149,9 @@ class ApiService {
   async getEnrollments() {
     return this.request('/enrollment/cohorts/findAll');
   }
+  async getEnrollmentsCard() {
+    return this.request('/enrollment');
+  }
 
   /**
    * Obtener cohortes con paginación

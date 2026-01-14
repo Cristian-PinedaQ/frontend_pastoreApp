@@ -1,7 +1,7 @@
 // 📊 DashboardLayout - Layout principal con sidebar y navegación
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from './AuthContext';
+import { useAuth } from './context/AuthContext';
 
 export const DashboardLayout = () => {
   const { user, logout, hasRole, hasAnyRole } = useAuth();
@@ -34,25 +34,25 @@ export const DashboardLayout = () => {
       label: 'Formación',
       path: '/dashboard/enrollments',
       icon: '🌾 ',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
+      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_PROFESORES', 'ROLE_GANANDO']),
     },
     {
       label: 'Estudiantes',
       path: '/dashboard/students',
       icon: '🎓',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
+      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_GANANDO' ]),
     },
     {
-      label: 'Lecciones',
+      label: 'LIDERAZGO',
       path: '/dashboard/lessons',
-      icon: '📖',
+      icon: '🦺',
       visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
     },
     {
-      label: 'Asistencias',
+      label: 'CBI',
       path: '/dashboard/attendance',
-      icon: '✅',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_PROFESORES']),
+      icon: '🏘️',
+      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
     },
     {
       label: 'Usuarios',
