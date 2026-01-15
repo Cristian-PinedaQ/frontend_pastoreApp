@@ -1,64 +1,74 @@
-// 📚 StudentsPage.jsx - Gestión de Estudiantes por Niveles
-// Versión limpia con estilos en archivo CSS separado
-// CORREGIDA: Permite seleccionar "Todos los niveles"
+// 📚 StudentsPage.jsx - CORREGIDO: Separar Pendiente de Reprobado
+// ✅ Cambio: Ahora "Solo Reprobados" SOLO muestra passed === false
+// ❌ Los Pendiente (passed === null) NO se incluyen en "Solo Reprobados"
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
 import ModalEnrollStudent from '../components/Modalenrollstudent';
 import ModalStatistics from '../components/ModalStatistics';
 import { generatePDF } from '../services/Pdfgenerator';
+import { logSecurityEvent, logUserAction } from '../utils/securityLogger';
 import '../css/Studentspage.css';
 
+const devLog = (message, data = null) => {
+  if (process.env.NODE_ENV === 'development') {
+    if (data) {
+      console.log(message, data);
+    } else {
+      console.log(message);
+    }
+  }
+};
+
+const devWarn = (message, data = null) => {
+  if (process.env.NODE_ENV === 'development') {
+    if (data) {
+      console.warn(message, data);
+    } else {
+      console.warn(message);
+    }
+  }
+};
+
 const StudentsPage = () => {
-  // ========== ESTADO PRINCIPAL ==========
   const [allStudents, setAllStudents] = useState([]);
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [availableLevels, setAvailableLevels] = useState([]);
 
-  // ========== FILTROS ==========
   const [selectedLevel, setSelectedLevel] = useState('ALL');
-  const [showOnlyFailed, setShowOnlyFailed] = useState(false);
+  const [selectedResultFilter, setSelectedResultFilter] = useState('ALL'); // ✅ NUEVO: Filtro de resultado
   const [searchText, setSearchText] = useState('');
 
-  // ========== MODALES ==========
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
 
-  // ========== DATOS PARA ESTADÍSTICAS ==========
   const [statisticsData, setStatisticsData] = useState(null);
 
-  // Cargar datos al montar
   useEffect(() => {
     loadStudents();
   }, []);
 
-  // Aplicar filtros cuando cambian
   useEffect(() => {
     applyFilters();
-  }, [allStudents, selectedLevel, showOnlyFailed, searchText]);
+  }, [allStudents, selectedLevel, selectedResultFilter, searchText]);
 
-  // ========== CARGAR ESTUDIANTES ==========
   const loadStudents = async () => {
     setLoading(true);
     setError('');
 
     try {
-      console.log('📚 Cargando todos los estudiantes...');
+      devLog('📚 Cargando estudiantes...');
 
       const enrollments = await apiService.getStudentEnrollments();
-
-      console.log('✅ Datos brutos del API:', enrollments);
+      devLog('✅ Enrollments cargados - Cantidad:', enrollments?.length || 0);
 
       if (!enrollments || enrollments.length === 0) {
-        console.warn('⚠️ No hay estudiantes disponibles');
+        devWarn('⚠️ No hay estudiantes disponibles');
         setAllStudents([]);
-        setAvailableLevels([]);
         return;
       }
 
-      // Procesar estudiantes
       const processedStudents = enrollments.map(enrollment => {
         const levelValue = extractLevel(enrollment);
 
@@ -78,23 +88,27 @@ const StudentsPage = () => {
         };
       });
 
-      console.log('✅ Estudiantes procesados:', processedStudents);
+      devLog('✅ Estudiantes procesados - Cantidad:', processedStudents.length);
       setAllStudents(processedStudents);
 
-      // Extraer niveles únicos disponibles
-      const uniqueLevels = [...new Set(processedStudents.map(s => s.levelEnrollment).filter(Boolean))];
-      console.log('📌 Niveles únicos encontrados:', uniqueLevels);
-      setAvailableLevels(uniqueLevels);
+      logUserAction('load_students', {
+        studentCount: processedStudents.length,
+        timestamp: new Date().toISOString()
+      });
 
     } catch (err) {
-      console.error('❌ Error cargando estudiantes:', err);
+      devWarn('❌ Error cargando estudiantes:', err.message);
       setError('Error al cargar la lista de estudiantes: ' + err.message);
+      
+      logSecurityEvent('student_load_error', {
+        errorType: 'api_error',
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // ========== EXTRAER NIVEL ==========
   const extractLevel = (enrollment) => {
     if (enrollment.level) return enrollment.level;
 
@@ -127,21 +141,34 @@ const StudentsPage = () => {
   const applyFilters = () => {
     let filtered = [...allStudents];
 
-    // ✅ CORREGIDO: Filtrar por nivel (si no es "ALL")
+    // ✅ ORDENAR POR FECHA (más recientes primero)
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.enrollmentDate || 0).getTime();
+      const dateB = new Date(b.enrollmentDate || 0).getTime();
+      return dateB - dateA; // Descendente: más recientes primero
+    });
+
     if (selectedLevel !== 'ALL') {
-      console.log('🔍 Filtrando por nivel:', selectedLevel);
+      devLog('🔍 Filtrando por nivel');
       filtered = filtered.filter(student => student.levelEnrollment === selectedLevel);
-      console.log(`✅ Después de filtro nivel: ${filtered.length} estudiantes`);
+      devLog(`✅ Después de filtro de nivel: ${filtered.length} estudiantes`);
     } else {
-      console.log('✅ Mostrando TODOS los estudiantes');
+      devLog('✅ Mostrando todos los niveles');
     }
 
-    // Filtrar solo reprobados
-    if (showOnlyFailed) {
-      filtered = filtered.filter(student => student.passed === false || student.passed === null);
+    // ✅ NUEVO: Filtrar por resultado (Aprobado, Reprobado, Pendiente)
+    if (selectedResultFilter !== 'ALL') {
+      devLog(`🔍 Filtrando por resultado: ${selectedResultFilter}`);
+      if (selectedResultFilter === 'PASSED') {
+        filtered = filtered.filter(student => student.passed === true);
+      } else if (selectedResultFilter === 'FAILED') {
+        filtered = filtered.filter(student => student.passed === false);
+      } else if (selectedResultFilter === 'PENDING') {
+        filtered = filtered.filter(student => student.passed === null);
+      }
+      devLog(`✅ Después de filtro de resultado: ${filtered.length} estudiantes`);
     }
 
-    // Filtrar por búsqueda
     if (searchText.trim()) {
       const search = searchText.toLowerCase();
       filtered = filtered.filter(student =>
@@ -149,50 +176,64 @@ const StudentsPage = () => {
       );
     }
 
-    console.log('📊 Resultado final del filtro:', filtered.length, 'estudiantes');
+    devLog('📊 Resultado final de filtros:', `${filtered.length} estudiantes`);
     setFilteredStudents(filtered);
   };
 
-  // ========== CANCELAR INSCRIPCIÓN ==========
   const handleCancelEnrollment = async (studentId) => {
     if (!window.confirm('¿Estás seguro de que deseas cancelar esta inscripción?')) {
       return;
     }
 
     try {
-      console.log('🚫 Cancelando inscripción:', studentId);
+      devLog('🚫 Cancelando inscripción');
+      
       await apiService.withdrawStudentFromCohort(studentId);
-      console.log('✅ Inscripción cancelada exitosamente');
+      
+      devLog('✅ Inscripción cancelada');
+      
+      logUserAction('cancel_enrollment', {
+        timestamp: new Date().toISOString()
+      });
+      
       alert('Inscripción cancelada exitosamente');
       loadStudents();
     } catch (err) {
-      console.error('❌ Error cancelando inscripción:', err);
+      devWarn('❌ Error cancelando inscripción:', err.message);
       alert('Error al cancelar la inscripción: ' + err.message);
+      
+      logSecurityEvent('enrollment_cancel_error', {
+        errorType: 'api_error',
+        timestamp: new Date().toISOString()
+      });
     }
   };
 
-  // ========== GENERAR ESTADÍSTICAS ==========
   const handleShowStatistics = async () => {
     try {
-      console.log('📊 Generando estadísticas...');
+      devLog('📊 Generando estadísticas');
       const stats = calculateStatistics();
       setStatisticsData(stats);
       setShowStatisticsModal(true);
-      console.log('✅ Estadísticas generadas:', stats);
+      
+      logUserAction('view_statistics', {
+        timestamp: new Date().toISOString()
+      });
     } catch (err) {
-      console.error('❌ Error generando estadísticas:', err);
+      devWarn('❌ Error generando estadísticas:', err.message);
       alert('Error al generar estadísticas: ' + err.message);
     }
   };
 
-  // ========== CALCULAR ESTADÍSTICAS ==========
+  // ✅ CORRECCIÓN: Estadísticas ahora separan Pendiente de Reprobado
   const calculateStatistics = () => {
     const stats = {};
 
-    availableLevels.forEach(level => {
+    ALL_LEVELS.forEach(level => {
       const levelStudents = allStudents.filter(s => s.levelEnrollment === level);
       const passed = levelStudents.filter(s => s.passed === true).length;
-      const failed = levelStudents.filter(s => s.passed === false || s.passed === null).length;
+      const failed = levelStudents.filter(s => s.passed === false).length;
+      const pending = levelStudents.filter(s => s.passed === null).length;
       const total = levelStudents.length;
 
       stats[level] = {
@@ -200,6 +241,7 @@ const StudentsPage = () => {
         total,
         passed,
         failed,
+        pending, // ✅ NUEVO: Campo para Pendientes
         passPercentage: total > 0 ? ((passed / total) * 100).toFixed(1) : 0,
       };
     });
@@ -207,13 +249,22 @@ const StudentsPage = () => {
     return stats;
   };
 
-  // ========== EXPORTAR A PDF ==========
   const handleExportPDF = async () => {
     try {
-      console.log('📄 Generando PDF...');
+      devLog('📄 Generando PDF');
+
+      // ✅ NUEVO: Generar título dinámico basado en filtro de resultado
+      let title = 'Listado de Estudiantes';
+      if (selectedResultFilter === 'PASSED') {
+        title = 'Estudiantes Aprobados';
+      } else if (selectedResultFilter === 'FAILED') {
+        title = 'Estudiantes Reprobados';
+      } else if (selectedResultFilter === 'PENDING') {
+        title = 'Estudiantes Pendientes';
+      }
 
       const data = {
-        title: showOnlyFailed ? 'Estudiantes Reprobados' : 'Listado de Estudiantes',
+        title: title,
         level: selectedLevel === 'ALL' ? 'Todos los Niveles' : getLevelLabel(selectedLevel),
         date: new Date().toLocaleDateString('es-CO'),
         students: filteredStudents,
@@ -221,9 +272,14 @@ const StudentsPage = () => {
       };
 
       generatePDF(data, 'students-report');
-      console.log('✅ PDF generado exitosamente');
+      
+      devLog('✅ PDF generado');
+      
+      logUserAction('export_pdf', {
+        timestamp: new Date().toISOString()
+      });
     } catch (err) {
-      console.error('❌ Error generando PDF:', err);
+      devWarn('❌ Error generando PDF:', err.message);
       alert('Error al generar PDF: ' + err.message);
     }
   };
@@ -246,21 +302,43 @@ const StudentsPage = () => {
     return levelMap[levelValue] || levelValue;
   };
 
-  // ========== RENDER ==========
+  // ✅ NUEVO: Todos los 11 niveles posibles
+  const ALL_LEVELS = [
+    'PREENCUENTRO',
+    'ENCUENTRO',
+    'POST_ENCUENTRO',
+    'BAUTIZOS',
+    'EDIRD_1',
+    'EDIRD_2',
+    'EDIRD_3',
+    'EDIRD_4',
+    'ADIESTRAMIENTO',
+    'SANIDAD_INTEGRAL_RAICES',
+    'GRADUACION',
+  ];
+
+  // ========== OBTENER ETIQUETA DE FILTRO DE RESULTADO ==========
+  const getResultFilterLabel = (filterValue) => {
+    const filterMap = {
+      'ALL': '',
+      'PASSED': ' · Mostrando: Aprobados',
+      'FAILED': ' · Mostrando: Reprobados',
+      'PENDING': ' · Mostrando: Pendientes',
+    };
+    return filterMap[filterValue] || '';
+  };
+
   return (
     <div className="students-page">
       <div className="students-page-container">
-        {/* Header */}
         <div className="students-page__header">
           <h1>👥 Gestión de Estudiantes</h1>
           <p>Visualiza y gestiona estudiantes por niveles de formación</p>
         </div>
 
-        {/* Controles */}
         <div className="students-page__controls">
           <div className="students-page__controls-grid">
 
-            {/* Búsqueda */}
             <div className="students-page__filter-item">
               <label>🔍 Buscar Estudiante</label>
               <input
@@ -270,18 +348,18 @@ const StudentsPage = () => {
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
-            {/* Filtro de Nivel */}
+
             <div className="students-page__filter-item">
               <label>📌 Filtrar por Nivel</label>
               <select
                 value={selectedLevel}
                 onChange={(e) => {
-                  console.log('🔄 Cambiando a nivel:', e.target.value);
+                  devLog('🔄 Cambiando filtro de nivel');
                   setSelectedLevel(e.target.value);
                 }}
               >
                 <option value="ALL">Todos los Niveles ({allStudents.length})</option>
-                {availableLevels.map(level => {
+                {ALL_LEVELS.map(level => {
                   const count = allStudents.filter(s => s.levelEnrollment === level).length;
                   return (
                     <option key={level} value={level}>
@@ -292,20 +370,23 @@ const StudentsPage = () => {
               </select>
             </div>
 
-            {/* Checkbox Reprobados */}
             <div className="students-page__filter-item">
-              <label className="students-page__checkbox">
-                <input
-                  type="checkbox"
-                  checked={showOnlyFailed}
-                  onChange={(e) => setShowOnlyFailed(e.target.checked)}
-                />
-                ❌ Solo Reprobados
-              </label>
+              <label>📊 Filtrar por Resultado</label>
+              <select
+                value={selectedResultFilter}
+                onChange={(e) => {
+                  devLog('🔄 Cambiando filtro de resultado');
+                  setSelectedResultFilter(e.target.value);
+                }}
+              >
+                <option value="ALL">Todos los Estados</option>
+                <option value="PASSED">✅ Aprobados</option>
+                <option value="FAILED">❌ Reprobados</option>
+                <option value="PENDING">⏳ Pendientes</option>
+              </select>
             </div>
           </div>
 
-          {/* Botones de Acción */}
           <div className="students-page__actions">
             <button
               className="students-page__btn students-page__btn--primary"
@@ -342,24 +423,21 @@ const StudentsPage = () => {
           </div>
         </div>
 
-        {/* Información de Filtros */}
         <div className="students-page__filter-info">
           <p>
             Mostrando <strong>{filteredStudents.length}</strong> de{' '}
             <strong>{allStudents.length}</strong> estudiantes
             {selectedLevel !== 'ALL' && ` · Nivel: ${getLevelLabel(selectedLevel)}`}
-            {showOnlyFailed && ' · Solo Reprobados'}
+            {getResultFilterLabel(selectedResultFilter)}
           </p>
         </div>
 
-        {/* Mensaje de Error */}
         {error && (
           <div className="students-page__error">
             ❌ {error}
           </div>
         )}
 
-        {/* Estado de Carga */}
         {loading ? (
           <div className="students-page__loading">
             ⏳ Cargando estudiantes...
@@ -367,14 +445,13 @@ const StudentsPage = () => {
         ) : filteredStudents.length === 0 ? (
           <div className="students-page__empty">
             <p>👤 No hay estudiantes que coincidan con los filtros</p>
-            {availableLevels.length === 0 && (
+            {allStudents.length === 0 && (
               <p className="students-page__empty-hint">
                 💡 Carga los datos para ver estudiantes disponibles
               </p>
             )}
           </div>
         ) : (
-          /* Tabla de Estudiantes */
           <div className="students-page__table-container">
             <table className="students-page__table">
               <thead>
@@ -401,7 +478,6 @@ const StudentsPage = () => {
                         : 'active'
                     }
                   >
-                    {/* Nombre */}
                     <td className="students-page__col-name">
                       <div className="students-page__student-info">
                         <span className="students-page__avatar">👤</span>
@@ -409,26 +485,22 @@ const StudentsPage = () => {
                       </div>
                     </td>
 
-                    {/* Nivel */}
                     <td className="students-page__col-level">
                       <span className="students-page__badge">
                         {getLevelLabel(student.levelEnrollment) || 'Sin nivel'}
                       </span>
                     </td>
 
-                    {/* Cohorte */}
                     <td className="students-page__col-cohort">
                       {student.cohortName}
                     </td>
 
-                    {/* Estado */}
                     <td className="students-page__col-status">
                       <span className={`students-page__status-badge students-page__status-badge--${student.status?.toLowerCase()}`}>
                         {getStatusLabel(student.status)}
                       </span>
                     </td>
 
-                    {/* Asistencia */}
                     <td className="students-page__col-attendance">
                       <div className="students-page__attendance-bar">
                         <div
@@ -441,7 +513,6 @@ const StudentsPage = () => {
                       </span>
                     </td>
 
-                    {/* Resultado */}
                     <td className="students-page__col-result">
                       {student.passed === true && (
                         <span className="students-page__badge--passed">✅ Aprobado</span>
@@ -454,14 +525,12 @@ const StudentsPage = () => {
                       )}
                     </td>
 
-                    {/* Fecha */}
                     <td className="students-page__col-date">
                       {student.enrollmentDate
                         ? new Date(student.enrollmentDate).toLocaleDateString('es-CO')
                         : '-'}
                     </td>
 
-                    {/* Acciones */}
                     <td className="students-page__col-actions">
                       <button
                         className="students-page__btn-cancel"
@@ -479,7 +548,6 @@ const StudentsPage = () => {
         )}
       </div>
 
-      {/* Modales */}
       <ModalEnrollStudent
         isOpen={showEnrollModal}
         onClose={() => setShowEnrollModal(false)}
@@ -502,7 +570,6 @@ const StudentsPage = () => {
   );
 };
 
-// Helper para obtener etiqueta de estado
 const getStatusLabel = (status) => {
   const statusMap = {
     ACTIVE: 'Activo',

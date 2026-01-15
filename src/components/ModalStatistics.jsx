@@ -1,5 +1,6 @@
-// 📊 ModalStatistics.jsx - Modal con gráficos de estadísticas de estudiantes
-// Muestra aprobados/reprobados por nivel, año y distrito
+// 📊 ModalStatistics.jsx - CORREGIDO: Separa Pendiente de Reprobado
+// ✅ Ahora muestra 3 categorías: Aprobados, Reprobados y Pendientes
+// ✅ Los Pendiente (⏳) NO se cuentan como Reprobados (❌)
 
 import React, { useState, useMemo } from 'react';
 import {
@@ -8,19 +9,18 @@ import {
 } from 'recharts';
 
 const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
-  const [viewType, setViewType] = useState('bar'); // 'bar', 'pie', 'combined'
+  const [viewType, setViewType] = useState('bar');
   const [selectedLevel, setSelectedLevel] = useState('ALL');
 
-  // Colores
   const COLORS = {
     passed: '#11cece',
     failed: '#d681e5',
+    pending: '#fbbf24', // ✅ NUEVO: Color para Pendiente
     neutral: '#6b7280',
   };
 
-  // ========== PREPARAR DATOS PARA GRÁFICOS - ANTES DE CUALQUIER RETURN ==========
+  // ========== PREPARAR DATOS PARA GRÁFICOS ==========
   
-  // Preparar datos para gráficos
   const levelStats = useMemo(() => {
     if (!data) return [];
     
@@ -30,12 +30,12 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         total: value.total,
         passed: value.passed,
         failed: value.failed,
+        pending: value.pending || 0, // ✅ NUEVO: Incluir pending
         passPercentage: parseFloat(value.passPercentage),
       }))
       .filter(item => item.total > 0);
   }, [data]);
 
-  // Datos para gráfico de pastel (si se selecciona nivel)
   const pieData = useMemo(() => {
     if (!data || levelStats.length === 0) return [];
     
@@ -44,12 +44,14 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         (acc, item) => ({
           passed: acc.passed + item.passed,
           failed: acc.failed + item.failed,
+          pending: acc.pending + item.pending,
         }),
-        { passed: 0, failed: 0 }
+        { passed: 0, failed: 0, pending: 0 }
       );
       return [
         { name: '✅ Aprobados', value: totals.passed, fill: COLORS.passed },
         { name: '❌ Reprobados', value: totals.failed, fill: COLORS.failed },
+        { name: '⏳ Pendientes', value: totals.pending, fill: COLORS.pending },
       ];
     }
 
@@ -59,10 +61,10 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
     return [
       { name: '✅ Aprobados', value: selected.passed, fill: COLORS.passed },
       { name: '❌ Reprobados', value: selected.failed, fill: COLORS.failed },
+      { name: '⏳ Pendientes', value: selected.pending, fill: COLORS.pending },
     ];
   }, [selectedLevel, levelStats, data]);
 
-  // Estadísticas generales
   const totalStudents = useMemo(() => {
     return levelStats.reduce((sum, item) => sum + item.total, 0);
   }, [levelStats]);
@@ -75,29 +77,28 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
     return levelStats.reduce((sum, item) => sum + item.failed, 0);
   }, [levelStats]);
 
+  const totalPending = useMemo(() => {
+    return levelStats.reduce((sum, item) => sum + item.pending, 0);
+  }, [levelStats]);
+
   const overallPassPercentage = useMemo(() => {
     return totalStudents > 0 
       ? ((totalPassed / totalStudents) * 100).toFixed(1) 
       : 0;
   }, [totalStudents, totalPassed]);
 
-  // Datos para gráfico de barras
   const barData = levelStats;
 
-  // ========== AHORA SÍ PUEDE HABER RETORNO CONDICIONAL ==========
-  
   if (!isOpen || !data) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-container statistics-modal" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
         <div className="modal-header">
           <h2 className="modal-title">📊 Estadísticas de Estudiantes</h2>
           <button className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        {/* Controles */}
         <div className="statistics-controls">
           <div className="control-group">
             <label>📈 Tipo de Gráfico</label>
@@ -172,6 +173,15 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
             </div>
           </div>
 
+          {/* ✅ NUEVO: Tarjeta para Pendientes */}
+          <div className="stat-card">
+            <div className="stat-icon">⏳</div>
+            <div className="stat-content">
+              <p className="stat-label">Pendientes</p>
+              <p className="stat-value" style={{ color: COLORS.pending }}>{totalPending}</p>
+            </div>
+          </div>
+
           <div className="stat-card">
             <div className="stat-icon">📊</div>
             <div className="stat-content">
@@ -181,7 +191,6 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           </div>
         </div>
 
-        {/* Body - Gráficos */}
         <div className="modal-body">
           {viewType === 'bar' && (
             <div className="chart-container">
@@ -208,6 +217,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                   <Legend />
                   <Bar dataKey="passed" fill={COLORS.passed} name="✅ Aprobados" />
                   <Bar dataKey="failed" fill={COLORS.failed} name="❌ Reprobados" />
+                  <Bar dataKey="pending" fill={COLORS.pending} name="⏳ Pendientes" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -265,6 +275,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                     <Tooltip formatter={(value) => `${value}`} />
                     <Bar dataKey="passed" fill={COLORS.passed} />
                     <Bar dataKey="failed" fill={COLORS.failed} />
+                    <Bar dataKey="pending" fill={COLORS.pending} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -304,6 +315,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                     <th className="text-center">Total</th>
                     <th className="text-center">✅ Aprobados</th>
                     <th className="text-center">❌ Reprobados</th>
+                    <th className="text-center">⏳ Pendientes</th>
                     <th className="text-center">% Aprobación</th>
                   </tr>
                 </thead>
@@ -317,6 +329,9 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                       </td>
                       <td className="text-center" style={{ color: COLORS.failed }}>
                         {item.failed}
+                      </td>
+                      <td className="text-center" style={{ color: COLORS.pending }}>
+                        {item.pending}
                       </td>
                       <td className="text-center">
                         <strong>{item.passPercentage}%</strong>
@@ -334,6 +349,9 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                     <td className="text-center" style={{ color: COLORS.failed }}>
                       <strong>{totalFailed}</strong>
                     </td>
+                    <td className="text-center" style={{ color: COLORS.pending }}>
+                      <strong>{totalPending}</strong>
+                    </td>
                     <td className="text-center">
                       <strong>{overallPassPercentage}%</strong>
                     </td>
@@ -344,7 +362,6 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           </div>
         </div>
 
-        {/* Footer */}
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>
             ✕ Cerrar
@@ -507,7 +524,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
         .stats-summary {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           gap: 12px;
           padding: 16px 24px;
           background: #f9fafb;
@@ -711,6 +728,10 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
           .level-select {
             width: 100%;
+          }
+
+          .stats-summary {
+            grid-template-columns: repeat(2, 1fr);
           }
         }
       `}</style>
