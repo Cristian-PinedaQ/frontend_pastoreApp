@@ -1,21 +1,37 @@
-// 📋 EnrollmentsPage.jsx - Versión v4 con Campo TEACHER (Maestro)
-// Gestión de cohortes con vistas modales independientes + Modal de asistencia por lección
-// ✅ NUEVO: Campo para seleccionar maestro al crear cohorte
+// 📋 EnrollmentsPage.jsx - Versión SEGURA
+// Gestión de cohortes con validaciones y protecciones de seguridad
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
+import { logError, logSecurityEvent } from '../utils/securityLogger';
+import { throttle } from 'lodash';
 import ModalCreateLesson from '../components/ModalCreateLesson';
 import ModalRecordAttendance from '../components/ModalRecordAttendance';
 import ModalLessonAttendanceDetail from '../components/ModalLessonAttendanceDetail';
 import '../css/EnrollmentsPage.css';
 
 const EnrollmentsPage = () => {
+  // ========== MENSAJES DE ERROR SEGUROS ==========
+  const ERROR_MESSAGES = {
+    FETCH_ENROLLMENTS: 'Error al cargar cohortes',
+    FETCH_TEACHERS: 'Error al cargar maestros',
+    FETCH_LESSONS: 'Error al cargar lecciones',
+    FETCH_STUDENTS: 'Error al cargar estudiantes',
+    FETCH_ATTENDANCE: 'Error al cargar asistencias',
+    CREATE_ENROLLMENT: 'Error al crear cohorte',
+    UPDATE_STATUS: 'Error al actualizar estado',
+    VALIDATION_ERROR: 'Datos inválidos. Por favor verifica los campos',
+    UNAUTHORIZED: 'No tienes permiso para realizar esta acción',
+    GENERIC: 'Error al procesar la solicitud. Intenta más tarde'
+  };
+
   // ========== ESTADO PRINCIPAL ==========
   const [enrollments, setEnrollments] = useState([]);
   const [filteredEnrollments, setFilteredEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterLevel, setFilterLevel] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [error, setError] = useState('');
 
   // ========== ESTADO DEL MODAL DE COHORTE ==========
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
@@ -30,7 +46,7 @@ const EnrollmentsPage = () => {
   const [showLessonAttendanceDetailModal, setShowLessonAttendanceDetailModal] = useState(false);
   const [selectedLesson, setSelectedLesson] = useState(null);
 
-  // ========== ESTADO DEL FORMULARIO DE CREAR COHORTE ==========
+  // ========== ESTADO DEL FORMULARIO ==========
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     level: 'PREENCUENTRO',
@@ -39,17 +55,17 @@ const EnrollmentsPage = () => {
     maxStudents: 30,
     minAttendancePercentage: 80,
     minAverageScore: 3.0,
-    teacher: null,  // ✅ NUEVO: Campo para maestro
+    teacher: null,
   });
 
   // ========== DATOS CARGADOS DINÁMICAMENTE ==========
   const [lessons, setLessons] = useState([]);
   const [students, setStudents] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState([]);
-  const [availableTeachers, setAvailableTeachers] = useState([]);  // ✅ NUEVO
-  const [filteredTeachers, setFilteredTeachers] = useState([]);    // ✅ NUEVO
-  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false); // ✅ NUEVO
-  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');   // ✅ NUEVO
+  const [availableTeachers, setAvailableTeachers] = useState([]);
+  const [filteredTeachers, setFilteredTeachers] = useState([]);
+  const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
+  const [teacherSearchTerm, setTeacherSearchTerm] = useState('');
 
   const LEVELS = [
     { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
@@ -73,10 +89,79 @@ const EnrollmentsPage = () => {
     { value: 'CANCELLED', label: 'Cancelada' },
   ];
 
+  // ✅ SEGURIDAD: Logger seguro
+  const handleError = (errorKey, context = '') => {
+    const errorMessage = ERROR_MESSAGES[errorKey] || ERROR_MESSAGES.GENERIC;
+    setError(errorMessage);
+    
+    logSecurityEvent('error', {
+      errorKey,
+      context,
+      timestamp: new Date().toISOString()
+    });
+  };
+
+  // ✅ SEGURIDAD: Función de logging centralizada
+  const log = (message, data = null) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[EnrollmentsPage] ${message}`);
+      if (data) console.log(data); // Solo en dev
+    }
+    // En producción, enviar al servidor
+    logSecurityEvent(message, data);
+  };
+
+  // ✅ SEGURIDAD: Sanitizar HTML
+  const escapeHtml = (text) => {
+    if (!text) return '';
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+  };
+
+  // ✅ SEGURIDAD: Enmascarar email
+  const maskEmail = (email) => {
+    if (!email || !email.includes('@')) return '***';
+    const [name, domain] = email.split('@');
+    const visible = Math.max(1, Math.floor(name.length / 2));
+    const masked = name.substring(0, visible) + '*'.repeat(name.length - visible);
+    return `${masked}@${domain}`;
+  };
+
+  // ✅ SEGURIDAD: Validar nivel
+  const isValidLevel = (level) => LEVELS.some(l => l.value === level);
+
+  // ✅ SEGURIDAD: Validar status
+  const isValidStatus = (status) => STATUSES.some(s => s.value === status);
+
+  // ✅ SEGURIDAD: Validar fechas
+  const validateDates = (startDate, endDate) => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return start < end;
+  };
+
+  // ✅ SEGURIDAD: Validar maxStudents
+  const isValidMaxStudents = (max) => {
+    const num = parseInt(max);
+    return !isNaN(num) && num >= 1 && num <= 500;
+  };
+
+  // ✅ SEGURIDAD: Validar porcentaje
+  const isValidPercentage = (value) => {
+    const num = parseFloat(value);
+    return !isNaN(num) && num >= 0 && num <= 100;
+  };
+
   // ========== EFECTOS ==========
   useEffect(() => {
     fetchEnrollments();
-    loadTeachers();  // ✅ NUEVO: Cargar maestros
+    loadTeachers();
   }, []);
 
   useEffect(() => {
@@ -85,19 +170,19 @@ const EnrollmentsPage = () => {
     }
   }, [activeTab, selectedEnrollment]);
 
-  // ========== FUNCIONES PARA CARGAR MAESTROS ========== ✅ NUEVO
+  // ========== CARGAR MAESTROS ==========
   const loadTeachers = async () => {
     try {
-      console.log('📚 Cargando maestros disponibles...');
+      log('Loading teachers');
       const members = await apiService.getAllMembers();
       setAvailableTeachers(members || []);
-      console.log(`✅ ${members?.length || 0} maestros cargados`);
     } catch (err) {
-      console.error('Error cargando maestros:', err);
+      // ✅ SEGURIDAD: No revelar detalles del error
+      handleError('FETCH_TEACHERS', 'loadTeachers');
     }
   };
 
-  // ========== FUNCIONES DE BÚSQUEDA DE MAESTRO ========== ✅ NUEVO
+  // ========== BÚSQUEDA DE MAESTRO ==========
   const handleTeacherSearch = (value) => {
     setTeacherSearchTerm(value);
     setShowTeacherDropdown(true);
@@ -107,27 +192,37 @@ const EnrollmentsPage = () => {
       return;
     }
 
+    // ✅ SEGURIDAD: Validar y sanitizar entrada
+    const sanitizedValue = value.toLowerCase().trim();
+    
     const filtered = availableTeachers.filter(
       (teacher) =>
-        teacher.name?.toLowerCase().includes(value.toLowerCase()) ||
-        teacher.email?.toLowerCase().includes(value.toLowerCase())
+        teacher.name?.toLowerCase().includes(sanitizedValue) ||
+        teacher.email?.toLowerCase().includes(sanitizedValue)
     );
-    setFilteredTeachers(filtered.slice(0, 5));
+    
+    setFilteredTeachers(filtered.slice(0, 5)); // Limitar a 5 resultados
   };
 
-  // ========== SELECCIONAR MAESTRO ========== ✅ NUEVO
+  // ========== SELECCIONAR MAESTRO ==========
   const handleSelectTeacher = (teacher) => {
+    // ✅ SEGURIDAD: Validar que el teacher tenga ID
+    if (!teacher.id) {
+      handleError('VALIDATION_ERROR', 'invalid_teacher_id');
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      teacher: { id: teacher.id, name: teacher.name },
+      teacher: { id: teacher.id, name: escapeHtml(teacher.name) },
     }));
-    setTeacherSearchTerm(teacher.name);
+    setTeacherSearchTerm(escapeHtml(teacher.name));
     setShowTeacherDropdown(false);
     setFilteredTeachers([]);
-    console.log('✅ Maestro seleccionado:', teacher.name);
+    log('Teacher selected', { teacherId: teacher.id });
   };
 
-  // ========== LIMPIAR MAESTRO ========== ✅ NUEVO
+  // ========== LIMPIAR MAESTRO ==========
   const handleClearTeacher = () => {
     setFormData((prev) => ({
       ...prev,
@@ -137,66 +232,108 @@ const EnrollmentsPage = () => {
     setFilteredTeachers([]);
   };
 
-  // ========== FUNCIONES PRINCIPALES ==========
+  // ========== CARGAR COHORTES ==========
   const fetchEnrollments = async () => {
     try {
       setLoading(true);
-      const data = await apiService.getEnrollments();
-      console.log('📥 Cohortes obtenidas:', data);
+      setError('');
+      log('Fetching enrollments');
 
-      const sorted = (data.content || data).sort((a, b) => {
+      const data = await apiService.getEnrollments();
+      const enrollmentsArray = data.content || data;
+
+      const sorted = enrollmentsArray.sort((a, b) => {
         return new Date(b.startDate) - new Date(a.startDate);
       });
 
       setEnrollments(sorted);
       applyFilters(sorted, filterLevel, filterStatus);
     } catch (err) {
-      alert('❌ Error al cargar cohortes: ' + err.message);
-      console.error('Error:', err);
+      // ✅ SEGURIDAD: No revelar detalles del error
+      handleError('FETCH_ENROLLMENTS', 'fetchEnrollments');
+      logError({
+        context: 'fetchEnrollments',
+        errorCode: err.code || 'UNKNOWN'
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  // ========== CARGAR DATOS DE TABS ==========
   const loadTabData = async (tab) => {
     if (!selectedEnrollment) return;
 
     try {
+      setError('');
+
       switch (tab) {
         case 'lessons':
-          console.log('📚 Cargando lecciones...');
+          log('Loading lessons');
           const lessonsData = await apiService.getLessonsByEnrollment(selectedEnrollment.id);
-          setLessons(lessonsData || []);
+          // ✅ SEGURIDAD: Sanitizar datos
+          const sanitizedLessons = (lessonsData || []).map(l => ({
+            ...l,
+            lessonName: escapeHtml(l.lessonName),
+            description: escapeHtml(l.description || '')
+          }));
+          setLessons(sanitizedLessons);
           break;
 
         case 'students':
-          console.log('👥 Cargando estudiantes...');
+          log('Loading students');
           const studentsData = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
-          setStudents(studentsData || []);
+          // ✅ SEGURIDAD: Sanitizar datos
+          const sanitizedStudents = (studentsData || []).map(s => ({
+            ...s,
+            memberName: escapeHtml(s.memberName)
+          }));
+          setStudents(sanitizedStudents);
           break;
 
         case 'attendance':
-          console.log('📊 Cargando resumen de asistencias...');
-          // Cargar lecciones para mostrar resumen
+          log('Loading attendance');
           const lessonsForAttendance = await apiService.getLessonsByEnrollment(selectedEnrollment.id);
-          setAttendanceSummary(lessonsForAttendance || []);
+          const sanitizedAttendance = (lessonsForAttendance || []).map(l => ({
+            ...l,
+            lessonName: escapeHtml(l.lessonName)
+          }));
+          setAttendanceSummary(sanitizedAttendance);
           break;
 
         default:
           break;
       }
     } catch (err) {
-      console.error(`Error cargando ${tab}:`, err);
-      alert(`Error al cargar ${tab}: ${err.message}`);
+      // ✅ SEGURIDAD: Mapear a error genérico
+      const errorKey = 
+        tab === 'lessons' ? 'FETCH_LESSONS' :
+        tab === 'students' ? 'FETCH_STUDENTS' :
+        tab === 'attendance' ? 'FETCH_ATTENDANCE' :
+        'GENERIC';
+      
+      handleError(errorKey, `loadTabData:${tab}`);
+      logError({
+        context: `loadTabData_${tab}`,
+        errorCode: err.code || 'UNKNOWN'
+      });
     }
   };
 
+  // ========== APLICAR FILTROS ==========
   const applyFilters = (data, level, status) => {
-    console.log('🔍 Aplicando filtros:', { level, status });
+    log('Applying filters', { level, status });
 
     let filtered = data;
 
     if (level && level.trim() !== '') {
+      // ✅ SEGURIDAD: Validar que el nivel es válido
+      if (!isValidLevel(level)) {
+        handleError('VALIDATION_ERROR', 'invalid_level');
+        setFilteredEnrollments([]);
+        return;
+      }
+
       filtered = filtered.filter(e => {
         const enrollmentLevel = e.levelEnrollment || e.level;
         return enrollmentLevel === level;
@@ -204,14 +341,23 @@ const EnrollmentsPage = () => {
     }
 
     if (status && status.trim() !== '') {
+      // ✅ SEGURIDAD: Validar que el status es válido
+      if (!isValidStatus(status)) {
+        handleError('VALIDATION_ERROR', 'invalid_status');
+        setFilteredEnrollments([]);
+        return;
+      }
+
       filtered = filtered.filter(e => e.status === status);
     }
 
-    console.log(`✅ Resultado: ${filtered.length} cohortes`);
     setFilteredEnrollments(filtered);
   };
 
+  // ========== MANEJO DE FILTROS ==========
   const handleFilterChange = (type, value) => {
+    setError('');
+    
     if (type === 'level') {
       setFilterLevel(value);
       applyFilters(enrollments, value, filterStatus);
@@ -221,12 +367,21 @@ const EnrollmentsPage = () => {
     }
   };
 
+  // ========== ABRIR MODAL DE COHORTE ==========
   const handleOpenEnrollmentModal = (enrollment) => {
+    // ✅ SEGURIDAD: Validar datos antes de abrir modal
+    if (!enrollment || !enrollment.id) {
+      handleError('VALIDATION_ERROR', 'invalid_enrollment');
+      return;
+    }
+
     setSelectedEnrollment(enrollment);
     setActiveTab('details');
     setShowEnrollmentModal(true);
+    setError('');
   };
 
+  // ========== CERRAR MODAL DE COHORTE ==========
   const handleCloseEnrollmentModal = () => {
     setSelectedEnrollment(null);
     setShowEnrollmentModal(false);
@@ -234,85 +389,143 @@ const EnrollmentsPage = () => {
     setLessons([]);
     setStudents([]);
     setAttendanceSummary([]);
+    setError('');
   };
 
-  const handleStatusChange = async (enrollmentId, newStatus) => {
-    try {
-      await apiService.updateEnrollmentStatus(enrollmentId, newStatus);
-      alert('✅ Estado actualizado exitosamente');
-      fetchEnrollments();
-      handleCloseEnrollmentModal();
-    } catch (err) {
-      alert('❌ Error al actualizar estado: ' + err.message);
-    }
+  // ========== CAMBIAR ESTADO (THROTTLED) ==========
+  const throttledStatusChange = throttle(
+    async (enrollmentId, newStatus) => {
+      // ✅ SEGURIDAD: Validar status
+      if (!isValidStatus(newStatus)) {
+        handleError('VALIDATION_ERROR', 'invalid_status_change');
+        return;
+      }
+
+      try {
+        setError('');
+        log('Changing status', { enrollmentId, newStatus });
+
+        await apiService.updateEnrollmentStatus(enrollmentId, newStatus);
+        
+        setError(''); // Limpiar errores previos
+        // Mostrar éxito sin usar alert
+        logSecurityEvent('status_changed', { enrollmentId, newStatus });
+        
+        fetchEnrollments();
+        handleCloseEnrollmentModal();
+      } catch (err) {
+        handleError('UPDATE_STATUS', 'handleStatusChange');
+        logError({
+          context: 'updateEnrollmentStatus',
+          enrollmentId,
+          errorCode: err.code || 'UNKNOWN'
+        });
+      }
+    },
+    1000 // Max 1 request/segundo
+  );
+
+  const handleStatusChange = (enrollmentId, newStatus) => {
+    throttledStatusChange(enrollmentId, newStatus);
   };
 
+  // ========== CREAR LECCIÓN ==========
   const handleCreateLesson = async () => {
     setShowCreateLessonModal(true);
   };
 
   const handleLessonCreated = async () => {
-    // Recargar lecciones
     if (selectedEnrollment) {
       await loadTabData('lessons');
     }
   };
 
+  // ========== REGISTRAR ASISTENCIA ==========
   const handleRecordAttendance = async () => {
     setShowRecordAttendanceModal(true);
   };
 
   const handleAttendanceRecorded = async () => {
-    // Recargar asistencias
     if (selectedEnrollment) {
       await loadTabData('attendance');
     }
   };
 
-  // ========== FUNCIONES DEL MODAL DE DETALLE DE ASISTENCIA ==========
+  // ========== DETALLE DE ASISTENCIA ==========
   const handleOpenLessonAttendanceDetail = (lesson) => {
-    console.log('📖 Abriendo detalle de asistencia para lección:', lesson.lessonName);
+    if (!lesson || !lesson.id) {
+      handleError('VALIDATION_ERROR', 'invalid_lesson');
+      return;
+    }
+
+    log('Opening lesson attendance detail', { lessonId: lesson.id });
     setSelectedLesson(lesson);
     setShowLessonAttendanceDetailModal(true);
   };
 
   const handleCloseLessonAttendanceDetail = () => {
-    console.log('📖 Cerrando detalle de asistencia');
     setSelectedLesson(null);
     setShowLessonAttendanceDetailModal(false);
   };
 
   const handleLessonAttendanceRecorded = async () => {
-    console.log('✅ Asistencia registrada, recargando datos...');
-    // Recargar el resumen de asistencias
     if (selectedEnrollment) {
       await loadTabData('attendance');
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+  // ========== VALIDAR FORMULARIO ==========
+  const validateForm = () => {
+    const errors = [];
+
+    if (!formData.level || !isValidLevel(formData.level)) {
+      errors.push('Nivel inválido');
+    }
+
+    if (!formData.startDate) {
+      errors.push('Fecha de inicio requerida');
+    }
+
+    if (!formData.endDate) {
+      errors.push('Fecha de fin requerida');
+    }
+
+    if (formData.startDate && formData.endDate) {
+      if (!validateDates(formData.startDate, formData.endDate)) {
+        errors.push('Fecha de inicio debe ser anterior a fecha de fin');
+      }
+    }
+
+    if (!formData.teacher || !formData.teacher.id) {
+      errors.push('Maestro requerido');
+    }
+
+    if (!isValidMaxStudents(formData.maxStudents)) {
+      errors.push('Máximo de estudiantes debe estar entre 1 y 500');
+    }
+
+    if (!isValidPercentage(formData.minAttendancePercentage)) {
+      errors.push('Porcentaje de asistencia debe estar entre 0 y 100');
+    }
+
+    if (formData.minAverageScore < 0 || formData.minAverageScore > 5) {
+      errors.push('Calificación mínima debe estar entre 0 y 5');
+    }
+
+    return errors;
   };
 
+  // ========== ENVIAR FORMULARIO ==========
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
-      if (!formData.level || !formData.startDate || !formData.endDate) {
-        alert('Por favor completa todos los campos requeridos');
-        return;
-      }
+      setError('');
 
-      if (!formData.teacher) {
-        alert('Por favor selecciona un maestro');
-        return;
-      }
-
-      if (new Date(formData.startDate) >= new Date(formData.endDate)) {
-        alert('La fecha de inicio debe ser anterior a la fecha de fin');
+      // ✅ SEGURIDAD: Validar en frontend
+      const validationErrors = validateForm();
+      if (validationErrors.length > 0) {
+        setError(validationErrors.join('. '));
         return;
       }
 
@@ -323,20 +536,29 @@ const EnrollmentsPage = () => {
         maxStudents: parseInt(formData.maxStudents),
         minAttendancePercentage: parseFloat(formData.minAttendancePercentage),
         minAverageScore: parseFloat(formData.minAverageScore),
-        teacher: formData.teacher,  // ✅ NUEVO: Incluir maestro
+        teacher: formData.teacher,
       };
 
-      console.log('📤 Creando cohorte:', enrollmentData);
+      log('Creating enrollment', { level: formData.level });
+
       await apiService.createEnrollment(enrollmentData);
-      alert('✅ Cohorte creada exitosamente');
+
+      // Éxito sin alert
+      logSecurityEvent('enrollment_created', { level: formData.level });
+      
       setShowForm(false);
       resetForm();
       fetchEnrollments();
     } catch (err) {
-      alert('❌ Error: ' + err.message);
+      handleError('CREATE_ENROLLMENT', 'handleSubmit');
+      logError({
+        context: 'createEnrollment',
+        errorCode: err.code || 'UNKNOWN'
+      });
     }
   };
 
+  // ========== RESETEAR FORMULARIO ==========
   const resetForm = () => {
     setFormData({
       level: 'PREENCUENTRO',
@@ -345,17 +567,21 @@ const EnrollmentsPage = () => {
       maxStudents: 30,
       minAttendancePercentage: 80,
       minAverageScore: 3.0,
-      teacher: null,  // ✅ NUEVO
+      teacher: null,
     });
     setTeacherSearchTerm('');
     setFilteredTeachers([]);
+    setError('');
   };
 
+  // ========== UTILIDADES ==========
   const getLevelLabel = (levelValue) => {
+    if (!levelValue) return '—';
     return LEVELS.find(l => l.value === levelValue)?.label || levelValue;
   };
 
   const getStatusLabel = (statusValue) => {
+    if (!statusValue) return '—';
     return STATUSES.find(s => s.value === statusValue)?.label || statusValue;
   };
 
@@ -380,6 +606,13 @@ const EnrollmentsPage = () => {
           <p>Crea y gestiona cohortes de formación</p>
         </div>
 
+        {/* ✅ SEGURIDAD: Mostrar errores de manera segura */}
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            <strong>⚠️ Error:</strong> {error}
+          </div>
+        )}
+
         {/* Botón crear */}
         <div className="button-group">
           <button
@@ -400,7 +633,7 @@ const EnrollmentsPage = () => {
                 <select
                   name="level"
                   value={formData.level}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                   required
                 >
                   {LEVELS.map(level => (
@@ -417,7 +650,7 @@ const EnrollmentsPage = () => {
                   type="date"
                   name="startDate"
                   value={formData.startDate}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                   required
                 />
               </div>
@@ -428,18 +661,18 @@ const EnrollmentsPage = () => {
                   type="date"
                   name="endDate"
                   value={formData.endDate}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                   required
                 />
               </div>
 
-              {/* ✅ NUEVO: Campo Maestro */}
+              {/* Maestro con búsqueda */}
               <div className="form-field form-field-full">
                 <label>Maestro / Profesor *</label>
                 <div className="teacher-search-container">
                   <input
                     type="text"
-                    placeholder="Busca un maestro por nombre o email..."
+                    placeholder="Busca un maestro por nombre..."
                     value={teacherSearchTerm}
                     onChange={(e) => handleTeacherSearch(e.target.value)}
                     onFocus={() => teacherSearchTerm && setShowTeacherDropdown(true)}
@@ -467,8 +700,7 @@ const EnrollmentsPage = () => {
                           onClick={() => handleSelectTeacher(teacher)}
                           className="teacher-option"
                         >
-                          <div className="teacher-name">{teacher.name}</div>
-                          <div className="teacher-email">{teacher.email}</div>
+                          <div className="teacher-name">{escapeHtml(teacher.name)}</div>
                         </button>
                       ))}
                     </div>
@@ -488,7 +720,7 @@ const EnrollmentsPage = () => {
                   type="number"
                   name="maxStudents"
                   value={formData.maxStudents}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData({ ...formData, maxStudents: e.target.value })}
                   min="1"
                   max="500"
                   required
@@ -501,7 +733,7 @@ const EnrollmentsPage = () => {
                   type="number"
                   name="minAttendancePercentage"
                   value={formData.minAttendancePercentage}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData({ ...formData, minAttendancePercentage: e.target.value })}
                   min="0"
                   max="100"
                   step="0.1"
@@ -515,7 +747,7 @@ const EnrollmentsPage = () => {
                   type="number"
                   name="minAverageScore"
                   value={formData.minAverageScore}
-                  onChange={handleInputChange}
+                  onChange={(e) => setFormData({ ...formData, minAverageScore: e.target.value })}
                   min="0"
                   max="5"
                   step="0.1"
@@ -593,9 +825,11 @@ const EnrollmentsPage = () => {
                 key={enrollment.id}
                 className="enrollment-card"
                 onClick={() => handleOpenEnrollmentModal(enrollment)}
+                role="button"
+                tabIndex={0}
               >
                 <div className="card-header">
-                  <h3>{enrollment.cohortName || getLevelLabel(enrollment.levelEnrollment || enrollment.level)}</h3>
+                  <h3>{escapeHtml(enrollment.cohortName || getLevelLabel(enrollment.levelEnrollment || enrollment.level))}</h3>
                   <span className={`status-badge ${getStatusColor(enrollment.status)}`}>
                     {getStatusLabel(enrollment.status)}
                   </span>
@@ -605,9 +839,8 @@ const EnrollmentsPage = () => {
                   <p><strong>Inicio:</strong> {new Date(enrollment.startDate).toLocaleDateString('es-CO')}</p>
                   <p><strong>Fin:</strong> {new Date(enrollment.endDate).toLocaleDateString('es-CO')}</p>
                   <p><strong>Estudiantes:</strong> {enrollment.maxStudents} máx</p>
-                  {/* ✅ NUEVO: Mostrar maestro en la tarjeta */}
-                  {enrollment.maestro && (
-                    <p><strong>👨‍🏫 Maestro:</strong> {enrollment.maestro.name || enrollment.maestro}</p>
+                  {enrollment.maestro?.name && (
+                    <p><strong>👨‍🏫 Maestro:</strong> {escapeHtml(enrollment.maestro.name)}</p>
                   )}
                 </div>
               </div>
@@ -616,13 +849,12 @@ const EnrollmentsPage = () => {
         </div>
       </div>
 
-      {/* ========== MODAL DE COHORTE (PRINCIPAL) ========== */}
+      {/* MODAL DE COHORTE */}
       {showEnrollmentModal && selectedEnrollment && (
         <div className="modal-overlay" onClick={handleCloseEnrollmentModal}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
             <div className="modal-header">
-              <h2>{selectedEnrollment.cohortName || getLevelLabel(selectedEnrollment.levelEnrollment)}</h2>
+              <h2>{escapeHtml(selectedEnrollment.cohortName || getLevelLabel(selectedEnrollment.levelEnrollment))}</h2>
               <button
                 className="modal-close-btn"
                 onClick={handleCloseEnrollmentModal}
@@ -659,16 +891,12 @@ const EnrollmentsPage = () => {
               </button>
             </div>
 
-            {/* Contenido de pestañas */}
+            {/* Contenido */}
             <div className="modal-body">
-              {/* PESTAÑA: Detalles */}
+              {/* DETALLES */}
               {activeTab === 'details' && (
                 <div className="tab-content">
                   <div className="details-grid">
-                    <div>
-                      <p className="detail-label">ID</p>
-                      <p className="detail-value">{selectedEnrollment.id}</p>
-                    </div>
                     <div>
                       <p className="detail-label">Nivel</p>
                       <p className="detail-value">{getLevelLabel(selectedEnrollment.levelEnrollment || selectedEnrollment.level)}</p>
@@ -681,13 +909,12 @@ const EnrollmentsPage = () => {
                         </span>
                       </p>
                     </div>
-                    {/* ✅ NUEVO: Mostrar maestro en detalles */}
-                    <div>
-                      <p className="detail-label">👨‍🏫 Maestro</p>
-                      <p className="detail-value">
-                        {selectedEnrollment.maestro?.name || selectedEnrollment.teacher?.name || '—'}
-                      </p>
-                    </div>
+                    {selectedEnrollment.maestro?.name && (
+                      <div>
+                        <p className="detail-label">👨‍🏫 Maestro</p>
+                        <p className="detail-value">{escapeHtml(selectedEnrollment.maestro.name)}</p>
+                      </div>
+                    )}
                     <div>
                       <p className="detail-label">Inicio</p>
                       <p className="detail-value">{new Date(selectedEnrollment.startDate).toLocaleDateString('es-CO')}</p>
@@ -708,15 +935,15 @@ const EnrollmentsPage = () => {
                     </div>
                     <div>
                       <p className="detail-label">% Asistencia Min.</p>
-                      <p className="detail-value">{selectedEnrollment.minAttendancePercentage * 100 } %</p>
+                      <p className="detail-value">{selectedEnrollment.minAttendancePercentage ? (selectedEnrollment.minAttendancePercentage * 100) : 0}%</p>
                     </div>
                     <div>
                       <p className="detail-label">Calificación Min.</p>
-                      <p className="detail-value">{selectedEnrollment.minAverageScore.toFixed(2)}</p>
+                      <p className="detail-value">{(selectedEnrollment.minAverageScore || 0).toFixed(2)}</p>
                     </div>
                   </div>
 
-                  {/* Acciones de estado */}
+                  {/* Acciones */}
                   <div className="actions-section">
                     <h3>🎯 Cambiar Estado</h3>
                     <div className="actions-grid">
@@ -757,14 +984,11 @@ const EnrollmentsPage = () => {
                 </div>
               )}
 
-              {/* PESTAÑA: Lecciones */}
+              {/* LECCIONES */}
               {activeTab === 'lessons' && (
                 <div className="tab-content">
                   <div className="tab-actions">
-                    <button
-                      onClick={handleCreateLesson}
-                      className="btn-primary"
-                    >
+                    <button onClick={handleCreateLesson} className="btn-primary">
                       ➕ Nueva Lección
                     </button>
                   </div>
@@ -792,7 +1016,7 @@ const EnrollmentsPage = () => {
                 </div>
               )}
 
-              {/* PESTAÑA: Estudiantes */}
+              {/* ESTUDIANTES */}
               {activeTab === 'students' && (
                 <div className="tab-content">
                   {students.length === 0 ? (
@@ -802,14 +1026,14 @@ const EnrollmentsPage = () => {
                       {students.map(student => (
                         <div key={student.id} className="student-item">
                           <div className="student-header">
-                            <h4>👤 {student.memberName || `Estudiante ${student.memberId}`}</h4>
+                            <h4>👤 {escapeHtml(student.memberName || `Estudiante ${student.memberId}`)}</h4>
                             <span className={`status-badge ${getStatusColor(student.status)}`}>
                               {getStatusLabel(student.status)}
                             </span>
                           </div>
                           <div className="student-info">
                             <p>📅 Inscrito: {new Date(student.enrollmentDate).toLocaleDateString('es-CO')}</p>
-                            {student.finalAttendancePercentage && (
+                            {student.finalAttendancePercentage !== undefined && student.finalAttendancePercentage !== null && (
                               <p>📊 Asistencia: {student.finalAttendancePercentage.toFixed(1)}%</p>
                             )}
                           </div>
@@ -820,14 +1044,11 @@ const EnrollmentsPage = () => {
                 </div>
               )}
 
-              {/* PESTAÑA: Asistencias - MEJORADA CON CLICK EN LECCIONES */}
+              {/* ASISTENCIAS */}
               {activeTab === 'attendance' && (
                 <div className="tab-content">
                   <div className="tab-actions">
-                    <button
-                      onClick={handleRecordAttendance}
-                      className="btn-primary"
-                    >
+                    <button onClick={handleRecordAttendance} className="btn-primary">
                       ➕ Registrar Asistencia
                     </button>
                   </div>
@@ -837,11 +1058,13 @@ const EnrollmentsPage = () => {
                   ) : (
                     <div className="attendance-summary">
                       {attendanceSummary.map(lesson => (
-                        <div 
-                          key={lesson.id} 
+                        <div
+                          key={lesson.id}
                           className="attendance-item clickable"
                           onClick={() => handleOpenLessonAttendanceDetail(lesson)}
-                          title="Click para ver detalles de asistencia"
+                          role="button"
+                          tabIndex={0}
+                          title="Click para ver detalles"
                         >
                           <div className="attendance-header">
                             <h4>📖 {lesson.lessonNumber}. {lesson.lessonName}</h4>
@@ -849,7 +1072,7 @@ const EnrollmentsPage = () => {
                           </div>
                           <div className="attendance-info">
                             <p>📅 {new Date(lesson.lessonDate).toLocaleDateString('es-CO')}</p>
-                            <p>✅ {lesson.attendanceCount || 0} registros de asistencia</p>
+                            <p>✅ {lesson.attendanceCount || 0} registros</p>
                           </div>
                         </div>
                       ))}
@@ -862,7 +1085,7 @@ const EnrollmentsPage = () => {
         </div>
       )}
 
-      {/* ========== MODAL DE DETALLE DE ASISTENCIA POR LECCIÓN ========== */}
+      {/* MODALES SECUNDARIOS */}
       {selectedLesson && selectedEnrollment && (
         <ModalLessonAttendanceDetail
           isOpen={showLessonAttendanceDetailModal}
@@ -873,7 +1096,6 @@ const EnrollmentsPage = () => {
         />
       )}
 
-      {/* ========== MODALES SECUNDARIOS ========== */}
       {selectedEnrollment && (
         <>
           <ModalCreateLesson
@@ -893,7 +1115,19 @@ const EnrollmentsPage = () => {
       )}
 
       <style jsx>{`
-        /* ✅ NUEVOS ESTILOS PARA MAESTRO */
+        .alert {
+          padding: 12px 16px;
+          margin-bottom: 20px;
+          border-radius: 4px;
+          border: 1px solid;
+        }
+
+        .alert-danger {
+          background-color: #fee;
+          border-color: #fcc;
+          color: #c00;
+        }
+
         .form-field-full {
           grid-column: 1 / -1;
         }
@@ -908,7 +1142,6 @@ const EnrollmentsPage = () => {
           border: 1px solid #ccc;
           border-radius: 4px;
           font-size: 14px;
-          transition: all 0.2s ease;
         }
 
         .teacher-search-input:focus {
@@ -930,10 +1163,6 @@ const EnrollmentsPage = () => {
           padding: 4px 8px;
         }
 
-        .teacher-clear-btn:hover {
-          color: #333;
-        }
-
         .teacher-dropdown {
           position: absolute;
           top: 100%;
@@ -946,7 +1175,6 @@ const EnrollmentsPage = () => {
           max-height: 200px;
           overflow-y: auto;
           z-index: 10;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .teacher-option {
@@ -957,26 +1185,15 @@ const EnrollmentsPage = () => {
           background: none;
           cursor: pointer;
           border-bottom: 1px solid #eee;
-          transition: background-color 0.2s ease;
         }
 
         .teacher-option:hover {
           background-color: #f3f4f6;
         }
 
-        .teacher-option:last-child {
-          border-bottom: none;
-        }
-
         .teacher-name {
           font-weight: 500;
           color: #333;
-          font-size: 14px;
-        }
-
-        .teacher-email {
-          color: #666;
-          font-size: 12px;
         }
 
         .teacher-selected {
@@ -985,38 +1202,22 @@ const EnrollmentsPage = () => {
           background-color: #dbeafe;
           border: 1px solid #93c5fd;
           border-radius: 4px;
-          animation: slideIn 0.2s ease;
         }
 
         .teacher-selected-name {
           color: #1e40af;
           font-weight: 500;
-          font-size: 14px;
           margin: 0;
         }
 
-        @keyframes slideIn {
-          from {
-            opacity: 0;
-            transform: translateY(-5px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        /* ✅ ESTILOS EXISTENTES */
         .attendance-item.clickable {
           cursor: pointer;
           transition: all 0.2s ease;
-          position: relative;
         }
 
         .attendance-item.clickable:hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 16px rgba(37, 99, 235, 0.15);
-          background-color: #f0f9ff;
         }
 
         .view-details-badge {
@@ -1027,16 +1228,6 @@ const EnrollmentsPage = () => {
           border-radius: 4px;
           font-size: 11px;
           font-weight: 600;
-          animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
         }
       `}</style>
     </div>

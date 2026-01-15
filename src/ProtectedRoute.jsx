@@ -1,7 +1,9 @@
-// 🛡️ ProtectedRoute - Valida permisos antes de mostrar componentes
+// 🛡️ ProtectedRoute - CORREGIDO: Sin exposición de datos sensibles
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+// ✅ CORREGIDO: Import relativo correcto
+import { logSecurityEvent } from './utils/securityLogger';
 
 /**
  * @param {JSX.Element} element - Componente a renderizar
@@ -13,11 +15,14 @@ export const ProtectedRoute = ({
   requiredRoles = null,
   requireAll = false,
 }) => {
-  const { isAuthenticated, user, hasRole, hasAnyRole, loading } = useAuth();
+  const { isAuthenticated, user, hasRole, loading } = useAuth();
 
-  console.log('🛡️ ProtectedRoute - Verificando acceso');
-  console.log('👤 Usuario:', user);
-  console.log('🔐 Roles requeridos:', requiredRoles);
+  // ✅ SEGURIDAD: Log seguro (sin exponer datos sensibles)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🛡️ ProtectedRoute - Verificando acceso');
+    console.log('🔐 Roles requeridos:', requiredRoles);
+    // NO loguear user completo - potencialmente sensible
+  }
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen">⏳ Cargando...</div>;
@@ -25,53 +30,60 @@ export const ProtectedRoute = ({
 
   // Si no está autenticado, redirigir a login
   if (!isAuthenticated()) {
-    console.warn('⚠️ Usuario no autenticado - redirigiendo a login');
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️ Usuario no autenticado - redirigiendo a login');
+    }
+    
+    // Log seguro de evento de seguridad
+    logSecurityEvent('unauthorized_access_attempt', {
+      timestamp: new Date().toISOString(),
+      reason: 'not_authenticated'
+    });
+    
     return <Navigate to="/login" replace />;
   }
 
   // Si se especifican roles requeridos, validar
   if (requiredRoles) {
     const rolesArray = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
-
-    console.log('🔍 Validando roles requeridos:');
-    
     let hasPermission;
 
     if (requireAll) {
       // Necesita TODOS los roles
-      hasPermission = rolesArray.every(role => {
-        const has = hasRole(role);
-        console.log(`  ✓ "${role}": ${has}`);
-        return has;
-      });
-      console.log(`📋 Modo: TODOS los roles requeridos - Resultado:`, hasPermission);
+      hasPermission = rolesArray.every(role => hasRole(role));
     } else {
       // Necesita AL MENOS UNO
-      hasPermission = rolesArray.some(role => {
-        const has = hasRole(role);
-        console.log(`  ✓ "${role}": ${has}`);
-        return has;
-      });
-      console.log(`📋 Modo: AL MENOS UNO - Resultado:`, hasPermission);
+      hasPermission = rolesArray.some(role => hasRole(role));
     }
 
+    // ✅ SEGURIDAD: Si acceso denegado, registrar evento seguro (sin exponer datos)
     if (!hasPermission) {
-      console.warn('❌ Acceso denegado - roles insuficientes');
-      console.warn('🔐 Roles del usuario:', user?.roles);
-      console.warn('🔐 Roles requeridos:', rolesArray);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('❌ Acceso denegado - roles insuficientes');
+      }
+
+      logSecurityEvent('unauthorized_access_attempt', {
+        timestamp: new Date().toISOString(),
+        reason: 'insufficient_roles',
+        requiredRoles: rolesArray,
+        // NO incluir roles reales del usuario
+      });
+
       return <Navigate to="/unauthorized" replace />;
     }
 
-    console.log('✅ Acceso permitido');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Acceso permitido');
+    }
   }
 
   return element;
 };
 
-// Página de acceso denegado
+// Página de acceso denegado - CORREGIDA: Sin datos sensibles
 export const UnauthorizedPage = () => {
   const { user } = useAuth();
-  
+
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
       <div className="text-center bg-white p-8 rounded-lg shadow-lg">
@@ -81,13 +93,13 @@ export const UnauthorizedPage = () => {
           No tienes permisos para acceder a esta página.
         </p>
         
-        {user && (
-          <div className="mb-6 p-4 bg-gray-50 rounded">
-            <p className="text-gray-700 font-semibold">Tu información:</p>
-            <p className="text-gray-800">👤 Usuario: <strong>{user.username}</strong></p>
-            <p className="text-gray-800">🔐 Roles: <strong>{user.roles?.join(', ') || 'Sin roles'}</strong></p>
-          </div>
-        )}
+        {/* ✅ SEGURIDAD: Sin exponer datos sensibles del usuario */}
+        <div className="mb-6 p-4 bg-gray-50 rounded">
+          <p className="text-gray-700 font-semibold">¿Necesitas ayuda?</p>
+          <p className="text-gray-600 text-sm">
+            Contacta con un administrador si crees que esto es un error.
+          </p>
+        </div>
         
         <a
           href="/dashboard"
@@ -99,3 +111,5 @@ export const UnauthorizedPage = () => {
     </div>
   );
 };
+
+export default ProtectedRoute;
