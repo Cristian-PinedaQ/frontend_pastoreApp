@@ -13,8 +13,8 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
   // Colores
   const COLORS = {
-    passed: '#10b981',
-    failed: '#ef4444',
+    passed: '#11cece',
+    failed: '#d681e5',
     neutral: '#6b7280',
   };
 

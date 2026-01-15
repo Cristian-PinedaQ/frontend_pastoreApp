@@ -410,7 +410,7 @@ button:active:not(:disabled) {
 
 /* Button Primary */
 .btn-primary {
-  background: var(--gradient-primary);
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
   color: white;
   box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
 }
@@ -422,25 +422,99 @@ button:active:not(:disabled) {
 
 /* Button Secondary */
 .btn-secondary {
-  background: var(--gradient-secondary);
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  box-shadow: 0 6px 25px rgba(16, 185, 129, 0.6);
+  box-shadow: 0 6px 25px rgba(245, 87, 108, 0.6);
   transform: translateY(-2px);
 }
 
 /* Button Danger */
 .btn-danger {
-  background: var(--gradient-danger);
+  background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
   color: white;
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
 }
 
 .btn-danger:hover:not(:disabled) {
-  box-shadow: 0 6px 25px rgba(239, 68, 68, 0.6);
+  box-shadow: 0 6px 25px rgba(245, 87, 108, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Button Export/Info */
+.btn-export {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+}
+
+.btn-export:hover:not(:disabled) {
+  box-shadow: 0 6px 25px rgba(79, 172, 254, 0.6);
+  transform: translateY(-2px);
+}
+
+/* ========== BOTONES DE ACCIONES - MEMBERS PAGE (StudentsPage Style) ========== */
+
+/* Button View/Details - Export Cyan (StudentsPage style) */
+.btn-view {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+}
+
+.btn-view:hover:not(:disabled) {
+  box-shadow: 0 6px 25px rgba(79, 172, 254, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Button Edit - Primary Blue (StudentsPage style) */
+.btn-edit {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+}
+
+.btn-edit:hover:not(:disabled) {
+  box-shadow: 0 6px 25px rgba(59, 130, 246, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Button History/Enrollment - Secondary Rosa (StudentsPage style) */
+.btn-history {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+}
+
+.btn-history:hover:not(:disabled) {
+  box-shadow: 0 6px 25px rgba(245, 87, 108, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Button Next Level/Enroll - Export Cyan (StudentsPage style) */
+.btn-next {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+}
+
+.btn-next:hover:not(:disabled) {
+  box-shadow: 0 6px 25px rgba(79, 172, 254, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Button Delete - Danger Rosa (StudentsPage style) */
+.btn-delete {
+  background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+}
+
+.btn-delete:hover:not(:disabled) {
+  box-shadow: 0 6px 25px rgba(245, 87, 108, 0.6);
   transform: translateY(-2px);
 }
 
@@ -576,7 +650,8 @@ tbody tr:last-child td {
   button,
   .btn-primary,
   .btn-secondary,
-  .btn-danger {
+  .btn-danger,
+  .btn-export {
     padding: var(--spacing-md) var(--spacing-lg);
   }
 }
@@ -585,7 +660,8 @@ tbody tr:last-child td {
   button,
   .btn-primary,
   .btn-secondary,
-  .btn-danger {
+  .btn-danger,
+  .btn-export {
     width: auto;
     padding: var(--spacing-md) var(--spacing-lg);
   }
@@ -621,7 +697,8 @@ tbody tr:last-child td {
   button,
   .btn-primary,
   .btn-secondary,
-  .btn-danger {
+  .btn-danger,
+  .btn-export {
     width: 100%;
     padding: var(--spacing-md);
     font-size: 0.95rem;
@@ -1030,6 +1107,83 @@ textarea:focus-visible {
     grid-template-columns: 1fr;
     gap: var(--spacing-md);
   }
+}
+
+/* ========== DASHBOARD HOME STYLES ========== */
+
+/* Header Gradient - Primary Blue (StudentsPage) */
+.dashboard-header {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+}
+
+/* Stat Cards - Primary Blue */
+.stat-card-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+}
+
+/* Stat Cards - Export Cyan */
+.stat-card-export {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+}
+
+/* Stat Cards - Secondary Rosa */
+.stat-card-secondary {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+}
+
+/* Stat Cards - Danger Red/Pink */
+.stat-card-danger {
+  background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%);
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+}
+
+/* Quick Access Links - Primary Blue */
+.quick-access-primary {
+  display: block;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid #3b82f6;
+  background-color: rgba(59, 130, 246, 0.05);
+  transition: all var(--transition-base);
+}
+
+.quick-access-primary:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+  border-left-color: #1e40af;
+}
+
+/* Quick Access Links - Export Cyan */
+.quick-access-export {
+  display: block;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid #4facfe;
+  background-color: rgba(79, 172, 254, 0.05);
+  transition: all var(--transition-base);
+}
+
+.quick-access-export:hover {
+  background-color: rgba(79, 172, 254, 0.15);
+  border-left-color: #00f2fe;
+}
+
+/* Quick Access Links - Secondary Rosa */
+.quick-access-secondary {
+  display: block;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid #f093fb;
+  background-color: rgba(245, 87, 108, 0.05);
+  transition: all var(--transition-base);
+}
+
+.quick-access-secondary:hover {
+  background-color: rgba(245, 87, 108, 0.15);
+  border-left-color: #f5576c;
 }
 
 /* ========== CUSTOM CLASSES ========== */

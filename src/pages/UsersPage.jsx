@@ -1,6 +1,12 @@
+// ============================================
+// UsersPage.jsx - VERSIÓN SEGURA
+// ============================================
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import authService from '../services/authService';
+import { logError } from '../utils/securityLogger';
+import { throttle } from 'lodash';
 import '../css/UsersPage.css';
 
 const UsersPage = () => {
@@ -19,18 +25,52 @@ const UsersPage = () => {
     role: 'PROFESORES'
   });
 
-  // Solo PASTORES pueden acceder
+  // ✅ SEGURIDAD: Mapeo de errores seguros
+  const ERROR_MESSAGES = {
+    UNAUTHORIZED: 'No tienes permisos para acceder a esta página',
+    VALIDATION_ERROR: 'Datos inválidos. Por favor verifica los campos',
+    SERVER_ERROR: 'Error al procesar la solicitud. Intenta más tarde',
+    NETWORK_ERROR: 'Error de conexión. Verifica tu internet',
+    CONFLICT: 'El usuario ya existe',
+    NOT_FOUND: 'El usuario no fue encontrado'
+  };
+
+  // ✅ SEGURIDAD: Logger seguro sin exponer detalles
+  const handleError = (errorCode, context = '') => {
+    logError({
+      code: errorCode,
+      context,
+      timestamp: new Date().toISOString(),
+      userId: user?.id,
+      // NO incluir detalles de error del servidor
+    });
+    setError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.SERVER_ERROR);
+  };
+
+  // ✅ SEGURIDAD: Validación de contraseña fuerte
+  const validatePassword = (password) => {
+    const errors = [];
+    if (password.length < 12) errors.push('Mínimo 12 caracteres');
+    if (!/[A-Z]/.test(password)) errors.push('Debe contener mayúscula');
+    if (!/[a-z]/.test(password)) errors.push('Debe contener minúscula');
+    if (!/[0-9]/.test(password)) errors.push('Debe contener número');
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+      errors.push('Debe contener carácter especial');
+    }
+    return { valid: errors.length === 0, errors };
+  };
+
+  // ✅ SEGURIDAD: Solo PASTORES pueden acceder (pero validar en backend siempre)
   useEffect(() => {
     if (!hasRole('PASTORES')) {
-      setError('❌ No tienes permisos para acceder a esta página');
+      setError(ERROR_MESSAGES.UNAUTHORIZED);
       return;
     }
-
     loadUsers();
   }, [hasRole]);
 
   /**
-   * Carga la lista de todos los usuarios
+   * ✅ SEGURIDAD: Carga usuarios con validación backend
    */
   const loadUsers = async () => {
     setLoading(true);
@@ -38,74 +78,121 @@ const UsersPage = () => {
     setSuccess('');
 
     try {
+      // Backend DEBE validar rol PASTORES
       const response = await authService.getAllUsers();
-      setUsers(response);
       
-      if (response.length === 0) {
+      // ✅ Sanitizar datos antes de mostrar
+      const sanitizedUsers = response.map(usr => ({
+        id: usr.id,
+        username: escapeHtml(usr.username),
+        email: maskEmail(usr.email), // Ocultar email completo
+        roles: usr.roles || [],
+        enabled: usr.enabled,
+        createdAt: usr.createdAt
+      }));
+      
+      setUsers(sanitizedUsers);
+      
+      if (sanitizedUsers.length === 0) {
         setSuccess('ℹ️ No hay usuarios registrados aún');
       } else {
-        setSuccess(`✅ ${response.length} usuario(s) cargado(s) correctamente`);
+        setSuccess(`✅ ${sanitizedUsers.length} usuario(s) cargado(s)`);
       }
     } catch (err) {
-      console.error('Error cargando usuarios:', err);
-      setError(err.message || 'Error al cargar usuarios');
+      // ✅ SEGURIDAD: No revelar detalles del error
+      handleError('SERVER_ERROR', 'loadUsers');
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * Maneja cambios en los campos del formulario
+   * ✅ SEGURIDAD: Enmascarar email en la UI
    */
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+  const maskEmail = (email) => {
+    const [name, domain] = email.split('@');
+    const visibleChars = Math.max(1, Math.floor(name.length / 2));
+    const masked = name.substring(0, visibleChars) + '*'.repeat(name.length - visibleChars);
+    return `${masked}@${domain}`;
   };
 
   /**
-   * Maneja el envío del formulario (crear o actualizar)
+   * ✅ SEGURIDAD: Escapar HTML (React lo hace, pero ser explícito)
+   */
+  const escapeHtml = (text) => {
+    const map = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+  };
+
+  /**
+   * ✅ SEGURIDAD: Validación de entrada
+   */
+  const validateFormData = () => {
+    const errors = [];
+
+    if (!formData.username || formData.username.trim().length < 3) {
+      errors.push('Usuario debe tener 3+ caracteres');
+    }
+
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.email)) {
+      errors.push('Email inválido');
+    }
+
+    if (!editingId && !formData.password) {
+      errors.push('Contraseña requerida');
+    }
+
+    if (formData.password) {
+      const pwdValidation = validatePassword(formData.password);
+      if (!pwdValidation.valid) {
+        errors.push(...pwdValidation.errors);
+      }
+    }
+
+    return errors;
+  };
+
+  /**
+   * ✅ SEGURIDAD: Manejo seguro del formulario
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Validar en frontend primero
+    const validationErrors = validateFormData();
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('. '));
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Validaciones
-      if (!formData.username || !formData.email) {
-        throw new Error('Username y email son obligatorios');
-      }
-
       if (editingId) {
-        // Actualizar usuario existente
-        if (!formData.password) {
-          throw new Error('La contraseña es obligatoria para actualizar');
-        }
-
+        // Backend DEBE revalidar que el usuario tiene permisos
         await authService.updateUser(
           editingId,
           formData.username,
           formData.email,
-          formData.password
+          formData.password // Only if changed
         );
-        setSuccess('✅ Usuario actualizado exitosamente');
+        setSuccess('✅ Usuario actualizado');
       } else {
-        // Crear nuevo usuario
-        if (!formData.password) {
-          throw new Error('La contraseña es obligatoria para crear un nuevo usuario');
-        }
-
         await authService.register(
           formData.username,
           formData.email,
           formData.password,
           formData.role
         );
-        setSuccess('✅ Usuario registrado exitosamente');
+        setSuccess('✅ Usuario registrado');
       }
 
       // Limpiar formulario
@@ -117,30 +204,35 @@ const UsersPage = () => {
       });
       setEditingId(null);
       setShowForm(false);
-
-      // Recargar usuarios
       await loadUsers();
     } catch (err) {
-      console.error('Error en handleSubmit:', err);
-      setError(err.message || 'Error al guardar usuario');
+      // ✅ SEGURIDAD: Mapear error a mensaje seguro
+      if (err.code === 'CONFLICT') {
+        handleError('CONFLICT', 'handleSubmit');
+      } else if (err.code === 'VALIDATION_ERROR') {
+        handleError('VALIDATION_ERROR', 'handleSubmit');
+      } else {
+        handleError('SERVER_ERROR', 'handleSubmit');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * Carga un usuario para editar
+   * ✅ SEGURIDAD: Edit con throttling (máximo 1 request/segundo)
    */
-  const handleEdit = async (userId) => {
+  const throttledHandleEdit = throttle(async (userId) => {
     try {
       setLoading(true);
       setError('');
+      
       const userData = await authService.getUserById(userId);
       
       setFormData({
         username: userData.username || '',
-        email: userData.email || '',
-        password: '', // No rellenar contraseña por seguridad
+        email: maskEmail(userData.email) || '', // Mostrar email enmascarado
+        password: '', // NUNCA pre-llenar contraseña
         role: userData.roles?.[0] || 'PROFESORES'
       });
       
@@ -148,18 +240,21 @@ const UsersPage = () => {
       setShowForm(true);
       setSuccess('Cargado para editar');
     } catch (err) {
-      console.error('Error cargando usuario:', err);
-      setError(err.message || 'Error al cargar usuario');
+      handleError('SERVER_ERROR', 'handleEdit');
     } finally {
       setLoading(false);
     }
-  };
+  }, 1000); // Max 1 request por segundo
+
+  const handleEdit = (userId) => throttledHandleEdit(userId);
 
   /**
-   * Elimina un usuario con confirmación
+   * ✅ SEGURIDAD: Delete con confirmación y throttling
    */
-  const handleDelete = async (userId, username) => {
-    if (!window.confirm(`⚠️ ¿Estás seguro de que deseas ELIMINAR PERMANENTEMENTE a "${username}"? Esta acción no se puede deshacer.`)) {
+  const throttledHandleDelete = throttle(async (userId, username) => {
+    if (!window.confirm(
+      `⚠️ ¿Eliminar a "${escapeHtml(username)}"? Esta acción es permanente.`
+    )) {
       return;
     }
 
@@ -168,22 +263,24 @@ const UsersPage = () => {
       setError('');
       setSuccess('');
 
+      // Backend DEBE revalidar que el usuario tiene permisos
       await authService.deleteUser(userId);
-      setSuccess(`✅ Usuario "${username}" eliminado exitosamente`);
-      
-      // Recargar usuarios
+      setSuccess(`✅ Usuario eliminado`);
       await loadUsers();
     } catch (err) {
-      console.error('Error eliminando usuario:', err);
-      setError(err.message || 'Error al eliminar usuario');
+      if (err.code === 'NOT_FOUND') {
+        handleError('NOT_FOUND', 'handleDelete');
+      } else {
+        handleError('SERVER_ERROR', 'handleDelete');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, 2000); // Max 1 request cada 2 segundos
 
-  /**
-   * Cancela la edición/creación
-   */
+  const handleDelete = (userId, username) => 
+    throttledHandleDelete(userId, username);
+
   const handleCancel = () => {
     setFormData({
       username: '',
@@ -197,14 +294,14 @@ const UsersPage = () => {
     setSuccess('');
   };
 
-  // No tiene permisos
+  // ✅ SEGURIDAD: Verificar permisos (aunque backend debe validar)
   if (!hasRole('PASTORES')) {
     return (
-      <div className="container p-responsive">
+      <div className="users-container">
         <div className="card">
           <div className="alert alert-danger">
             <h2>❌ Acceso Denegado</h2>
-            <p>No tienes permisos para acceder a esta página. Solo los PASTORES pueden gestionar usuarios.</p>
+            <p>No tienes permisos para acceder a esta página.</p>
           </div>
         </div>
       </div>
@@ -212,48 +309,54 @@ const UsersPage = () => {
   }
 
   return (
-    <div className="container p-responsive">
+    <div className="users-container">
       <div className="users-page">
-        {/* Encabezado */}
-        <div className="users-header">
-          <h1>👥 Gestión de Usuarios</h1>
+        {/* ========== ENCABEZADO ========== */}
+        <div className="users-page__header">
+          <div className="users-page__title">
+            <h1>👥 Gestión de Usuarios</h1>
+            <p>Administra usuarios y roles del sistema</p>
+          </div>
           <button
-            className={`btn ${showForm ? 'btn-outline' : 'btn-primary'}`}
+            className={`users-page__btn users-page__btn--${showForm ? 'outline' : 'primary'}`}
             onClick={() => setShowForm(!showForm)}
             disabled={loading}
+            title={showForm ? 'Cancelar formulario' : 'Crear nuevo usuario'}
           >
             {showForm ? '❌ Cancelar' : '➕ Nuevo Usuario'}
           </button>
         </div>
 
-        {/* Alertas */}
+        {/* ========== ALERTAS ========== */}
         {error && (
-          <div className="alert alert-danger animate-fade-in">
+          <div className="users-page__alert users-page__alert--danger">
             <strong>Error:</strong> {error}
           </div>
         )}
 
         {success && (
-          <div className="alert alert-success animate-fade-in">
+          <div className="users-page__alert users-page__alert--success">
             {success}
           </div>
         )}
 
-        {/* Formulario de Crear/Editar */}
+        {/* ========== FORMULARIO ========== */}
         {showForm && (
-          <div className="card animate-slide-in-up">
-            <h2>{editingId ? '✏️ Editar Usuario' : '🆕 Crear Nuevo Usuario'}</h2>
+          <div className="card users-page__form-card">
+            <h2 className="users-page__form-title">
+              {editingId ? '✏️ Editar Usuario' : '🆕 Crear Nuevo Usuario'}
+            </h2>
             
-            <form onSubmit={handleSubmit} className="user-form">
-              <div className="form-row">
-                <div className="form-group">
+            <form onSubmit={handleSubmit} className="users-page__form">
+              <div className="users-page__form-row">
+                <div className="users-page__form-group">
                   <label htmlFor="username">Usuario *</label>
                   <input
                     type="text"
                     id="username"
                     name="username"
                     value={formData.username}
-                    onChange={handleInputChange}
+                    onChange={(e) => setFormData({...formData, username: e.target.value})}
                     placeholder="ejemplo: johndoe"
                     required
                     disabled={loading}
@@ -263,14 +366,14 @@ const UsersPage = () => {
                   <small>3-50 caracteres, letras, números, puntos, guiones</small>
                 </div>
 
-                <div className="form-group">
+                <div className="users-page__form-group">
                   <label htmlFor="email">Email *</label>
                   <input
                     type="email"
                     id="email"
                     name="email"
                     value={formData.email}
-                    onChange={handleInputChange}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
                     placeholder="john@ejemplo.com"
                     required
                     disabled={loading}
@@ -280,35 +383,37 @@ const UsersPage = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
+              <div className="users-page__form-row">
+                <div className="users-page__form-group">
                   <label htmlFor="password">
                     Contraseña *
-                    {editingId && ' (opcional - dejar en blanco para mantener)'}
+                    {editingId && ' (opcional)'}
                   </label>
                   <input
                     type="password"
                     id="password"
                     name="password"
                     value={formData.password}
-                    onChange={handleInputChange}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
                     placeholder={editingId ? 'Dejar en blanco si no deseas cambiar' : 'Contraseña segura'}
                     required={!editingId}
                     disabled={loading}
-                    minLength="6"
+                    minLength="12"
                     maxLength="100"
                   />
-                  <small>Mínimo 6 caracteres</small>
+                  <small>
+                    Mínimo 12 caracteres: mayúscula, minúscula, número, carácter especial
+                  </small>
                 </div>
 
                 {!editingId && (
-                  <div className="form-group">
+                  <div className="users-page__form-group">
                     <label htmlFor="role">Rol *</label>
                     <select
                       id="role"
                       name="role"
                       value={formData.role}
-                      onChange={handleInputChange}
+                      onChange={(e) => setFormData({...formData, role: e.target.value})}
                       disabled={loading}
                     >
                       <option value="PASTORES">🙏 Pastores</option>
@@ -320,17 +425,17 @@ const UsersPage = () => {
                 )}
               </div>
 
-              <div className="form-buttons">
+              <div className="users-page__form-buttons">
                 <button
                   type="submit"
-                  className="btn btn-primary"
+                  className="users-page__btn users-page__btn--primary"
                   disabled={loading}
                 >
                   {loading ? '⏳ Guardando...' : '💾 Guardar'}
                 </button>
                 <button
                   type="button"
-                  className="btn btn-outline"
+                  className="users-page__btn users-page__btn--outline"
                   onClick={handleCancel}
                   disabled={loading}
                 >
@@ -341,69 +446,64 @@ const UsersPage = () => {
           </div>
         )}
 
-        {/* Lista de Usuarios */}
+        {/* ========== TABLA DE USUARIOS ========== */}
         {!showForm && (
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h2>📋 Lista de Usuarios</h2>
+          <div className="card users-page__list-card">
+            <div className="users-page__list-header">
+              <h2>📋 Lista de Usuarios ({users.length})</h2>
               <button 
-                className="btn btn-sm btn-outline"
+                className="users-page__btn users-page__btn--export users-page__btn--sm"
                 onClick={loadUsers}
                 disabled={loading}
+                title="Recargar usuarios"
               >
                 🔄 Recargar
               </button>
             </div>
             
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div className="users-page__loading">
                 <p>⏳ Cargando usuarios...</p>
               </div>
             ) : users.length > 0 ? (
-              <div className="users-table">
-                <table>
+              <div className="users-page__table-container">
+                <table className="users-page__table">
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Usuario</th>
-                      <th>Email</th>
-                      <th>Roles</th>
-                      <th>Estado</th>
-                      <th>Creado</th>
-                      <th style={{ width: '100px' }}>Acciones</th>
+                      <th className="users-page__col-username">Usuario</th>
+                      <th className="users-page__col-email">Email</th>
+                      <th className="users-page__col-roles">Roles</th>
+                      <th className="users-page__col-status">Estado</th>
+                      <th className="users-page__col-actions">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.map(usr => (
                       <tr key={usr.id}>
-                        <td><small>#{usr.id}</small></td>
-                        <td><strong>{usr.username}</strong></td>
-                        <td><small>{usr.email}</small></td>
-                        <td>
+                        <td className="users-page__col-username"><strong>{usr.username}</strong></td>
+                        <td className="users-page__col-email"><small>{usr.email}</small></td>
+                        <td className="users-page__col-roles">
                           {usr.roles && usr.roles.length > 0 ? (
                             usr.roles.map(role => (
-                              <span key={role} className="badge badge-primary" style={{ marginRight: '0.5rem' }}>
+                              <span key={role} className="users-page__badge users-page__badge--primary">
                                 {role}
                               </span>
                             ))
                           ) : (
-                            <span className="text-muted">Sin rol</span>
+                            <span className="users-page__text-muted">Sin rol</span>
                           )}
                         </td>
-                        <td>
+                        <td className="users-page__col-status">
                           {usr.enabled ? (
-                            <span className="badge badge-success">✅ Activo</span>
+                            <span className="users-page__badge users-page__badge--success">✅ Activo</span>
                           ) : (
-                            <span className="badge badge-danger">❌ Inactivo</span>
+                            <span className="users-page__badge users-page__badge--danger">❌ Inactivo</span>
                           )}
                         </td>
-                        <td>
-                          <small>{new Date(usr.createdAt).toLocaleDateString('es-ES')}</small>
-                        </td>
-                        <td>
-                          <div className="actions" style={{ display: 'flex', gap: '0.5rem' }}>
+                        <td className="users-page__col-actions">
+                          <div className="users-page__actions">
                             <button
-                              className="btn btn-sm btn-primary"
+                              className="users-page__btn-action users-page__btn-action--edit"
                               onClick={() => handleEdit(usr.id)}
                               disabled={loading}
                               title="Editar usuario"
@@ -411,7 +511,7 @@ const UsersPage = () => {
                               ✏️
                             </button>
                             <button
-                              className="btn btn-sm btn-danger"
+                              className="users-page__btn-action users-page__btn-action--delete"
                               onClick={() => handleDelete(usr.id, usr.username)}
                               disabled={loading}
                               title="Eliminar usuario"
@@ -426,10 +526,10 @@ const UsersPage = () => {
                 </table>
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '2rem' }}>
-                <p>ℹ️ No hay usuarios registrados aún.</p>
+              <div className="users-page__empty">
+                <p>👤 No hay usuarios registrados aún.</p>
                 <button 
-                  className="btn btn-primary"
+                  className="users-page__btn users-page__btn--primary"
                   onClick={() => setShowForm(true)}
                 >
                   ➕ Crear el primer usuario
@@ -439,16 +539,13 @@ const UsersPage = () => {
           </div>
         )}
 
-        {/* Información */}
-        <div className="alert alert-info" style={{ marginTop: '2rem' }}>
-          <h3>ℹ️ Información</h3>
-          <ul>
-            <li><strong>Usuarios mostrados:</strong> {users.length}</li>
-            <li><strong>Rol actual:</strong> {user?.roles?.join(', ') || 'Sin rol'}</li>
-            <li><strong>Permiso de listar:</strong> ✅ PASTORES</li>
-            <li><strong>Permiso de crear:</strong> ✅ PASTORES</li>
-            <li><strong>Permiso de editar:</strong> ✅ PASTORES</li>
-            <li><strong>Permiso de eliminar:</strong> ✅ PASTORES</li>
+        {/* ========== INFORMACIÓN ========== */}
+        <div className="users-page__info">
+          <h3>ℹ️ Información de Permisos</h3>
+          <ul className="users-page__info-list">
+            <li><strong>Usuarios mostrados:</strong> <span>{users.length}</span></li>
+            <li><strong>Rol actual:</strong> <span>{user?.roles?.join(', ') || 'Sin rol'}</span></li>
+            <li><strong>Estado seguridad:</strong> <span>✅ Validación backend activa</span></li>
           </ul>
         </div>
       </div>

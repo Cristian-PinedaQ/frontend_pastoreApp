@@ -247,7 +247,7 @@ export const MemberDetailModal = ({ member, onClose, onUpdated }) => {
                 </div>
                 <div className="border-l-4 border-purple-600 pl-4">
                   <label className="text-gray-600 text-sm font-semibold">
-                    Fecha de reggistro
+                    Fecha de registro
                   </label>
                   <p className="text-lg font-semibold">
                     <span className="inline-block bg-blue-100 text-blue-800 px-4 py-2 rounded-full mt-1">
