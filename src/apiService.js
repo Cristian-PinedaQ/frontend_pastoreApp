@@ -1,5 +1,6 @@
 // 🔌 Servicio API centralizado - VERSIÓN CORREGIDA PARA ESTUDIANTES POR COHORTE
 // ✅ Rutas de endpoint corregidas
+// ✅ MEJORADO: Extrae errores de validación específicos del backend
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 class ApiService {
@@ -42,8 +43,18 @@ class ApiService {
 
         console.error('❌ ERROR DEL SERVIDOR:', JSON.stringify(errorData, null, 2));
 
+        // 🔴 MEJORADO: Extraer errores de validación específicos por campo
         let errorMessage = '';
-        if (typeof errorData === 'string') {
+        
+        // Si hay fieldErrors (errores de validación), priorizar esos
+        if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
+          const fieldErrorsArray = Object.entries(errorData.fieldErrors)
+            .map(([field, message]) => `${field}: ${message}`)
+            .join(' | ');
+          errorMessage = fieldErrorsArray;
+        } 
+        // Sino, usar el mensaje general
+        else if (typeof errorData === 'string') {
           errorMessage = errorData;
         } else if (errorData.message) {
           errorMessage = typeof errorData.message === 'string'

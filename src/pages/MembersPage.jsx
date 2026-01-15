@@ -1,5 +1,6 @@
 // 👥 MembersPage - Gestión de miembros
 // ✅ CON MODAL DE HISTORIAL DE INSCRIPCIONES
+// ✅ MEJORADO: Muestra errores específicos del backend
 import React, { useState, useEffect, useRef } from "react";
 import apiService from "../apiService";
 import { useAuth } from '../context/AuthContext';
@@ -12,6 +13,7 @@ export const MembersPage = () => {
   const [allMembers, setAllMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [formError, setFormError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -30,8 +32,9 @@ export const MembersPage = () => {
   const [enrollmentHistory, setEnrollmentHistory] = useState([]);
   const [historyMemberName, setHistoryMemberName] = useState("");
 
-  // Ref para el formulario (para scroll)
+  // Refs para scroll automático
   const formRef = useRef(null);
+  const errorRef = useRef(null);
 
   // Estados para líder autocomplete
   const [leaderSearchTerm, setLeaderSearchTerm] = useState("");
@@ -60,6 +63,18 @@ export const MembersPage = () => {
     console.log("📥 Componente montado, cargando miembros...");
     fetchAllMembers();
   }, []);
+
+  // ✅ NUEVO: Hacer scroll automático al error cuando aparezca
+  useEffect(() => {
+    if (formError && errorRef.current) {
+      setTimeout(() => {
+        errorRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
+    }
+  }, [formError]);
 
   const fetchAllMembers = async () => {
     try {
@@ -148,6 +163,7 @@ export const MembersPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError(null);
     try {
       const memberData = {
         name: formData.name,
@@ -176,7 +192,9 @@ export const MembersPage = () => {
       resetForm();
       fetchAllMembers();
     } catch (err) {
-      alert("❌ Error: " + err.message);
+      // ✅ MEJORADO: Mostrar error en la página en lugar de alert
+      setFormError(err.message);
+      console.error("Error al procesar miembro:", err);
     }
   };
 
@@ -205,6 +223,7 @@ export const MembersPage = () => {
 
     setEditingId(member.id);
     setShowForm(true);
+    setFormError(null);
 
     // Scroll al formulario
     setTimeout(() => {
@@ -287,6 +306,7 @@ export const MembersPage = () => {
     setFilteredLeaders([]);
     setEditingId(null);
     setShowForm(false);
+    setFormError(null);
   };
 
   // Función para ordenar alfabéticamente
@@ -349,7 +369,7 @@ export const MembersPage = () => {
         )}
       </div>
 
-      {/* Error */}
+      {/* Error general */}
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm">
           {error}
@@ -362,6 +382,18 @@ export const MembersPage = () => {
           <h2 className="text-lg sm:text-xl font-bold mb-4">
             {editingId ? "✏️ Editar Miembro" : "➕ Nuevo Miembro"}
           </h2>
+
+          {/* ✅ NUEVO: Mostrar errores del formulario CON SCROLL AUTOMÁTICO */}
+          {formError && (
+            <div 
+              ref={errorRef}
+              className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm animate-pulse"
+            >
+              <p className="font-semibold mb-2">❌ Error de validación:</p>
+              <p className="whitespace-pre-wrap">{formError}</p>
+            </div>
+          )}
+
           <form
             onSubmit={handleSubmit}
             className="grid grid-cols-1 sm:grid-cols-2 gap-4"
@@ -723,35 +755,35 @@ export const MembersPage = () => {
                           <div className="flex gap-1 justify-center flex-wrap">
                             <button
                               onClick={() => handleViewDetails(member)}
-                              className="w-16 py-1 bg-green-500 text-white rounded hover:bg-indigo-600 transition text-xs font-semibold"
+                              className="btn-view btn-sm w-16"
                               title="Ver detalles"
                             >
-                            📇
+                              📇
                             </button>
                             <button
                               onClick={() => handleEdit(member)}
-                              className="w-16 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold"
+                              className="btn-edit btn-sm w-16"
                               title="Editar"
                             >
                               ✏️
                             </button>
                             <button
                               onClick={() => handleViewEnrollment(member.id, member.name)}
-                              className="w-16 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 transition text-xs font-semibold"
+                              className="btn-history btn-sm w-16"
                               title="Historial"
                             >
                               📋
                             </button>
                             <button
                               onClick={() => handleEnrollNext(member.id)}
-                              className="w-16 py-1 bg-indigo-600 text-white rounded hover:bg-green-600 transition text-xs font-semibold"
+                              className="btn-next btn-sm w-16"
                               title="Siguiente"
                             >
                               📈
                             </button>
                             <button
                               onClick={() => handleDelete(member.id)}
-                              className="w-16 py-1 bg-gray-900 text-white rounded hover:bg-red-700 transition text-xs font-semibold"
+                              className="btn-delete btn-sm w-16"
                               title="Eliminar"
                             >
                               ❌
@@ -793,15 +825,15 @@ export const MembersPage = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t">
                       <button
                         onClick={() => handleViewDetails(member)}
-                        className="py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 transition text-xs font-semibold flex flex-col items-center gap-1"
+                        className="btn-view py-2 text-xs font-semibold flex flex-col items-center gap-1"
                         title="Ver detalles"
                       >
-                        <span>👁️</span>
+                        <span>📇</span>
                         <span className="hidden sm:block">Detalles</span>
                       </button>
                       <button
                         onClick={() => handleEdit(member)}
-                        className="py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition text-xs font-semibold flex flex-col items-center gap-1"
+                        className="btn-edit py-2 text-xs font-semibold flex flex-col items-center gap-1"
                         title="Editar"
                       >
                         <span>✏️</span>
@@ -809,7 +841,7 @@ export const MembersPage = () => {
                       </button>
                       <button
                         onClick={() => handleViewEnrollment(member.id, member.name)}
-                        className="py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition text-xs font-semibold flex flex-col items-center gap-1"
+                        className="btn-history py-2 text-xs font-semibold flex flex-col items-center gap-1"
                         title="Historial"
                       >
                         <span>📋</span>
@@ -817,7 +849,7 @@ export const MembersPage = () => {
                       </button>
                       <button
                         onClick={() => handleEnrollNext(member.id)}
-                        className="py-2 bg-green-500 text-white rounded hover:bg-green-600 transition text-xs font-semibold flex flex-col items-center gap-1"
+                        className="btn-next py-2 text-xs font-semibold flex flex-col items-center gap-1"
                         title="Siguiente"
                       >
                         <span>📈</span>
@@ -825,10 +857,10 @@ export const MembersPage = () => {
                       </button>
                       <button
                         onClick={() => handleDelete(member.id)}
-                        className="col-span-2 sm:col-span-1 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold flex flex-col items-center gap-1"
+                        className="btn-delete col-span-2 sm:col-span-1 py-2 text-xs font-semibold flex flex-col items-center gap-1"
                         title="Eliminar"
                       >
-                        <span>🗑️</span>
+                        <span>❌</span>
                         <span className="hidden sm:block">Eliminar</span>
                       </button>
                     </div>
