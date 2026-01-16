@@ -1,6 +1,6 @@
-// 📚 StudentsPage.jsx - CORREGIDO: Separar Pendiente de Reprobado
-// ✅ Cambio: Ahora "Solo Reprobados" SOLO muestra passed === false
-// ❌ Los Pendiente (passed === null) NO se incluyen en "Solo Reprobados"
+// 📚 StudentsPage.jsx - CORREGIDO: Agregar filtro CANCELLED
+// ✅ Cambio: Agregado filtro para "Cancelados" en el select de resultado
+// ✅ Cambio: Agregada lógica para filtrar por passed === null Y status === 'CANCELLED' separadamente
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
@@ -37,7 +37,7 @@ const StudentsPage = () => {
   const [error, setError] = useState('');
 
   const [selectedLevel, setSelectedLevel] = useState('ALL');
-  const [selectedResultFilter, setSelectedResultFilter] = useState('ALL'); // ✅ NUEVO: Filtro de resultado
+  const [selectedResultFilter, setSelectedResultFilter] = useState('ALL'); // ✅ Filtro de resultado
   const [searchText, setSearchText] = useState('');
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
@@ -156,7 +156,7 @@ const StudentsPage = () => {
       devLog('✅ Mostrando todos los niveles');
     }
 
-    // ✅ NUEVO: Filtrar por resultado (Aprobado, Reprobado, Pendiente)
+    // ✅ Filtrar por resultado (Aprobado, Reprobado, Pendiente, Cancelado)
     if (selectedResultFilter !== 'ALL') {
       devLog(`🔍 Filtrando por resultado: ${selectedResultFilter}`);
       if (selectedResultFilter === 'PASSED') {
@@ -164,7 +164,11 @@ const StudentsPage = () => {
       } else if (selectedResultFilter === 'FAILED') {
         filtered = filtered.filter(student => student.passed === false);
       } else if (selectedResultFilter === 'PENDING') {
-        filtered = filtered.filter(student => student.passed === null);
+        // ✅ CORRECCIÓN: Excluir cancelados - mostrar solo passed === null Y status !== 'CANCELLED'
+        filtered = filtered.filter(student => student.passed === null && student.status !== 'CANCELLED');
+      } else if (selectedResultFilter === 'CANCELLED') {
+        // ✅ NUEVO: Filtrar por status === 'CANCELLED'
+        filtered = filtered.filter(student => student.status === 'CANCELLED');
       }
       devLog(`✅ Después de filtro de resultado: ${filtered.length} estudiantes`);
     }
@@ -225,7 +229,7 @@ const StudentsPage = () => {
     }
   };
 
-  // ✅ CORRECCIÓN: Estadísticas ahora separan Pendiente de Reprobado
+  // ✅ Estadísticas separan Pendiente, Reprobado y Cancelado
   const calculateStatistics = () => {
     const stats = {};
 
@@ -234,6 +238,7 @@ const StudentsPage = () => {
       const passed = levelStudents.filter(s => s.passed === true).length;
       const failed = levelStudents.filter(s => s.passed === false).length;
       const pending = levelStudents.filter(s => s.passed === null).length;
+      const cancelled = levelStudents.filter(s => s.status === 'CANCELLED').length;
       const total = levelStudents.length;
 
       stats[level] = {
@@ -241,7 +246,8 @@ const StudentsPage = () => {
         total,
         passed,
         failed,
-        pending, // ✅ NUEVO: Campo para Pendientes
+        pending,
+        cancelled, // ✅ NUEVO: Campo para Cancelados
         passPercentage: total > 0 ? ((passed / total) * 100).toFixed(1) : 0,
       };
     });
@@ -253,7 +259,7 @@ const StudentsPage = () => {
     try {
       devLog('📄 Generando PDF');
 
-      // ✅ NUEVO: Generar título dinámico basado en filtro de resultado
+      // ✅ Generar título dinámico basado en filtro de resultado
       let title = 'Listado de Estudiantes';
       if (selectedResultFilter === 'PASSED') {
         title = 'Estudiantes Aprobados';
@@ -261,6 +267,8 @@ const StudentsPage = () => {
         title = 'Estudiantes Reprobados';
       } else if (selectedResultFilter === 'PENDING') {
         title = 'Estudiantes Pendientes';
+      } else if (selectedResultFilter === 'CANCELLED') {
+        title = 'Estudiantes Cancelados';
       }
 
       const data = {
@@ -302,7 +310,7 @@ const StudentsPage = () => {
     return levelMap[levelValue] || levelValue;
   };
 
-  // ✅ NUEVO: Todos los 11 niveles posibles
+  // ✅ Todos los 11 niveles posibles
   const ALL_LEVELS = [
     'PREENCUENTRO',
     'ENCUENTRO',
@@ -324,6 +332,7 @@ const StudentsPage = () => {
       'PASSED': ' · Mostrando: Aprobados',
       'FAILED': ' · Mostrando: Reprobados',
       'PENDING': ' · Mostrando: Pendientes',
+      'CANCELLED': ' · Mostrando: Cancelados', // ✅ NUEVO
     };
     return filterMap[filterValue] || '';
   };
@@ -383,6 +392,7 @@ const StudentsPage = () => {
                 <option value="PASSED">✅ Aprobados</option>
                 <option value="FAILED">❌ Reprobados</option>
                 <option value="PENDING">⏳ Pendientes</option>
+                <option value="CANCELLED">🚫 Cancelados</option>
               </select>
             </div>
           </div>
@@ -471,7 +481,9 @@ const StudentsPage = () => {
                   <tr
                     key={student.id}
                     className={
-                      student.passed === false
+                      student.status === 'CANCELLED'
+                        ? 'cancelled'
+                        : student.passed === false
                         ? 'failed'
                         : student.passed === true
                         ? 'passed'
@@ -520,8 +532,11 @@ const StudentsPage = () => {
                       {student.passed === false && (
                         <span className="students-page__badge--failed">❌ Reprobado</span>
                       )}
-                      {student.passed === null && (
+                      {student.passed === null && student.status !== 'CANCELLED' && (
                         <span className="students-page__badge--pending">⏳ Pendiente</span>
+                      )}
+                      {student.status === 'CANCELLED' && (
+                        <span className="students-page__badge--cancelled">🚫 Cancelado</span>
                       )}
                     </td>
 

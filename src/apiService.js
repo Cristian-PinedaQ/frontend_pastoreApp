@@ -1,6 +1,7 @@
 // 🔌 Servicio API centralizado - VERSIÓN CORREGIDA PARA ESTUDIANTES POR COHORTE
 // ✅ Rutas de endpoint corregidas
 // ✅ MEJORADO: Extrae errores de validación específicos del backend
+// ✅ NUEVO: Métodos para editar cohortes
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 class ApiService {
@@ -202,6 +203,69 @@ class ApiService {
     return this.request(`/enrollment/cohort/${id}/status?status=${status}`, {
       method: 'PUT',
     });
+  }
+
+  /**
+   * ✅ NUEVO: Editar una cohorte existente
+   * PUT /api/v1/enrollment/cohorts/{id}/edit
+   * 
+   * Permite editar: cohortName, level, startDate, endDate, maxStudents,
+   * minAttendancePercentage, minAverageScore, teacher
+   */
+  async editEnrollment(enrollmentId, updateData) {
+    try {
+      console.log('📝 [editEnrollment] Editando cohorte ID:', enrollmentId);
+      console.log('   Datos a actualizar:', updateData);
+
+      const response = await this.request(`/enrollment/cohorts/${enrollmentId}/edit`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+
+      console.log('✅ [editEnrollment] Éxito:', response);
+      return response;
+    } catch (error) {
+      console.error('❌ [editEnrollment] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVO: Editar cohorte y cambiar estado (con cancelación cascada si aplica)
+   * PUT /api/v1/enrollment/cohorts/{id}/edit-with-status?newStatus=X
+   * 
+   * 🔴 IMPORTANTE: Si newStatus = CANCELLED, automáticamente cancela todos los estudiantes inscritos
+   * 
+   * @param {number} enrollmentId - ID de la cohorte
+   * @param {object} updateData - Datos a actualizar (mismo formato que editEnrollment)
+   * @param {string} newStatus - Nuevo estado (PENDING, ACTIVE, SUSPENDED, CANCELLED, COMPLETED)
+   * @returns {Promise} Respuesta del servidor
+   */
+  async editEnrollmentWithStatus(enrollmentId, updateData, newStatus) {
+    try {
+      console.log('📝 [editEnrollmentWithStatus] Editando cohorte ID:', enrollmentId);
+      console.log('   Datos a actualizar:', updateData);
+      console.log('   Nuevo estado:', newStatus);
+
+      const params = newStatus ? `?newStatus=${newStatus}` : '';
+      
+      const response = await this.request(`/enrollment/cohorts/${enrollmentId}/edit-with-status${params}`, {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+
+      console.log('✅ [editEnrollmentWithStatus] Éxito:', response);
+      
+      // Si la cohorte fue cancelada, advertencia especial
+      if (newStatus === 'CANCELLED') {
+        console.warn('🚫 ATENCIÓN: Se cancelaron todos los estudiantes inscritos en esta cohorte');
+      }
+
+      return response;
+    } catch (error) {
+      console.error('❌ [editEnrollmentWithStatus] Error:', error.message);
+      throw error;
+    }
   }
 
   // ========== 🎓 INSCRIPCIONES DE ESTUDIANTES ==========
