@@ -1,4 +1,12 @@
-// 🛡️ ProtectedRoute - CORREGIDO: Sin exposición de datos sensibles
+/**
+ * 🛡️ ProtectedRoute - Protección de rutas y validación de roles
+ * 
+ * ℹ️ VERSIÓN OPTIMIZADA PARA PRODUCCIÓN:
+ * - Todos los console.log están comentados para mejor rendimiento
+ * - Si necesitas debuggear, busca las líneas con "// 🔧 DEBUG" y descomenta
+ * - Valida autenticación y permisos de forma segura sin exponer datos sensibles
+ */
+
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
@@ -19,8 +27,9 @@ export const ProtectedRoute = ({
 
   // ✅ SEGURIDAD: Log seguro (sin exponer datos sensibles)
   if (process.env.NODE_ENV === 'development') {
-    console.log('🛡️ ProtectedRoute - Verificando acceso');
-    console.log('🔐 Roles requeridos:', requiredRoles);
+    // 🔧 DEBUG (descomentar solo en desarrollo):
+    // console.log('🛡️ ProtectedRoute - Verificando acceso');
+    // console.log('🔐 Roles requeridos:', requiredRoles);
     // NO loguear user completo - potencialmente sensible
   }
 
@@ -31,7 +40,8 @@ export const ProtectedRoute = ({
   // Si no está autenticado, redirigir a login
   if (!isAuthenticated()) {
     if (process.env.NODE_ENV === 'development') {
-      console.warn('⚠️ Usuario no autenticado - redirigiendo a login');
+      // 🔧 DEBUG (descomentar solo en desarrollo):
+      // console.warn('⚠️ Usuario no autenticado - redirigiendo a login');
     }
     
     // Log seguro de evento de seguridad
@@ -59,7 +69,8 @@ export const ProtectedRoute = ({
     // ✅ SEGURIDAD: Si acceso denegado, registrar evento seguro (sin exponer datos)
     if (!hasPermission) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('❌ Acceso denegado - roles insuficientes');
+        // 🔧 DEBUG (descomentar solo en desarrollo):
+        // console.warn('❌ Acceso denegado - roles insuficientes');
       }
 
       logSecurityEvent('unauthorized_access_attempt', {
@@ -73,14 +84,18 @@ export const ProtectedRoute = ({
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ Acceso permitido');
+      // 🔧 DEBUG (descomentar solo en desarrollo):
+      // console.log('✅ Acceso permitido');
     }
   }
 
   return element;
 };
 
-// Página de acceso denegado - CORREGIDA: Sin datos sensibles
+/**
+ * 🚫 UnauthorizedPage - Página de acceso denegado
+ * Mostrada cuando un usuario intenta acceder a una ruta sin permisos suficientes
+ */
 export const UnauthorizedPage = () => {
   const { user } = useAuth();
 

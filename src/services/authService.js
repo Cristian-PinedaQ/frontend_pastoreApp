@@ -66,28 +66,37 @@ class authService {
   }
 
   // Registro de nuevo usuario
-  async register(userData) {
-  try {
-    console.log("📨 Enviando datos al backend:", userData);
+  async register(username, email, password, roleName) {
+    try {
+      console.log("📨 Enviando datos al backend:", { username, email, roleName });
 
-    const res = await fetch(`${API_URL}/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userData),
-    });
+      // ✅ CORRECCIÓN: Usar this.baseURL y estructura correcta
+      const res = await fetch(`${this.baseURL}/register`, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          username,
+          email,
+          password,
+          roleName: roleName.toUpperCase() // ✅ Asegurar que sea mayúscula
+        })
+      });
 
-    if (!res.ok) throw new Error("Error registrando usuario.");
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Error registrando usuario');
+      }
 
-    const data = await res.json();
-    console.log("⬅️ Respuesta backend al registrar:", data);
+      const data = await res.json();
+      console.log("⬅️ Respuesta backend al registrar:", data);
 
-    // NO guardar token ni user en register
-    return data; 
-  } catch (error) {
-    console.error("❌ Error al registrar usuario:", error);
-    throw error;
+      // NO guardar token ni user en register
+      return data; 
+    } catch (error) {
+      console.error("❌ Error al registrar usuario:", error);
+      throw error;
+    }
   }
-}
 
   // Verificar si el token es válido
   isTokenValid() {

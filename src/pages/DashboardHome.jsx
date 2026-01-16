@@ -2,13 +2,24 @@ import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
 import { useAuth } from '../context/AuthContext';
 
+/**
+ * 📊 DashboardHome - Panel Principal
+ * 
+ * ℹ️ VERSIÓN OPTIMIZADA PARA PRODUCCIÓN:
+ * - Todos los console.log están comentados para mejor rendimiento
+ * - Si necesitas debuggear, busca las líneas con "// 🔧 DEBUG" y descomenta
+ * - Los filtros funcionan correctamente:
+ *   • Miembros: isActive === true
+ *   • Cohortes: status === 'PENDING' || status === 'ACTIVE'
+ */
+
 export const DashboardHome = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
     totalMembers: 0,
     totalEnrollments: 0,
-    totalLeaders: 0,
-    totalCbi: 0,
+    totalLessons: 0,
+    totalAttendance: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -19,20 +30,46 @@ export const DashboardHome = () => {
         setLoading(true);
         setError(null);
 
-        const membersRes = await apiService.getMembers(0, 1);
-        const enrollmentsRes = await apiService.getEnrollmentsCard(0, 1);
+        // ✅ OBTENER MIEMBROS ACTIVOS
+        const membersRes = await apiService.getAllMembers();
+        // 🔧 DEBUG (descomentar solo en desarrollo):
+        // console.log("📊 Todos los miembros:", membersRes);
+        
+        // ✅ Filtrar solo miembros ACTIVOS (isActive = true)
+        const activeMembersCount = Array.isArray(membersRes)
+          ? membersRes.filter(member => member.isActive === true).length
+          : 0;
+        
+        // 🔧 DEBUG (descomentar solo en desarrollo):
+        // console.log("✅ Miembros activos (isActive=true):", activeMembersCount);
 
-        const totalMembers = membersRes?.totalElements || 0;
-        const totalEnrollments = enrollmentsRes?.totalElements || 0;
+        // ✅ OBTENER COHORTES PENDIENTES/EN CURSO O ACTIVAS
+        const enrollmentsRes = await apiService.getEnrollments();
+        // 🔧 DEBUG (descomentar solo en desarrollo):
+        // console.log("📊 Todas las cohortes:", enrollmentsRes);
+        // console.log("🔴 Valores de status en todas las cohortes:");
+        // enrollmentsRes?.forEach((e, i) => console.log(`   Cohorte ${i}: ${e.cohortName} = status: ${e.status}`));
+        
+        // ✅ Filtrar cohortes PENDIENTES o ACTIVAS (en curso)
+        // Status posibles: PENDING, ACTIVE, COMPLETED, CANCELLED, etc.
+        const activeEnrollmentsCount = Array.isArray(enrollmentsRes)
+          ? enrollmentsRes.filter(enrollment => 
+              enrollment.status === 'PENDING' || enrollment.status === 'ACTIVE'
+            ).length
+          : 0;
+        
+        // 🔧 DEBUG (descomentar solo en desarrollo):
+        // console.log("✅ Cohortes pendientes/activas (status=PENDING o ACTIVE):", activeEnrollmentsCount);
 
         setStats({
-          totalMembers,
-          totalEnrollments,
+          totalMembers: activeMembersCount,
+          totalEnrollments: activeEnrollmentsCount,
           totalLessons: 0,
           totalAttendance: 0,
         });
       } catch (err) {
-        console.error('Error:', err);
+        // 🔧 DEBUG (descomentar solo en desarrollo):
+        // console.error('❌ Error al cargar estadísticas:', err);
         setError('No se pudieron cargar las estadísticas');
       } finally {
         setLoading(false);
@@ -74,13 +111,13 @@ export const DashboardHome = () => {
       {/* ========== STAT CARDS CON GRADIENTES STUDIENTSPAGE ========== */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
-          title="Miembros" 
+          title="Miembros Activos" 
           value={stats.totalMembers} 
           icon="👥" 
           gradient="stat-card-primary"
         />
         <StatCard 
-          title="Cohortes" 
+          title="Cohortes Activas" 
           value={stats.totalEnrollments} 
           icon="🗂️" 
           gradient="stat-card-export"

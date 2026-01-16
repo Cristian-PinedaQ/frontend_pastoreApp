@@ -2,41 +2,41 @@
 // UsersPage.jsx - VERSIÓN SEGURA
 // ============================================
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import authService from '../services/authService';
-import { logError } from '../utils/securityLogger';
-import { throttle } from 'lodash';
-import '../css/UsersPage.css';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import authService from "../services/authService";
+import { logError } from "../utils/securityLogger";
+import { throttle } from "lodash";
+import "../css/UsersPage.css";
 
 const UsersPage = () => {
   const { user, hasRole } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
   const [formData, setFormData] = useState({
-    username: '',
-    email: '',
-    password: '',
-    role: 'PROFESORES'
+    username: "",
+    email: "",
+    password: "",
+    role: "PROFESORES",
   });
 
   // ✅ SEGURIDAD: Mapeo de errores seguros
   const ERROR_MESSAGES = {
-    UNAUTHORIZED: 'No tienes permisos para acceder a esta página',
-    VALIDATION_ERROR: 'Datos inválidos. Por favor verifica los campos',
-    SERVER_ERROR: 'Error al procesar la solicitud. Intenta más tarde',
-    NETWORK_ERROR: 'Error de conexión. Verifica tu internet',
-    CONFLICT: 'El usuario ya existe',
-    NOT_FOUND: 'El usuario no fue encontrado'
+    UNAUTHORIZED: "No tienes permisos para acceder a esta página",
+    VALIDATION_ERROR: "Datos inválidos. Por favor verifica los campos",
+    SERVER_ERROR: "Error al procesar la solicitud. Intenta más tarde",
+    NETWORK_ERROR: "Error de conexión. Verifica tu internet",
+    CONFLICT: "El usuario ya existe",
+    NOT_FOUND: "El usuario no fue encontrado",
   };
 
   // ✅ SEGURIDAD: Logger seguro sin exponer detalles
-  const handleError = (errorCode, context = '') => {
+  const handleError = (errorCode, context = "") => {
     logError({
       code: errorCode,
       context,
@@ -50,19 +50,19 @@ const UsersPage = () => {
   // ✅ SEGURIDAD: Validación de contraseña fuerte
   const validatePassword = (password) => {
     const errors = [];
-    if (password.length < 12) errors.push('Mínimo 12 caracteres');
-    if (!/[A-Z]/.test(password)) errors.push('Debe contener mayúscula');
-    if (!/[a-z]/.test(password)) errors.push('Debe contener minúscula');
-    if (!/[0-9]/.test(password)) errors.push('Debe contener número');
+    if (password.length < 12) errors.push("Mínimo 12 caracteres");
+    if (!/[A-Z]/.test(password)) errors.push("Debe contener mayúscula");
+    if (!/[a-z]/.test(password)) errors.push("Debe contener minúscula");
+    if (!/[0-9]/.test(password)) errors.push("Debe contener número");
     if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
-      errors.push('Debe contener carácter especial');
+      errors.push("Debe contener carácter especial");
     }
     return { valid: errors.length === 0, errors };
   };
 
   // ✅ SEGURIDAD: Solo PASTORES pueden acceder (pero validar en backend siempre)
   useEffect(() => {
-    if (!hasRole('PASTORES')) {
+    if (!hasRole("PASTORES")) {
       setError(ERROR_MESSAGES.UNAUTHORIZED);
       return;
     }
@@ -74,33 +74,33 @@ const UsersPage = () => {
    */
   const loadUsers = async () => {
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
       // Backend DEBE validar rol PASTORES
       const response = await authService.getAllUsers();
-      
+
       // ✅ Sanitizar datos antes de mostrar
-      const sanitizedUsers = response.map(usr => ({
+      const sanitizedUsers = response.map((usr) => ({
         id: usr.id,
         username: escapeHtml(usr.username),
         email: maskEmail(usr.email), // Ocultar email completo
         roles: usr.roles || [],
         enabled: usr.enabled,
-        createdAt: usr.createdAt
+        createdAt: usr.createdAt,
       }));
-      
+
       setUsers(sanitizedUsers);
-      
+
       if (sanitizedUsers.length === 0) {
-        setSuccess('ℹ️ No hay usuarios registrados aún');
+        setSuccess("ℹ️ No hay usuarios registrados aún");
       } else {
         setSuccess(`✅ ${sanitizedUsers.length} usuario(s) cargado(s)`);
       }
     } catch (err) {
       // ✅ SEGURIDAD: No revelar detalles del error
-      handleError('SERVER_ERROR', 'loadUsers');
+      handleError("SERVER_ERROR", "loadUsers");
     } finally {
       setLoading(false);
     }
@@ -110,9 +110,10 @@ const UsersPage = () => {
    * ✅ SEGURIDAD: Enmascarar email en la UI
    */
   const maskEmail = (email) => {
-    const [name, domain] = email.split('@');
+    const [name, domain] = email.split("@");
     const visibleChars = Math.max(1, Math.floor(name.length / 2));
-    const masked = name.substring(0, visibleChars) + '*'.repeat(name.length - visibleChars);
+    const masked =
+      name.substring(0, visibleChars) + "*".repeat(name.length - visibleChars);
     return `${masked}@${domain}`;
   };
 
@@ -121,13 +122,13 @@ const UsersPage = () => {
    */
   const escapeHtml = (text) => {
     const map = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;'
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#039;",
     };
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return text.replace(/[&<>"']/g, (m) => map[m]);
   };
 
   /**
@@ -137,15 +138,15 @@ const UsersPage = () => {
     const errors = [];
 
     if (!formData.username || formData.username.trim().length < 3) {
-      errors.push('Usuario debe tener 3+ caracteres');
+      errors.push("Usuario debe tener 3+ caracteres");
     }
 
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.email)) {
-      errors.push('Email inválido');
+      errors.push("Email inválido");
     }
 
     if (!editingId && !formData.password) {
-      errors.push('Contraseña requerida');
+      errors.push("Contraseña requerida");
     }
 
     if (formData.password) {
@@ -163,13 +164,13 @@ const UsersPage = () => {
    */
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     // Validar en frontend primero
     const validationErrors = validateFormData();
     if (validationErrors.length > 0) {
-      setError(validationErrors.join('. '));
+      setError(validationErrors.join(". "));
       return;
     }
 
@@ -184,7 +185,7 @@ const UsersPage = () => {
           formData.email,
           formData.password // Only if changed
         );
-        setSuccess('✅ Usuario actualizado');
+        setSuccess("✅ Usuario actualizado");
       } else {
         await authService.register(
           formData.username,
@@ -192,27 +193,27 @@ const UsersPage = () => {
           formData.password,
           formData.role
         );
-        setSuccess('✅ Usuario registrado');
+        setSuccess("✅ Usuario registrado");
       }
 
       // Limpiar formulario
       setFormData({
-        username: '',
-        email: '',
-        password: '',
-        role: 'PROFESORES'
+        username: "",
+        email: "",
+        password: "",
+        role: "PROFESORES",
       });
       setEditingId(null);
       setShowForm(false);
       await loadUsers();
     } catch (err) {
       // ✅ SEGURIDAD: Mapear error a mensaje seguro
-      if (err.code === 'CONFLICT') {
-        handleError('CONFLICT', 'handleSubmit');
-      } else if (err.code === 'VALIDATION_ERROR') {
-        handleError('VALIDATION_ERROR', 'handleSubmit');
+      if (err.code === "CONFLICT") {
+        handleError("CONFLICT", "handleSubmit");
+      } else if (err.code === "VALIDATION_ERROR") {
+        handleError("VALIDATION_ERROR", "handleSubmit");
       } else {
-        handleError('SERVER_ERROR', 'handleSubmit');
+        handleError("SERVER_ERROR", "handleSubmit");
       }
     } finally {
       setLoading(false);
@@ -225,22 +226,22 @@ const UsersPage = () => {
   const throttledHandleEdit = throttle(async (userId) => {
     try {
       setLoading(true);
-      setError('');
-      
+      setError("");
+
       const userData = await authService.getUserById(userId);
-      
+
       setFormData({
-        username: userData.username || '',
-        email: maskEmail(userData.email) || '', // Mostrar email enmascarado
-        password: '', // NUNCA pre-llenar contraseña
-        role: userData.roles?.[0] || 'PROFESORES'
+        username: userData.username || "",
+        email: maskEmail(userData.email) || "", // Mostrar email enmascarado
+        password: "", // NUNCA pre-llenar contraseña
+        role: userData.roles?.[0] || "PROFESORES",
       });
-      
+
       setEditingId(userId);
       setShowForm(true);
-      setSuccess('Cargado para editar');
+      setSuccess("Cargado para editar");
     } catch (err) {
-      handleError('SERVER_ERROR', 'handleEdit');
+      handleError("SERVER_ERROR", "handleEdit");
     } finally {
       setLoading(false);
     }
@@ -252,50 +253,52 @@ const UsersPage = () => {
    * ✅ SEGURIDAD: Delete con confirmación y throttling
    */
   const throttledHandleDelete = throttle(async (userId, username) => {
-    if (!window.confirm(
-      `⚠️ ¿Eliminar a "${escapeHtml(username)}"? Esta acción es permanente.`
-    )) {
+    if (
+      !window.confirm(
+        `⚠️ ¿Eliminar a "${escapeHtml(username)}"? Esta acción es permanente.`
+      )
+    ) {
       return;
     }
 
     try {
       setLoading(true);
-      setError('');
-      setSuccess('');
+      setError("");
+      setSuccess("");
 
       // Backend DEBE revalidar que el usuario tiene permisos
       await authService.deleteUser(userId);
       setSuccess(`✅ Usuario eliminado`);
       await loadUsers();
     } catch (err) {
-      if (err.code === 'NOT_FOUND') {
-        handleError('NOT_FOUND', 'handleDelete');
+      if (err.code === "NOT_FOUND") {
+        handleError("NOT_FOUND", "handleDelete");
       } else {
-        handleError('SERVER_ERROR', 'handleDelete');
+        handleError("SERVER_ERROR", "handleDelete");
       }
     } finally {
       setLoading(false);
     }
   }, 2000); // Max 1 request cada 2 segundos
 
-  const handleDelete = (userId, username) => 
+  const handleDelete = (userId, username) =>
     throttledHandleDelete(userId, username);
 
   const handleCancel = () => {
     setFormData({
-      username: '',
-      email: '',
-      password: '',
-      role: 'PROFESORES'
+      username: "",
+      email: "",
+      password: "",
+      role: "PROFESORES",
     });
     setEditingId(null);
     setShowForm(false);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
   };
 
   // ✅ SEGURIDAD: Verificar permisos (aunque backend debe validar)
-  if (!hasRole('PASTORES')) {
+  if (!hasRole("PASTORES")) {
     return (
       <div className="users-container">
         <div className="card">
@@ -318,12 +321,23 @@ const UsersPage = () => {
             <p>Administra usuarios y roles del sistema</p>
           </div>
           <button
-            className={`users-page__btn users-page__btn--${showForm ? 'outline' : 'primary'}`}
-            onClick={() => setShowForm(!showForm)}
+            className={`users-page__btn users-page__btn--${
+              showForm ? "outline" : "primary"
+            }`}
+            onClick={() => {
+              setShowForm(!showForm);
+              setEditingId(null); // ✅ Limpiar siempre
+              setFormData({
+                username: "",
+                email: "",
+                password: "",
+                role: "PROFESORES",
+              });
+            }}
             disabled={loading}
-            title={showForm ? 'Cancelar formulario' : 'Crear nuevo usuario'}
+            title={showForm ? "Cancelar formulario" : "Crear nuevo usuario"}
           >
-            {showForm ? '❌ Cancelar' : '➕ Nuevo Usuario'}
+            {showForm ? "❌ Cancelar" : "➕ Nuevo Usuario"}
           </button>
         </div>
 
@@ -344,9 +358,9 @@ const UsersPage = () => {
         {showForm && (
           <div className="card users-page__form-card">
             <h2 className="users-page__form-title">
-              {editingId ? '✏️ Editar Usuario' : '🆕 Crear Nuevo Usuario'}
+              {editingId ? "✏️ Editar Usuario" : "🆕 Crear Nuevo Usuario"}
             </h2>
-            
+
             <form onSubmit={handleSubmit} className="users-page__form">
               <div className="users-page__form-row">
                 <div className="users-page__form-group">
@@ -356,14 +370,18 @@ const UsersPage = () => {
                     id="username"
                     name="username"
                     value={formData.username}
-                    onChange={(e) => setFormData({...formData, username: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, username: e.target.value })
+                    }
                     placeholder="ejemplo: johndoe"
                     required
                     disabled={loading}
                     minLength="3"
                     maxLength="50"
                   />
-                  <small>3-50 caracteres, letras, números, puntos, guiones</small>
+                  <small>
+                    3-50 caracteres, letras, números, puntos, guiones
+                  </small>
                 </div>
 
                 <div className="users-page__form-group">
@@ -373,7 +391,9 @@ const UsersPage = () => {
                     id="email"
                     name="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
                     placeholder="john@ejemplo.com"
                     required
                     disabled={loading}
@@ -386,23 +406,29 @@ const UsersPage = () => {
               <div className="users-page__form-row">
                 <div className="users-page__form-group">
                   <label htmlFor="password">
-                    Contraseña *
-                    {editingId && ' (opcional)'}
+                    Contraseña *{editingId && " (opcional)"}
                   </label>
                   <input
                     type="password"
                     id="password"
                     name="password"
                     value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    placeholder={editingId ? 'Dejar en blanco si no deseas cambiar' : 'Contraseña segura'}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    placeholder={
+                      editingId
+                        ? "Dejar en blanco si no deseas cambiar"
+                        : "Contraseña segura"
+                    }
                     required={!editingId}
                     disabled={loading}
                     minLength="12"
                     maxLength="100"
                   />
                   <small>
-                    Mínimo 12 caracteres: mayúscula, minúscula, número, carácter especial
+                    Mínimo 12 caracteres: mayúscula, minúscula, número, carácter
+                    especial
                   </small>
                 </div>
 
@@ -413,7 +439,9 @@ const UsersPage = () => {
                       id="role"
                       name="role"
                       value={formData.role}
-                      onChange={(e) => setFormData({...formData, role: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({ ...formData, role: e.target.value })
+                      }
                       disabled={loading}
                     >
                       <option value="PASTORES">🙏 Pastores</option>
@@ -431,7 +459,7 @@ const UsersPage = () => {
                   className="users-page__btn users-page__btn--primary"
                   disabled={loading}
                 >
-                  {loading ? '⏳ Guardando...' : '💾 Guardar'}
+                  {loading ? "⏳ Guardando..." : "💾 Guardar"}
                 </button>
                 <button
                   type="button"
@@ -451,7 +479,7 @@ const UsersPage = () => {
           <div className="card users-page__list-card">
             <div className="users-page__list-header">
               <h2>📋 Lista de Usuarios ({users.length})</h2>
-              <button 
+              <button
                 className="users-page__btn users-page__btn--export users-page__btn--sm"
                 onClick={loadUsers}
                 disabled={loading}
@@ -460,7 +488,7 @@ const UsersPage = () => {
                 🔄 Recargar
               </button>
             </div>
-            
+
             {loading ? (
               <div className="users-page__loading">
                 <p>⏳ Cargando usuarios...</p>
@@ -478,26 +506,39 @@ const UsersPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map(usr => (
+                    {users.map((usr) => (
                       <tr key={usr.id}>
-                        <td className="users-page__col-username"><strong>{usr.username}</strong></td>
-                        <td className="users-page__col-email"><small>{usr.email}</small></td>
+                        <td className="users-page__col-username">
+                          <strong>{usr.username}</strong>
+                        </td>
+                        <td className="users-page__col-email">
+                          <small>{usr.email}</small>
+                        </td>
                         <td className="users-page__col-roles">
                           {usr.roles && usr.roles.length > 0 ? (
-                            usr.roles.map(role => (
-                              <span key={role} className="users-page__badge users-page__badge--primary">
+                            usr.roles.map((role) => (
+                              <span
+                                key={role}
+                                className="users-page__badge users-page__badge--primary"
+                              >
                                 {role}
                               </span>
                             ))
                           ) : (
-                            <span className="users-page__text-muted">Sin rol</span>
+                            <span className="users-page__text-muted">
+                              Sin rol
+                            </span>
                           )}
                         </td>
                         <td className="users-page__col-status">
                           {usr.enabled ? (
-                            <span className="users-page__badge users-page__badge--success">✅ Activo</span>
+                            <span className="users-page__badge users-page__badge--success">
+                              ✅ Activo
+                            </span>
                           ) : (
-                            <span className="users-page__badge users-page__badge--danger">❌ Inactivo</span>
+                            <span className="users-page__badge users-page__badge--danger">
+                              ❌ Inactivo
+                            </span>
                           )}
                         </td>
                         <td className="users-page__col-actions">
@@ -528,7 +569,7 @@ const UsersPage = () => {
             ) : (
               <div className="users-page__empty">
                 <p>👤 No hay usuarios registrados aún.</p>
-                <button 
+                <button
                   className="users-page__btn users-page__btn--primary"
                   onClick={() => setShowForm(true)}
                 >
@@ -543,9 +584,17 @@ const UsersPage = () => {
         <div className="users-page__info">
           <h3>ℹ️ Información de Permisos</h3>
           <ul className="users-page__info-list">
-            <li><strong>Usuarios mostrados:</strong> <span>{users.length}</span></li>
-            <li><strong>Rol actual:</strong> <span>{user?.roles?.join(', ') || 'Sin rol'}</span></li>
-            <li><strong>Estado seguridad:</strong> <span>✅ Validación backend activa</span></li>
+            <li>
+              <strong>Usuarios mostrados:</strong> <span>{users.length}</span>
+            </li>
+            <li>
+              <strong>Rol actual:</strong>{" "}
+              <span>{user?.roles?.join(", ") || "Sin rol"}</span>
+            </li>
+            <li>
+              <strong>Estado seguridad:</strong>{" "}
+              <span>✅ Validación backend activa</span>
+            </li>
           </ul>
         </div>
       </div>

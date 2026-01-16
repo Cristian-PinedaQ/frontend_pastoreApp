@@ -58,7 +58,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<EnrollmentsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_PROFESORES']}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_GANANDO', 'ROLE_AREAS', 'ROLE_PROFESORES']}
                 />
               }
             />
@@ -69,7 +69,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<StudentsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_GANANDO', 'ROLE_AREAS']}
                 />
               }
             />
