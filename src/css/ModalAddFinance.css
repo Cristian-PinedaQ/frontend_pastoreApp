@@ -1,0 +1,408 @@
+/* 💰 ModalAddFinance.css - ESTILOS MEJORADOS */
+/* ============================================ */
+
+.modal-overlay-finance {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-container-finance {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* HEADER */
+.modal-header-finance {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-header-finance h2 {
+  margin: 0;
+  color: white;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-close-btn-finance {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.2s;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-btn-finance:hover {
+  transform: scale(1.1);
+}
+
+/* BODY */
+.modal-body-finance {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* FORM GROUPS */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select {
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: all 0.3s;
+  font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+.form-group input.input-error {
+  border-color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.form-group input.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+/* HELP TEXT */
+.help-text {
+  font-weight: 400;
+  color: #6b7280;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+/* ERROR MESSAGE */
+.error-message {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* ========== SELECTOR DE MIEMBROS CON AUTOCOMPLETE ========== */
+
+.member-search-container {
+  position: relative;
+}
+
+.member-search-container input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.member-search-container input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1);
+}
+
+/* LISTA DESPLEGABLE DE MIEMBROS */
+.member-list-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 2px solid #059669;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1001;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.member-item {
+  padding: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.member-item:hover {
+  background-color: #f0fdf4;
+}
+
+.member-item:last-child {
+  border-bottom: none;
+}
+
+.member-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.member-document {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+/* LISTA VACÍA */
+.member-list-empty {
+  padding: 12px;
+  background: #fef2f2;
+  color: #dc2626;
+  text-align: center;
+  font-size: 14px;
+  border: 2px solid #fecaca;
+  border-radius: 0 0 6px 6px;
+}
+
+/* MIEMBRO SELECCIONADO */
+.selected-member-info {
+  padding: 10px;
+  background: #f0fdf4;
+  border-left: 4px solid #059669;
+  color: #047857;
+  font-size: 13px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.selected-member-info strong {
+  font-weight: 600;
+}
+
+/* ========== VALIDACIÓN DE TRANSFERENCIA BANCARIA ========== */
+
+.bank-transfer-notice {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.notice-header {
+  padding: 12px 16px;
+  background: rgba(245, 158, 11, 0.1);
+  font-weight: 600;
+  color: #b45309;
+  font-size: 14px;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.notice-body {
+  padding: 12px 16px;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.notice-checkboxes {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+/* CHECKBOX PERSONALIZADO */
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #059669;
+}
+
+.checkbox-label input[type="checkbox"]:focus {
+  outline: 2px solid #059669;
+  outline-offset: 2px;
+}
+
+/* FORM GROUP CHECKBOX */
+.form-group-checkbox {
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+/* ========== FOOTER ========== */
+
+.modal-footer-finance {
+  display: flex;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+  justify-content: flex-end;
+}
+
+/* BUTTONS */
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-family: inherit;
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+  transform: translateY(-2px);
+}
+
+.btn-submit {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.btn-submit:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ========== RESPONSIVE ========== */
+
+@media (max-width: 600px) {
+  .modal-container-finance {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .modal-header-finance {
+    padding: 16px;
+  }
+
+  .modal-header-finance h2 {
+    font-size: 16px;
+  }
+
+  .modal-body-finance {
+    padding: 16px;
+  }
+
+  .modal-footer-finance {
+    flex-direction: column-reverse;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}
+
+/* ========== SCROLL PERSONALIZADO ========== */
+
+.member-list-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.member-list-dropdown::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.member-list-dropdown::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.member-list-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

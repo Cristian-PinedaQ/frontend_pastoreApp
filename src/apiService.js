@@ -2,6 +2,7 @@
 // ✅ Rutas de endpoint corregidas
 // ✅ MEJORADO: Extrae errores de validación específicos del backend
 // ✅ NUEVO: Métodos para editar cohortes
+// ✅ FIXED: createFinance y updateFinance ahora incluyen recordedBy y registrationDate
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 class ApiService {
@@ -570,6 +571,307 @@ class ApiService {
     return this.request(`/users/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // ========== 💰 FINANZAS ==========
+
+  /**
+   * ✅ Obtener todas las finanzas paginado
+   */
+  async getFinances(page = 0, limit = 10) {
+    try {
+      console.log('📡 [getFinances] Obteniendo finanzas - Página:', page);
+
+      const response = await this.request(`/finances?page=${page}&limit=${limit}`);
+
+      console.log('✅ [getFinances] Finanzas obtenidas:', response?.content?.length || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener una finanza por ID
+   */
+  async getFinanceById(id) {
+    try {
+      console.log('📡 [getFinanceById] Obteniendo finanza ID:', id);
+
+      const response = await this.request(`/finances/${id}`);
+
+      console.log('✅ [getFinanceById] Finanza obtenida');
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinanceById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Crear nueva finanza
+   * 🔧 FIXED: Ahora incluye recordedBy, registrationDate e isVerified
+   */
+  async createFinance(financeData) {
+    try {
+      console.log('📤 [createFinance] Creando nueva finanza');
+      console.log('   Datos:', financeData);
+
+      const body = {
+        memberId: financeData.memberId,
+        memberName: financeData.memberName,
+        amount: financeData.amount,
+        incomeConcept: financeData.incomeConcept,
+        incomeMethod: financeData.incomeMethod,
+        description: financeData.description || '',
+        recordedBy: financeData.recordedBy,  // ✅ INCLUIDO
+        registrationDate: financeData.registrationDate,  // ✅ INCLUIDO
+        isVerified: financeData.isVerified,  // ✅ AHORA INCLUIDO
+      };
+
+      console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
+
+      const response = await this.request('/finances', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+
+      console.log('✅ [createFinance] Finanza creada - ID:', response?.id);
+      return response;
+    } catch (error) {
+      console.error('❌ [createFinance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Actualizar finanza
+   * 🔧 FIXED: Ahora incluye recordedBy, registrationDate e isVerified
+   */
+  async updateFinance(id, financeData) {
+    try {
+      console.log('📝 [updateFinance] Actualizando finanza ID:', id);
+      console.log('   Datos:', financeData);
+
+      const body = {
+        memberId: financeData.memberId,
+        memberName: financeData.memberName,
+        amount: financeData.amount,
+        incomeConcept: financeData.incomeConcept,
+        incomeMethod: financeData.incomeMethod,
+        description: financeData.description || '',
+        recordedBy: financeData.recordedBy,  // ✅ INCLUIDO
+        registrationDate: financeData.registrationDate,  // ✅ INCLUIDO
+        isVerified: financeData.isVerified,  // ✅ AHORA INCLUIDO
+      };
+
+      console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
+
+      const response = await this.request(`/finances/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+
+      console.log('✅ [updateFinance] Finanza actualizada');
+      return response;
+    } catch (error) {
+      console.error('❌ [updateFinance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Eliminar finanza
+   */
+  async deleteFinance(id) {
+    try {
+      console.log('🗑️ [deleteFinance] Eliminando finanza ID:', id);
+
+      const response = await this.request(`/finances/${id}`, {
+        method: 'DELETE',
+      });
+
+      console.log('✅ [deleteFinance] Finanza eliminada');
+      return response;
+    } catch (error) {
+      console.error('❌ [deleteFinance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas por miembro
+   */
+  async getFinancesByMember(memberId, page = 0, limit = 10) {
+    try {
+      console.log('📡 [getFinancesByMember] Obteniendo finanzas del miembro ID:', memberId);
+
+      const response = await this.request(`/finances/member/${memberId}?page=${page}&limit=${limit}`);
+
+      console.log('✅ [getFinancesByMember] Finanzas obtenidas:', response?.content?.length || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinancesByMember] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener total de finanzas por miembro
+   */
+  async getTotalFinancesByMember(memberId) {
+    try {
+      console.log('📡 [getTotalFinancesByMember] Obteniendo total del miembro ID:', memberId);
+
+      const response = await this.request(`/finances/member/${memberId}/total`);
+
+      console.log('✅ [getTotalFinancesByMember] Total obtenido:', response?.totalAmount);
+      return response;
+    } catch (error) {
+      console.error('❌ [getTotalFinancesByMember] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas por rango de fechas
+   */
+  async getFinancesByDateRange(startDate, endDate) {
+    try {
+      console.log('📡 [getFinancesByDateRange] Obteniendo finanzas entre:', startDate, '-', endDate);
+
+      const response = await this.request(
+        `/finances/date-range?startDate=${startDate}&endDate=${endDate}`
+      );
+
+      console.log('✅ [getFinancesByDateRange] Finanzas obtenidas:', response?.length || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinancesByDateRange] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas por mes
+   */
+  async getFinancesByMonth(year, month) {
+    try {
+      console.log('📡 [getFinancesByMonth] Obteniendo finanzas - Mes:', month, 'Año:', year);
+
+      const response = await this.request(`/finances/month/${year}/${month}`);
+
+      console.log('✅ [getFinancesByMonth] Finanzas obtenidas:', response?.total || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinancesByMonth] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas por año
+   */
+  async getFinancesByYear(year) {
+    try {
+      console.log('📡 [getFinancesByYear] Obteniendo finanzas - Año:', year);
+
+      const response = await this.request(`/finances/year/${year}`);
+
+      console.log('✅ [getFinancesByYear] Finanzas obtenidas:', response?.total || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinancesByYear] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas por concepto
+   */
+  async getFinancesByConcept(concept) {
+    try {
+      console.log('📡 [getFinancesByConcept] Obteniendo finanzas - Concepto:', concept);
+
+      const response = await this.request(`/finances/concept/${concept}`);
+
+      console.log('✅ [getFinancesByConcept] Finanzas obtenidas:', response?.total || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinancesByConcept] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas por método de pago
+   */
+  async getFinancesByMethod(method) {
+    try {
+      console.log('📡 [getFinancesByMethod] Obteniendo finanzas - Método:', method);
+
+      const response = await this.request(`/finances/method/${method}`);
+
+      console.log('✅ [getFinancesByMethod] Finanzas obtenidas:', response?.total || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getFinancesByMethod] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas verificadas
+   */
+  async getVerifiedFinances() {
+    try {
+      console.log('📡 [getVerifiedFinances] Obteniendo finanzas verificadas');
+
+      const response = await this.request('/finances/verified');
+
+      console.log('✅ [getVerifiedFinances] Finanzas obtenidas:', response?.total || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getVerifiedFinances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Obtener finanzas no verificadas
+   */
+  async getUnverifiedFinances() {
+    try {
+      console.log('📡 [getUnverifiedFinances] Obteniendo finanzas pendientes');
+
+      const response = await this.request('/finances/unverified');
+
+      console.log('✅ [getUnverifiedFinances] Finanzas obtenidas:', response?.total || 0);
+      return response;
+    } catch (error) {
+      console.error('❌ [getUnverifiedFinances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Verificar una finanza
+   */
+  async verifyFinance(id) {
+    try {
+      console.log('✅ [verifyFinance] Verificando finanza ID:', id);
+
+      const response = await this.request(`/finances/${id}/verify`, {
+        method: 'PATCH',
+      });
+
+      console.log('✅ [verifyFinance] Finanza verificada');
+      return response;
+    } catch (error) {
+      console.error('❌ [verifyFinance] Error:', error.message);
+      throw error;
+    }
   }
 }
 

@@ -11,6 +11,7 @@ import { MembersPage } from './pages/MembersPage';
 import  EnrollmentsPage  from './pages/EnrollmentsPage';
 import  StudentsPage  from './pages/StudentsPage';
 import  UsersPage  from './pages/UsersPage';
+import  FinancesPage  from './pages/FinancesPage';
 import {
   LessonsPage,
   AttendancePage,
@@ -92,6 +93,17 @@ function App() {
                 <ProtectedRoute
                   element={<AttendancePage />}
                   requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_PROFESORES']}
+                />
+              }
+            />
+
+            {/* Finanzas - PASTORES, AREAS */}
+            <Route
+              path="finances"
+              element={
+                <ProtectedRoute
+                  element={<FinancesPage />}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
                 />
               }
             />
