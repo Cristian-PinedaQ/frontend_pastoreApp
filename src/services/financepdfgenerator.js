@@ -365,7 +365,7 @@ export const generateFinancePDF = (data, filename = 'reporte-financiero') => {
         amount: `$ ${(finance.amount || 0).toLocaleString('es-CO')}`,
         concept: getConceptLabel(finance.concept),
         method: getMethodLabel(finance.method),
-        status: finance.isVerified ? '✅ Verificado' : '⏳ Pendiente',
+        status: finance.isVerified ? ' Verificado' : ' Pendiente',
         date: finance.registrationDate
           ? new Date(finance.registrationDate).toLocaleDateString('es-CO')
           : '-',
@@ -595,7 +595,8 @@ const getConceptLabel = (concept) => {
     'OFFERING': 'Ofrenda',
     'SEED_OFFERING': 'Ofrenda de Semilla',
     'BUILDING_FUND': 'Fondo de Construcción',
-    'FIRST_FRUITS': 'Primicias',  // ✅ NUEVO: Primicias
+    'FIRST_FRUITS': 'Primicias',
+    'CELL_GROUP_OFFERING': 'Ofrenda Grupo de Célula',  // ✅ NUEVO: Ofrenda de Grupo de Célula
   };
   return map[concept] || concept;
 };

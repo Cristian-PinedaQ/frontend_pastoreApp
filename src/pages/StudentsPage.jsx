@@ -1,6 +1,7 @@
-// 📚 StudentsPage.jsx - CORREGIDO: Agregar filtro CANCELLED
+// 📚 StudentsPage.jsx - CON DARK MODE COMPLETO
 // ✅ Cambio: Agregado filtro para "Cancelados" en el select de resultado
 // ✅ Cambio: Agregada lógica para filtrar por passed === null Y status === 'CANCELLED' separadamente
+// ✅ DARK MODE: Detección automática + tema dinámico
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
@@ -44,6 +45,56 @@ const StudentsPage = () => {
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
 
   const [statisticsData, setStatisticsData] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // ========== DARK MODE DETECTION ==========
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode') || 
+                             document.documentElement.classList.contains('dark');
+
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(
+        document.documentElement.classList.contains('dark-mode') ||
+        document.documentElement.classList.contains('dark')
+      );
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // ========== THEME COLORS ==========
+  const theme = {
+    bg: isDarkMode ? '#0f172a' : '#f9fafb',
+    bgSecondary: isDarkMode ? '#1e293b' : '#ffffff',
+    text: isDarkMode ? '#f3f4f6' : '#1f2937',
+    textSecondary: isDarkMode ? '#9ca3af' : '#6b7280',
+    border: isDarkMode ? '#334155' : '#e5e7eb',
+    errorBg: isDarkMode ? '#7f1d1d' : '#fee2e2',
+    errorBorder: '#ef4444',
+    errorText: isDarkMode ? '#fecaca' : '#991b1b',
+  };
 
   useEffect(() => {
     loadStudents();
@@ -338,7 +389,7 @@ const StudentsPage = () => {
   };
 
   return (
-    <div className="students-page">
+    <div className="students-page" style={{ backgroundColor: theme.bg, color: theme.text, transition: 'all 0.3s ease' }}>
       <div className="students-page-container">
         <div className="students-page__header">
           <h1>👥 Gestión de Estudiantes</h1>
@@ -355,6 +406,12 @@ const StudentsPage = () => {
                 placeholder="Nombre del estudiante..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
+                style={{
+                  backgroundColor: theme.bgSecondary,
+                  color: theme.text,
+                  borderColor: theme.border,
+                  transition: 'all 0.3s ease',
+                }}
               />
             </div>
 
@@ -365,6 +422,12 @@ const StudentsPage = () => {
                 onChange={(e) => {
                   devLog('🔄 Cambiando filtro de nivel');
                   setSelectedLevel(e.target.value);
+                }}
+                style={{
+                  backgroundColor: theme.bgSecondary,
+                  color: theme.text,
+                  borderColor: theme.border,
+                  transition: 'all 0.3s ease',
                 }}
               >
                 <option value="ALL">Todos los Niveles ({allStudents.length})</option>
@@ -386,6 +449,12 @@ const StudentsPage = () => {
                 onChange={(e) => {
                   devLog('🔄 Cambiando filtro de resultado');
                   setSelectedResultFilter(e.target.value);
+                }}
+                style={{
+                  backgroundColor: theme.bgSecondary,
+                  color: theme.text,
+                  borderColor: theme.border,
+                  transition: 'all 0.3s ease',
                 }}
               >
                 <option value="ALL">Todos los Estados</option>
@@ -433,7 +502,7 @@ const StudentsPage = () => {
           </div>
         </div>
 
-        <div className="students-page__filter-info">
+        <div className="students-page__filter-info" style={{ color: theme.text, transition: 'color 0.3s ease' }}>
           <p>
             Mostrando <strong>{filteredStudents.length}</strong> de{' '}
             <strong>{allStudents.length}</strong> estudiantes
@@ -443,17 +512,25 @@ const StudentsPage = () => {
         </div>
 
         {error && (
-          <div className="students-page__error">
+          <div
+            className="students-page__error"
+            style={{
+              backgroundColor: theme.errorBg,
+              borderColor: theme.errorBorder,
+              color: theme.errorText,
+              transition: 'all 0.3s ease',
+            }}
+          >
             ❌ {error}
           </div>
         )}
 
         {loading ? (
-          <div className="students-page__loading">
+          <div className="students-page__loading" style={{ color: theme.text }}>
             ⏳ Cargando estudiantes...
           </div>
         ) : filteredStudents.length === 0 ? (
-          <div className="students-page__empty">
+          <div className="students-page__empty" style={{ color: theme.textSecondary }}>
             <p>👤 No hay estudiantes que coincidan con los filtros</p>
             {allStudents.length === 0 && (
               <p className="students-page__empty-hint">
@@ -465,7 +542,7 @@ const StudentsPage = () => {
           <div className="students-page__table-container">
             <table className="students-page__table">
               <thead>
-                <tr>
+                <tr style={{ backgroundColor: theme.bgSecondary, borderColor: theme.border }}>
                   <th className="students-page__col-name">Estudiante</th>
                   <th className="students-page__col-level">Nivel</th>
                   <th className="students-page__col-cohort">Cohorte</th>
@@ -489,6 +566,12 @@ const StudentsPage = () => {
                         ? 'passed'
                         : 'active'
                     }
+                    style={{
+                      backgroundColor: isDarkMode ? '#1a2332' : '#fff',
+                      borderColor: theme.border,
+                      color: theme.text,
+                      transition: 'all 0.3s ease',
+                    }}
                   >
                     <td className="students-page__col-name">
                       <div className="students-page__student-info">
@@ -581,6 +664,21 @@ const StudentsPage = () => {
           generatePDF({ statistics: stats, title: 'Estadísticas de Estudiantes' }, 'statistics-report');
         }}
       />
+
+      <style>{`
+        .students-page {
+          transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .students-page__filter-item input,
+        .students-page__filter-item select {
+          transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+
+        .students-page__table tbody tr {
+          transition: all 0.3s ease;
+        }
+      `}</style>
     </div>
   );
 };

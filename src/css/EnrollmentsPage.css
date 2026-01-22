@@ -1,6 +1,8 @@
-/* ðŸŽ¨ EnrollmentsPage.css - Estilos para v3 con Modales Separados */
+/* 🎨 EnrollmentsPage.css - v4 CON MODO OSCURO COMPLETO */
 
+/* ========== VARIABLES GLOBALES - MODO CLARO ========== */
 :root {
+  /* COLORES PRIMARIOS (Sin cambios en ambos modos) */
   --primary-color: #2563eb;
   --primary-dark: #1d4ed8;
   --primary-light: #60a5fa;
@@ -12,6 +14,19 @@
   --info-color: #3b82f6;
   --success-color: #10b981;
 
+  /* ========== COLORES ADAPTATIVOS - MODO CLARO ========== */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  --bg-gradient-start: #f0f9ff;
+  --bg-gradient-end: #f0fdf4;
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --border-color: #e5e7eb;
+  --border-light: #f3f4f6;
+
+  /* ESCALA DE GRISES - MODO CLARO */
   --gray-50: #f9fafb;
   --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
@@ -23,17 +38,72 @@
   --gray-800: #1f2937;
   --gray-900: #111827;
 
+  /* SOMBRAS */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 
+  /* BORDES Y ESPACIOS */
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
-
   --transition: 300ms ease-in-out;
+}
+
+/* ========== MODO OSCURO - PREFERENCIA DEL SISTEMA ========== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* COLORES ADAPTATIVOS - MODO OSCURO */
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-tertiary: #334155;
+    --bg-gradient-start: #1e293b;
+    --bg-gradient-end: #0f172a;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --border-color: #334155;
+    --border-light: #475569;
+
+    /* ESCALA DE GRISES - MODO OSCURO */
+    --gray-50: #0f172a;
+    --gray-100: #1e293b;
+    --gray-200: #334155;
+    --gray-300: #475569;
+    --gray-400: #64748b;
+    --gray-500: #78909c;
+    --gray-600: #94a3b8;
+    --gray-700: #cbd5e1;
+    --gray-800: #e2e8f0;
+    --gray-900: #f1f5f9;
+  }
+}
+
+/* ========== CLASE ALTERNATIVA PARA MODO OSCURO MANUAL ========== */
+html.dark-mode {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --bg-gradient-start: #1e293b;
+  --bg-gradient-end: #0f172a;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --border-color: #334155;
+  --border-light: #475569;
+
+  --gray-50: #0f172a;
+  --gray-100: #1e293b;
+  --gray-200: #334155;
+  --gray-300: #475569;
+  --gray-400: #64748b;
+  --gray-500: #78909c;
+  --gray-600: #94a3b8;
+  --gray-700: #cbd5e1;
+  --gray-800: #e2e8f0;
+  --gray-900: #f1f5f9;
 }
 
 /* ========== BASE STYLES ========== */
@@ -48,15 +118,17 @@ body {
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: var(--gray-50);
-  color: var(--gray-900);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: background-color var(--transition), color var(--transition);
 }
 
 /* ========== ENROLLMENTS PAGE ========== */
 .enrollments-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #f0f9ff 0%, #f0fdf4 100%);
+  background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
   padding: 20px;
+  transition: background var(--transition);
 }
 
 .page-container {
@@ -74,13 +146,13 @@ body {
 .page-header h1 {
   font-size: 2.5rem;
   font-weight: 700;
-  color: var(--gray-900);
+  color: var(--text-primary);
   margin-bottom: 8px;
 }
 
 .page-header p {
   font-size: 1rem;
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 /* ========== BUTTONS ========== */
@@ -119,12 +191,14 @@ body {
 }
 
 .btn-secondary {
-  background-color: var(--gray-200);
-  color: var(--gray-700);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: var(--gray-300);
+  background-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 .btn-success {
@@ -174,19 +248,20 @@ body {
 
 /* ========== FORM SECTION ========== */
 .form-section {
-  background: white;
+  background: var(--bg-primary);
   border-radius: var(--radius-xl);
   padding: 30px;
   margin-bottom: 30px;
   box-shadow: var(--shadow-lg);
   border-left: 4px solid var(--primary-color);
+  transition: background-color var(--transition);
 }
 
 .form-section h2 {
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 20px;
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 .form-grid {
@@ -205,17 +280,23 @@ body {
 .form-field label {
   font-size: 14px;
   font-weight: 600;
-  color: var(--gray-700);
+  color: var(--text-primary);
 }
 
 .form-field input,
 .form-field select {
   padding: 10px 12px;
-  border: 2px solid var(--gray-200);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
   font-size: 14px;
   font-family: inherit;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
   transition: all var(--transition);
+}
+
+.form-field input::placeholder {
+  color: var(--text-tertiary);
 }
 
 .form-field input:focus,
@@ -223,11 +304,12 @@ body {
   outline: none;
   border-color: var(--primary-color);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background-color: var(--bg-primary);
 }
 
 /* ========== FILTERS SECTION ========== */
 .filters-section {
-  background: white;
+  background: var(--bg-primary);
   border-radius: var(--radius-xl);
   padding: 20px;
   margin-bottom: 20px;
@@ -236,6 +318,7 @@ body {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 15px;
   align-items: flex-end;
+  transition: background-color var(--transition);
 }
 
 .filter-group {
@@ -247,15 +330,17 @@ body {
 .filter-group label {
   font-size: 14px;
   font-weight: 600;
-  color: var(--gray-700);
+  color: var(--text-primary);
 }
 
 .filter-group select {
   padding: 10px 12px;
-  border: 2px solid var(--gray-200);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
   font-size: 14px;
   font-family: inherit;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
   transition: all var(--transition);
 }
 
@@ -267,7 +352,7 @@ body {
 
 .filter-info {
   text-align: center;
-  color: var(--gray-600);
+  color: var(--text-secondary);
   font-size: 14px;
   margin: 15px 0;
 }
@@ -281,7 +366,7 @@ body {
 }
 
 .enrollment-card {
-  background: white;
+  background: var(--bg-primary);
   border-radius: var(--radius-xl);
   padding: 20px;
   box-shadow: var(--shadow-md);
@@ -307,7 +392,7 @@ body {
 .card-header h3 {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--gray-900);
+  color: var(--text-primary);
   flex: 1;
   word-break: break-word;
 }
@@ -320,11 +405,11 @@ body {
 
 .card-body p {
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 .card-body strong {
-  color: var(--gray-700);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -332,7 +417,7 @@ body {
 .empty-message {
   text-align: center;
   padding: 60px 20px;
-  color: var(--gray-500);
+  color: var(--text-tertiary);
   font-size: 16px;
 }
 
@@ -387,7 +472,7 @@ body {
 }
 
 .modal-container {
-  background: white;
+  background: var(--bg-primary);
   border-radius: var(--radius-xl);
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   max-width: 900px;
@@ -395,6 +480,7 @@ body {
   max-height: 90vh;
   overflow-y: auto;
   animation: slideInUp 0.3s ease-in-out;
+  transition: background-color var(--transition);
 }
 
 .modal-header {
@@ -442,11 +528,12 @@ body {
 /* ========== MODAL TABS ========== */
 .modal-tabs {
   display: flex;
-  border-bottom: 2px solid var(--gray-200);
-  background-color: var(--gray-50);
+  border-bottom: 2px solid var(--border-color);
+  background-color: var(--bg-secondary);
   padding: 0;
   gap: 0;
   flex-wrap: wrap;
+  transition: background-color var(--transition);
 }
 
 .tab-btn {
@@ -455,7 +542,7 @@ body {
   padding: 16px 20px;
   font-size: 14px;
   font-weight: 600;
-  color: var(--gray-600);
+  color: var(--text-tertiary);
   cursor: pointer;
   transition: all var(--transition);
   position: relative;
@@ -475,6 +562,8 @@ body {
 /* ========== MODAL BODY ========== */
 .modal-body {
   padding: 24px;
+  background: var(--bg-primary);
+  transition: background-color var(--transition);
 }
 
 .tab-content {
@@ -497,7 +586,7 @@ body {
 .detail-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--gray-500);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -505,20 +594,20 @@ body {
 .detail-value {
   font-size: 16px;
   font-weight: 600;
-  color: var(--gray-900);
+  color: var(--text-primary);
 }
 
 /* ========== ACTIONS SECTION ========== */
 .actions-section {
   margin-top: 30px;
   padding-top: 20px;
-  border-top: 2px solid var(--gray-200);
+  border-top: 2px solid var(--border-color);
 }
 
 .actions-section h3 {
   font-size: 16px;
   font-weight: 700;
-  color: var(--gray-900);
+  color: var(--text-primary);
   margin-bottom: 15px;
 }
 
@@ -546,8 +635,8 @@ body {
 }
 
 .lesson-item {
-  background-color: var(--gray-50);
-  border: 2px solid var(--gray-200);
+  background-color: var(--bg-secondary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 16px;
   transition: all var(--transition);
@@ -569,7 +658,7 @@ body {
 .lesson-header h4 {
   font-size: 14px;
   font-weight: 700;
-  color: var(--gray-900);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -587,7 +676,7 @@ body {
   display: flex;
   gap: 20px;
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 .lesson-info p {
@@ -597,9 +686,9 @@ body {
 .lesson-description {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid var(--gray-200);
+  border-top: 1px solid var(--border-color);
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -611,8 +700,8 @@ body {
 }
 
 .student-item {
-  background-color: var(--gray-50);
-  border: 2px solid var(--gray-200);
+  background-color: var(--bg-secondary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 16px;
   transition: all var(--transition);
@@ -634,7 +723,7 @@ body {
 .student-header h4 {
   font-size: 14px;
   font-weight: 700;
-  color: var(--gray-900);
+  color: var(--text-primary);
   margin: 0;
   flex: 1;
 }
@@ -643,7 +732,7 @@ body {
   display: flex;
   gap: 20px;
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 .student-info p {
@@ -658,8 +747,8 @@ body {
 }
 
 .attendance-item {
-  background-color: var(--gray-50);
-  border: 2px solid var(--gray-200);
+  background-color: var(--bg-secondary);
+  border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 16px;
   transition: all var(--transition);
@@ -677,7 +766,7 @@ body {
 .attendance-header h4 {
   font-size: 14px;
   font-weight: 700;
-  color: var(--gray-900);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -685,7 +774,7 @@ body {
   display: flex;
   gap: 20px;
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--text-secondary);
 }
 
 .attendance-info p {
@@ -826,14 +915,14 @@ body {
 }
 
 .modal-container::-webkit-scrollbar-track {
-  background: var(--gray-100);
+  background: var(--bg-secondary);
 }
 
 .modal-container::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 .modal-container::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-400);
+  background: var(--text-tertiary);
 }

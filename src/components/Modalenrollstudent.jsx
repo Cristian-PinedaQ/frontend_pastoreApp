@@ -1,12 +1,70 @@
-// 📝 ModalEnrollStudent.jsx - Modal para inscribir estudiantes a cohortes
-// Permite seleccionar estudiante, nivel y cohorte disponible
+// 📝 ModalEnrollStudent.jsx - v2 CON MODO OSCURO
+// Modal para inscribir estudiantes a cohortes
+// Legible automáticamente en modo oscuro
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
 
 const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
+  // ========== DARK MODE ==========
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // Tema
+  const themeColors = {
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+    bgLight: isDarkMode ? '#1a2332' : '#f5f7fa',
+    text: isDarkMode ? '#f1f5f9' : '#111827',
+    textSecondary: isDarkMode ? '#cbd5e1' : '#666666',
+    textTertiary: isDarkMode ? '#94a3b8' : '#999999',
+    border: isDarkMode ? '#334155' : '#e0e0e0',
+    borderLight: isDarkMode ? '#475569' : '#f0f0f0',
+    header: isDarkMode
+      ? 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
+      : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    card: isDarkMode ? '#1e293b' : '#ffffff',
+    hover: isDarkMode ? '#334155' : '#f9fafb',
+    selected: isDarkMode ? '#334155' : '#e0e7ff',
+    selectedBorder: isDarkMode ? '#6366f1' : '#667eea',
+    infoBox: isDarkMode ? '#1e3a8a' : '#f0f9ff',
+    infoBorder: isDarkMode ? '#3b82f6' : '#0284c7',
+    infoText: isDarkMode ? '#93c5fd' : '#0c4a6e',
+  };
+
   // ========== ESTADO ==========
-  const [step, setStep] = useState(1); // 1: Seleccionar estudiante, 2: Seleccionar nivel, 3: Seleccionar cohorte
+  const [step, setStep] = useState(1);
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedLevel, setSelectedLevel] = useState(null);
@@ -119,15 +177,11 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
     try {
       console.log('📝 Inscribiendo estudiante...');
-      console.log('  Estudiante:', selectedMember.id);
-      console.log('  Cohorte:', selectedCohort.cohortId);
-
       await apiService.createStudentEnrollment(selectedMember.id, selectedCohort.cohortId);
 
       console.log('✅ Estudiante inscrito exitosamente');
       alert('Estudiante inscrito exitosamente en la cohorte');
 
-      // Resetear y cerrar modal
       handleReset();
       onEnrollmentSuccess();
     } catch (err) {
@@ -157,10 +211,28 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={handleReset}>
-      <div className="modal-container enroll-modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-overlay"
+      style={{
+        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+      }}
+      onClick={handleReset}
+    >
+      <div
+        className="modal-container enroll-modal"
+        style={{
+          backgroundColor: themeColors.bg,
+          color: themeColors.text,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="modal-header">
+        <div
+          className="modal-header"
+          style={{
+            background: themeColors.header,
+          }}
+        >
           <h2 className="modal-title">
             {step === 1 && '👤 Seleccionar Estudiante'}
             {step === 2 && '📚 Seleccionar Nivel'}
@@ -170,23 +242,36 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         </div>
 
         {/* Progress Bar */}
-        <div className="progress-container">
-          <div className="progress-bar">
+        <div
+          className="progress-container"
+          style={{
+            backgroundColor: themeColors.bgLight,
+            borderBottomColor: themeColors.border,
+          }}
+        >
+          <div className="progress-bar" style={{ backgroundColor: themeColors.border }}>
             <div className="progress-fill" style={{ width: `${(step / 3) * 100}%` }}></div>
           </div>
-          <p className="progress-text">Paso {step} de 3</p>
+          <p className="progress-text" style={{ color: themeColors.textSecondary }}>Paso {step} de 3</p>
         </div>
 
         {/* Body */}
         <div className="modal-body">
           {error && (
-            <div className="error-message">
+            <div
+              className="error-message"
+              style={{
+                backgroundColor: isDarkMode ? '#7f1d1d' : '#fee2e2',
+                color: isDarkMode ? '#fca5a5' : '#991b1b',
+                borderLeftColor: isDarkMode ? '#dc2626' : '#ef4444',
+              }}
+            >
               ❌ {error}
             </div>
           )}
 
           {loading ? (
-            <div className="loading-state">
+            <div className="loading-state" style={{ color: themeColors.textSecondary }}>
               ⏳ Cargando información...
             </div>
           ) : (
@@ -201,17 +286,28 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                       value={searchMember}
                       onChange={(e) => setSearchMember(e.target.value)}
                       className="search-input"
+                      style={{
+                        backgroundColor: themeColors.card,
+                        color: themeColors.text,
+                        borderColor: themeColors.border,
+                      }}
                     />
                   </div>
 
                   <div className="options-list">
                     {filteredMembers.length === 0 ? (
-                      <p className="no-options">No hay estudiantes disponibles</p>
+                      <p className="no-options" style={{ color: themeColors.textTertiary }}>
+                        No hay estudiantes disponibles
+                      </p>
                     ) : (
                       filteredMembers.map(member => (
                         <div
                           key={member.id}
                           className={`option-item ${selectedMember?.id === member.id ? 'selected' : ''}`}
+                          style={{
+                            borderColor: selectedMember?.id === member.id ? themeColors.selectedBorder : themeColors.border,
+                            backgroundColor: selectedMember?.id === member.id ? themeColors.selected : themeColors.card,
+                          }}
                           onClick={() => setSelectedMember(member)}
                         >
                           <input
@@ -220,8 +316,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                             onChange={() => setSelectedMember(member)}
                           />
                           <span className="option-text">
-                            <strong>{member.name}</strong>
-                            <small>{member.email}</small>
+                            <strong style={{ color: themeColors.text }}>{member.name}</strong>
+                            <small style={{ color: themeColors.textSecondary }}>{member.email}</small>
                           </span>
                         </div>
                       ))
@@ -229,7 +325,14 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                   </div>
 
                   {selectedMember && (
-                    <div className="selection-summary">
+                    <div
+                      className="selection-summary"
+                      style={{
+                        backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4',
+                        borderLeftColor: isDarkMode ? '#10b981' : '#10b981',
+                        color: isDarkMode ? '#86efac' : '#065f46',
+                      }}
+                    >
                       <p>✅ Estudiante seleccionado: <strong>{selectedMember.name}</strong></p>
                     </div>
                   )}
@@ -239,7 +342,14 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
               {/* PASO 2: Seleccionar Nivel */}
               {step === 2 && (
                 <div className="step-content">
-                  <p className="step-info">
+                  <p
+                    className="step-info"
+                    style={{
+                      backgroundColor: themeColors.infoBox,
+                      borderLeftColor: themeColors.infoBorder,
+                      color: themeColors.infoText,
+                    }}
+                  >
                     Estudiante: <strong>{selectedMember?.name}</strong>
                   </p>
 
@@ -248,6 +358,10 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                       <div
                         key={level.value}
                         className={`option-card ${selectedLevel === level.value ? 'selected' : ''}`}
+                        style={{
+                          borderColor: selectedLevel === level.value ? themeColors.selectedBorder : themeColors.border,
+                          backgroundColor: selectedLevel === level.value ? themeColors.selected : themeColors.card,
+                        }}
                         onClick={() => setSelectedLevel(level.value)}
                       >
                         <input
@@ -255,13 +369,20 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                           checked={selectedLevel === level.value}
                           onChange={() => setSelectedLevel(level.value)}
                         />
-                        <span className="card-label">{level.label}</span>
+                        <span className="card-label" style={{ color: themeColors.text }}>{level.label}</span>
                       </div>
                     ))}
                   </div>
 
                   {selectedLevel && (
-                    <div className="selection-summary">
+                    <div
+                      className="selection-summary"
+                      style={{
+                        backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4',
+                        borderLeftColor: isDarkMode ? '#10b981' : '#10b981',
+                        color: isDarkMode ? '#86efac' : '#065f46',
+                      }}
+                    >
                       <p>✅ Nivel seleccionado: <strong>{LEVELS.find(l => l.value === selectedLevel)?.label}</strong></p>
                     </div>
                   )}
@@ -271,14 +392,21 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
               {/* PASO 3: Seleccionar Cohorte */}
               {step === 3 && (
                 <div className="step-content">
-                  <p className="step-info">
+                  <p
+                    className="step-info"
+                    style={{
+                      backgroundColor: themeColors.infoBox,
+                      borderLeftColor: themeColors.infoBorder,
+                      color: themeColors.infoText,
+                    }}
+                  >
                     Estudiante: <strong>{selectedMember?.name}</strong><br />
                     Nivel: <strong>{LEVELS.find(l => l.value === selectedLevel)?.label}</strong>
                   </p>
 
                   <div className="cohorts-list">
                     {availableCohorts.length === 0 ? (
-                      <p className="no-options">
+                      <p className="no-options" style={{ color: themeColors.textTertiary }}>
                         No hay cohortes disponibles para este nivel
                       </p>
                     ) : (
@@ -286,6 +414,10 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                         <div
                           key={cohort.cohortId}
                           className={`cohort-item ${selectedCohort?.cohortId === cohort.cohortId ? 'selected' : ''}`}
+                          style={{
+                            borderColor: selectedCohort?.cohortId === cohort.cohortId ? themeColors.selectedBorder : themeColors.border,
+                            backgroundColor: selectedCohort?.cohortId === cohort.cohortId ? themeColors.selected : themeColors.card,
+                          }}
                           onClick={() => setSelectedCohort(cohort)}
                         >
                           <input
@@ -294,13 +426,23 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                             onChange={() => setSelectedCohort(cohort)}
                           />
                           <div className="cohort-info">
-                            <strong>{cohort.cohortName}</strong>
-                            <p>
-                              Maestro: {cohort.maestro?.name || 'No asignado'} | 
+                            <strong style={{ color: themeColors.text }}>{cohort.cohortName}</strong>
+                            <p style={{ color: themeColors.textSecondary }}>
+                              Maestro: {cohort.maestro?.name || 'No asignado'} |
                               Estudiantes: {cohort.currentStudents}/{cohort.maxStudents} |
                               Espacios: {cohort.availableSpots}
                             </p>
-                            <span className={`status-badge ${cohort.available ? 'available' : 'full'}`}>
+                            <span
+                              className={`status-badge ${cohort.available ? 'available' : 'full'}`}
+                              style={{
+                                backgroundColor: cohort.available
+                                  ? isDarkMode ? '#064e3b' : '#d1fae5'
+                                  : isDarkMode ? '#7f1d1d' : '#fee2e2',
+                                color: cohort.available
+                                  ? isDarkMode ? '#86efac' : '#065f46'
+                                  : isDarkMode ? '#fca5a5' : '#991b1b',
+                              }}
+                            >
                               {cohort.available ? '✅ Disponible' : '❌ Llena'}
                             </span>
                           </div>
@@ -310,7 +452,14 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                   </div>
 
                   {selectedCohort && (
-                    <div className="selection-summary">
+                    <div
+                      className="selection-summary"
+                      style={{
+                        backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4',
+                        borderLeftColor: isDarkMode ? '#10b981' : '#10b981',
+                        color: isDarkMode ? '#86efac' : '#065f46',
+                      }}
+                    >
                       <p>✅ Cohorte seleccionada: <strong>{selectedCohort.cohortName}</strong></p>
                     </div>
                   )}
@@ -321,11 +470,22 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         </div>
 
         {/* Footer */}
-        <div className="modal-footer">
+        <div
+          className="modal-footer"
+          style={{
+            backgroundColor: themeColors.bgLight,
+            borderTopColor: themeColors.border,
+          }}
+        >
           <button
             className="btn-secondary"
             onClick={handlePrevious}
             disabled={step === 1 || loading}
+            style={{
+              backgroundColor: themeColors.bgSecondary,
+              color: themeColors.text,
+              borderColor: themeColors.border,
+            }}
           >
             ← Anterior
           </button>
@@ -351,6 +511,10 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           <button
             className="btn-tertiary"
             onClick={handleReset}
+            style={{
+              color: themeColors.textSecondary,
+              borderColor: themeColors.border,
+            }}
           >
             ✕ Cancelar
           </button>
@@ -364,35 +528,36 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 1000;
           animation: fadeIn 0.3s ease-in-out;
+          padding: 20px;
+          transition: background-color 300ms ease-in-out;
         }
 
         .modal-container {
-          background: white;
           border-radius: 12px;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
           max-width: 700px;
-          width: 95%;
+          width: 100%;
           max-height: 90vh;
           overflow-y: auto;
           animation: slideInUp 0.3s ease-in-out;
           display: flex;
           flex-direction: column;
+          transition: all 300ms ease-in-out;
         }
 
         .modal-header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
           padding: 24px;
           display: flex;
           justify-content: space-between;
           align-items: center;
           border-radius: 12px 12px 0 0;
+          transition: background 300ms ease-in-out;
         }
 
         .modal-title {
@@ -423,16 +588,16 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
         .progress-container {
           padding: 16px 24px;
-          background: #f5f7fa;
-          border-bottom: 1px solid #e0e0e0;
+          border-bottom: 1px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .progress-bar {
           height: 6px;
-          background: #e0e0e0;
           border-radius: 3px;
           overflow: hidden;
           margin-bottom: 8px;
+          transition: background 300ms ease-in-out;
         }
 
         .progress-fill {
@@ -444,29 +609,29 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         .progress-text {
           margin: 0;
           font-size: 12px;
-          color: #666;
           font-weight: 500;
+          transition: color 300ms ease-in-out;
         }
 
         .modal-body {
           flex: 1;
           padding: 24px;
           overflow-y: auto;
+          transition: color 300ms ease-in-out;
         }
 
         .error-message {
-          background: #fee2e2;
-          color: #991b1b;
           padding: 12px 16px;
           border-radius: 8px;
           margin-bottom: 16px;
-          border-left: 4px solid #ef4444;
+          border-left: 4px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .loading-state {
           text-align: center;
           padding: 40px 20px;
-          color: #666;
+          transition: color 300ms ease-in-out;
         }
 
         .step-content {
@@ -476,15 +641,14 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         .step-info {
           margin: 0 0 20px;
           padding: 12px 16px;
-          background: #f0f9ff;
-          border-left: 4px solid #0284c7;
+          border-left: 4px solid;
           border-radius: 6px;
-          color: #0c4a6e;
           font-size: 13px;
+          transition: all 300ms ease-in-out;
         }
 
         .step-info strong {
-          color: #075985;
+          font-weight: 600;
         }
 
         .search-box {
@@ -494,7 +658,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         .search-input {
           width: 100%;
           padding: 10px 12px;
-          border: 1.5px solid #e0e0e0;
+          border: 1.5px solid;
           border-radius: 8px;
           font-size: 14px;
           font-family: inherit;
@@ -519,7 +683,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         .option-item,
         .cohort-item {
           padding: 12px 16px;
-          border: 1.5px solid #e0e0e0;
+          border: 1.5px solid;
           border-radius: 8px;
           cursor: pointer;
           transition: all 0.2s;
@@ -530,14 +694,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
         .option-item:hover,
         .cohort-item:hover {
-          background: #f9fafb;
-          border-color: #667eea;
-        }
-
-        .option-item.selected,
-        .cohort-item.selected {
-          background: #e0e7ff;
-          border-color: #667eea;
+          transform: translateX(4px);
         }
 
         .option-item input,
@@ -554,11 +711,9 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
         .option-text strong {
           font-weight: 600;
-          color: #333;
         }
 
         .option-text small {
-          color: #999;
           font-size: 12px;
         }
 
@@ -568,13 +723,11 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
         .cohort-info strong {
           display: block;
-          color: #333;
           margin-bottom: 4px;
         }
 
         .cohort-info p {
           margin: 0 0 8px;
-          color: #666;
           font-size: 12px;
         }
 
@@ -584,16 +737,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           border-radius: 4px;
           font-size: 11px;
           font-weight: 600;
-        }
-
-        .status-badge.available {
-          background: #d1fae5;
-          color: #065f46;
-        }
-
-        .status-badge.full {
-          background: #fee2e2;
-          color: #991b1b;
+          transition: all 300ms ease-in-out;
         }
 
         .options-grid {
@@ -605,7 +749,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
         .option-card {
           padding: 16px 12px;
-          border: 1.5px solid #e0e0e0;
+          border: 1.5px solid;
           border-radius: 8px;
           cursor: pointer;
           transition: all 0.2s;
@@ -613,13 +757,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         }
 
         .option-card:hover {
-          background: #f9fafb;
-          border-color: #667eea;
-        }
-
-        .option-card.selected {
-          background: #e0e7ff;
-          border-color: #667eea;
+          transform: translateY(-2px);
         }
 
         .option-card input {
@@ -630,24 +768,23 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         .card-label {
           display: block;
           font-weight: 500;
-          color: #333;
           font-size: 13px;
+          transition: color 300ms ease-in-out;
         }
 
         .no-options {
           text-align: center;
-          color: #999;
           padding: 20px;
+          transition: color 300ms ease-in-out;
         }
 
         .selection-summary {
           margin-top: 20px;
           padding: 12px 16px;
-          background: #f0fdf4;
-          border-left: 4px solid #10b981;
+          border-left: 4px solid;
           border-radius: 6px;
-          color: #065f46;
           font-size: 13px;
+          transition: all 300ms ease-in-out;
         }
 
         .modal-footer {
@@ -655,9 +792,9 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           gap: 12px;
           justify-content: flex-end;
           padding: 16px 24px;
-          border-top: 1px solid #e0e0e0;
-          background: #f9fafb;
+          border-top: 1px solid;
           border-radius: 0 0 12px 12px;
+          transition: all 300ms ease-in-out;
         }
 
         .btn-primary,
@@ -683,23 +820,22 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         }
 
         .btn-secondary {
-          background: #e0e0e0;
-          color: #333;
+          border: 1px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .btn-secondary:hover:not(:disabled) {
-          background: #d0d0d0;
+          opacity: 0.8;
         }
 
         .btn-tertiary {
           background: none;
-          color: #666;
-          border: 1px solid #e0e0e0;
+          border: 1px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .btn-tertiary:hover:not(:disabled) {
-          background: #f9fafb;
-          border-color: #999;
+          opacity: 0.8;
         }
 
         .btn-primary:disabled,

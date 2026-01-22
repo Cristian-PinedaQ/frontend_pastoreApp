@@ -1,6 +1,6 @@
-// 👥 MembersPage - Gestión de miembros
-// ✅ CON MODAL DE HISTORIAL DE INSCRIPCIONES
-// ✅ MEJORADO: Muestra errores específicos del backend
+// 👥 MembersPage - Gestión de miembros CON DARK MODE COMPLETO
+// ✅ TOTALMENTE LEGIBLE EN MODO OSCURO
+
 import React, { useState, useEffect, useRef } from "react";
 import apiService from "../apiService";
 import { useAuth } from '../context/AuthContext';
@@ -8,6 +8,54 @@ import { MemberDetailModal } from "../components/MemberDetailModal";
 import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal";
 
 export const MembersPage = () => {
+  // ========== DARK MODE ==========
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // Tema
+  const theme = {
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+    bgHover: isDarkMode ? '#334155' : '#f3f4f6',
+    text: isDarkMode ? '#f1f5f9' : '#111827',
+    textSecondary: isDarkMode ? '#cbd5e1' : '#4b5563',
+    border: isDarkMode ? '#334155' : '#e5e7eb',
+    input: isDarkMode ? '#1e293b' : '#ffffff',
+    error: isDarkMode ? '#7f1d1d' : '#fee2e2',
+    errorText: isDarkMode ? '#fca5a5' : '#991b1b',
+  };
+
   const { hasAnyRole } = useAuth();
   const [members, setMembers] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
@@ -26,17 +74,13 @@ export const MembersPage = () => {
 
   const [selectedMember, setSelectedMember] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-
-  // ✅ NUEVO: Estados para modal de historial
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [enrollmentHistory, setEnrollmentHistory] = useState([]);
   const [historyMemberName, setHistoryMemberName] = useState("");
 
-  // Refs para scroll automático
   const formRef = useRef(null);
   const errorRef = useRef(null);
 
-  // Estados para líder autocomplete
   const [leaderSearchTerm, setLeaderSearchTerm] = useState("");
   const [filteredLeaders, setFilteredLeaders] = useState([]);
   const [showLeaderDropdown, setShowLeaderDropdown] = useState(false);
@@ -60,11 +104,9 @@ export const MembersPage = () => {
   });
 
   useEffect(() => {
-    console.log("📥 Componente montado, cargando miembros...");
     fetchAllMembers();
   }, []);
 
-  // ✅ NUEVO: Hacer scroll automático al error cuando aparezca
   useEffect(() => {
     if (formError && errorRef.current) {
       setTimeout(() => {
@@ -85,7 +127,6 @@ export const MembersPage = () => {
       fetchMembers(0);
     } catch (err) {
       setError(err.message);
-      console.error("Error fetching all members:", err);
     } finally {
       setLoading(false);
     }
@@ -106,7 +147,6 @@ export const MembersPage = () => {
       });
     } catch (err) {
       setError(err.message);
-      console.error("Error fetching members:", err);
     } finally {
       setLoading(false);
     }
@@ -120,7 +160,6 @@ export const MembersPage = () => {
     }));
   };
 
-  // Manejar búsqueda de líder
   const handleLeaderSearch = (value) => {
     setLeaderSearchTerm(value);
     setShowLeaderDropdown(true);
@@ -138,7 +177,6 @@ export const MembersPage = () => {
     setFilteredLeaders(filtered.slice(0, 5));
   };
 
-  // Seleccionar líder
   const handleSelectLeader = (leader) => {
     setSelectedLeader(leader);
     setFormData((prev) => ({
@@ -150,7 +188,6 @@ export const MembersPage = () => {
     setFilteredLeaders([]);
   };
 
-  // Limpiar líder
   const handleClearLeader = () => {
     setSelectedLeader(null);
     setFormData((prev) => ({
@@ -192,9 +229,7 @@ export const MembersPage = () => {
       resetForm();
       fetchAllMembers();
     } catch (err) {
-      // ✅ MEJORADO: Mostrar error en la página en lugar de alert
       setFormError(err.message);
-      console.error("Error al procesar miembro:", err);
     }
   };
 
@@ -225,7 +260,6 @@ export const MembersPage = () => {
     setShowForm(true);
     setFormError(null);
 
-    // Scroll al formulario
     setTimeout(() => {
       if (formRef.current) {
         formRef.current.scrollIntoView({
@@ -249,12 +283,10 @@ export const MembersPage = () => {
   };
 
   const handleViewDetails = (member) => {
-    console.log("👁️ Abriendo detalles para:", member.name);
     setSelectedMember(member);
     setShowDetailModal(true);
   };
 
-  // ✅ NUEVO: Mostrar historial en modal en lugar de alert
   const handleViewEnrollment = async (id, memberName) => {
     try {
       const response = await apiService.getMemberEnrollmentHistory(id);
@@ -270,7 +302,6 @@ export const MembersPage = () => {
       setShowHistoryModal(true);
     } catch (err) {
       alert("❌ Error: " + err.message);
-      console.error("Error en historial:", err);
     }
   };
 
@@ -309,7 +340,6 @@ export const MembersPage = () => {
     setFormError(null);
   };
 
-  // Función para ordenar alfabéticamente
   const sortByName = (membersArray) => {
     return [...membersArray].sort((a, b) => {
       const nameA = (a.name || "").toLowerCase().trim();
@@ -332,594 +362,418 @@ export const MembersPage = () => {
 
   const canEdit = hasAnyRole(["ROLE_PASTORES", "ROLE_GANANDO"]);
 
+  // Componente de Input Reutilizable
+  const Input = ({ label, ...props }) => (
+    <div style={{ gridColumn: props.gridColumn }}>
+      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: theme.text, marginBottom: '0.5rem' }}>
+        {label}
+      </label>
+      <input
+        {...props}
+        style={{
+          width: '100%',
+          padding: '0.5rem 1rem',
+          border: `2px solid ${theme.border}`,
+          borderRadius: '0.5rem',
+          backgroundColor: theme.input,
+          color: theme.text,
+          fontSize: '0.875rem',
+          boxSizing: 'border-box',
+          ...props.style
+        }}
+      />
+    </div>
+  );
+
+  // Componente de Select Reutilizable
+  const Select = ({ label, options, ...props }) => (
+    <div style={{ gridColumn: props.gridColumn }}>
+      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: theme.text, marginBottom: '0.5rem' }}>
+        {label}
+      </label>
+      <select
+        {...props}
+        style={{
+          width: '100%',
+          padding: '0.5rem 1rem',
+          border: `2px solid ${theme.border}`,
+          borderRadius: '0.5rem',
+          backgroundColor: theme.input,
+          color: theme.text,
+          fontSize: '0.875rem',
+          boxSizing: 'border-box',
+          ...props.style
+        }}
+      >
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   return (
-    <div className="space-y-6 p-4 lg:p-0">
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
-            👥 Miembros
-          </h1>
-          <p className="text-gray-600 text-xs sm:text-sm mt-1">
-            {isSearching
-              ? `${filteredMembers.length} resultados encontrados`
-              : `Total: ${pagination.totalElements} miembros`}
-          </p>
-        </div>
-        {canEdit && (
-          <button
-            onClick={() => {
-              resetForm();
-              setShowForm(!showForm);
-              if (!showForm) {
-                setTimeout(() => {
-                  if (formRef.current) {
-                    formRef.current.scrollIntoView({
-                      behavior: "smooth",
-                      block: "start",
-                    });
-                  }
-                }, 100);
-              }
-            }}
-            className="w-full sm:w-auto bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
-          >
-            {showForm ? "Cancelar" : "+ Agregar Miembro"}
-          </button>
-        )}
-      </div>
-
-      {/* Error general */}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm">
-          {error}
-        </div>
-      )}
-
-      {/* Formulario */}
-      {showForm && canEdit && (
-        <div ref={formRef} className="bg-white rounded-lg shadow-lg p-4 sm:p-6 animate-slide-in-up">
-          <h2 className="text-lg sm:text-xl font-bold mb-4">
-            {editingId ? "✏️ Editar Miembro" : "➕ Nuevo Miembro"}
-          </h2>
-
-          {/* ✅ NUEVO: Mostrar errores del formulario CON SCROLL AUTOMÁTICO */}
-          {formError && (
-            <div 
-              ref={errorRef}
-              className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm animate-pulse"
+    <div style={{
+      backgroundColor: theme.bg,
+      color: theme.text,
+      minHeight: '100vh',
+      padding: '1.5rem',
+      transition: 'all 300ms ease-in-out',
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Encabezado */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
+          <div>
+            <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', margin: 0 }}>👥 Miembros</h1>
+            <p style={{ color: theme.textSecondary, fontSize: '0.875rem', marginTop: '0.25rem', margin: 0 }}>
+              {isSearching ? `${filteredMembers.length} resultados` : `Total: ${pagination.totalElements} miembros`}
+            </p>
+          </div>
+          {canEdit && (
+            <button
+              onClick={() => { resetForm(); setShowForm(!showForm); }}
+              style={{
+                backgroundColor: '#2563eb',
+                color: 'white',
+                padding: '0.5rem 1.5rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+              }}
             >
-              <p className="font-semibold mb-2">❌ Error de validación:</p>
-              <p className="whitespace-pre-wrap">{formError}</p>
-            </div>
+              {showForm ? "Cancelar" : "+ Agregar"}
+            </button>
           )}
+        </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-          >
-            {/* CAMPOS BÁSICOS */}
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Nombre Completo *
-              </label>
-              <input
-                type="text"
-                name="name"
-                placeholder="Nombre completo"
-                value={formData.name}
-                onChange={handleInputChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
+        {/* Error */}
+        {error && (
+          <div style={{
+            backgroundColor: theme.error,
+            color: theme.errorText,
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            fontSize: '0.875rem',
+            border: `1px solid ${isDarkMode ? '#dc2626' : '#f87171'}`,
+          }}>
+            {error}
+          </div>
+        )}
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Correo Electrónico *
-              </label>
-              <input
-                type="email"
-                name="email"
-                placeholder="correo@ejemplo.com"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
+        {/* Formulario */}
+        {showForm && canEdit && (
+          <div ref={formRef} style={{
+            backgroundColor: theme.bg,
+            borderRadius: '0.5rem',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+            padding: '1.5rem',
+            border: `1px solid ${theme.border}`,
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem', margin: 0 }}>
+              {editingId ? "✏️ Editar" : "➕ Nuevo"}
+            </h2>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Teléfono
-              </label>
-              <input
-                type="tel"
-                name="phone"
-                placeholder="Teléfono"
-                value={formData.phone}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
+            {formError && (
+              <div ref={errorRef} style={{
+                marginBottom: '1rem',
+                backgroundColor: theme.error,
+                color: theme.errorText,
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                fontSize: '0.875rem',
+                border: `1px solid ${isDarkMode ? '#991b1b' : '#fecaca'}`,
+              }}>
+                <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', margin: 0 }}>❌ Error:</p>
+                <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{formError}</p>
+              </div>
+            )}
 
-            {/* CAMPO LÍDER CON AUTOCOMPLETE */}
-            <div className="sm:col-span-2 relative">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Líder
-              </label>
-              <div className="relative">
+            <form onSubmit={handleSubmit} style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1rem',
+            }}>
+              <Input label="Nombre Completo *" type="text" name="name" placeholder="Nombre" value={formData.name} onChange={handleInputChange} required gridColumn="1 / -1" />
+              <Input label="Email *" type="email" name="email" placeholder="email@ejemplo.com" value={formData.email} onChange={handleInputChange} required />
+              <Input label="Teléfono" type="tel" name="phone" placeholder="Teléfono" value={formData.phone} onChange={handleInputChange} />
+
+              <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
+                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: theme.text, marginBottom: '0.5rem' }}>Líder</label>
                 <input
                   type="text"
-                  placeholder="Busca un miembro como líder..."
+                  placeholder="Buscar líder..."
                   value={leaderSearchTerm}
                   onChange={(e) => handleLeaderSearch(e.target.value)}
-                  onFocus={() =>
-                    leaderSearchTerm && setShowLeaderDropdown(true)
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  onFocus={() => leaderSearchTerm && setShowLeaderDropdown(true)}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 1rem',
+                    paddingRight: '2.5rem',
+                    border: `2px solid ${theme.border}`,
+                    borderRadius: '0.5rem',
+                    backgroundColor: theme.input,
+                    color: theme.text,
+                    fontSize: '0.875rem',
+                    boxSizing: 'border-box',
+                  }}
                 />
 
                 {selectedLeader && (
                   <button
                     type="button"
                     onClick={handleClearLeader}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
-                    title="Limpiar selección"
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      color: theme.textSecondary,
+                      cursor: 'pointer',
+                      fontSize: '1.25rem',
+                    }}
                   >
                     ✕
                   </button>
                 )}
 
                 {showLeaderDropdown && filteredLeaders.length > 0 && (
-                  <div className="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                  <div style={{
+                    position: 'absolute',
+                    zIndex: 50,
+                    width: '100%',
+                    backgroundColor: theme.input,
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '0.5rem',
+                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                    marginTop: '0.25rem',
+                    maxHeight: '12rem',
+                    overflowY: 'auto',
+                  }}>
                     {filteredLeaders.map((leader) => (
                       <button
                         key={leader.id}
                         type="button"
                         onClick={() => handleSelectLeader(leader)}
-                        className="w-full text-left px-4 py-2 hover:bg-blue-100 border-b last:border-b-0 transition"
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '0.5rem 1rem',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          borderBottom: `1px solid ${theme.border}`,
+                          transition: 'background-color 200ms',
+                          color: theme.text,
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = theme.bgHover}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                       >
-                        <div className="font-semibold text-sm text-gray-900">
-                          {leader.name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {leader.email}
-                        </div>
+                        <div style={{ fontWeight: 'bold', fontSize: '0.875rem' }}>{leader.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: theme.textSecondary }}>{leader.email}</div>
                       </button>
                     ))}
                   </div>
                 )}
 
                 {selectedLeader && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded-lg border border-blue-200 animate-fade-in">
-                    <p className="text-sm font-semibold text-blue-900">
-                      ✅ {selectedLeader.name}
-                    </p>
-                    <p className="text-xs text-blue-600">
-                      Distrito: {selectedLeader.district}
-                    </p>
+                  <div style={{
+                    marginTop: '0.5rem',
+                    padding: '0.5rem',
+                    backgroundColor: isDarkMode ? '#1e3a8a' : '#eff6ff',
+                    borderRadius: '0.5rem',
+                    border: `1px solid ${isDarkMode ? '#3b82f6' : '#bfdbfe'}`,
+                  }}>
+                    <p style={{ fontSize: '0.875rem', fontWeight: 'bold', margin: 0 }}>✅ {selectedLeader.name}</p>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* CAMPOS ADICIONALES */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Distrito
-              </label>
-              <select
-                name="district"
-                value={formData.district}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              <Select label="Distrito" name="district" value={formData.district} onChange={handleInputChange} options={[
+                { value: '', label: 'Seleccionar' },
+                { value: 'D1', label: 'Distrito 1' },
+                { value: 'D2', label: 'Distrito 2' },
+                { value: 'D3', label: 'Distrito 3' },
+                { value: 'Pastores', label: 'Pastores' },
+              ]} />
+
+              <Select label="Tipo de Documento" name="documentType" value={formData.documentType} onChange={handleInputChange} options={[
+                { value: '', label: 'Seleccionar' },
+                { value: 'C.C.', label: 'Cedula' },
+                { value: 'T.I.', label: 'Tarjeta de identidad' },
+                { value: 'Pasaporte', label: 'Pasaporte' },
+                { value: 'C.E.', label: 'Cedula de Extranjeria' },
+                { value: 'Otro', label: 'Otro' },
+              ]} />
+
+              <Input label="Número de Documento" type="text" name="document" placeholder="Número" value={formData.document} onChange={handleInputChange} />
+
+              <Select label="Género" name="gender" value={formData.gender} onChange={handleInputChange} options={[
+                { value: '', label: 'Seleccionar' },
+                { value: 'Masculino', label: 'Masculino' },
+                { value: 'Femenino', label: 'Femenino' },
+              ]} />
+
+              <Select label="Estado Civil" name="maritalStatus" value={formData.maritalStatus} onChange={handleInputChange} options={[
+                { value: '', label: 'Seleccionar' },
+                { value: 'Soltero', label: 'Soltero' },
+                { value: 'Casado', label: 'Casado' },
+                { value: 'Union Libre', label: 'Union Libre' },
+                { value: 'Divorciado', label: 'Divorciado' },
+                { value: 'Viudo', label: 'Viudo' },
+              ]} />
+
+              <Input label="Dirección" type="text" name="address" placeholder="Dirección" value={formData.address} onChange={handleInputChange} gridColumn="1 / -1" />
+              <Input label="Ciudad" type="text" name="city" placeholder="Ciudad" value={formData.city} onChange={handleInputChange} />
+              <Input label="Profesión" type="text" name="profession" placeholder="Profesión" value={formData.profession} onChange={handleInputChange} />
+              <Input label="Fecha de Nacimiento" type="date" name="birthdate" value={formData.birthdate} onChange={handleInputChange} />
+
+              <Select label="Estado Laboral" name="employmentStatus" value={formData.employmentStatus} onChange={handleInputChange} options={[
+                { value: '', label: 'Seleccionar' },
+                { value: 'Empleado', label: 'Empleado' },
+                { value: 'Desempleado', label: 'Desempleado' },
+                { value: 'Independiente', label: 'Independiente' },
+                { value: 'Estudiante', label: 'Estudiante' },
+                { value: 'Jubilado', label: 'Jubilado' },
+              ]} />
+
+              <button
+                type="submit"
+                style={{
+                  gridColumn: '1 / -1',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  padding: '0.5rem 1.5rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                }}
               >
-                <option value="">Seleccionar</option>
-                <option value="D1">Distrito 1</option>
-                <option value="D2">Distrito 2</option>
-                <option value="D3">Distrito 3</option>
-                <option value="Pastores">Pastores</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Tipo de Documento
-              </label>
-              <select
-                name="documentType"
-                value={formData.documentType}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="">Seleccionar</option>
-                <option value="C.C.">Cedula</option>
-                <option value="T.I.">Tarjeta de identidad</option>
-                <option value="Pasaporte">Pasaporte</option>
-                <option value="C.E.">Cedula de Extranjeria</option>
-                <option value="Otro">otro</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Número de Documento
-              </label>
-              <input
-                type="text"
-                name="document"
-                placeholder="Número de documento"
-                value={formData.document}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Género
-              </label>
-              <select
-                name="gender"
-                value={formData.gender}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="">Seleccionar</option>
-                <option value="Masculino">Masculino</option>
-                <option value="Femenino">Femenino</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Estado Civil
-              </label>
-              <select
-                name="maritalStatus"
-                value={formData.maritalStatus}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="">Seleccionar</option>
-                <option value="Soltero">Soltero</option>
-                <option value="Casado">Casado</option>
-                <option value="Divorciado">Divorciado</option>
-                <option value="Viudo">Viudo</option>
-              </select>
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Dirección
-              </label>
-              <input
-                type="text"
-                name="address"
-                placeholder="Dirección completa"
-                value={formData.address}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Ciudad
-              </label>
-              <input
-                type="text"
-                name="city"
-                placeholder="Ciudad"
-                value={formData.city}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Profesión
-              </label>
-              <input
-                type="text"
-                name="profession"
-                placeholder="Profesión"
-                value={formData.profession}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Fecha de Nacimiento
-              </label>
-              <input
-                type="date"
-                name="birthdate"
-                value={formData.birthdate}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Estado Laboral
-              </label>
-              <select
-                name="employmentStatus"
-                value={formData.employmentStatus}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              >
-                <option value="">Seleccionar</option>
-                <option value="Empleado">Empleado</option>
-                <option value="Desempleado">Desempleado</option>
-                <option value="Independiente">Independiente</option>
-                <option value="Estudiante">Estudiante</option>
-                <option value="Jubilado">Jubilado</option>
-              </select>
-            </div>
-
-            {/* BOTONES */}
-            <button
-              type="submit"
-              className="sm:col-span-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition text-sm font-semibold"
-            >
-              {editingId ? "✏️ Actualizar" : "➕ Crear"}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* Búsqueda */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <input
-          type="text"
-          placeholder="🔍 Buscar por nombre o email..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-        />
-        {isSearching && (
-          <p className="text-xs sm:text-sm text-gray-600 mt-2">
-            ✅ Buscando en {allMembers.length} miembros -{" "}
-            {filteredMembers.length} resultado(s)
-          </p>
+                {editingId ? "✏️ Actualizar" : "➕ Crear"}
+              </button>
+            </form>
+          </div>
         )}
-      </div>
 
-      {/* Tabla de miembros - Responsive */}
-      {loading ? (
-        <div className="text-center py-8">⏳ Cargando...</div>
-      ) : displayMembers.length === 0 ? (
-        <div className="text-center py-8 text-gray-600 text-sm">
-          {isSearching
-            ? "❌ No hay miembros que coincidan con tu búsqueda"
-            : "📭 No hay miembros registrados"}
+        {/* Búsqueda */}
+        <div style={{
+          backgroundColor: theme.bg,
+          borderRadius: '0.5rem',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          padding: '1rem',
+          border: `1px solid ${theme.border}`,
+        }}>
+          <input
+            type="text"
+            placeholder="🔍 Buscar..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '0.5rem 1rem',
+              border: `1px solid ${theme.border}`,
+              borderRadius: '0.5rem',
+              backgroundColor: theme.input,
+              color: theme.text,
+              fontSize: '0.875rem',
+              boxSizing: 'border-box',
+            }}
+          />
+          {isSearching && (
+            <p style={{ fontSize: '0.75rem', color: theme.textSecondary, marginTop: '0.5rem', margin: 0 }}>
+              ✅ {filteredMembers.length} resultado(s)
+            </p>
+          )}
         </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <div className="bg-white rounded-lg shadow-lg">
-            {/* Vista Tabla - Desktop */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-100 border-b">
-                  <tr>
-                    <th className="px-4 lg:px-6 py-3 text-left text-gray-700 font-semibold text-sm">
-                      Nombre
-                    </th>
-                    <th className="px-4 lg:px-6 py-3 text-left text-gray-700 font-semibold text-sm hidden lg:table-cell">
-                      Email
-                    </th>
-                    <th className="px-4 lg:px-6 py-3 text-left text-gray-700 font-semibold text-sm hidden lg:table-cell">
-                      Teléfono
-                    </th>
-                    <th className="px-4 lg:px-6 py-3 text-left text-gray-700 font-semibold text-sm hidden xl:table-cell">
-                      Líder
-                    </th>
+
+        {/* Tabla */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>⏳ Cargando...</div>
+        ) : displayMembers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
+            {isSearching ? "❌ Sin resultados" : "📭 No hay miembros"}
+          </div>
+        ) : (
+          <div style={{
+            backgroundColor: theme.bg,
+            borderRadius: '0.5rem',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+            border: `1px solid ${theme.border}`,
+            overflowX: 'auto',
+          }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ backgroundColor: theme.bgSecondary, borderBottom: `1px solid ${theme.border}` }}>
+                <tr>
+                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Nombre</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Email</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Teléfono</th>
+                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Líder</th>
+                  {canEdit && <th style={{ padding: '1rem', textAlign: 'center', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Acciones</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {displayMembers.map((member) => (
+                  <tr key={member.id} style={{
+                    borderBottom: `1px solid ${theme.border}`,
+                    transition: 'background-color 200ms',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.bgHover}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <td style={{ padding: '1rem', fontSize: '0.875rem', fontWeight: '500', color: theme.text }}>{member.name}</td>
+                    <td style={{ padding: '1rem', fontSize: '0.875rem', color: theme.text }}>{member.email}</td>
+                    <td style={{ padding: '1rem', fontSize: '0.875rem', color: theme.text }}>{member.phone || "-"}</td>
+                    <td style={{ padding: '1rem', fontSize: '0.875rem', color: theme.text }}>
+                      {member.leader ? (
+                        <span style={{
+                          backgroundColor: isDarkMode ? '#1e3a8a' : '#bfdbfe',
+                          color: isDarkMode ? '#93c5fd' : '#0c4a6e',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.25rem',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold',
+                        }}>
+                          {member.leader.name}
+                        </span>
+                      ) : <span style={{ color: theme.textSecondary }}>—</span>}
+                    </td>
                     {canEdit && (
-                      <th className="px-4 lg:px-6 py-3 text-center text-gray-700 font-semibold text-sm">
-                        Acciones
-                      </th>
+                      <td style={{ padding: '1rem', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <button onClick={() => handleViewDetails(member)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Detalles">📇</button>
+                          <button onClick={() => handleEdit(member)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Editar">✏️</button>
+                          <button onClick={() => handleViewEnrollment(member.id, member.name)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Historial">📋</button>
+                          <button onClick={() => handleEnrollNext(member.id)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Siguiente">📈</button>
+                          <button onClick={() => handleDelete(member.id)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Eliminar">❌</button>
+                        </div>
+                      </td>
                     )}
                   </tr>
-                </thead>
-                <tbody>
-                  {displayMembers.map((member) => (
-                    <tr key={member.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 lg:px-6 py-4 text-sm font-medium">
-                        {member.name}
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 text-sm hidden lg:table-cell">
-                        {member.email}
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 text-sm hidden lg:table-cell">
-                        {member.phone || "-"}
-                      </td>
-                      <td className="px-4 lg:px-6 py-4 text-sm hidden xl:table-cell">
-                        {member.leader ? (
-                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
-                            {member.leader.name}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-
-                      {canEdit && (
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="flex gap-1 justify-center flex-wrap">
-                            <button
-                              onClick={() => handleViewDetails(member)}
-                              className="btn-view btn-sm w-16"
-                              title="Ver detalles"
-                            >
-                              📇
-                            </button>
-                            <button
-                              onClick={() => handleEdit(member)}
-                              className="btn-edit btn-sm w-16"
-                              title="Editar"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => handleViewEnrollment(member.id, member.name)}
-                              className="btn-history btn-sm w-16"
-                              title="Historial"
-                            >
-                              📋
-                            </button>
-                            <button
-                              onClick={() => handleEnrollNext(member.id)}
-                              className="btn-next btn-sm w-16"
-                              title="Siguiente"
-                            >
-                              📈
-                            </button>
-                            <button
-                              onClick={() => handleDelete(member.id)}
-                              className="btn-delete btn-sm w-16"
-                              title="Eliminar"
-                            >
-                              ❌
-                            </button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Vista Tarjetas - Mobile y Tablet */}
-            <div className="md:hidden space-y-3 p-4">
-              {displayMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className="border rounded-lg p-4 space-y-3 hover:shadow-md transition"
-                >
-                  {/* Información del miembro */}
-                  <div>
-                    <h3 className="font-bold text-base text-gray-900">
-                      {member.name}
-                    </h3>
-                    <p className="text-xs text-gray-600">{member.email}</p>
-                    {member.phone && (
-                      <p className="text-xs text-gray-600">📱 {member.phone}</p>
-                    )}
-                    {member.leader && (
-                      <p className="text-xs text-blue-600 font-semibold">
-                        👤 Líder: {member.leader.name}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Botones - Grid responsivo */}
-                  {canEdit && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t">
-                      <button
-                        onClick={() => handleViewDetails(member)}
-                        className="btn-view py-2 text-xs font-semibold flex flex-col items-center gap-1"
-                        title="Ver detalles"
-                      >
-                        <span>📇</span>
-                        <span className="hidden sm:block">Detalles</span>
-                      </button>
-                      <button
-                        onClick={() => handleEdit(member)}
-                        className="btn-edit py-2 text-xs font-semibold flex flex-col items-center gap-1"
-                        title="Editar"
-                      >
-                        <span>✏️</span>
-                        <span className="hidden sm:block">Editar</span>
-                      </button>
-                      <button
-                        onClick={() => handleViewEnrollment(member.id, member.name)}
-                        className="btn-history py-2 text-xs font-semibold flex flex-col items-center gap-1"
-                        title="Historial"
-                      >
-                        <span>📋</span>
-                        <span className="hidden sm:block">Historial</span>
-                      </button>
-                      <button
-                        onClick={() => handleEnrollNext(member.id)}
-                        className="btn-next py-2 text-xs font-semibold flex flex-col items-center gap-1"
-                        title="Siguiente"
-                      >
-                        <span>📈</span>
-                        <span className="hidden sm:block">Siguiente</span>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(member.id)}
-                        className="btn-delete col-span-2 sm:col-span-1 py-2 text-xs font-semibold flex flex-col items-center gap-1"
-                        title="Eliminar"
-                      >
-                        <span>❌</span>
-                        <span className="hidden sm:block">Eliminar</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Paginación */}
-      {!isSearching && pagination.totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 px-4 py-3 bg-gray-50 border-t rounded-lg">
-          <p className="text-xs sm:text-sm text-gray-600">
-            Página {pagination.currentPage + 1} de {pagination.totalPages}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() =>
-                fetchMembers(Math.max(0, pagination.currentPage - 1))
-              }
-              disabled={pagination.currentPage === 0}
-              className="px-3 sm:px-4 py-1 text-xs sm:text-sm bg-gray-300 text-gray-700 rounded disabled:opacity-50 hover:bg-gray-400"
-            >
-              ← Anterior
-            </button>
-            <button
-              onClick={() => fetchMembers(pagination.currentPage + 1)}
-              disabled={pagination.currentPage >= pagination.totalPages - 1}
-              className="px-3 sm:px-4 py-1 text-xs sm:text-sm bg-gray-300 text-gray-700 rounded disabled:opacity-50 hover:bg-gray-400"
-            >
-              Siguiente →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ✅ NUEVO: Modal de Historial de Inscripciones */}
-      <EnrollmentHistoryModal
-        isOpen={showHistoryModal}
-        history={enrollmentHistory}
-        memberName={historyMemberName}
-        onClose={() => setShowHistoryModal(false)}
-      />
-
-      {/* Modal de Detalles */}
-      {showDetailModal && selectedMember && (
-        <MemberDetailModal
-          member={selectedMember}
-          onClose={() => {
-            setShowDetailModal(false);
-            setSelectedMember(null);
-          }}
-          onUpdated={() => {
-            fetchAllMembers();
-          }}
+        {/* Modales */}
+        <EnrollmentHistoryModal
+          isOpen={showHistoryModal}
+          history={enrollmentHistory}
+          memberName={historyMemberName}
+          onClose={() => setShowHistoryModal(false)}
         />
-      )}
+
+        {showDetailModal && selectedMember && (
+          <MemberDetailModal
+            member={selectedMember}
+            onClose={() => { setShowDetailModal(false); setSelectedMember(null); }}
+            onUpdated={() => fetchAllMembers()}
+          />
+        )}
+      </div>
     </div>
   );
 };

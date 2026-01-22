@@ -1,5 +1,5 @@
 // ============================================
-// UsersPage.jsx - VERSIÓN SEGURA
+// UsersPage.jsx - VERSIÓN SEGURA CON DARK MODE
 // ============================================
 
 import React, { useState, useEffect } from "react";
@@ -7,9 +7,64 @@ import { useAuth } from "../context/AuthContext";
 import authService from "../services/authService";
 import { logError } from "../utils/securityLogger";
 import { throttle } from "lodash";
-import "../css/UsersPage.css";
 
 const UsersPage = () => {
+  // ========== DARK MODE ==========
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // Tema
+  const theme = {
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+    bgLight: isDarkMode ? '#1a2332' : '#f5f7fa',
+    text: isDarkMode ? '#f1f5f9' : '#111827',
+    textSecondary: isDarkMode ? '#cbd5e1' : '#6b7280',
+    textTertiary: isDarkMode ? '#94a3b8' : '#9ca3af',
+    border: isDarkMode ? '#334155' : '#e5e7eb',
+    input: isDarkMode ? '#1e293b' : '#ffffff',
+    error: isDarkMode ? '#7f1d1d' : '#fee2e2',
+    errorText: isDarkMode ? '#fca5a5' : '#991b1b',
+    errorBorder: isDarkMode ? '#dc2626' : '#ef4444',
+    success: isDarkMode ? '#064e3b' : '#d1fae5',
+    successText: isDarkMode ? '#86efac' : '#065f46',
+    danger: isDarkMode ? '#dc2626' : '#ef4444',
+    dangerHover: isDarkMode ? '#b91c1c' : '#dc2626',
+    primary: isDarkMode ? '#1e40af' : '#2563eb',
+    primaryHover: isDarkMode ? '#1e3a8a' : '#1d4ed8',
+  };
+
   const { user, hasRole } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +97,6 @@ const UsersPage = () => {
       context,
       timestamp: new Date().toISOString(),
       userId: user?.id,
-      // NO incluir detalles de error del servidor
     });
     setError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.SERVER_ERROR);
   };
@@ -60,7 +114,7 @@ const UsersPage = () => {
     return { valid: errors.length === 0, errors };
   };
 
-  // ✅ SEGURIDAD: Solo PASTORES pueden acceder (pero validar en backend siempre)
+  // ✅ SEGURIDAD: Solo PASTORES pueden acceder
   useEffect(() => {
     if (!hasRole("PASTORES")) {
       setError(ERROR_MESSAGES.UNAUTHORIZED);
@@ -78,14 +132,13 @@ const UsersPage = () => {
     setSuccess("");
 
     try {
-      // Backend DEBE validar rol PASTORES
       const response = await authService.getAllUsers();
 
       // ✅ Sanitizar datos antes de mostrar
       const sanitizedUsers = response.map((usr) => ({
         id: usr.id,
         username: escapeHtml(usr.username),
-        email: maskEmail(usr.email), // Ocultar email completo
+        email: maskEmail(usr.email),
         roles: usr.roles || [],
         enabled: usr.enabled,
         createdAt: usr.createdAt,
@@ -99,7 +152,6 @@ const UsersPage = () => {
         setSuccess(`✅ ${sanitizedUsers.length} usuario(s) cargado(s)`);
       }
     } catch (err) {
-      // ✅ SEGURIDAD: No revelar detalles del error
       handleError("SERVER_ERROR", "loadUsers");
     } finally {
       setLoading(false);
@@ -118,7 +170,7 @@ const UsersPage = () => {
   };
 
   /**
-   * ✅ SEGURIDAD: Escapar HTML (React lo hace, pero ser explícito)
+   * ✅ SEGURIDAD: Escapar HTML
    */
   const escapeHtml = (text) => {
     const map = {
@@ -167,7 +219,6 @@ const UsersPage = () => {
     setError("");
     setSuccess("");
 
-    // Validar en frontend primero
     const validationErrors = validateFormData();
     if (validationErrors.length > 0) {
       setError(validationErrors.join(". "));
@@ -178,12 +229,11 @@ const UsersPage = () => {
 
     try {
       if (editingId) {
-        // Backend DEBE revalidar que el usuario tiene permisos
         await authService.updateUser(
           editingId,
           formData.username,
           formData.email,
-          formData.password // Only if changed
+          formData.password
         );
         setSuccess("✅ Usuario actualizado");
       } else {
@@ -196,7 +246,6 @@ const UsersPage = () => {
         setSuccess("✅ Usuario registrado");
       }
 
-      // Limpiar formulario
       setFormData({
         username: "",
         email: "",
@@ -207,7 +256,6 @@ const UsersPage = () => {
       setShowForm(false);
       await loadUsers();
     } catch (err) {
-      // ✅ SEGURIDAD: Mapear error a mensaje seguro
       if (err.code === "CONFLICT") {
         handleError("CONFLICT", "handleSubmit");
       } else if (err.code === "VALIDATION_ERROR") {
@@ -221,7 +269,7 @@ const UsersPage = () => {
   };
 
   /**
-   * ✅ SEGURIDAD: Edit con throttling (máximo 1 request/segundo)
+   * ✅ SEGURIDAD: Edit con throttling
    */
   const throttledHandleEdit = throttle(async (userId) => {
     try {
@@ -232,8 +280,8 @@ const UsersPage = () => {
 
       setFormData({
         username: userData.username || "",
-        email: maskEmail(userData.email) || "", // Mostrar email enmascarado
-        password: "", // NUNCA pre-llenar contraseña
+        email: maskEmail(userData.email) || "",
+        password: "",
         role: userData.roles?.[0] || "PROFESORES",
       });
 
@@ -245,7 +293,7 @@ const UsersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, 1000); // Max 1 request por segundo
+  }, 1000);
 
   const handleEdit = (userId) => throttledHandleEdit(userId);
 
@@ -266,7 +314,6 @@ const UsersPage = () => {
       setError("");
       setSuccess("");
 
-      // Backend DEBE revalidar que el usuario tiene permisos
       await authService.deleteUser(userId);
       setSuccess(`✅ Usuario eliminado`);
       await loadUsers();
@@ -279,7 +326,7 @@ const UsersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, 2000); // Max 1 request cada 2 segundos
+  }, 2000);
 
   const handleDelete = (userId, username) =>
     throttledHandleDelete(userId, username);
@@ -297,14 +344,33 @@ const UsersPage = () => {
     setSuccess("");
   };
 
-  // ✅ SEGURIDAD: Verificar permisos (aunque backend debe validar)
+  // ✅ SEGURIDAD: Verificar permisos
   if (!hasRole("PASTORES")) {
     return (
-      <div className="users-container">
-        <div className="card">
-          <div className="alert alert-danger">
-            <h2>❌ Acceso Denegado</h2>
-            <p>No tienes permisos para acceder a esta página.</p>
+      <div style={{
+        maxWidth: '1200px',
+        margin: '0 auto',
+        padding: '1.5rem',
+      }}>
+        <div style={{
+          backgroundColor: theme.bg,
+          borderRadius: '0.5rem',
+          padding: '2rem',
+          border: `1px solid ${theme.border}`,
+        }}>
+          <div style={{
+            backgroundColor: theme.error,
+            color: theme.errorText,
+            padding: '1.5rem',
+            borderRadius: '0.5rem',
+            border: `1px solid ${theme.errorBorder}`,
+          }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
+              ❌ Acceso Denegado
+            </h2>
+            <p style={{ color: theme.errorText, margin: '0.5rem 0 0 0' }}>
+              No tienes permisos para acceder a esta página.
+            </p>
           </div>
         </div>
       </div>
@@ -312,21 +378,45 @@ const UsersPage = () => {
   }
 
   return (
-    <div className="users-container">
-      <div className="users-page">
+    <div style={{
+      maxWidth: '1200px',
+      margin: '0 auto',
+      backgroundColor: theme.bg,
+      color: theme.text,
+      transition: 'all 300ms ease-in-out',
+    }}>
+      <div style={{ padding: '1.5rem' }}>
         {/* ========== ENCABEZADO ========== */}
-        <div className="users-page__header">
-          <div className="users-page__title">
-            <h1>👥 Gestión de Usuarios</h1>
-            <p>Administra usuarios y roles del sistema</p>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          marginBottom: '1.5rem',
+          gap: '1rem',
+        }}>
+          <div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 'bold', margin: 0 }}>
+              👥 Gestión de Usuarios
+            </h1>
+            <p style={{ color: theme.textSecondary, fontSize: '0.875rem', margin: '0.5rem 0 0 0' }}>
+              Administra usuarios y roles del sistema
+            </p>
           </div>
           <button
-            className={`users-page__btn users-page__btn--${
-              showForm ? "outline" : "primary"
-            }`}
+            style={{
+              backgroundColor: showForm ? 'transparent' : theme.primary,
+              color: showForm ? theme.text : 'white',
+              padding: '0.5rem 1.5rem',
+              borderRadius: '0.5rem',
+              border: `1px solid ${showForm ? theme.border : theme.primary}`,
+              cursor: 'pointer',
+              fontWeight: '600',
+              transition: 'all 300ms ease-in-out',
+              opacity: loading ? 0.6 : 1,
+            }}
             onClick={() => {
               setShowForm(!showForm);
-              setEditingId(null); // ✅ Limpiar siempre
+              setEditingId(null);
               setFormData({
                 username: "",
                 email: "",
@@ -335,6 +425,14 @@ const UsersPage = () => {
               });
             }}
             disabled={loading}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.target.style.backgroundColor = showForm ? theme.bgSecondary : theme.primaryHover;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = showForm ? 'transparent' : theme.primary;
+            }}
             title={showForm ? "Cancelar formulario" : "Crear nuevo usuario"}
           >
             {showForm ? "❌ Cancelar" : "➕ Nuevo Usuario"}
@@ -343,129 +441,260 @@ const UsersPage = () => {
 
         {/* ========== ALERTAS ========== */}
         {error && (
-          <div className="users-page__alert users-page__alert--danger">
+          <div style={{
+            backgroundColor: theme.error,
+            color: theme.errorText,
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '1.5rem',
+            border: `1px solid ${theme.errorBorder}`,
+          }}>
             <strong>Error:</strong> {error}
           </div>
         )}
 
         {success && (
-          <div className="users-page__alert users-page__alert--success">
+          <div style={{
+            backgroundColor: theme.success,
+            color: theme.successText,
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '1.5rem',
+            border: `1px solid ${isDarkMode ? '#10b981' : '#6ee7b7'}`,
+          }}>
             {success}
           </div>
         )}
 
         {/* ========== FORMULARIO ========== */}
         {showForm && (
-          <div className="card users-page__form-card">
-            <h2 className="users-page__form-title">
+          <div style={{
+            backgroundColor: theme.bg,
+            borderRadius: '0.5rem',
+            padding: '1.5rem',
+            marginBottom: '1.5rem',
+            border: `1px solid ${theme.border}`,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          }}>
+            <h2 style={{
+              fontSize: '1.25rem',
+              fontWeight: 'bold',
+              marginBottom: '1.5rem',
+              color: theme.text,
+              margin: 0,
+            }}>
               {editingId ? "✏️ Editar Usuario" : "🆕 Crear Nuevo Usuario"}
             </h2>
 
-            <form onSubmit={handleSubmit} className="users-page__form">
-              <div className="users-page__form-row">
-                <div className="users-page__form-group">
-                  <label htmlFor="username">Usuario *</label>
-                  <input
-                    type="text"
-                    id="username"
-                    name="username"
-                    value={formData.username}
-                    onChange={(e) =>
-                      setFormData({ ...formData, username: e.target.value })
-                    }
-                    placeholder="ejemplo: johndoe"
-                    required
-                    disabled={loading}
-                    minLength="3"
-                    maxLength="50"
-                  />
-                  <small>
-                    3-50 caracteres, letras, números, puntos, guiones
-                  </small>
-                </div>
-
-                <div className="users-page__form-group">
-                  <label htmlFor="email">Email *</label>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    placeholder="john@ejemplo.com"
-                    required
-                    disabled={loading}
-                    maxLength="150"
-                  />
-                  <small>Email válido y único</small>
-                </div>
+            <form onSubmit={handleSubmit} style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '1rem',
+            }}>
+              {/* Usuario */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: theme.text,
+                  marginBottom: '0.5rem',
+                }}>
+                  Usuario *
+                </label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) =>
+                    setFormData({ ...formData, username: e.target.value })
+                  }
+                  placeholder="ejemplo: johndoe"
+                  required
+                  disabled={loading}
+                  minLength="3"
+                  maxLength="50"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 1rem',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '0.5rem',
+                    backgroundColor: theme.input,
+                    color: theme.text,
+                    fontSize: '0.875rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <small style={{ color: theme.textSecondary, display: 'block', marginTop: '0.25rem' }}>
+                  3-50 caracteres
+                </small>
               </div>
 
-              <div className="users-page__form-row">
-                <div className="users-page__form-group">
-                  <label htmlFor="password">
-                    Contraseña *{editingId && " (opcional)"}
+              {/* Email */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: theme.text,
+                  marginBottom: '0.5rem',
+                }}>
+                  Email *
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  placeholder="john@ejemplo.com"
+                  required
+                  disabled={loading}
+                  maxLength="150"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 1rem',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '0.5rem',
+                    backgroundColor: theme.input,
+                    color: theme.text,
+                    fontSize: '0.875rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <small style={{ color: theme.textSecondary, display: 'block', marginTop: '0.25rem' }}>
+                  Email válido y único
+                </small>
+              </div>
+
+              {/* Contraseña */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '600',
+                  color: theme.text,
+                  marginBottom: '0.5rem',
+                }}>
+                  Contraseña * {editingId && "(opcional)"}
+                </label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  placeholder={
+                    editingId
+                      ? "Dejar en blanco si no deseas cambiar"
+                      : "Contraseña segura"
+                  }
+                  required={!editingId}
+                  disabled={loading}
+                  minLength="12"
+                  maxLength="100"
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem 1rem',
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: '0.5rem',
+                    backgroundColor: theme.input,
+                    color: theme.text,
+                    fontSize: '0.875rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                <small style={{ color: theme.textSecondary, display: 'block', marginTop: '0.25rem' }}>
+                  Mínimo 12 caracteres: mayúscula, minúscula, número, carácter especial
+                </small>
+              </div>
+
+              {/* Rol */}
+              {!editingId && (
+                <div>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    fontWeight: '600',
+                    color: theme.text,
+                    marginBottom: '0.5rem',
+                  }}>
+                    Rol *
                   </label>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
+                  <select
+                    value={formData.role}
                     onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
+                      setFormData({ ...formData, role: e.target.value })
                     }
-                    placeholder={
-                      editingId
-                        ? "Dejar en blanco si no deseas cambiar"
-                        : "Contraseña segura"
-                    }
-                    required={!editingId}
                     disabled={loading}
-                    minLength="12"
-                    maxLength="100"
-                  />
-                  <small>
-                    Mínimo 12 caracteres: mayúscula, minúscula, número, carácter
-                    especial
-                  </small>
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 1rem',
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: '0.5rem',
+                      backgroundColor: theme.input,
+                      color: theme.text,
+                      fontSize: '0.875rem',
+                      boxSizing: 'border-box',
+                    }}
+                  >
+                    <option value="PASTORES">🙏 Pastores</option>
+                    <option value="PROFESORES">👨‍🏫 Profesores</option>
+                    <option value="AREAS">📋 Áreas</option>
+                    <option value="GANANDO">🎯 Ganando</option>
+                    <option value="ECONOMICO">🏦 Economico</option>
+                  </select>
                 </div>
+              )}
 
-                {!editingId && (
-                  <div className="users-page__form-group">
-                    <label htmlFor="role">Rol *</label>
-                    <select
-                      id="role"
-                      name="role"
-                      value={formData.role}
-                      onChange={(e) =>
-                        setFormData({ ...formData, role: e.target.value })
-                      }
-                      disabled={loading}
-                    >
-                      <option value="PASTORES">🙏 Pastores</option>
-                      <option value="PROFESORES">👨‍🏫 Profesores</option>
-                      <option value="AREAS">📋 Áreas</option>
-                      <option value="GANANDO">🎯 Ganando</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-
-              <div className="users-page__form-buttons">
+              {/* Botones */}
+              <div style={{
+                gridColumn: '1 / -1',
+                display: 'flex',
+                gap: '1rem',
+                justifyContent: 'flex-end',
+              }}>
                 <button
                   type="submit"
-                  className="users-page__btn users-page__btn--primary"
+                  style={{
+                    backgroundColor: theme.primary,
+                    color: 'white',
+                    padding: '0.5rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    opacity: loading ? 0.6 : 1,
+                  }}
                   disabled={loading}
+                  onMouseEnter={(e) => {
+                    if (!loading) e.target.style.backgroundColor = theme.primaryHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = theme.primary;
+                  }}
                 >
                   {loading ? "⏳ Guardando..." : "💾 Guardar"}
                 </button>
                 <button
                   type="button"
-                  className="users-page__btn users-page__btn--outline"
+                  style={{
+                    backgroundColor: 'transparent',
+                    color: theme.text,
+                    padding: '0.5rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: `1px solid ${theme.border}`,
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    opacity: loading ? 0.6 : 1,
+                  }}
                   onClick={handleCancel}
                   disabled={loading}
+                  onMouseEnter={(e) => {
+                    if (!loading) e.target.style.backgroundColor = theme.bgSecondary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'transparent';
+                  }}
                 >
                   Cancelar
                 </button>
@@ -476,13 +705,46 @@ const UsersPage = () => {
 
         {/* ========== TABLA DE USUARIOS ========== */}
         {!showForm && (
-          <div className="card users-page__list-card">
-            <div className="users-page__list-header">
-              <h2>📋 Lista de Usuarios ({users.length})</h2>
+          <div style={{
+            backgroundColor: theme.bg,
+            borderRadius: '0.5rem',
+            padding: '1.5rem',
+            border: `1px solid ${theme.border}`,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1.5rem',
+            }}>
+              <h2 style={{
+                fontSize: '1.25rem',
+                fontWeight: 'bold',
+                margin: 0,
+                color: theme.text,
+              }}>
+                📋 Lista de Usuarios ({users.length})
+              </h2>
               <button
-                className="users-page__btn users-page__btn--export users-page__btn--sm"
                 onClick={loadUsers}
                 disabled={loading}
+                style={{
+                  backgroundColor: theme.bgSecondary,
+                  color: theme.text,
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: `1px solid ${theme.border}`,
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  opacity: loading ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) e.target.style.backgroundColor = theme.bgLight;
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = theme.bgSecondary;
+                }}
                 title="Recargar usuarios"
               >
                 🔄 Recargar
@@ -490,71 +752,186 @@ const UsersPage = () => {
             </div>
 
             {loading ? (
-              <div className="users-page__loading">
+              <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
                 <p>⏳ Cargando usuarios...</p>
               </div>
             ) : users.length > 0 ? (
-              <div className="users-page__table-container">
-                <table className="users-page__table">
-                  <thead>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                }}>
+                  <thead style={{
+                    backgroundColor: theme.bgSecondary,
+                    borderBottom: `1px solid ${theme.border}`,
+                  }}>
                     <tr>
-                      <th className="users-page__col-username">Usuario</th>
-                      <th className="users-page__col-email">Email</th>
-                      <th className="users-page__col-roles">Roles</th>
-                      <th className="users-page__col-status">Estado</th>
-                      <th className="users-page__col-actions">Acciones</th>
+                      <th style={{
+                        padding: '0.75rem',
+                        textAlign: 'left',
+                        color: theme.text,
+                        fontWeight: '600',
+                        fontSize: '0.875rem',
+                      }}>
+                        Usuario
+                      </th>
+                      <th style={{
+                        padding: '0.75rem',
+                        textAlign: 'left',
+                        color: theme.text,
+                        fontWeight: '600',
+                        fontSize: '0.875rem',
+                      }}>
+                        Email
+                      </th>
+                      <th style={{
+                        padding: '0.75rem',
+                        textAlign: 'left',
+                        color: theme.text,
+                        fontWeight: '600',
+                        fontSize: '0.875rem',
+                      }}>
+                        Roles
+                      </th>
+                      <th style={{
+                        padding: '0.75rem',
+                        textAlign: 'left',
+                        color: theme.text,
+                        fontWeight: '600',
+                        fontSize: '0.875rem',
+                      }}>
+                        Estado
+                      </th>
+                      <th style={{
+                        padding: '0.75rem',
+                        textAlign: 'center',
+                        color: theme.text,
+                        fontWeight: '600',
+                        fontSize: '0.875rem',
+                      }}>
+                        Acciones
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {users.map((usr) => (
-                      <tr key={usr.id}>
-                        <td className="users-page__col-username">
-                          <strong>{usr.username}</strong>
+                      <tr
+                        key={usr.id}
+                        style={{
+                          borderBottom: `1px solid ${theme.border}`,
+                          transition: 'background-color 200ms',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.bgSecondary}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <td style={{
+                          padding: '0.75rem',
+                          color: theme.text,
+                          fontWeight: '500',
+                          fontSize: '0.875rem',
+                        }}>
+                          {usr.username}
                         </td>
-                        <td className="users-page__col-email">
-                          <small>{usr.email}</small>
+                        <td style={{
+                          padding: '0.75rem',
+                          color: theme.text,
+                          fontSize: '0.75rem',
+                        }}>
+                          {usr.email}
                         </td>
-                        <td className="users-page__col-roles">
+                        <td style={{
+                          padding: '0.75rem',
+                          fontSize: '0.875rem',
+                        }}>
                           {usr.roles && usr.roles.length > 0 ? (
-                            usr.roles.map((role) => (
-                              <span
-                                key={role}
-                                className="users-page__badge users-page__badge--primary"
-                              >
-                                {role}
-                              </span>
-                            ))
+                            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              {usr.roles.map((role) => (
+                                <span
+                                  key={role}
+                                  style={{
+                                    backgroundColor: theme.primary,
+                                    color: 'white',
+                                    padding: '0.25rem 0.75rem',
+                                    borderRadius: '0.25rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: '600',
+                                  }}
+                                >
+                                  {role}
+                                </span>
+                              ))}
+                            </div>
                           ) : (
-                            <span className="users-page__text-muted">
-                              Sin rol
-                            </span>
+                            <span style={{ color: theme.textTertiary }}>Sin rol</span>
                           )}
                         </td>
-                        <td className="users-page__col-status">
+                        <td style={{
+                          padding: '0.75rem',
+                          fontSize: '0.875rem',
+                        }}>
                           {usr.enabled ? (
-                            <span className="users-page__badge users-page__badge--success">
+                            <span style={{
+                              backgroundColor: theme.success,
+                              color: theme.successText,
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '0.25rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                            }}>
                               ✅ Activo
                             </span>
                           ) : (
-                            <span className="users-page__badge users-page__badge--danger">
+                            <span style={{
+                              backgroundColor: theme.error,
+                              color: theme.errorText,
+                              padding: '0.25rem 0.75rem',
+                              borderRadius: '0.25rem',
+                              fontSize: '0.75rem',
+                              fontWeight: '600',
+                            }}>
                               ❌ Inactivo
                             </span>
                           )}
                         </td>
-                        <td className="users-page__col-actions">
-                          <div className="users-page__actions">
+                        <td style={{
+                          padding: '0.75rem',
+                          textAlign: 'center',
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            gap: '0.5rem',
+                            justifyContent: 'center',
+                          }}>
                             <button
-                              className="users-page__btn-action users-page__btn-action--edit"
                               onClick={() => handleEdit(usr.id)}
                               disabled={loading}
+                              style={{
+                                backgroundColor: '#f59e0b',
+                                color: 'white',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '0.25rem',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                opacity: loading ? 0.6 : 1,
+                              }}
                               title="Editar usuario"
                             >
                               ✏️
                             </button>
                             <button
-                              className="users-page__btn-action users-page__btn-action--delete"
                               onClick={() => handleDelete(usr.id, usr.username)}
                               disabled={loading}
+                              style={{
+                                backgroundColor: theme.danger,
+                                color: 'white',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '0.25rem',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '0.875rem',
+                                opacity: loading ? 0.6 : 1,
+                              }}
                               title="Eliminar usuario"
                             >
                               🗑️
@@ -567,11 +944,27 @@ const UsersPage = () => {
                 </table>
               </div>
             ) : (
-              <div className="users-page__empty">
-                <p>👤 No hay usuarios registrados aún.</p>
+              <div style={{
+                textAlign: 'center',
+                padding: '2rem',
+                color: theme.textSecondary,
+              }}>
+                <p style={{ fontSize: '1rem', marginBottom: '1rem' }}>
+                  👤 No hay usuarios registrados aún.
+                </p>
                 <button
-                  className="users-page__btn users-page__btn--primary"
                   onClick={() => setShowForm(true)}
+                  style={{
+                    backgroundColor: theme.primary,
+                    color: 'white',
+                    padding: '0.5rem 1.5rem',
+                    borderRadius: '0.5rem',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = theme.primaryHover}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = theme.primary}
                 >
                   ➕ Crear el primer usuario
                 </button>
@@ -581,19 +974,38 @@ const UsersPage = () => {
         )}
 
         {/* ========== INFORMACIÓN ========== */}
-        <div className="users-page__info">
-          <h3>ℹ️ Información de Permisos</h3>
-          <ul className="users-page__info-list">
-            <li>
-              <strong>Usuarios mostrados:</strong> <span>{users.length}</span>
+        <div style={{
+          marginTop: '1.5rem',
+          padding: '1.5rem',
+          backgroundColor: theme.bgSecondary,
+          borderRadius: '0.5rem',
+          border: `1px solid ${theme.border}`,
+        }}>
+          <h3 style={{
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            color: theme.text,
+            marginBottom: '1rem',
+            margin: 0,
+          }}>
+            ℹ️ Información de Permisos
+          </h3>
+          <ul style={{
+            listStyle: 'none',
+            padding: 0,
+            margin: 0,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+          }}>
+            <li style={{ color: theme.textSecondary }}>
+              <strong style={{ color: theme.text }}>Usuarios mostrados:</strong> <span>{users.length}</span>
             </li>
-            <li>
-              <strong>Rol actual:</strong>{" "}
-              <span>{user?.roles?.join(", ") || "Sin rol"}</span>
+            <li style={{ color: theme.textSecondary }}>
+              <strong style={{ color: theme.text }}>Rol actual:</strong> <span>{user?.roles?.join(", ") || "Sin rol"}</span>
             </li>
-            <li>
-              <strong>Estado seguridad:</strong>{" "}
-              <span>✅ Validación backend activa</span>
+            <li style={{ color: theme.textSecondary }}>
+              <strong style={{ color: theme.text }}>Seguridad:</strong> <span>✅ Validación backend</span>
             </li>
           </ul>
         </div>

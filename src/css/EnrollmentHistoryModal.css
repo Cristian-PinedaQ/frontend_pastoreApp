@@ -1,0 +1,625 @@
+/* 📋 EnrollmentHistoryModal.css - v2 CON MODO OSCURO COMPLETO */
+/* ============================================================ */
+
+/* ========== VARIABLES GLOBALES - MODO CLARO ========== */
+:root {
+  /* COLORES PRIMARIOS (No cambian) */
+  --primary-color: #2563eb;
+  --primary-dark: #1e40af;
+  --primary-light: #3b82f6;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --danger-color: #ef4444;
+  --info-color: #0891b2;
+
+  /* ========== COLORES ADAPTATIVOS - MODO CLARO ========== */
+  --bg-modal: #ffffff;
+  --bg-overlay: rgba(0, 0, 0, 0.5);
+  --bg-gradient-start: #eff6ff;
+  --bg-gradient-end: #ffffff;
+  --bg-header: linear-gradient(to right, #2563eb 0%, #1e3a8a 100%);
+  --bg-card: #eff6ff;
+  --bg-secondary: #f3f4f6;
+  --bg-footer: #f9fafb;
+  
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-tertiary: #6b7280;
+  --text-white: #ffffff;
+  --text-subtitle: #3b82f6;
+  
+  --border-color: #e5e7eb;
+  --border-left: #2563eb;
+  
+  --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  --shadow-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  
+  /* ESCALA DE GRISES - MODO CLARO */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* SOMBRAS */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+  /* BORDES Y ESPACIOS */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  --transition-base: 300ms ease-in-out;
+}
+
+/* ========== MODO OSCURO - PREFERENCIA DEL SISTEMA ========== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* COLORES ADAPTATIVOS - MODO OSCURO */
+    --bg-modal: #0f172a;
+    --bg-overlay: rgba(0, 0, 0, 0.7);
+    --bg-gradient-start: #1e293b;
+    --bg-gradient-end: #0f172a;
+    --bg-header: linear-gradient(to right, #2563eb 0%, #1e40af 100%);
+    --bg-card: #1e293b;
+    --bg-secondary: #334155;
+    --bg-footer: #1a2332;
+    
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-tertiary: #94a3b8;
+    --text-white: #f1f5f9;
+    --text-subtitle: #93c5fd;
+    
+    --border-color: #334155;
+    --border-left: #3b82f6;
+    
+    --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    --shadow-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    
+    /* ESCALA DE GRISES - MODO OSCURO */
+    --gray-50: #0f172a;
+    --gray-100: #1e293b;
+    --gray-200: #334155;
+    --gray-300: #475569;
+    --gray-400: #64748b;
+    --gray-500: #78909c;
+    --gray-600: #94a3b8;
+    --gray-700: #cbd5e1;
+    --gray-800: #e2e8f0;
+    --gray-900: #f1f5f9;
+  }
+}
+
+/* ========== CLASE ALTERNATIVA PARA MODO OSCURO MANUAL ========== */
+html.dark-mode {
+  --bg-modal: #0f172a;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+  --bg-gradient-start: #1e293b;
+  --bg-gradient-end: #0f172a;
+  --bg-header: linear-gradient(to right, #2563eb 0%, #1e40af 100%);
+  --bg-card: #1e293b;
+  --bg-secondary: #334155;
+  --bg-footer: #1a2332;
+  
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-white: #f1f5f9;
+  --text-subtitle: #93c5fd;
+  
+  --border-color: #334155;
+  --border-left: #3b82f6;
+  
+  --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  --shadow-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  
+  --gray-50: #0f172a;
+  --gray-100: #1e293b;
+  --gray-200: #334155;
+  --gray-300: #475569;
+  --gray-400: #64748b;
+  --gray-500: #78909c;
+  --gray-600: #94a3b8;
+  --gray-700: #cbd5e1;
+  --gray-800: #e2e8f0;
+  --gray-900: #f1f5f9;
+}
+
+/* ========== BASE STYLES ========== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ========== ANIMACIONES ========== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* ========== MODAL OVERLAY ========== */
+.enrollment-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  animation: fadeIn 0.3s ease-in-out;
+  transition: background-color var(--transition-base);
+}
+
+/* ========== MODAL CONTAINER ========== */
+.enrollment-modal-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--bg-modal);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  max-width: 900px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  z-index: 50;
+  animation: slideUp 0.3s ease-out;
+  transition: background-color var(--transition-base);
+}
+
+/* ========== MODAL HEADER ========== */
+.enrollment-modal-header {
+  position: sticky;
+  top: 0;
+  background: var(--bg-header);
+  color: var(--text-white);
+  padding: var(--spacing-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  z-index: 10;
+}
+
+.enrollment-modal-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-white);
+}
+
+.enrollment-modal-header-subtitle {
+  color: rgba(255, 255, 255, 0.9);
+  margin-top: var(--spacing-sm);
+  font-size: 0.95rem;
+}
+
+.enrollment-modal-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-white);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+}
+
+.enrollment-modal-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ========== MODAL CONTENT ========== */
+.enrollment-modal-content {
+  padding: var(--spacing-lg);
+  background-color: var(--bg-modal);
+  transition: background-color var(--transition-base);
+}
+
+.enrollment-empty-state {
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+
+.enrollment-empty-state-text {
+  color: var(--text-tertiary);
+  font-size: 1.125rem;
+}
+
+/* ========== ENROLLMENT ITEMS ========== */
+.enrollment-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.enrollment-item {
+  border-left: 4px solid var(--border-left);
+  background: linear-gradient(to right, var(--bg-gradient-start), var(--bg-gradient-end));
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  transition: all var(--transition-base);
+}
+
+.enrollment-item:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+/* ========== ENROLLMENT ITEM HEADER ========== */
+.enrollment-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-md);
+}
+
+.enrollment-item-title-section {
+  flex: 1;
+}
+
+.enrollment-item-level {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.enrollment-item-cohort {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.enrollment-item-cohort-value {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ========== STATUS BADGE ========== */
+.enrollment-status-badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all var(--transition-base);
+}
+
+.enrollment-status-active {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #065f46;
+}
+
+@media (prefers-color-scheme: dark) {
+  .enrollment-status-active {
+    background-color: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+  }
+}
+
+html.dark-mode .enrollment-status-active {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
+.enrollment-status-completed {
+  background-color: rgba(37, 99, 235, 0.15);
+  color: #0c4a6e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .enrollment-status-completed {
+    background-color: rgba(37, 99, 235, 0.2);
+    color: #93c5fd;
+  }
+}
+
+html.dark-mode .enrollment-status-completed {
+  background-color: rgba(37, 99, 235, 0.2);
+  color: #93c5fd;
+}
+
+.enrollment-status-cancelled {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #991b1b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .enrollment-status-cancelled {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+  }
+}
+
+html.dark-mode .enrollment-status-cancelled {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+.enrollment-status-pending {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #92400e;
+}
+
+@media (prefers-color-scheme: dark) {
+  .enrollment-status-pending {
+    background-color: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+  }
+}
+
+html.dark-mode .enrollment-status-pending {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+/* ========== ENROLLMENT DETAILS GRID ========== */
+.enrollment-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.enrollment-detail-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.enrollment-detail-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.enrollment-detail-content {
+  flex: 1;
+}
+
+.enrollment-detail-label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xs);
+}
+
+.enrollment-detail-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ========== PROGRESS BAR ========== */
+.enrollment-progress-section {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--border-color);
+}
+
+.enrollment-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-sm);
+}
+
+.enrollment-progress-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.enrollment-progress-percentage {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.enrollment-progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--gray-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.enrollment-progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, var(--primary-color), var(--info-color));
+  border-radius: var(--radius-lg);
+  transition: width var(--transition-base);
+}
+
+.enrollment-progress-fill.high {
+  background: linear-gradient(to right, var(--success-color), #10b981);
+}
+
+.enrollment-progress-fill.medium {
+  background: linear-gradient(to right, var(--warning-color), #f59e0b);
+}
+
+.enrollment-progress-fill.low {
+  background: linear-gradient(to right, var(--danger-color), #ef4444);
+}
+
+/* ========== MODAL FOOTER ========== */
+.enrollment-modal-footer {
+  background-color: var(--bg-footer);
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background-color var(--transition-base);
+}
+
+.enrollment-total-count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.enrollment-total-count-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.enrollment-close-button {
+  background: var(--primary-color);
+  color: var(--text-white);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.enrollment-close-button:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.enrollment-close-button:active {
+  transform: scale(0.98);
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+  .enrollment-modal-container {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .enrollment-modal-header {
+    padding: var(--spacing-md);
+  }
+
+  .enrollment-modal-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .enrollment-modal-content {
+    padding: var(--spacing-md);
+  }
+
+  .enrollment-modal-footer {
+    flex-direction: column-reverse;
+    gap: var(--spacing-md);
+  }
+
+  .enrollment-close-button {
+    width: 100%;
+  }
+
+  .enrollment-details-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .enrollment-modal-container {
+    width: 98%;
+  }
+
+  .enrollment-modal-header {
+    padding: var(--spacing-md);
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .enrollment-modal-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .enrollment-item {
+    padding: var(--spacing-md);
+  }
+
+  .enrollment-details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .enrollment-item-header {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .enrollment-close-button {
+    width: 100%;
+  }
+}
+
+/* ========== SCROLLBAR CUSTOM ========== */
+.enrollment-modal-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.enrollment-modal-container::-webkit-scrollbar-track {
+  background: var(--bg-modal);
+}
+
+.enrollment-modal-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.enrollment-modal-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}

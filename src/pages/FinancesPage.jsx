@@ -70,8 +70,8 @@ const FinancesPage = () => {
   const [editingFinance, setEditingFinance] = useState(null);
 
   // Enums para conceptos e métodos (del backend Java)
-  // ✅ NUEVO: FIRST_FRUITS agregado
-  const INCOME_CONCEPTS = ['TITHE', 'OFFERING', 'SEED_OFFERING', 'BUILDING_FUND', 'FIRST_FRUITS'];
+  // ✅ NUEVO: FIRST_FRUITS y CELL_GROUP_OFFERING agregados
+  const INCOME_CONCEPTS = ['TITHE', 'OFFERING', 'SEED_OFFERING', 'BUILDING_FUND', 'FIRST_FRUITS', 'CELL_GROUP_OFFERING'];
   const INCOME_METHODS = ['CASH', 'BANK_TRANSFER'];
 
   useEffect(() => {
@@ -528,10 +528,11 @@ const FinancesPage = () => {
   const getConceptLabel = (concept) => {
     const map = {
       'TITHE': '💵 Diezmo',
-      'OFFERING': '💝 Ofrenda',
+      'OFFERING': '🎁 Ofrenda',
       'SEED_OFFERING': '🌱 Ofrenda de Semilla',
       'BUILDING_FUND': '🏗️ Fondo de Construcción',
-      'FIRST_FRUITS': '🍇 Primicias',  // ✅ NUEVO: Primicias
+      'FIRST_FRUITS': '🍇 Primicias',
+      'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',  // ✅ NUEVO: Ofrenda de Grupo de Célula
     };
     return map[concept] || concept;
   };

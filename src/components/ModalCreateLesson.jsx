@@ -1,12 +1,12 @@
-// 📚 ModalCreateLesson.jsx - Modal para crear lecciones con Plan de Lecciones
-// ⚠️ Importante: Las lecciones NO crean asistencias automáticamente
-// Se debe inicializar manualmente después
+// 📚 ModalCreateLesson.jsx - Modal para crear lecciones CON DARK MODE
+// Soporta creación individual y plan predeterminado
+// ✅ COMPLETAMENTE LEGIBLE EN MODO OSCURO
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
 
 const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) => {
-  const [mode, setMode] = useState('individual'); // 'individual' o 'default-plan'
+  const [mode, setMode] = useState('individual');
   const [formData, setFormData] = useState({
     lessonName: '',
     lessonNumber: '',
@@ -21,6 +21,74 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
   const [createdLessonId, setCreatedLessonId] = useState(null);
   const [createdLessons, setCreatedLessons] = useState([]);
   const [initializingAttendance, setInitializingAttendance] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // ========== DARK MODE ==========
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // Tema
+  const theme = {
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+    bgLight: isDarkMode ? '#1a2332' : '#f3f4f6',
+    text: isDarkMode ? '#f1f5f9' : '#374151',
+    textSecondary: isDarkMode ? '#cbd5e1' : '#6b7280',
+    textTertiary: isDarkMode ? '#94a3b8' : '#9ca3af',
+    border: isDarkMode ? '#334155' : '#e5e7eb',
+    borderLight: isDarkMode ? '#475569' : '#f0f0f0',
+    header: isDarkMode
+      ? 'linear-gradient(135deg, #1e40af 0%, #059669 100%)'
+      : 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
+    input: isDarkMode ? '#1e293b' : '#ffffff',
+    inputBorder: isDarkMode ? '#334155' : '#e5e7eb',
+    inputBorderFocus: '#2563eb',
+    inputFocusShadow: 'rgba(37, 99, 235, 0.1)',
+    button: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+    buttonHover: '0 4px 12px rgba(37, 99, 235, 0.4)',
+    info: isDarkMode ? '#0c4a6e' : '#0c4a6e',
+    infoBg: isDarkMode ? '#082f49' : '#e0f2fe',
+    infoBorder: '#0284c7',
+    warning: isDarkMode ? '#92400e' : '#92400e',
+    warningBg: isDarkMode ? '#78350f' : '#fef3c7',
+    warningBorder: '#f59e0b',
+    error: isDarkMode ? '#991b1b' : '#991b1b',
+    errorBg: isDarkMode ? '#7f1d1d' : '#fee2e2',
+    errorBorder: '#ef4444',
+    success: isDarkMode ? '#059669' : '#10b981',
+    successBg: isDarkMode ? '#064e3b' : '#d1fae5',
+    successText: isDarkMode ? '#86efac' : '#065f46',
+    card: isDarkMode ? '#1e293b' : '#ffffff',
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -50,7 +118,6 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
     return true;
   };
 
-  // ========== CREAR LECCIÓN INDIVIDUAL ==========
   const handleCreateIndividualLesson = async (e) => {
     e.preventDefault();
     setError('');
@@ -82,7 +149,6 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
       setCreatedLessonId(response.lessonId);
       setShowInitializeAttendance(true);
 
-      // Resetear formulario
       setFormData({
         lessonName: '',
         lessonNumber: '',
@@ -102,7 +168,6 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
     }
   };
 
-  // ========== CREAR PLAN DE LECCIONES POR DEFECTO ==========
   const handleCreateDefaultPlan = async () => {
     setError('');
     setLoading(true);
@@ -114,7 +179,6 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
 
       console.log('✅ Plan de lecciones creado:', response);
 
-      // response contiene: message, lessonCount, lessons
       setCreatedLessons(response.lessons || []);
       setShowInitializeAttendance(true);
 
@@ -129,7 +193,6 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
     }
   };
 
-  // ========== INICIALIZAR ASISTENCIAS ==========
   const handleInitializeAttendance = async () => {
     if (!createdLessonId && createdLessons.length === 0) return;
 
@@ -137,12 +200,10 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
 
     try {
       if (createdLessonId) {
-        // Lección individual
         console.log('📊 Inicializando asistencias para lección:', createdLessonId);
         await apiService.initializeLessonAttendance(createdLessonId);
         console.log('✅ Asistencias inicializadas');
       } else if (createdLessons.length > 0) {
-        // Plan de lecciones - inicializar para cada lección
         console.log('📊 Inicializando asistencias para', createdLessons.length, 'lecciones');
         
         for (const lesson of createdLessons) {
@@ -200,66 +261,215 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        animation: 'fadeIn 0.3s ease-in-out',
+        transition: 'background-color 300ms ease-in-out',
+      }}
+      onClick={handleClose}
+    >
+      <div
+        style={{
+          backgroundColor: theme.bg,
+          borderRadius: '12px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          maxWidth: '600px',
+          width: '90%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          animation: 'slideInUp 0.3s ease-in-out',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'all 300ms ease-in-out',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="modal-header">
-          <h2 className="modal-title">📚 Crear Lecciones</h2>
+        <div
+          style={{
+            background: theme.header,
+            color: 'white',
+            padding: '24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderRadius: '12px 12px 0 0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+          }}
+        >
+          <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>
+            📚 Crear Lecciones
+          </h2>
           <button
-            className="modal-close-btn"
             onClick={handleClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: 0,
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
           >
             ✕
           </button>
         </div>
 
         {/* Body */}
-        <div className="modal-body">
+        <div
+          style={{
+            padding: '24px',
+            overflowY: 'auto',
+            flex: 1,
+            color: theme.text,
+          }}
+        >
           {!showInitializeAttendance ? (
             <>
               {error && (
-                <div className="error-message">
+                <div
+                  style={{
+                    backgroundColor: theme.errorBg,
+                    color: theme.error,
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                    borderLeft: `4px solid ${theme.errorBorder}`,
+                    fontSize: '14px',
+                  }}
+                >
                   ❌ {error}
                 </div>
               )}
 
-              {/* SELECTOR DE MODO */}
-              <div className="mode-selector">
-                <button
-                  className={`mode-btn ${mode === 'individual' ? 'active' : ''}`}
-                  onClick={() => setMode('individual')}
-                  disabled={loading}
-                >
-                  ✏️ Lección Individual
-                </button>
-                <button
-                  className={`mode-btn ${mode === 'default-plan' ? 'active' : ''}`}
-                  onClick={() => setMode('default-plan')}
-                  disabled={loading}
-                >
-                  📚 Plan Predeterminado
-                </button>
+              {/* MODE SELECTOR */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '24px',
+                }}
+              >
+                {['individual', 'default-plan'].map(modeOption => (
+                  <button
+                    key={modeOption}
+                    onClick={() => setMode(modeOption)}
+                    disabled={loading}
+                    style={{
+                      padding: '12px 16px',
+                      border: `2px solid ${mode === modeOption ? '#2563eb' : theme.border}`,
+                      borderRadius: '8px',
+                      backgroundColor: mode === modeOption
+                        ? 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)'
+                        : theme.card,
+                      background: mode === modeOption
+                        ? 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)'
+                        : theme.card,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      color: mode === modeOption ? 'white' : theme.text,
+                      transition: 'all 0.2s',
+                      opacity: loading && mode !== modeOption ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (mode !== modeOption && !loading) {
+                        e.target.style.borderColor = '#2563eb';
+                        e.target.style.backgroundColor = isDarkMode ? '#1a2332' : '#f0f9ff';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (mode !== modeOption) {
+                        e.target.style.borderColor = theme.border;
+                        e.target.style.backgroundColor = theme.card;
+                      }
+                    }}
+                  >
+                    {modeOption === 'individual' ? '✏️ Lección Individual' : '📚 Plan Predeterminado'}
+                  </button>
+                ))}
               </div>
 
-              {/* MODO: LECCIÓN INDIVIDUAL */}
+              {/* INDIVIDUAL MODE */}
               {mode === 'individual' && (
-                <form onSubmit={handleCreateIndividualLesson} className="form-create-lesson">
-                  <div className="form-group">
-                    <label className="form-label">Nombre de Lección *</label>
+                <form
+                  onSubmit={handleCreateIndividualLesson}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '16px',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: theme.text,
+                    }}>
+                      Nombre de Lección *
+                    </label>
                     <input
                       type="text"
                       name="lessonName"
                       value={formData.lessonName}
                       onChange={handleChange}
                       placeholder="Ej: Introducción al tema"
-                      className="form-input"
                       disabled={loading}
+                      style={{
+                        padding: '10px 12px',
+                        border: `2px solid ${theme.inputBorder}`,
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        backgroundColor: theme.input,
+                        color: theme.text,
+                        fontFamily: 'inherit',
+                        transition: 'all 0.2s',
+                        cursor: loading ? 'not-allowed' : 'text',
+                      }}
+                      onFocus={(e) => {
+                        if (!loading) {
+                          e.target.style.borderColor = theme.inputBorderFocus;
+                          e.target.style.boxShadow = `0 0 0 3px ${theme.inputFocusShadow}`;
+                        }
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = theme.inputBorder;
+                        e.target.style.boxShadow = 'none';
+                      }}
                     />
                   </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Número de Lección *</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: theme.text,
+                      }}>
+                        Número de Lección *
+                      </label>
                       <input
                         type="number"
                         name="lessonNumber"
@@ -268,13 +478,38 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
                         placeholder="Ej: 1"
                         min="1"
                         max="200"
-                        className="form-input"
                         disabled={loading}
+                        style={{
+                          padding: '10px 12px',
+                          border: `2px solid ${theme.inputBorder}`,
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          backgroundColor: theme.input,
+                          color: theme.text,
+                          fontFamily: 'inherit',
+                          transition: 'all 0.2s',
+                        }}
+                        onFocus={(e) => {
+                          if (!loading) {
+                            e.target.style.borderColor = theme.inputBorderFocus;
+                            e.target.style.boxShadow = `0 0 0 3px ${theme.inputFocusShadow}`;
+                          }
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = theme.inputBorder;
+                          e.target.style.boxShadow = 'none';
+                        }}
                       />
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Duración (minutos) *</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: theme.text,
+                      }}>
+                        Duración (minutos) *
+                      </label>
                       <input
                         type="number"
                         name="durationMinutes"
@@ -283,55 +518,178 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
                         placeholder="120"
                         min="1"
                         max="480"
-                        className="form-input"
                         disabled={loading}
+                        style={{
+                          padding: '10px 12px',
+                          border: `2px solid ${theme.inputBorder}`,
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          backgroundColor: theme.input,
+                          color: theme.text,
+                          fontFamily: 'inherit',
+                          transition: 'all 0.2s',
+                        }}
+                        onFocus={(e) => {
+                          if (!loading) {
+                            e.target.style.borderColor = theme.inputBorderFocus;
+                            e.target.style.boxShadow = `0 0 0 3px ${theme.inputFocusShadow}`;
+                          }
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = theme.inputBorder;
+                          e.target.style.boxShadow = 'none';
+                        }}
                       />
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Fecha de Lección *</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: theme.text,
+                    }}>
+                      Fecha de Lección *
+                    </label>
                     <input
                       type="datetime-local"
                       name="lessonDate"
                       value={formData.lessonDate}
                       onChange={handleChange}
-                      className="form-input"
                       disabled={loading}
+                      style={{
+                        padding: '10px 12px',
+                        border: `2px solid ${theme.inputBorder}`,
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        backgroundColor: theme.input,
+                        color: theme.text,
+                        fontFamily: 'inherit',
+                        transition: 'all 0.2s',
+                      }}
+                      onFocus={(e) => {
+                        if (!loading) {
+                          e.target.style.borderColor = theme.inputBorderFocus;
+                          e.target.style.boxShadow = `0 0 0 3px ${theme.inputFocusShadow}`;
+                        }
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = theme.inputBorder;
+                        e.target.style.boxShadow = 'none';
+                      }}
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Descripción</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: theme.text,
+                    }}>
+                      Descripción
+                    </label>
                     <textarea
                       name="description"
                       value={formData.description}
                       onChange={handleChange}
                       placeholder="Descripción de la lección..."
                       rows="3"
-                      className="form-input form-textarea"
                       disabled={loading}
+                      style={{
+                        padding: '10px 12px',
+                        border: `2px solid ${theme.inputBorder}`,
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        backgroundColor: theme.input,
+                        color: theme.text,
+                        fontFamily: 'inherit',
+                        resize: 'vertical',
+                        transition: 'all 0.2s',
+                      }}
+                      onFocus={(e) => {
+                        if (!loading) {
+                          e.target.style.borderColor = theme.inputBorderFocus;
+                          e.target.style.boxShadow = `0 0 0 3px ${theme.inputFocusShadow}`;
+                        }
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = theme.inputBorder;
+                        e.target.style.boxShadow = 'none';
+                      }}
                     />
                   </div>
 
-                  <div className="info-box">
+                  <div
+                    style={{
+                      backgroundColor: isDarkMode ? '#78350f' : '#fef3c7',
+                      color: isDarkMode ? '#fcd34d' : '#92400e',
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      borderLeft: `4px solid ${isDarkMode ? '#f59e0b' : '#f59e0b'}`,
+                    }}
+                  >
                     ⚠️ <strong>Nota:</strong> Las asistencias se crean de forma independiente.
                     Después de crear la lección, podrás inicializar los registros de asistencia.
                   </div>
 
-                  <div className="form-actions">
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '12px',
+                      justifyContent: 'flex-end',
+                      marginTop: '8px',
+                    }}
+                  >
                     <button
                       type="button"
-                      className="btn-secondary"
                       onClick={handleClose}
                       disabled={loading}
-                    >
-                      Cancelar
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: theme.bgSecondary,
+                        color: theme.text,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        opacity: loading ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!loading) e.target.style.opacity = '0.8';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!loading) e.target.style.opacity = '1';
+                      }}
+                    >Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="btn-primary"
                       disabled={loading}
+                      style={{
+                        padding: '10px 20px',
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        opacity: loading ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!loading) {
+                          e.target.style.boxShadow = theme.buttonHover;
+                          e.target.style.transform = 'translateY(-2px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.transform = 'translateY(0)';
+                      }}
                     >
                       {loading ? '⏳ Creando...' : '✅ Crear Lección'}
                     </button>
@@ -339,18 +697,50 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
                 </form>
               )}
 
-              {/* MODO: PLAN PREDETERMINADO */}
+              {/* PLAN MODE */}
               {mode === 'default-plan' && (
-                <div className="plan-mode-content">
-                  <div className="info-box large">
-                    📚 <strong>Plan de Lecciones Predeterminado</strong>
-                    <p>Se crearán automáticamente todas las lecciones según el nivel de la cohorte.</p>
-                    <p>Las lecciones se distribuirán semanalmente desde la fecha de inicio.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div
+                    style={{
+                      backgroundColor: theme.infoBg,
+                      color: theme.info,
+                      padding: '16px',
+                      borderRadius: '8px',
+                      borderLeft: `4px solid ${theme.infoBorder}`,
+                    }}
+                  >
+                    <p style={{
+                      margin: 0,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      marginBottom: '8px',
+                    }}>
+                      📚 Plan de Lecciones Predeterminado
+                    </p>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', lineHeight: 1.5 }}>
+                      Se crearán automáticamente todas las lecciones según el nivel de la cohorte.
+                      Las lecciones se distribuirán semanalmente desde la fecha de inicio.
+                    </p>
                   </div>
 
-                  <div className="warning-box">
-                    ⚠️ <strong>Importante:</strong>
-                    <ul>
+                  <div
+                    style={{
+                      backgroundColor: isDarkMode ? '#78350f' : '#fef3c7',
+                      color: isDarkMode ? '#fcd34d' : '#92400e',
+                      padding: '16px',
+                      borderRadius: '8px',
+                      borderLeft: `4px solid ${isDarkMode ? '#f59e0b' : '#f59e0b'}`,
+                    }}
+                  >
+                    <p style={{
+                      margin: 0,
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      marginBottom: '8px',
+                    }}>
+                      ⚠️ Importante:
+                    </p>
+                    <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', fontSize: '13px' }}>
                       <li>✅ Solo PASTORES y AREAS pueden crear planes</li>
                       <li>✅ Se crearán todas las lecciones del nivel automáticamente</li>
                       <li>❌ No se puede deshacer una vez creado</li>
@@ -358,20 +748,63 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
                     </ul>
                   </div>
 
-                  <div className="form-actions">
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '12px',
+                      justifyContent: 'flex-end',
+                    }}
+                  >
                     <button
-                      type="button"
-                      className="btn-secondary"
                       onClick={handleClose}
                       disabled={loading}
+                      style={{
+                        padding: '10px 20px',
+                        backgroundColor: theme.bgSecondary,
+                        color: theme.text,
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        opacity: loading ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!loading) e.target.style.opacity = '0.8';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!loading) e.target.style.opacity = '1';
+                      }}
                     >
                       Cancelar
                     </button>
                     <button
-                      type="button"
-                      className="btn-primary btn-large"
                       onClick={handleCreateDefaultPlan}
                       disabled={loading}
+                      style={{
+                        padding: '12px 28px',
+                        background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '15px',
+                        fontWeight: 600,
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        width: '100%',
+                        transition: 'all 0.2s',
+                        opacity: loading ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!loading) {
+                          e.target.style.boxShadow = theme.buttonHover;
+                          e.target.style.transform = 'translateY(-2px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.transform = 'translateY(0)';
+                      }}
                     >
                       {loading ? '⏳ Creando plan...' : '📚 Crear Plan Completo'}
                     </button>
@@ -381,46 +814,127 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
             </>
           ) : (
             <>
-              {/* Dialog para inicializar asistencias */}
-              <div className="success-dialog">
-                <div className="success-icon">✅</div>
-                <h3>¡{createdLessonId ? 'Lección' : 'Plan de lecciones'} creado exitosamente!</h3>
-                
+              {/* SUCCESS DIALOG */}
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '64px', marginBottom: '16px' }}>✅</div>
+                <h3 style={{
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  color: theme.success,
+                  margin: '0 0 8px 0',
+                }}>
+                  ¡{createdLessonId ? 'Lección' : 'Plan de lecciones'} creado exitosamente!
+                </h3>
+
                 {createdLessons.length > 0 && (
-                  <div className="created-lessons-list">
-                    <p><strong>Lecciones creadas: {createdLessons.length}</strong></p>
-                    <div className="lessons-preview">
+                  <div style={{ margin: '16px 0', padding: '12px', backgroundColor: theme.bgLight, borderRadius: '8px' }}>
+                    <p style={{
+                      margin: '0 0 12px 0',
+                      fontWeight: 600,
+                      color: theme.text,
+                    }}>
+                      Lecciones creadas: {createdLessons.length}
+                    </p>
+                    <div style={{ maxHeight: '300px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {createdLessons.map((lesson, idx) => (
-                        <div key={lesson.id} className="lesson-preview-item">
-                          <span className="lesson-number">{idx + 1}.</span>
-                          <span className="lesson-name">{lesson.name}</span>
+                        <div
+                          key={lesson.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            padding: '8px',
+                            backgroundColor: theme.card,
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            color: theme.text,
+                            borderLeft: `3px solid #2563eb`,
+                          }}
+                        >
+                          <span style={{ fontWeight: 700, color: '#2563eb', minWidth: '30px' }}>
+                            {idx + 1}.
+                          </span>
+                          <span style={{ flex: 1 }}>{lesson.name}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                <p>¿Deseas inicializar los registros de asistencia ahora?</p>
-                
-                <div className="info-box">
-                  📊 Se crearán registros de asistencia para todos los estudiantes 
-                  inscritos en la cohorte.
+                <p style={{ color: theme.text, margin: '16px 0' }}>
+                  ¿Deseas inicializar los registros de asistencia ahora?
+                </p>
+
+                <div
+                  style={{
+                    backgroundColor: theme.infoBg,
+                    color: theme.info,
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    borderLeft: `4px solid ${theme.infoBorder}`,
+                    marginBottom: '16px',
+                  }}
+                >
+                  📊 Se crearán registros de asistencia para todos los estudiantes inscritos en la cohorte.
                 </div>
 
-                <div className="form-actions">
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '12px',
+                    justifyContent: 'flex-end',
+                  }}
+                >
                   <button
-                    type="button"
-                    className="btn-secondary"
                     onClick={handleSkipAttendance}
                     disabled={initializingAttendance}
+                    style={{
+                      padding: '10px 20px',
+                      backgroundColor: theme.bgSecondary,
+                      color: theme.text,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: initializingAttendance ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s',
+                      opacity: initializingAttendance ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!initializingAttendance) e.target.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!initializingAttendance) e.target.style.opacity = '1';
+                    }}
                   >
                     Hacerlo Después
                   </button>
                   <button
-                    type="button"
-                    className="btn-primary"
                     onClick={handleInitializeAttendance}
                     disabled={initializingAttendance}
+                    style={{
+                      padding: '10px 20px',
+                      background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      cursor: initializingAttendance ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.2s',
+                      opacity: initializingAttendance ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!initializingAttendance) {
+                        e.target.style.boxShadow = theme.buttonHover;
+                        e.target.style.transform = 'translateY(-2px)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.boxShadow = 'none';
+                      e.target.style.transform = 'translateY(0)';
+                    }}
                   >
                     {initializingAttendance ? '⏳ Inicializando...' : '📊 Inicializar Asistencias'}
                   </button>
@@ -429,392 +943,18 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
             </>
           )}
         </div>
+
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideInUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+        `}</style>
       </div>
-
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          animation: fadeIn 0.3s ease-in-out;
-        }
-
-        .modal-container {
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          max-width: 600px;
-          width: 90%;
-          max-height: 90vh;
-          overflow-y: auto;
-          animation: slideInUp 0.3s ease-in-out;
-        }
-
-        .modal-header {
-          background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-          color: white;
-          padding: 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-radius: 12px 12px 0 0;
-        }
-
-        .modal-title {
-          font-size: 20px;
-          font-weight: 700;
-          margin: 0;
-        }
-
-        .modal-close-btn {
-          background: none;
-          border: none;
-          color: white;
-          font-size: 24px;
-          cursor: pointer;
-          padding: 0;
-          width: 40px;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 6px;
-          transition: background-color 0.2s;
-        }
-
-        .modal-close-btn:hover {
-          background-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .modal-body {
-          padding: 24px;
-        }
-
-        /* ========== MODE SELECTOR ========== */
-        .mode-selector {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 12px;
-          margin-bottom: 24px;
-        }
-
-        .mode-btn {
-          padding: 12px 16px;
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          background: white;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          color: #374151;
-        }
-
-        .mode-btn:hover:not(:disabled) {
-          border-color: #2563eb;
-          background-color: #f0f9ff;
-        }
-
-        .mode-btn.active {
-          border-color: #2563eb;
-          background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-          color: white;
-        }
-
-        .mode-btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        /* ========== FORM STYLES ========== */
-        .error-message {
-          background-color: #fee2e2;
-          color: #991b1b;
-          padding: 12px 16px;
-          border-radius: 8px;
-          margin-bottom: 16px;
-          border-left: 4px solid #ef4444;
-        }
-
-        .form-create-lesson {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .form-group {
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
-        }
-
-        .form-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 16px;
-        }
-
-        .form-label {
-          font-size: 14px;
-          font-weight: 600;
-          color: #374151;
-        }
-
-        .form-input {
-          padding: 10px 12px;
-          border: 2px solid #e5e7eb;
-          border-radius: 8px;
-          font-size: 14px;
-          font-family: inherit;
-          transition: all 0.2s;
-        }
-
-        .form-input:focus {
-          outline: none;
-          border-color: #2563eb;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        .form-input:disabled {
-          background-color: #f3f4f6;
-          color: #9ca3af;
-          cursor: not-allowed;
-        }
-
-        .form-textarea {
-          resize: vertical;
-          min-height: 80px;
-        }
-
-        .info-box {
-          background-color: #fef3c7;
-          color: #92400e;
-          padding: 12px 16px;
-          border-radius: 8px;
-          font-size: 13px;
-          border-left: 4px solid #f59e0b;
-        }
-
-        .info-box.large {
-          padding: 16px;
-          font-size: 14px;
-          background-color: #e0f2fe;
-          color: #0c4a6e;
-          border-left-color: #0284c7;
-        }
-
-        .info-box p {
-          margin: 8px 0 0 0;
-          line-height: 1.5;
-        }
-
-        .warning-box {
-          background-color: #fee2e2;
-          color: #991b1b;
-          padding: 16px;
-          border-radius: 8px;
-          border-left: 4px solid #ef4444;
-          margin: 16px 0;
-        }
-
-        .warning-box strong {
-          display: block;
-          margin-bottom: 8px;
-        }
-
-        .warning-box ul {
-          margin: 0;
-          padding-left: 20px;
-          list-style: none;
-        }
-
-        .warning-box li {
-          margin: 4px 0;
-          padding-left: 20px;
-          position: relative;
-        }
-
-        .warning-box li:before {
-          content: attr(data-content);
-          position: absolute;
-          left: 0;
-        }
-
-        /* ========== PLAN MODE ========== */
-        .plan-mode-content {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        /* ========== CREATED LESSONS LIST ========== */
-        .created-lessons-list {
-          margin: 16px 0;
-          padding: 12px;
-          background-color: #f3f4f6;
-          border-radius: 8px;
-        }
-
-        .created-lessons-list p {
-          margin: 0 0 12px 0;
-          font-weight: 600;
-          color: #374151;
-        }
-
-        .lessons-preview {
-          max-height: 300px;
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .lesson-preview-item {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 8px;
-          background: white;
-          border-radius: 6px;
-          font-size: 13px;
-          color: #374151;
-          border-left: 3px solid #2563eb;
-        }
-
-        .lesson-number {
-          font-weight: 700;
-          color: #2563eb;
-          min-width: 30px;
-        }
-
-        .lesson-name {
-          flex: 1;
-        }
-
-        /* ========== BUTTONS ========== */
-        .form-actions {
-          display: flex;
-          gap: 12px;
-          justify-content: flex-end;
-          margin-top: 8px;
-        }
-
-        .btn-primary,
-        .btn-secondary {
-          padding: 10px 20px;
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .btn-primary {
-          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-          color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-          transform: translateY(-2px);
-        }
-
-        .btn-primary.btn-large {
-          padding: 12px 28px;
-          font-size: 15px;
-          width: 100%;
-        }
-
-        .btn-secondary {
-          background-color: #e5e7eb;
-          color: #374151;
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-          background-color: #d1d5db;
-        }
-
-        .btn-primary:disabled,
-        .btn-secondary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        /* ========== SUCCESS DIALOG ========== */
-        .success-dialog {
-          text-align: center;
-          padding: 20px 0;
-        }
-
-        .success-icon {
-          font-size: 64px;
-          margin-bottom: 16px;
-        }
-
-        .success-dialog h3 {
-          font-size: 20px;
-          font-weight: 700;
-          color: #10b981;
-          margin: 0 0 8px 0;
-        }
-
-        .success-dialog p {
-          color: #6b7280;
-          margin: 0 0 16px 0;
-        }
-
-        /* ========== ANIMATIONS ========== */
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideInUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .modal-container {
-            width: 95%;
-            max-height: 95vh;
-          }
-
-          .form-row {
-            grid-template-columns: 1fr;
-          }
-
-          .mode-selector {
-            grid-template-columns: 1fr;
-          }
-
-          .modal-header {
-            padding: 16px;
-          }
-
-          .modal-body {
-            padding: 16px;
-          }
-        }
-      `}</style>
     </div>
   );
 };

@@ -506,6 +506,7 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
               <option value="SEED_OFFERING">🌱 Ofrenda de Semilla</option>
               <option value="BUILDING_FUND">🏗️ Fondo de Construcción</option>
               <option value="FIRST_FRUITS">🍇 Primicias</option>
+              <option value="CELL_GROUP_OFFERING">🏘️ Ofrenda Grupo de Célula</option>
             </select>
             {errors.incomeConcept && <span className="error-message">{errors.incomeConcept}</span>}
           </div>
