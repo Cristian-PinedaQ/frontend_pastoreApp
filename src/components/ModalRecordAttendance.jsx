@@ -1,6 +1,6 @@
-// ✅ ModalRecordAttendance.jsx - Modal mejorado para registrar asistencias
-// - Usuario autenticado por defecto en "recordedBy"
-// - Fix completo de guardado de asistencias
+// ✅ ModalRecordAttendance.jsx - v2 CON MODO OSCURO
+// Modal mejorado para registrar asistencias
+// Legible automáticamente en modo oscuro
 
 import React, { useState, useEffect } from "react";
 import apiService from "../apiService";
@@ -11,6 +11,66 @@ const ModalRecordAttendance = ({
   enrollmentId,
   onAttendanceRecorded,
 }) => {
+  // ========== DARK MODE ==========
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // Tema
+  const themeColors = {
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+    text: isDarkMode ? '#f1f5f9' : '#111827',
+    textSecondary: isDarkMode ? '#cbd5e1' : '#666666',
+    textTertiary: isDarkMode ? '#94a3b8' : '#999999',
+    border: isDarkMode ? '#334155' : '#e5e7eb',
+    header: isDarkMode
+      ? 'linear-gradient(135deg, #1e40af 0%, #047857 100%)'
+      : 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
+    card: isDarkMode ? '#1e293b' : '#ffffff',
+    input: isDarkMode ? '#1e293b' : '#ffffff',
+    error: isDarkMode ? '#7f1d1d' : '#fee2e2',
+    errorText: isDarkMode ? '#fca5a5' : '#991b1b',
+    errorBorder: isDarkMode ? '#dc2626' : '#ef4444',
+    success: isDarkMode ? '#064e3b' : '#d1fae5',
+    successText: isDarkMode ? '#86efac' : '#065f46',
+    successBorder: isDarkMode ? '#10b981' : '#10b981',
+    info: isDarkMode ? '#1e3a8a' : '#e0f2fe',
+    infoText: isDarkMode ? '#93c5fd' : '#0c4a6e',
+    infoBorder: isDarkMode ? '#0284c7' : '#0284c7',
+  };
+
+  // ========== ESTADO ==========
   const [lessons, setLessons] = useState([]);
   const [students, setStudents] = useState([]);
   const [selectedLesson, setSelectedLesson] = useState("");
@@ -32,28 +92,22 @@ const ModalRecordAttendance = ({
   // ========== OBTENER USUARIO AUTENTICADO ==========
   const getUserAuthenticated = () => {
     try {
-      // Opción 1: Desde localStorage (si guardas usuario)
       const userData = localStorage.getItem("user");
       if (userData) {
         const user = JSON.parse(userData);
-        console.log("👤 Usuario desde localStorage:", user);
         return user.name || user.username || user.email || "Usuario";
       }
 
-      // Opción 2: Desde sessionStorage
       const sessionUser = sessionStorage.getItem("currentUser");
       if (sessionUser) {
         const user = JSON.parse(sessionUser);
-        console.log("👤 Usuario desde sessionStorage:", user);
         return user.name || user.username || user.email || "Usuario";
       }
 
-      // Opción 3: Desde token JWT decodificado
       const token = localStorage.getItem("token");
       if (token) {
         try {
           const decodedToken = parseJwt(token);
-          console.log("👤 Token decodificado:", decodedToken);
           return (
             decodedToken.sub ||
             decodedToken.username ||
@@ -93,7 +147,6 @@ const ModalRecordAttendance = ({
   useEffect(() => {
     const userName = getUserAuthenticated();
     setRecordedBy(userName);
-    console.log("🔐 Usuario autenticado establecido:", userName);
   }, []);
 
   // Cargar lecciones y estudiantes al abrir el modal
@@ -108,16 +161,12 @@ const ModalRecordAttendance = ({
     setError("");
 
     try {
-      console.log("📚 Cargando lecciones para cohorte:", enrollmentId);
       const lessonsData = await apiService.getLessonsByEnrollment(enrollmentId);
-      console.log("✅ Lecciones cargadas:", lessonsData);
       setLessons(lessonsData || []);
 
-      console.log("👥 Cargando estudiantes para cohorte:", enrollmentId);
       const studentsData = await apiService.getStudentEnrollmentsByEnrollment(
         enrollmentId
       );
-      console.log("✅ Estudiantes cargados:", studentsData);
       setStudents(studentsData || []);
 
       if (
@@ -139,7 +188,6 @@ const ModalRecordAttendance = ({
     setError("");
     setSuccessMessage("");
 
-    // Validaciones
     if (!selectedLesson) {
       setError("❌ Selecciona una lección");
       return;
@@ -156,7 +204,6 @@ const ModalRecordAttendance = ({
     setLoading(true);
 
     try {
-      // Preparar datos
       const attendanceData = {
         studentEnrollmentId: parseInt(selectedStudent),
         lessonId: parseInt(selectedLesson),
@@ -165,20 +212,9 @@ const ModalRecordAttendance = ({
         score,
       };
 
-      console.log(
-        "📊 DATOS A ENVIAR:",
-        JSON.stringify(attendanceData, null, 2)
-      );
-
-      // Realizar request
-      const response = await apiService.recordAttendance(attendanceData);
-
-      console.log("✅ RESPUESTA DEL SERVIDOR:", response);
-
-      // Mostrar éxito
+      await apiService.recordAttendance(attendanceData);
       setSuccessMessage("✅ ¡Asistencia registrada correctamente!");
 
-      // Limpiar formulario
       setTimeout(() => {
         setSelectedLesson("");
         setSelectedStudent("");
@@ -186,18 +222,15 @@ const ModalRecordAttendance = ({
         setScore("POCA_PARTICIPACION");
         setSuccessMessage("");
 
-        // Notificar cambios
         if (onAttendanceRecorded) {
           onAttendanceRecorded();
         }
 
-        // Recargar datos
         loadData();
       }, 1500);
     } catch (err) {
       console.error("❌ ERROR AL REGISTRAR:", err);
 
-      // Mensaje de error mejorado
       let errorMsg = err.message || "Error al registrar asistencia";
 
       if (err.message.includes("409")) {
@@ -222,7 +255,7 @@ const ModalRecordAttendance = ({
   const handleClose = () => {
     setSelectedLesson("");
     setSelectedStudent("");
-    setRecordedBy(getUserAuthenticated()); // Reiniciar con usuario autenticado
+    setRecordedBy(getUserAuthenticated());
     setPresent(true);
     setScore("POCA_PARTICIPACION");
     setError("");
@@ -233,10 +266,28 @@ const ModalRecordAttendance = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-overlay"
+      style={{
+        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+      }}
+      onClick={handleClose}
+    >
+      <div
+        className="modal-container"
+        style={{
+          backgroundColor: themeColors.bg,
+          color: themeColors.text,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="modal-header">
+        <div
+          className="modal-header"
+          style={{
+            background: themeColors.header,
+          }}
+        >
           <h2 className="modal-title">✅ Registrar Asistencia</h2>
           <button className="modal-close-btn" onClick={handleClose}>
             ✕
@@ -246,30 +297,59 @@ const ModalRecordAttendance = ({
         {/* Body */}
         <div className="modal-body">
           {successMessage && (
-            <div className="success-message">{successMessage}</div>
+            <div
+              className="success-message"
+              style={{
+                backgroundColor: themeColors.success,
+                color: themeColors.successText,
+                borderLeftColor: themeColors.successBorder,
+              }}
+            >
+              {successMessage}
+            </div>
           )}
 
           {loadingData ? (
-            <div className="loading-state">⏳ Cargando datos...</div>
+            <div className="loading-state" style={{ color: themeColors.textSecondary }}>
+              ⏳ Cargando datos...
+            </div>
           ) : lessons.length === 0 || students.length === 0 ? (
-            <div className="empty-state">
+            <div className="empty-state" style={{ color: themeColors.textSecondary }}>
               <p>📚 No hay lecciones o estudiantes disponibles</p>
-              <small>
+              <small style={{ color: themeColors.textTertiary }}>
                 Asegúrate de tener lecciones creadas y estudiantes inscritos
               </small>
             </div>
           ) : (
             <>
-              {error && <div className="error-message">{error}</div>}
+              {error && (
+                <div
+                  className="error-message"
+                  style={{
+                    backgroundColor: themeColors.error,
+                    color: themeColors.errorText,
+                    borderLeftColor: themeColors.errorBorder,
+                  }}
+                >
+                  {error}
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} className="form-record-attendance">
                 {/* Lección */}
                 <div className="form-group">
-                  <label className="form-label">Lección *</label>
+                  <label className="form-label" style={{ color: themeColors.text }}>
+                    Lección *
+                  </label>
                   <select
                     value={selectedLesson}
                     onChange={(e) => setSelectedLesson(e.target.value)}
                     className="form-input form-select"
+                    style={{
+                      backgroundColor: themeColors.input,
+                      color: themeColors.text,
+                      borderColor: themeColors.border,
+                    }}
                     disabled={loading}
                   >
                     <option value="">-- Selecciona una lección --</option>
@@ -287,11 +367,18 @@ const ModalRecordAttendance = ({
 
                 {/* Estudiante */}
                 <div className="form-group">
-                  <label className="form-label">Estudiante *</label>
+                  <label className="form-label" style={{ color: themeColors.text }}>
+                    Estudiante *
+                  </label>
                   <select
                     value={selectedStudent}
                     onChange={(e) => setSelectedStudent(e.target.value)}
                     className="form-input form-select"
+                    style={{
+                      backgroundColor: themeColors.input,
+                      color: themeColors.text,
+                      borderColor: themeColors.border,
+                    }}
                     disabled={loading}
                   >
                     <option value="">-- Selecciona un estudiante --</option>
@@ -306,13 +393,18 @@ const ModalRecordAttendance = ({
 
                 {/* Puntuación */}
                 <div className="form-group">
-                  <label className="form-label">
+                  <label className="form-label" style={{ color: themeColors.text }}>
                     Puntuación de Participación *
                   </label>
                   <select
                     value={score}
                     onChange={(e) => setScore(e.target.value)}
                     className="form-input form-select"
+                    style={{
+                      backgroundColor: themeColors.input,
+                      color: themeColors.text,
+                      borderColor: themeColors.border,
+                    }}
                     disabled={loading}
                   >
                     {participationScores.map((s) => (
@@ -323,9 +415,9 @@ const ModalRecordAttendance = ({
                   </select>
                 </div>
 
-                {/* Registrado por - CON USUARIO AUTENTICADO */}
+                {/* Registrado por */}
                 <div className="form-group">
-                  <label className="form-label">
+                  <label className="form-label" style={{ color: themeColors.text }}>
                     Registrado por (Tu nombre) *
                   </label>
                   <div className="input-with-icon">
@@ -335,11 +427,16 @@ const ModalRecordAttendance = ({
                       onChange={(e) => setRecordedBy(e.target.value)}
                       placeholder="Tu nombre"
                       className="form-input"
+                      style={{
+                        backgroundColor: themeColors.input,
+                        color: themeColors.text,
+                        borderColor: themeColors.border,
+                      }}
                       disabled={loading}
                     />
                     <span className="input-icon">🔐 Autenticado</span>
                   </div>
-                  <small className="input-hint">
+                  <small className="input-hint" style={{ color: themeColors.textSecondary }}>
                     Se cargó automáticamente de tu sesión. Puedes cambiar si es
                     necesario.
                   </small>
@@ -347,7 +444,7 @@ const ModalRecordAttendance = ({
 
                 {/* Presente */}
                 <div className="form-group-checkbox">
-                  <label className="checkbox-label">
+                  <label className="checkbox-label" style={{ color: themeColors.text }}>
                     <input
                       type="checkbox"
                       checked={present}
@@ -359,9 +456,16 @@ const ModalRecordAttendance = ({
                 </div>
 
                 {/* INFO BOX */}
-                <div className="info-box">
+                <div
+                  className="info-box"
+                  style={{
+                    backgroundColor: themeColors.info,
+                    color: themeColors.infoText,
+                    borderLeftColor: themeColors.infoBorder,
+                  }}
+                >
                   💡 <strong>Tip:</strong> Tu nombre se cargó automáticamente.
-                  Si ves "Usuario" en lugar de tu nombre, contáctale al
+                  Si ves "Usuario" en lugar de tu nombre, contacta al
                   administrador.
                 </div>
 
@@ -372,6 +476,11 @@ const ModalRecordAttendance = ({
                     className="btn-secondary"
                     onClick={handleClose}
                     disabled={loading}
+                    style={{
+                      backgroundColor: themeColors.bgSecondary,
+                      color: themeColors.text,
+                      borderColor: themeColors.border,
+                    }}
                   >
                     Cancelar
                   </button>
@@ -396,33 +505,34 @@ const ModalRecordAttendance = ({
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 1000;
           animation: fadeIn 0.3s ease-in-out;
+          padding: 20px;
+          transition: background-color 300ms ease-in-out;
         }
 
         .modal-container {
-          background: white;
           border-radius: 12px;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
           max-width: 600px;
-          width: 90%;
+          width: 100%;
           max-height: 90vh;
           overflow-y: auto;
           animation: slideInUp 0.3s ease-in-out;
+          transition: all 300ms ease-in-out;
         }
 
         .modal-header {
-          background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
           color: white;
           padding: 24px;
           display: flex;
           justify-content: space-between;
           align-items: center;
           border-radius: 12px 12px 0 0;
+          transition: background 300ms ease-in-out;
         }
 
         .modal-title {
@@ -453,19 +563,20 @@ const ModalRecordAttendance = ({
 
         .modal-body {
           padding: 24px;
+          transition: color 300ms ease-in-out;
         }
 
         .loading-state {
           text-align: center;
           padding: 40px 20px;
-          color: #6b7280;
           font-size: 16px;
+          transition: color 300ms ease-in-out;
         }
 
         .empty-state {
           text-align: center;
           padding: 40px 20px;
-          color: #6b7280;
+          transition: color 300ms ease-in-out;
         }
 
         .empty-state p {
@@ -474,26 +585,24 @@ const ModalRecordAttendance = ({
         }
 
         .empty-state small {
-          color: #9ca3af;
+          transition: color 300ms ease-in-out;
         }
 
         .error-message {
-          background-color: #fee2e2;
-          color: #991b1b;
           padding: 12px 16px;
           border-radius: 8px;
           margin-bottom: 16px;
-          border-left: 4px solid #ef4444;
+          border-left: 4px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .success-message {
-          background-color: #d1fae5;
-          color: #065f46;
           padding: 12px 16px;
           border-radius: 8px;
           margin-bottom: 16px;
-          border-left: 4px solid #10b981;
+          border-left: 4px solid;
           font-weight: 600;
+          transition: all 300ms ease-in-out;
         }
 
         .form-record-attendance {
@@ -511,13 +620,13 @@ const ModalRecordAttendance = ({
         .form-label {
           font-size: 14px;
           font-weight: 600;
-          color: #374151;
+          transition: color 300ms ease-in-out;
         }
 
         .form-input,
         .form-select {
           padding: 10px 12px;
-          border: 2px solid #e5e7eb;
+          border: 2px solid;
           border-radius: 8px;
           font-size: 14px;
           font-family: inherit;
@@ -533,12 +642,10 @@ const ModalRecordAttendance = ({
 
         .form-input:disabled,
         .form-select:disabled {
-          background-color: #f3f4f6;
-          color: #9ca3af;
+          opacity: 0.6;
           cursor: not-allowed;
         }
 
-        /* INPUT CON ICONO */
         .input-with-icon {
           position: relative;
           display: flex;
@@ -566,9 +673,9 @@ const ModalRecordAttendance = ({
         .input-hint {
           display: block;
           font-size: 12px;
-          color: #6b7280;
           margin-top: 4px;
           font-style: italic;
+          transition: color 300ms ease-in-out;
         }
 
         .form-group-checkbox {
@@ -583,7 +690,7 @@ const ModalRecordAttendance = ({
           cursor: pointer;
           font-size: 14px;
           font-weight: 500;
-          color: #374151;
+          transition: color 300ms ease-in-out;
         }
 
         .checkbox-label input[type="checkbox"] {
@@ -593,16 +700,15 @@ const ModalRecordAttendance = ({
         }
 
         .info-box {
-          background-color: #e0f2fe;
-          color: #0c4a6e;
           padding: 12px 16px;
           border-radius: 8px;
           font-size: 13px;
-          border-left: 4px solid #0284c7;
+          border-left: 4px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .info-box strong {
-          color: #0c4a6e;
+          font-weight: 600;
         }
 
         .form-actions {
@@ -634,12 +740,12 @@ const ModalRecordAttendance = ({
         }
 
         .btn-secondary {
-          background-color: #e5e7eb;
-          color: #374151;
+          border: 1px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .btn-secondary:hover:not(:disabled) {
-          background-color: #d1d5db;
+          opacity: 0.8;
         }
 
         .btn-primary:disabled,

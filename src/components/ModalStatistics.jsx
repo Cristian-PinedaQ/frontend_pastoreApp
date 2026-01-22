@@ -1,8 +1,8 @@
-// 📊 ModalStatistics.jsx - CORREGIDO: Separa Pendiente de Reprobado
-// ✅ Ahora muestra 3 categorías: Aprobados, Reprobados y Pendientes
-// ✅ Los Pendiente (⏳) NO se cuentan como Reprobados (❌)
+// 📊 ModalStatistics.jsx - v2 CON MODO OSCURO
+// ✅ Separa Pendiente de Reprobado (3 categorías)
+// ✅ Legible en modo oscuro automático
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -11,26 +11,80 @@ import {
 const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
   const [viewType, setViewType] = useState('bar');
   const [selectedLevel, setSelectedLevel] = useState('ALL');
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // Detectar modo oscuro
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    // Escuchar cambios
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // Colores adaptativos
   const COLORS = {
     passed: '#11cece',
     failed: '#d681e5',
-    pending: '#fbbf24', // ✅ NUEVO: Color para Pendiente
-    neutral: '#6b7280',
+    pending: '#fbbf24',
+    neutral: isDarkMode ? '#94a3b8' : '#6b7280',
+  };
+
+  // Colores del tema
+  const themeColors = {
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+    bgLight: isDarkMode ? '#1a2332' : '#fafafa',
+    text: isDarkMode ? '#f1f5f9' : '#111827',
+    textSecondary: isDarkMode ? '#cbd5e1' : '#666666',
+    border: isDarkMode ? '#334155' : '#e0e0e0',
+    borderLight: isDarkMode ? '#475569' : '#f0f0f0',
+    header: isDarkMode 
+      ? 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' 
+      : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    card: isDarkMode ? '#1e293b' : '#ffffff',
+    hover: isDarkMode ? '#334155' : '#f9fafb',
+    chartBg: isDarkMode ? '#0f172a' : '#ffffff',
+    gridColor: isDarkMode ? '#334155' : '#e0e0e0',
   };
 
   // ========== PREPARAR DATOS PARA GRÁFICOS ==========
-  
+
   const levelStats = useMemo(() => {
     if (!data) return [];
-    
+
     return Object.entries(data)
       .map(([key, value]) => ({
         name: value.label,
         total: value.total,
         passed: value.passed,
         failed: value.failed,
-        pending: value.pending || 0, // ✅ NUEVO: Incluir pending
+        pending: value.pending || 0,
         passPercentage: parseFloat(value.passPercentage),
       }))
       .filter(item => item.total > 0);
@@ -38,7 +92,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
   const pieData = useMemo(() => {
     if (!data || levelStats.length === 0) return [];
-    
+
     if (selectedLevel === 'ALL') {
       const totals = levelStats.reduce(
         (acc, item) => ({
@@ -63,7 +117,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
       { name: '❌ Reprobados', value: selected.failed, fill: COLORS.failed },
       { name: '⏳ Pendientes', value: selected.pending, fill: COLORS.pending },
     ];
-  }, [selectedLevel, levelStats, data]);
+  }, [selectedLevel, levelStats, data, COLORS]);
 
   const totalStudents = useMemo(() => {
     return levelStats.reduce((sum, item) => sum + item.total, 0);
@@ -82,8 +136,8 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
   }, [levelStats]);
 
   const overallPassPercentage = useMemo(() => {
-    return totalStudents > 0 
-      ? ((totalPassed / totalStudents) * 100).toFixed(1) 
+    return totalStudents > 0
+      ? ((totalPassed / totalStudents) * 100).toFixed(1)
       : 0;
   }, [totalStudents, totalPassed]);
 
@@ -92,31 +146,82 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
   if (!isOpen || !data) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container statistics-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+    <div
+      className="modal-overlay"
+      style={{
+        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="modal-container statistics-modal"
+        style={{
+          backgroundColor: themeColors.bg,
+          color: themeColors.text,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          className="modal-header"
+          style={{
+            background: themeColors.header,
+          }}
+        >
           <h2 className="modal-title">📊 Estadísticas de Estudiantes</h2>
           <button className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        <div className="statistics-controls">
+        <div
+          className="statistics-controls"
+          style={{
+            backgroundColor: themeColors.bgLight,
+            borderBottomColor: themeColors.border,
+          }}
+        >
           <div className="control-group">
-            <label>📈 Tipo de Gráfico</label>
+            <label style={{ color: themeColors.textSecondary }}>📈 Tipo de Gráfico</label>
             <div className="button-group">
               <button
                 className={`control-btn ${viewType === 'bar' ? 'active' : ''}`}
+                style={{
+                  borderColor: viewType === 'bar' ? 'transparent' : themeColors.border,
+                  backgroundColor: viewType === 'bar'
+                    ? themeColors.header === 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+                      ? '#f093fb'
+                      : '#ec4899'
+                    : themeColors.card,
+                  color: viewType === 'bar' ? 'white' : themeColors.textSecondary,
+                }}
                 onClick={() => setViewType('bar')}
               >
                 📊 Barras
               </button>
               <button
                 className={`control-btn ${viewType === 'pie' ? 'active' : ''}`}
+                style={{
+                  borderColor: viewType === 'pie' ? 'transparent' : themeColors.border,
+                  backgroundColor: viewType === 'pie'
+                    ? themeColors.header === 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+                      ? '#f093fb'
+                      : '#ec4899'
+                    : themeColors.card,
+                  color: viewType === 'pie' ? 'white' : themeColors.textSecondary,
+                }}
                 onClick={() => setViewType('pie')}
               >
                 🥧 Pastel
               </button>
               <button
                 className={`control-btn ${viewType === 'combined' ? 'active' : ''}`}
+                style={{
+                  borderColor: viewType === 'combined' ? 'transparent' : themeColors.border,
+                  backgroundColor: viewType === 'combined'
+                    ? themeColors.header === 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
+                      ? '#f093fb'
+                      : '#ec4899'
+                    : themeColors.card,
+                  color: viewType === 'combined' ? 'white' : themeColors.textSecondary,
+                }}
                 onClick={() => setViewType('combined')}
               >
                 📈 Combinado
@@ -126,11 +231,16 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
           {viewType === 'pie' && (
             <div className="control-group">
-              <label>📌 Filtrar por Nivel</label>
+              <label style={{ color: themeColors.textSecondary }}>📌 Filtrar por Nivel</label>
               <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value)}
                 className="level-select"
+                style={{
+                  backgroundColor: themeColors.card,
+                  color: themeColors.text,
+                  borderColor: themeColors.border,
+                }}
               >
                 <option value="ALL">Todos los Niveles</option>
                 {levelStats.map(item => (
@@ -142,79 +252,128 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
             </div>
           )}
 
-          <button className="btn-export" onClick={onExportPDF}>
+          <button
+            className="btn-export"
+            onClick={onExportPDF}
+          >
             📄 Exportar PDF
           </button>
         </div>
 
         {/* Estadísticas Generales */}
-        <div className="stats-summary">
-          <div className="stat-card">
+        <div
+          className="stats-summary"
+          style={{
+            backgroundColor: themeColors.bgLight,
+          }}
+        >
+          <div
+            className="stat-card"
+            style={{
+              backgroundColor: themeColors.card,
+              borderColor: themeColors.border,
+            }}
+          >
             <div className="stat-icon">👥</div>
             <div className="stat-content">
-              <p className="stat-label">Total de Estudiantes</p>
-              <p className="stat-value">{totalStudents}</p>
+              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Total de Estudiantes</p>
+              <p className="stat-value" style={{ color: themeColors.text }}>{totalStudents}</p>
             </div>
           </div>
 
-          <div className="stat-card">
+          <div
+            className="stat-card"
+            style={{
+              backgroundColor: themeColors.card,
+              borderColor: themeColors.border,
+            }}
+          >
             <div className="stat-icon">✅</div>
             <div className="stat-content">
-              <p className="stat-label">Aprobados</p>
+              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Aprobados</p>
               <p className="stat-value" style={{ color: COLORS.passed }}>{totalPassed}</p>
             </div>
           </div>
 
-          <div className="stat-card">
+          <div
+            className="stat-card"
+            style={{
+              backgroundColor: themeColors.card,
+              borderColor: themeColors.border,
+            }}
+          >
             <div className="stat-icon">❌</div>
             <div className="stat-content">
-              <p className="stat-label">Reprobados</p>
+              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Reprobados</p>
               <p className="stat-value" style={{ color: COLORS.failed }}>{totalFailed}</p>
             </div>
           </div>
 
-          {/* ✅ NUEVO: Tarjeta para Pendientes */}
-          <div className="stat-card">
+          <div
+            className="stat-card"
+            style={{
+              backgroundColor: themeColors.card,
+              borderColor: themeColors.border,
+            }}
+          >
             <div className="stat-icon">⏳</div>
             <div className="stat-content">
-              <p className="stat-label">Pendientes</p>
+              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Pendientes</p>
               <p className="stat-value" style={{ color: COLORS.pending }}>{totalPending}</p>
             </div>
           </div>
 
-          <div className="stat-card">
+          <div
+            className="stat-card"
+            style={{
+              backgroundColor: themeColors.card,
+              borderColor: themeColors.border,
+            }}
+          >
             <div className="stat-icon">📊</div>
             <div className="stat-content">
-              <p className="stat-label">Tasa de Aprobación</p>
-              <p className="stat-value">{overallPassPercentage}%</p>
+              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Tasa de Aprobación</p>
+              <p className="stat-value" style={{ color: themeColors.text }}>{overallPassPercentage}%</p>
             </div>
           </div>
         </div>
 
-        <div className="modal-body">
+        <div
+          className="modal-body"
+          style={{
+            color: themeColors.text,
+          }}
+        >
           {viewType === 'bar' && (
-            <div className="chart-container">
-              <h3 className="chart-title">Estudiantes por Nivel</h3>
+            <div
+              className="chart-container"
+              style={{
+                backgroundColor: themeColors.card,
+                borderColor: themeColors.border,
+              }}
+            >
+              <h3 className="chart-title" style={{ color: themeColors.text }}>Estudiantes por Nivel</h3>
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={barData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                  <XAxis 
-                    dataKey="name" 
-                    angle={-45} 
-                    textAnchor="end" 
+                  <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
                     height={100}
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 12, fill: themeColors.text }}
                   />
-                  <YAxis />
-                  <Tooltip 
+                  <YAxis tick={{ fontSize: 12, fill: themeColors.text }} />
+                  <Tooltip
                     contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #e0e0e0',
+                      backgroundColor: themeColors.card,
+                      border: `1px solid ${themeColors.border}`,
                       borderRadius: '8px',
+                      color: themeColors.text,
                     }}
                     formatter={(value) => `${value} estudiantes`}
                   />
-                  <Legend />
+                  <Legend wrapperStyle={{ color: themeColors.text }} />
                   <Bar dataKey="passed" fill={COLORS.passed} name="✅ Aprobados" />
                   <Bar dataKey="failed" fill={COLORS.failed} name="❌ Reprobados" />
                   <Bar dataKey="pending" fill={COLORS.pending} name="⏳ Pendientes" />
@@ -224,8 +383,14 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           )}
 
           {viewType === 'pie' && (
-            <div className="chart-container">
-              <h3 className="chart-title">
+            <div
+              className="chart-container"
+              style={{
+                backgroundColor: themeColors.card,
+                borderColor: themeColors.border,
+              }}
+            >
+              <h3 className="chart-title" style={{ color: themeColors.text }}>
                 {selectedLevel === 'ALL' ? 'Total General' : selectedLevel}
               </h3>
               <ResponsiveContainer width="100%" height={400}>
@@ -244,12 +409,13 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     formatter={(value) => `${value} estudiantes`}
                     contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #e0e0e0',
+                      backgroundColor: themeColors.card,
+                      border: `1px solid ${themeColors.border}`,
                       borderRadius: '8px',
+                      color: themeColors.text,
                     }}
                   />
                 </PieChart>
@@ -259,20 +425,33 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
           {viewType === 'combined' && (
             <div className="charts-grid">
-              <div className="chart-container">
-                <h3 className="chart-title">Por Nivel</h3>
+              <div
+                className="chart-container"
+                style={{
+                  backgroundColor: themeColors.card,
+                  borderColor: themeColors.border,
+                }}
+              >
+                <h3 className="chart-title" style={{ color: themeColors.text }}>Por Nivel</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
-                    <XAxis 
-                      dataKey="name" 
-                      angle={-45} 
-                      textAnchor="end" 
+                    <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />
+                    <XAxis
+                      dataKey="name"
+                      angle={-45}
+                      textAnchor="end"
                       height={80}
-                      tick={{ fontSize: 11 }}
+                      tick={{ fontSize: 11, fill: themeColors.text }}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={(value) => `${value}`} />
+                    <YAxis tick={{ fontSize: 11, fill: themeColors.text }} />
+                    <Tooltip
+                      formatter={(value) => `${value}`}
+                      contentStyle={{
+                        backgroundColor: themeColors.card,
+                        border: `1px solid ${themeColors.border}`,
+                        color: themeColors.text,
+                      }}
+                    />
                     <Bar dataKey="passed" fill={COLORS.passed} />
                     <Bar dataKey="failed" fill={COLORS.failed} />
                     <Bar dataKey="pending" fill={COLORS.pending} />
@@ -280,8 +459,14 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                 </ResponsiveContainer>
               </div>
 
-              <div className="chart-container">
-                <h3 className="chart-title">Total General</h3>
+              <div
+                className="chart-container"
+                style={{
+                  backgroundColor: themeColors.card,
+                  borderColor: themeColors.border,
+                }}
+              >
+                <h3 className="chart-title" style={{ color: themeColors.text }}>Total General</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
@@ -297,7 +482,14 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => `${value}`} />
+                    <Tooltip
+                      formatter={(value) => `${value}`}
+                      contentStyle={{
+                        backgroundColor: themeColors.card,
+                        border: `1px solid ${themeColors.border}`,
+                        color: themeColors.text,
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -306,53 +498,59 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
           {/* Tabla de Detalles */}
           <div className="details-section">
-            <h3 className="section-title">📋 Detalle por Nivel</h3>
+            <h3 className="section-title" style={{ color: themeColors.text }}>📋 Detalle por Nivel</h3>
             <div className="table-container">
-              <table className="details-table">
+              <table
+                className="details-table"
+                style={{
+                  backgroundColor: themeColors.card,
+                  borderColor: themeColors.border,
+                }}
+              >
                 <thead>
-                  <tr>
-                    <th>Nivel</th>
-                    <th className="text-center">Total</th>
-                    <th className="text-center">✅ Aprobados</th>
-                    <th className="text-center">❌ Reprobados</th>
-                    <th className="text-center">⏳ Pendientes</th>
-                    <th className="text-center">% Aprobación</th>
+                  <tr style={{ backgroundColor: themeColors.bgSecondary }}>
+                    <th style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>Nivel</th>
+                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>Total</th>
+                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>✅ Aprobados</th>
+                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>❌ Reprobados</th>
+                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>⏳ Pendientes</th>
+                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>% Aprobación</th>
                   </tr>
                 </thead>
                 <tbody>
                   {levelStats.map((item, index) => (
-                    <tr key={index}>
-                      <td className="level-name">{item.name}</td>
-                      <td className="text-center">{item.total}</td>
-                      <td className="text-center" style={{ color: COLORS.passed }}>
+                    <tr key={index} style={{ backgroundColor: index % 2 === 0 ? themeColors.card : themeColors.bgSecondary }}>
+                      <td className="level-name" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>{item.name}</td>
+                      <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>{item.total}</td>
+                      <td className="text-center" style={{ color: COLORS.passed, borderBottomColor: themeColors.border }}>
                         {item.passed}
                       </td>
-                      <td className="text-center" style={{ color: COLORS.failed }}>
+                      <td className="text-center" style={{ color: COLORS.failed, borderBottomColor: themeColors.border }}>
                         {item.failed}
                       </td>
-                      <td className="text-center" style={{ color: COLORS.pending }}>
+                      <td className="text-center" style={{ color: COLORS.pending, borderBottomColor: themeColors.border }}>
                         {item.pending}
                       </td>
-                      <td className="text-center">
+                      <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>
                         <strong>{item.passPercentage}%</strong>
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="footer-row">
-                    <td><strong>TOTAL</strong></td>
-                    <td className="text-center"><strong>{totalStudents}</strong></td>
-                    <td className="text-center" style={{ color: COLORS.passed }}>
+                  <tr className="footer-row" style={{ backgroundColor: themeColors.bgSecondary, borderTopColor: themeColors.border }}>
+                    <td style={{ color: themeColors.text, borderBottomColor: themeColors.border }}><strong>TOTAL</strong></td>
+                    <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}><strong>{totalStudents}</strong></td>
+                    <td className="text-center" style={{ color: COLORS.passed, borderBottomColor: themeColors.border }}>
                       <strong>{totalPassed}</strong>
                     </td>
-                    <td className="text-center" style={{ color: COLORS.failed }}>
+                    <td className="text-center" style={{ color: COLORS.failed, borderBottomColor: themeColors.border }}>
                       <strong>{totalFailed}</strong>
                     </td>
-                    <td className="text-center" style={{ color: COLORS.pending }}>
+                    <td className="text-center" style={{ color: COLORS.pending, borderBottomColor: themeColors.border }}>
                       <strong>{totalPending}</strong>
                     </td>
-                    <td className="text-center">
+                    <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>
                       <strong>{overallPassPercentage}%</strong>
                     </td>
                   </tr>
@@ -362,8 +560,22 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>
+        <div
+          className="modal-footer"
+          style={{
+            backgroundColor: themeColors.bgLight,
+            borderTopColor: themeColors.border,
+          }}
+        >
+          <button
+            className="btn-secondary"
+            onClick={onClose}
+            style={{
+              backgroundColor: themeColors.bgSecondary,
+              color: themeColors.text,
+              borderColor: themeColors.border,
+            }}
+          >
             ✕ Cerrar
           </button>
           <button className="btn-primary" onClick={onExportPDF}>
@@ -379,17 +591,16 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 1000;
           animation: fadeIn 0.3s ease-in-out;
           padding: 20px;
+          transition: background-color 300ms ease-in-out;
         }
 
         .modal-container {
-          background: white;
           border-radius: 12px;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
           width: 100%;
@@ -399,10 +610,10 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           animation: slideInUp 0.3s ease-in-out;
           display: flex;
           flex-direction: column;
+          transition: all 300ms ease-in-out;
         }
 
         .modal-header {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
           color: white;
           padding: 24px;
           display: flex;
@@ -412,6 +623,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           position: sticky;
           top: 0;
           z-index: 10;
+          transition: background 300ms ease-in-out;
         }
 
         .modal-title {
@@ -442,12 +654,12 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
         .statistics-controls {
           padding: 16px 24px;
-          background: linear-gradient(to bottom, #fafafa, transparent);
-          border-bottom: 1px solid #e0e0e0;
+          border-bottom: 1px solid;
           display: flex;
           gap: 20px;
           align-items: flex-end;
           flex-wrap: wrap;
+          transition: all 300ms ease-in-out;
         }
 
         .control-group {
@@ -459,7 +671,6 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         .control-group label {
           font-size: 12px;
           font-weight: 600;
-          color: #666;
         }
 
         .button-group {
@@ -469,40 +680,30 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
         .control-btn {
           padding: 8px 16px;
-          border: 1.5px solid #e0e0e0;
-          background: white;
+          border: 1.5px solid;
           border-radius: 6px;
           cursor: pointer;
           font-size: 12px;
           font-weight: 600;
-          color: #666;
           transition: all 0.2s;
         }
 
         .control-btn:hover {
-          border-color: #f093fb;
-          color: #f5576c;
-        }
-
-        .control-btn.active {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-          color: white;
-          border-color: transparent;
+          transform: translateY(-1px);
         }
 
         .level-select {
           padding: 8px 12px;
-          border: 1.5px solid #e0e0e0;
+          border: 1.5px solid;
           border-radius: 6px;
           font-size: 12px;
-          background: white;
           cursor: pointer;
           transition: all 0.2s;
+          font-family: inherit;
         }
 
         .level-select:focus {
           outline: none;
-          border-color: #f093fb;
           box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
         }
 
@@ -527,17 +728,17 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
           gap: 12px;
           padding: 16px 24px;
-          background: #f9fafb;
+          transition: all 300ms ease-in-out;
         }
 
         .stat-card {
-          background: white;
           padding: 12px;
           border-radius: 8px;
-          border: 1px solid #e0e0e0;
+          border: 1px solid;
           display: flex;
           align-items: center;
           gap: 12px;
+          transition: all 300ms ease-in-out;
         }
 
         .stat-icon {
@@ -551,7 +752,6 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         .stat-label {
           margin: 0;
           font-size: 11px;
-          color: #999;
           font-weight: 600;
         }
 
@@ -559,21 +759,21 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           margin: 0;
           font-size: 18px;
           font-weight: 700;
-          color: #333;
         }
 
         .modal-body {
           flex: 1;
           padding: 24px;
           overflow-y: auto;
+          transition: color 300ms ease-in-out;
         }
 
         .chart-container {
-          background: white;
           padding: 20px;
           border-radius: 8px;
-          border: 1px solid #e0e0e0;
+          border: 1px solid;
           margin-bottom: 20px;
+          transition: all 300ms ease-in-out;
         }
 
         .charts-grid {
@@ -587,7 +787,6 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           margin: 0 0 16px;
           font-size: 14px;
           font-weight: 600;
-          color: #333;
         }
 
         .details-section {
@@ -598,7 +797,6 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           margin: 0 0 12px;
           font-size: 14px;
           font-weight: 600;
-          color: #333;
         }
 
         .table-container {
@@ -609,36 +807,32 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           width: 100%;
           border-collapse: collapse;
           font-size: 12px;
-          background: white;
-          border: 1px solid #e0e0e0;
+          border: 1px solid;
           border-radius: 8px;
           overflow: hidden;
-        }
-
-        .details-table thead {
-          background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+          transition: all 300ms ease-in-out;
         }
 
         .details-table th {
           padding: 12px;
           text-align: left;
           font-weight: 600;
-          color: #333;
-          border-bottom: 2px solid #e0e0e0;
+          border-bottom: 2px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .details-table td {
           padding: 12px;
-          border-bottom: 1px solid #e8e8e8;
+          border-bottom: 1px solid;
+          transition: all 300ms ease-in-out;
         }
 
         .details-table tbody tr:hover {
-          background: #f9fafb;
+          opacity: 0.8;
         }
 
         .level-name {
           font-weight: 500;
-          color: #333;
         }
 
         .text-center {
@@ -646,8 +840,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         }
 
         .footer-row {
-          background: #f9fafb;
-          border-top: 2px solid #e0e0e0;
+          border-top: 2px solid;
         }
 
         .modal-footer {
@@ -655,11 +848,11 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           gap: 12px;
           justify-content: flex-end;
           padding: 16px 24px;
-          border-top: 1px solid #e0e0e0;
-          background: #f9fafb;
+          border-top: 1px solid;
           border-radius: 0 0 12px 12px;
           position: sticky;
           bottom: 0;
+          transition: all 300ms ease-in-out;
         }
 
         .btn-primary,
@@ -684,12 +877,11 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         }
 
         .btn-secondary {
-          background: #e0e0e0;
-          color: #333;
+          border: 1px solid;
         }
 
         .btn-secondary:hover {
-          background: #d0d0d0;
+          opacity: 0.8;
         }
 
         @keyframes fadeIn {

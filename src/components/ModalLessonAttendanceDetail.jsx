@@ -1,5 +1,5 @@
-// ✅ ModalLessonAttendanceDetail.jsx - VERSIÓN MEJORADA CON SELECTOR DE PARTICIPACIÓN
-// Modal para ver asistencias por lección con tabla intuitiva y selector de participación
+// ✅ ModalLessonAttendanceDetail.jsx - CON DARK MODE Y SELECTOR DE PARTICIPACIÓN
+// Modal para ver asistencias por lección con tabla intuitiva
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
@@ -16,74 +16,103 @@ const ModalLessonAttendanceDetail = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recordingId, setRecordingId] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   
-  // ========== NUEVO: ESTADO PARA PARTICIPACIÓN ==========
+  // Estados para participación
   const [participationScores, setParticipationScores] = useState({});
   const [showParticipationSelect, setShowParticipationSelect] = useState({});
 
-  console.log('🔍 ModalLessonAttendanceDetail - Props recibidos:', {
-    lessonId: lesson?.id,
-    lessonName: lesson?.lessonName,
-    enrollmentId: enrollment?.id,
-    enrollmentName: enrollment?.cohortName
-  });
+  // ========== DARK MODE ==========
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const savedMode = localStorage.getItem('darkMode');
+    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
 
-  // Opciones de participación
+    setIsDarkMode(
+      savedMode === 'true' || htmlHasDarkClass || prefersDark
+    );
+
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+    });
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
+  // Tema
+  const theme = {
+    bg: isDarkMode ? '#0f172a' : '#ffffff',
+    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+    bgLight: isDarkMode ? '#1a2332' : '#f8f9fa',
+    text: isDarkMode ? '#f1f5f9' : '#1f2937',
+    textSecondary: isDarkMode ? '#cbd5e1' : '#6b7280',
+    textTertiary: isDarkMode ? '#94a3b8' : '#9ca3af',
+    border: isDarkMode ? '#334155' : '#e5e7eb',
+    header: isDarkMode
+      ? 'linear-gradient(135deg, #1e40af 0%, #059669 100%)'
+      : 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
+    hover: isDarkMode ? '#334155' : '#f9fafb',
+    success: isDarkMode ? '#064e3b' : '#d1fae5',
+    successText: isDarkMode ? '#86efac' : '#065f46',
+    warning: isDarkMode ? '#78350f' : '#fef3c7',
+    warningText: isDarkMode ? '#fcd34d' : '#92400e',
+    error: isDarkMode ? '#7f1d1d' : '#fee2e2',
+    errorText: isDarkMode ? '#fca5a5' : '#991b1b',
+    info: isDarkMode ? '#1e3a8a' : '#e0e7ff',
+    infoText: isDarkMode ? '#93c5fd' : '#3730a3',
+  };
+
   const PARTICIPATION_OPTIONS = [
-    { value: 'NO_PARTICIPA', label: '🤐 No participa', emoji: '🤐' },
-    { value: 'POCA_PARTICIPACION', label: '👌 Poca participación', emoji: '👌' },
-    { value: 'EXCELENTE_PARTICIPACION', label: '🌟 Excelente participación', emoji: '🌟' },
+    { value: 'NO_PARTICIPA', label: '🤐 No participa' },
+    { value: 'POCA_PARTICIPACION', label: '👌 Poca participación' },
+    { value: 'EXCELENTE_PARTICIPACION', label: '🌟 Excelente participación' },
   ];
 
-  // Cargar datos al abrir
   useEffect(() => {
     if (isOpen && lesson?.id && enrollment?.id) {
-      console.log('📂 Iniciando carga de datos...');
       loadData();
-    } else {
-      console.warn('⚠️ Datos incompletos:', { 
-        isOpen, 
-        lessonId: lesson?.id, 
-        enrollmentId: enrollment?.id 
-      });
     }
   }, [isOpen, lesson?.id, enrollment?.id]);
 
   const loadData = async () => {
     setLoading(true);
     setError('');
-    // Limpiar estados de participación al recargar
     setParticipationScores({});
     setShowParticipationSelect({});
 
     try {
-      console.log('📡 Obteniendo estudiantes de la cohorte ID:', enrollment.id);
-
       let studentsData = [];
       try {
         studentsData = await apiService.getStudentEnrollmentsByEnrollment(enrollment.id);
-        console.log('✅ Estudiantes obtenidos:', studentsData?.length || 0);
       } catch (err) {
-        console.warn('⚠️ Método getStudentEnrollmentsByEnrollment no disponible, intentando alternativa');
-        
         try {
           const enrollmentData = await apiService.getEnrollmentById(enrollment.id);
           studentsData = enrollmentData?.studentEnrollments || [];
-          console.log('✅ Estudiantes obtenidos (alternativa):', studentsData?.length || 0);
         } catch (err2) {
-          console.error('❌ Error obteniendo estudiantes:', err2);
           setError('No se pudo cargar la lista de estudiantes');
         }
       }
 
-      console.log('📡 Obteniendo asistencias de la lección ID:', lesson.id);
-
       let attendancesData = [];
       try {
         attendancesData = await apiService.getAttendancesByLesson(lesson.id);
-        console.log('✅ Asistencias obtenidas:', attendancesData?.length || 0);
       } catch (err) {
-        console.warn('⚠️ Error obteniendo asistencias:', err);
         attendancesData = [];
       }
 
@@ -91,34 +120,26 @@ const ModalLessonAttendanceDetail = ({
       setAttendances(attendancesData || []);
 
       if (studentsData?.length === 0) {
-        console.warn('⚠️ No hay estudiantes en esta cohorte');
         setError('No hay estudiantes inscritos en esta cohorte');
       }
-
-      console.log('✅ Datos cargados correctamente');
     } catch (err) {
-      console.error('❌ Error cargando datos:', err);
       setError('Error al cargar la información de la lección: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Verificar si un estudiante tiene asistencia registrada
   const getStudentAttendance = (studentEnrollmentId) => {
     return attendances.find(a => a.studentEnrollmentId === studentEnrollmentId);
   };
 
-  // ========== NUEVO: MANEJAR CAMBIO DE PARTICIPACIÓN ==========
   const handleParticipationChange = (studentEnrollmentId, value) => {
-    console.log(`📊 Participación seleccionada para estudiante ${studentEnrollmentId}: ${value}`);
     setParticipationScores(prev => ({
       ...prev,
       [studentEnrollmentId]: value
     }));
   };
 
-  // ========== NUEVO: TOGGLE DEL SELECTOR DE PARTICIPACIÓN ==========
   const toggleParticipationSelect = (studentEnrollmentId) => {
     setShowParticipationSelect(prev => ({
       ...prev,
@@ -126,41 +147,31 @@ const ModalLessonAttendanceDetail = ({
     }));
   };
 
-  // Registrar asistencia con participación seleccionada
   const handleQuickAttendance = async (studentEnrollmentId, studentName, present = true) => {
     try {
       setRecordingId(studentEnrollmentId);
-      console.log(`📝 Registrando asistencia para ${studentName}...`);
 
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const recordedBy = userData.name || userData.username || 'Admin';
 
-      // ========== NUEVO: USAR LA PARTICIPACIÓN SELECCIONADA ==========
       const selectedScore = participationScores[studentEnrollmentId] || 'POCA_PARTICIPACION';
-      console.log(`   Participación seleccionada: ${selectedScore}`);
 
       const attendanceData = {
         studentEnrollmentId,
         lessonId: lesson.id,
         present,
         recordedBy,
-        score: selectedScore  // ✅ AHORA USA LA SELECCIONADA
+        score: selectedScore
       };
 
-      console.log('📤 Datos a enviar:', attendanceData);
-
       await apiService.recordAttendance(attendanceData);
-
-      console.log('✅ Asistencia registrada exitosamente');
       
-      // Recargar datos
       await loadData();
       
       if (onAttendanceRecorded) {
         onAttendanceRecorded();
       }
     } catch (err) {
-      console.error('❌ Error registrando asistencia:', err);
       setError('Error al registrar la asistencia: ' + err.message);
     } finally {
       setRecordingId(null);
@@ -169,78 +180,246 @@ const ModalLessonAttendanceDetail = ({
 
   if (!isOpen) return null;
 
-  // Contar asistencias
   const presentCount = attendances.filter(a => a.present).length;
   const totalStudents = students.length;
   const attendancePercentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-container attendance-detail-modal" onClick={(e) => e.stopPropagation()}>
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px',
+        animation: 'fadeIn 0.3s ease-in-out',
+        transition: 'background-color 300ms ease-in-out',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: theme.bg,
+          color: theme.text,
+          borderRadius: '12px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          maxWidth: '1000px',
+          width: '95%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          animation: 'slideInUp 0.3s ease-in-out',
+          transition: 'all 300ms ease-in-out',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="modal-header">
-          <div className="header-content">
-            <h2 className="modal-title">📖 {lesson?.lessonName || 'Lección'}</h2>
-            <p className="lesson-meta">
+        <div
+          style={{
+            background: theme.header,
+            color: 'white',
+            padding: '24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            borderRadius: '12px 12px 0 0',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>
+              📖 {lesson?.lessonName || 'Lección'}
+            </h2>
+            <p style={{
+              fontSize: '13px',
+              color: 'rgba(255, 255, 255, 0.9)',
+              margin: '6px 0 0 0',
+            }}>
               {lesson?.lessonDate && new Date(lesson.lessonDate).toLocaleDateString('es-CO')}
               {' • '}
               Cohorte: {enrollment?.cohortName || 'Sin cohorte'}
             </p>
           </div>
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer',
+              padding: 0,
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              transition: 'background-color 0.2s',
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+          >
+            ✕
+          </button>
         </div>
 
         {/* Stats */}
-        <div className="attendance-stats">
-          <div className="stat-box">
-            <span className="stat-label">Presentes</span>
-            <span className="stat-value present">{presentCount}</span>
-          </div>
-          <div className="stat-box">
-            <span className="stat-label">Total</span>
-            <span className="stat-value">{totalStudents}</span>
-          </div>
-          <div className="stat-box">
-            <span className="stat-label">Porcentaje</span>
-            <span className="stat-value">{attendancePercentage}%</span>
-          </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '12px',
+            padding: '16px 24px',
+            backgroundColor: theme.bgLight,
+            borderBottom: `1px solid ${theme.border}`,
+            transition: 'all 300ms ease-in-out',
+          }}
+        >
+          {[
+            { label: 'Presentes', value: presentCount, color: '#10b981' },
+            { label: 'Total', value: totalStudents, color: theme.text },
+            { label: 'Porcentaje', value: `${attendancePercentage}%`, color: theme.text },
+          ].map((stat, idx) => (
+            <div
+              key={idx}
+              style={{
+                backgroundColor: theme.bg,
+                padding: '12px',
+                borderRadius: '8px',
+                border: `2px solid ${theme.border}`,
+                textAlign: 'center',
+                transition: 'all 300ms ease-in-out',
+              }}
+            >
+              <p style={{
+                margin: 0,
+                fontSize: '12px',
+                color: theme.textSecondary,
+                fontWeight: 600,
+              }}>
+                {stat.label}
+              </p>
+              <p style={{
+                margin: '4px 0 0 0',
+                fontSize: '24px',
+                fontWeight: 700,
+                color: stat.color,
+              }}>
+                {stat.value}
+              </p>
+            </div>
+          ))}
         </div>
 
         {/* Progress Bar */}
-        <div className="progress-bar-container">
-          <div className="progress-bar">
-            <div 
-              className="progress-fill" 
-              style={{ width: `${attendancePercentage}%` }}
-            ></div>
+        <div style={{ padding: '0 24px 16px', backgroundColor: theme.bg }}>
+          <div
+            style={{
+              height: '8px',
+              backgroundColor: theme.border,
+              borderRadius: '4px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                background: 'linear-gradient(90deg, #2563eb, #10b981)',
+                width: `${attendancePercentage}%`,
+                transition: 'width 0.3s ease',
+              }}
+            />
           </div>
         </div>
 
         {/* Body */}
-        <div className="modal-body attendance-body">
+        <div
+          style={{
+            flex: 1,
+            padding: 0,
+            overflowY: 'auto',
+            backgroundColor: theme.bg,
+          }}
+        >
           {error && (
-            <div className="error-message">
+            <div
+              style={{
+                backgroundColor: theme.error,
+                color: theme.errorText,
+                padding: '12px 24px',
+                margin: '16px 24px',
+                borderRadius: '8px',
+                borderLeft: `4px solid ${isDarkMode ? '#dc2626' : '#ef4444'}`,
+                fontSize: '14px',
+              }}
+            >
               ❌ {error}
             </div>
           )}
 
           {loading ? (
-            <div className="loading-state">
+            <div
+              style={{
+                padding: '40px 24px',
+                textAlign: 'center',
+                color: theme.textSecondary,
+              }}
+            >
               ⏳ Cargando estudiantes y asistencias...
             </div>
           ) : students.length === 0 ? (
-            <div className="empty-state">
+            <div
+              style={{
+                padding: '40px 24px',
+                textAlign: 'center',
+                color: theme.textSecondary,
+              }}
+            >
               <p>📚 No hay estudiantes inscritos en esta cohorte</p>
             </div>
           ) : (
-            <div className="attendance-table-container">
-              <table className="attendance-table">
-                <thead>
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '14px',
+                }}
+              >
+                <thead
+                  style={{
+                    backgroundColor: theme.bgSecondary,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 5,
+                  }}
+                >
                   <tr>
-                    <th className="col-student">Estudiante</th>
-                    <th className="col-status">Estado</th>
-                    <th className="col-score">Participación</th>
-                    <th className="col-action">Acción</th>
+                    {['Estudiante', 'Estado', 'Participación', 'Acción'].map((header, idx) => (
+                      <th
+                        key={idx}
+                        style={{
+                          padding: '14px',
+                          textAlign: 'left',
+                          fontWeight: 600,
+                          color: theme.text,
+                          borderBottom: `2px solid ${theme.border}`,
+                          transition: 'all 300ms ease-in-out',
+                        }}
+                      >
+                        {header}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -252,95 +431,205 @@ const ModalLessonAttendanceDetail = ({
                     const selectedParticipation = participationScores[student.id];
 
                     return (
-                      <tr key={student.id} className={att ? 'row-with-attendance' : 'row-no-attendance'}>
+                      <tr
+                        key={student.id}
+                        style={{
+                          backgroundColor: att
+                            ? theme.success
+                            : showParticipation
+                            ? theme.warning
+                            : 'transparent',
+                          transition: 'background-color 200ms',
+                          borderBottom: `1px solid ${theme.border}`,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!att && !showParticipation) {
+                            e.currentTarget.style.backgroundColor = theme.hover;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!att && !showParticipation) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          } else if (att) {
+                            e.currentTarget.style.backgroundColor = theme.success;
+                          } else if (showParticipation) {
+                            e.currentTarget.style.backgroundColor = theme.warning;
+                          }
+                        }}
+                      >
                         {/* Estudiante */}
-                        <td className="col-student">
-                          <div className="student-info">
-                            <span className="student-avatar">👤</span>
-                            <span className="student-name">
-                              {studentName}
-                            </span>
+                        <td
+                          style={{
+                            padding: '14px',
+                            color: theme.text,
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '18px' }}>👤</span>
+                            <span style={{ fontWeight: 500 }}>{studentName}</span>
                           </div>
                         </td>
 
                         {/* Estado */}
-                        <td className="col-status">
+                        <td style={{ padding: '14px' }}>
                           {att ? (
-                            <div className={`status-badge ${att.present ? 'present' : 'absent'}`}>
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                backgroundColor: theme.successText === '#065f46' ? '#065f46' : '#d1fae5',
+                                color: theme.successText === '#065f46' ? '#86efac' : '#065f46',
+                              }}
+                            >
                               {att.present ? '✅ Presente' : '❌ Ausente'}
-                            </div>
+                            </span>
                           ) : (
-                            <div className="status-badge pending">
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                backgroundColor: theme.warningText === '#fcd34d' ? '#78350f' : '#fef3c7',
+                                color: theme.warningText === '#fcd34d' ? '#fcd34d' : '#92400e',
+                              }}
+                            >
                               ⏳ Sin registrar
-                            </div>
+                            </span>
                           )}
                         </td>
 
-                        {/* Puntuación / Selector */}
-                        <td className="col-score">
+                        {/* Participación */}
+                        <td style={{ padding: '14px' }}>
                           {att ? (
-                            // YA TIENE ASISTENCIA - MOSTRAR SCORE
-                            <div className="score-badge">
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                backgroundColor: theme.info,
+                                color: theme.infoText,
+                              }}
+                            >
                               {att.score === 'NO_PARTICIPA' && '🤐 No participa'}
                               {att.score === 'POCA_PARTICIPACION' && '👌 Poca'}
                               {att.score === 'EXCELENTE_PARTICIPACION' && '🌟 Excelente'}
-                            </div>
+                            </span>
+                          ) : showParticipation ? (
+                            <select
+                              value={selectedParticipation || ''}
+                              onChange={(e) => handleParticipationChange(student.id, e.target.value)}
+                              style={{
+                                padding: '6px 8px',
+                                border: `1.5px solid #2563eb`,
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                backgroundColor: theme.bg,
+                                color: theme.text,
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                              }}
+                              autoFocus
+                            >
+                              <option value="">Seleccionar...</option>
+                              {PARTICIPATION_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
                           ) : (
-                            // NO TIENE ASISTENCIA - SELECTOR O BOTÓN
-                            showParticipation ? (
-                              <div className="participation-select">
-                                <select 
-                                  value={selectedParticipation || ''}
-                                  onChange={(e) => handleParticipationChange(student.id, e.target.value)}
-                                  className="select-input"
-                                  autoFocus
-                                >
-                                  <option value="">Seleccionar...</option>
-                                  {PARTICIPATION_OPTIONS.map(opt => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            ) : (
-                              <span className="score-empty">-</span>
-                            )
+                            <span style={{ color: theme.textTertiary }}>-</span>
                           )}
                         </td>
 
                         {/* Acción */}
-                        <td className="col-action">
+                        <td
+                          style={{
+                            padding: '14px',
+                            textAlign: 'right',
+                          }}
+                        >
                           {att ? (
-                            // YA TIENE ASISTENCIA
-                            <div className="action-recorded">
-                              <span className="recorded-info">
-                                ✅ {att.recordedBy || 'Registrado'}
-                              </span>
-                            </div>
+                            <span
+                              style={{
+                                fontSize: '12px',
+                                color: '#059669',
+                                fontWeight: 500,
+                              }}
+                            >
+                              ✅ {att.recordedBy || 'Registrado'}
+                            </span>
+                          ) : showParticipation ? (
+                            <button
+                              onClick={() => handleQuickAttendance(student.id, studentName, true)}
+                              disabled={isRecording || !selectedParticipation}
+                              style={{
+                                padding: '8px 12px',
+                                background: selectedParticipation
+                                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                  : 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: isRecording || !selectedParticipation ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s',
+                                opacity: isRecording || !selectedParticipation ? 0.6 : 1,
+                                whiteSpace: 'nowrap',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isRecording && selectedParticipation) {
+                                  e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
+                                  e.target.style.transform = 'translateY(-2px)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.boxShadow = 'none';
+                                e.target.style.transform = 'translateY(0)';
+                              }}
+                              title={selectedParticipation ? "Registrar asistencia" : "Selecciona participación"}
+                            >
+                              {isRecording ? '⏳' : '✅ Registrar'}
+                            </button>
                           ) : (
-                            // NO TIENE ASISTENCIA - MOSTRAR BOTÓN O CONFIRMAR
-                            showParticipation ? (
-                              // MODO: CONFIRMAR REGISTRO
-                              <button
-                                className={`btn-confirm-attendance ${isRecording ? 'loading' : ''} ${!selectedParticipation ? 'disabled' : ''}`}
-                                onClick={() => handleQuickAttendance(student.id, studentName, true)}
-                                disabled={isRecording || !selectedParticipation}
-                                title={selectedParticipation ? "Registrar asistencia con participación seleccionada" : "Selecciona participación primero"}
-                              >
-                                {isRecording ? '⏳' : '✅ Registrar'}
-                              </button>
-                            ) : (
-                              // MODO: NORMAL - MOSTRAR BOTÓN PARA SELECCIONAR
-                              <button
-                                className={`btn-register-quick ${isRecording ? 'loading' : ''}`}
-                                onClick={() => toggleParticipationSelect(student.id)}
-                                disabled={isRecording}
-                                title="Click para seleccionar participación"
-                              >
-                                {isRecording ? '⏳' : '➕ Registrar'}
-                              </button>
-                            )
+                            <button
+                              onClick={() => toggleParticipationSelect(student.id)}
+                              disabled={isRecording}
+                              style={{
+                                padding: '8px 12px',
+                                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: isRecording ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s',
+                                opacity: isRecording ? 0.6 : 1,
+                                whiteSpace: 'nowrap',
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isRecording) {
+                                  e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
+                                  e.target.style.transform = 'translateY(-2px)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.boxShadow = 'none';
+                                e.target.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              {isRecording ? '⏳' : '➕ Registrar'}
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -353,528 +642,80 @@ const ModalLessonAttendanceDetail = ({
         </div>
 
         {/* Footer */}
-        <div className="modal-footer">
+        <div
+          style={{
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end',
+            padding: '16px 24px',
+            borderTop: `1px solid ${theme.border}`,
+            backgroundColor: theme.bgLight,
+            borderRadius: '0 0 12px 12px',
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 10,
+            transition: 'all 300ms ease-in-out',
+          }}
+        >
           <button
-            className="btn-secondary"
             onClick={onClose}
+            style={{
+              padding: '10px 20px',
+              backgroundColor: theme.bgSecondary,
+              color: theme.text,
+              border: `1px solid ${theme.border}`,
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+            onMouseLeave={(e) => e.target.style.opacity = '1'}
           >
             Cerrar
           </button>
           <button
-            className="btn-primary"
             onClick={loadData}
             disabled={loading}
+            style={{
+              padding: '10px 20px',
+              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              opacity: loading ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
+                e.target.style.transform = 'translateY(-2px)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.boxShadow = 'none';
+              e.target.style.transform = 'translateY(0)';
+            }}
           >
             🔄 Recargar
           </button>
         </div>
+
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideInUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+        `}</style>
       </div>
-
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(0, 0, 0, 0.5);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          animation: fadeIn 0.3s ease-in-out;
-        }
-
-        .modal-container {
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          max-width: 1000px;
-          width: 95%;
-          max-height: 90vh;
-          overflow-y: auto;
-          animation: slideInUp 0.3s ease-in-out;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .attendance-detail-modal {
-          max-width: 1000px;
-        }
-
-        .modal-header {
-          background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
-          color: white;
-          padding: 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          border-radius: 12px 12px 0 0;
-          position: sticky;
-          top: 0;
-          z-index: 10;
-        }
-
-        .header-content {
-          flex: 1;
-        }
-
-        .modal-title {
-          font-size: 22px;
-          font-weight: 700;
-          margin: 0;
-        }
-
-        .lesson-meta {
-          font-size: 13px;
-          color: rgba(255, 255, 255, 0.9);
-          margin: 6px 0 0 0;
-        }
-
-        .modal-close-btn {
-          background: none;
-          border: none;
-          color: white;
-          font-size: 24px;
-          cursor: pointer;
-          padding: 0;
-          width: 40px;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 6px;
-          transition: background-color 0.2s;
-        }
-
-        .modal-close-btn:hover {
-          background-color: rgba(255, 255, 255, 0.2);
-        }
-
-        /* Stats */
-        .attendance-stats {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 12px;
-          padding: 16px 24px;
-          background: linear-gradient(to bottom, #f8f9fa, transparent);
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .stat-box {
-          background: white;
-          padding: 12px;
-          border-radius: 8px;
-          text-align: center;
-          border: 2px solid #e5e7eb;
-        }
-
-        .stat-label {
-          display: block;
-          font-size: 12px;
-          color: #6b7280;
-          font-weight: 600;
-          margin-bottom: 4px;
-        }
-
-        .stat-value {
-          display: block;
-          font-size: 24px;
-          font-weight: 700;
-          color: #1f2937;
-        }
-
-        .stat-value.present {
-          color: #10b981;
-        }
-
-        /* Progress Bar */
-        .progress-bar-container {
-          padding: 0 24px 16px;
-        }
-
-        .progress-bar {
-          height: 8px;
-          background-color: #e5e7eb;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #2563eb, #10b981);
-          transition: width 0.3s ease;
-        }
-
-        /* Body */
-        .modal-body {
-          flex: 1;
-          padding: 0;
-          overflow-y: auto;
-        }
-
-        .attendance-body {
-          padding: 0;
-        }
-
-        .error-message {
-          background-color: #fee2e2;
-          color: #991b1b;
-          padding: 12px 24px;
-          margin: 16px 24px;
-          border-radius: 8px;
-          border-left: 4px solid #ef4444;
-        }
-
-        .loading-state,
-        .empty-state {
-          padding: 40px 24px;
-          text-align: center;
-          color: #6b7280;
-        }
-
-        /* Tabla */
-        .attendance-table-container {
-          overflow-x: auto;
-          padding: 0;
-        }
-
-        .attendance-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 14px;
-        }
-
-        .attendance-table thead {
-          background-color: #f3f4f6;
-          position: sticky;
-          top: 0;
-          z-index: 5;
-        }
-
-        .attendance-table th {
-          padding: 14px;
-          text-align: left;
-          font-weight: 600;
-          color: #374151;
-          border-bottom: 2px solid #e5e7eb;
-        }
-
-        .attendance-table td {
-          padding: 14px;
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .attendance-table tbody tr {
-          transition: background-color 0.2s;
-        }
-
-        .attendance-table tbody tr:hover {
-          background-color: #f9fafb;
-        }
-
-        .row-with-attendance {
-          background-color: #f0fdf4;
-        }
-
-        .row-no-attendance {
-          background-color: #fffbeb;
-        }
-
-        /* Columnas */
-        .col-student {
-          width: 35%;
-        }
-
-        .col-status {
-          width: 20%;
-        }
-
-        .col-score {
-          width: 20%;
-        }
-
-        .col-action {
-          width: 25%;
-          text-align: right;
-        }
-
-        .student-info {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .student-avatar {
-          font-size: 18px;
-        }
-
-        .student-name {
-          font-weight: 500;
-          color: #1f2937;
-        }
-
-        /* Status Badges */
-        .status-badge {
-          display: inline-block;
-          padding: 6px 12px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .status-badge.present {
-          background-color: #d1fae5;
-          color: #065f46;
-        }
-
-        .status-badge.absent {
-          background-color: #fee2e2;
-          color: #991b1b;
-        }
-
-        .status-badge.pending {
-          background-color: #fef3c7;
-          color: #92400e;
-        }
-
-        /* Score */
-        .score-badge {
-          display: inline-block;
-          padding: 6px 12px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          background-color: #e0e7ff;
-          color: #3730a3;
-          white-space: nowrap;
-        }
-
-        .score-empty {
-          color: #9ca3af;
-        }
-
-        /* ========== NUEVO: ESTILOS PARA SELECTOR DE PARTICIPACIÓN ========== */
-        .participation-select {
-          display: inline-block;
-        }
-
-        .select-input {
-          padding: 6px 8px;
-          border: 1.5px solid #2563eb;
-          border-radius: 6px;
-          font-size: 12px;
-          background-color: white;
-          color: #1f2937;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .select-input:focus {
-          outline: none;
-          border-color: #1d4ed8;
-          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        .select-input:hover {
-          border-color: #1d4ed8;
-          background-color: #f0f9ff;
-        }
-
-        /* Action */
-        .action-recorded {
-          font-size: 12px;
-          color: #059669;
-          font-weight: 500;
-        }
-
-        .recorded-info {
-          display: block;
-        }
-
-        .btn-register-quick {
-          padding: 8px 12px;
-          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-          color: white;
-          border: none;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          white-space: nowrap;
-        }
-
-        .btn-register-quick:hover:not(:disabled) {
-          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-          transform: translateY(-2px);
-        }
-
-        .btn-register-quick:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .btn-register-quick.loading {
-          opacity: 0.6;
-        }
-
-        /* ========== NUEVO: ESTILOS PARA BOTÓN DE CONFIRMACIÓN ========== */
-        .btn-confirm-attendance {
-          padding: 8px 12px;
-          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-          color: white;
-          border: none;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          white-space: nowrap;
-        }
-
-        .btn-confirm-attendance:hover:not(:disabled) {
-          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-          transform: translateY(-2px);
-        }
-
-        .btn-confirm-attendance:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-          background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
-        }
-
-        .btn-confirm-attendance.disabled {
-          background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
-          opacity: 0.6;
-        }
-
-        .btn-confirm-attendance.loading {
-          opacity: 0.6;
-        }
-
-        /* Footer */
-        .modal-footer {
-          display: flex;
-          gap: 12px;
-          justify-content: flex-end;
-          padding: 16px 24px;
-          border-top: 1px solid #e5e7eb;
-          background-color: #f9fafb;
-          border-radius: 0 0 12px 12px;
-          position: sticky;
-          bottom: 0;
-          z-index: 10;
-        }
-
-        .btn-primary,
-        .btn-secondary {
-          padding: 10px 20px;
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .btn-primary {
-          background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-          color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-          transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-          background-color: #e5e7eb;
-          color: #374151;
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-          background-color: #d1d5db;
-        }
-
-        .btn-primary:disabled,
-        .btn-secondary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideInUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .modal-container {
-            width: 98%;
-            max-height: 98vh;
-          }
-
-          .attendance-stats {
-            grid-template-columns: 1fr;
-          }
-
-          .col-student {
-            width: 50%;
-          }
-
-          .col-status,
-          .col-score,
-          .col-action {
-            width: 16.66%;
-            font-size: 12px;
-          }
-
-          .modal-header {
-            padding: 16px;
-          }
-
-          .modal-title {
-            font-size: 18px;
-          }
-
-          .attendance-table th,
-          .attendance-table td {
-            padding: 10px 8px;
-          }
-
-          .btn-register-quick,
-          .btn-confirm-attendance {
-            padding: 6px 8px;
-            font-size: 11px;
-          }
-
-          .student-name {
-            font-size: 13px;
-          }
-
-          .select-input {
-            font-size: 11px;
-            padding: 4px 6px;
-          }
-        }
-      `}</style>
     </div>
   );
 };
