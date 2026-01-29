@@ -1,13 +1,17 @@
-// 🔓 LoginPage - Formulario de Login CON DARK MODE
+// 🔓 LoginPage - Formulario de Login CON DARK MODE Y LOGOS DINÁMICOS
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+
+// Importa los logos
+import logoBlancoIcon from './assets/Pastoreappblanco.png';
+import logoNegroIcon from './assets/Pastoreappnegro.png';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
   const { login, loading, error } = useAuth();
   const [formData, setFormData] = useState({
-    username: '', // ✅ Cambiado de email a username
+    username: '',
     password: '',
   });
   const [validationError, setValidationError] = useState('');
@@ -87,14 +91,13 @@ export const LoginPage = () => {
     e.preventDefault();
     setValidationError('');
 
-    // Validación básica
     if (!formData.username || !formData.password) {
       setValidationError('Por favor completa todos los campos');
       return;
     }
 
     try {
-      await login(formData.username, formData.password); // ✅ Ahora envía username
+      await login(formData.username, formData.password);
       navigate('/dashboard');
     } catch (err) {
       setValidationError(err.message || 'Error al iniciar sesión');
@@ -124,26 +127,56 @@ export const LoginPage = () => {
           transition: 'all 0.3s ease',
         }}
       >
-        {/* Encabezado */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+        {/* Encabezado con Logo Dinámico */}
+        <div style={{ 
+          textAlign: 'center', 
+          marginBottom: '48px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          {/* Logo que cambia según el tema */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '0',
+            width: '100%',
+          }}>
+            <img
+              src={isDarkMode ? logoBlancoIcon : logoNegroIcon}
+              alt="PastoreApp Logo"
+              style={{
+                height: '160px',
+                width: 'auto',
+                maxWidth: '100%',
+                objectFit: 'contain',
+                transition: 'all 0.3s ease',
+                filter: isDarkMode ? 'brightness(1)' : 'brightness(1)',
+                display: 'block',
+                lineHeight: '0',
+              }}
+            />
+          </div>
+          
           <h1
             style={{
-              fontSize: '28px',
+              fontSize: '32px',
               fontWeight: 'bold',
               color: isDarkMode ? '#f3f4f6' : '#1f2937',
-              margin: 0,
-              background: 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              margin: '0',
+              marginTop: '-8px',
+              transition: 'color 0.3s ease',
             }}
           >
             PastoreApp
           </h1>
+          
           <p
             style={{
               color: theme.textSecondary,
-              marginTop: '8px',
+              marginTop: '4px',
               fontSize: '14px',
               transition: 'color 0.3s ease',
             }}

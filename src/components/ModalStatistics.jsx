@@ -1,6 +1,8 @@
-// 📊 ModalStatistics.jsx - v2 CON MODO OSCURO
+// 📊 ModalStatistics.jsx - v4 OPTIMIZADO PARA MÓVIL
 // ✅ Separa Pendiente de Reprobado (3 categorías)
 // ✅ Legible en modo oscuro automático
+// ✅ SCROLL COMPLETO en todo el contenido
+// ✅ MOBILE FIRST - Perfecto en teléfonos
 
 import React, { useState, useMemo, useEffect } from 'react';
 import {
@@ -141,7 +143,12 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
       : 0;
   }, [totalStudents, totalPassed]);
 
-  const barData = levelStats;
+  const barData = useMemo(() => {
+    if (selectedLevel === 'ALL') {
+      return levelStats;
+    }
+    return levelStats.filter(item => item.name === selectedLevel);
+  }, [levelStats, selectedLevel]);
 
   if (!isOpen || !data) return null;
 
@@ -161,6 +168,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* HEADER - Sticky */}
         <div
           className="modal-header"
           style={{
@@ -171,6 +179,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           <button className="modal-close-btn" onClick={onClose}>✕</button>
         </div>
 
+        {/* CONTROLS - Sticky */}
         <div
           className="statistics-controls"
           style={{
@@ -180,77 +189,42 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         >
           <div className="control-group">
             <label style={{ color: themeColors.textSecondary }}>📈 Tipo de Gráfico</label>
-            <div className="button-group">
-              <button
-                className={`control-btn ${viewType === 'bar' ? 'active' : ''}`}
-                style={{
-                  borderColor: viewType === 'bar' ? 'transparent' : themeColors.border,
-                  backgroundColor: viewType === 'bar'
-                    ? themeColors.header === 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-                      ? '#f093fb'
-                      : '#ec4899'
-                    : themeColors.card,
-                  color: viewType === 'bar' ? 'white' : themeColors.textSecondary,
-                }}
-                onClick={() => setViewType('bar')}
-              >
-                📊 Barras
-              </button>
-              <button
-                className={`control-btn ${viewType === 'pie' ? 'active' : ''}`}
-                style={{
-                  borderColor: viewType === 'pie' ? 'transparent' : themeColors.border,
-                  backgroundColor: viewType === 'pie'
-                    ? themeColors.header === 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-                      ? '#f093fb'
-                      : '#ec4899'
-                    : themeColors.card,
-                  color: viewType === 'pie' ? 'white' : themeColors.textSecondary,
-                }}
-                onClick={() => setViewType('pie')}
-              >
-                🥧 Pastel
-              </button>
-              <button
-                className={`control-btn ${viewType === 'combined' ? 'active' : ''}`}
-                style={{
-                  borderColor: viewType === 'combined' ? 'transparent' : themeColors.border,
-                  backgroundColor: viewType === 'combined'
-                    ? themeColors.header === 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'
-                      ? '#f093fb'
-                      : '#ec4899'
-                    : themeColors.card,
-                  color: viewType === 'combined' ? 'white' : themeColors.textSecondary,
-                }}
-                onClick={() => setViewType('combined')}
-              >
-                📈 Combinado
-              </button>
-            </div>
+            <select
+              value={viewType}
+              onChange={(e) => setViewType(e.target.value)}
+              className="chart-type-select"
+              style={{
+                backgroundColor: themeColors.card,
+                color: themeColors.text,
+                borderColor: themeColors.border,
+              }}
+            >
+              <option value="bar">📊 Barras</option>
+              <option value="pie">🥧 Pastel</option>
+              <option value="combined">📈 Combinado</option>
+            </select>
           </div>
 
-          {viewType === 'pie' && (
-            <div className="control-group">
-              <label style={{ color: themeColors.textSecondary }}>📌 Filtrar por Nivel</label>
-              <select
-                value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value)}
-                className="level-select"
-                style={{
-                  backgroundColor: themeColors.card,
-                  color: themeColors.text,
-                  borderColor: themeColors.border,
-                }}
-              >
-                <option value="ALL">Todos los Niveles</option>
-                {levelStats.map(item => (
-                  <option key={item.name} value={item.name}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="control-group">
+            <label style={{ color: themeColors.textSecondary }}>📌 Filtrar por Nivel</label>
+            <select
+              value={selectedLevel}
+              onChange={(e) => setSelectedLevel(e.target.value)}
+              className="level-select"
+              style={{
+                backgroundColor: themeColors.card,
+                color: themeColors.text,
+                borderColor: themeColors.border,
+              }}
+            >
+              <option value="ALL">Todos los Niveles</option>
+              {levelStats.map(item => (
+                <option key={item.name} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <button
             className="btn-export"
@@ -260,171 +234,95 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           </button>
         </div>
 
-        {/* Estadísticas Generales */}
+        {/* SCROLLABLE CONTENT */}
         <div
-          className="stats-summary"
-          style={{
-            backgroundColor: themeColors.bgLight,
-          }}
+          className="modal-body-wrapper"
         >
+          {/* Estadísticas Generales */}
           <div
-            className="stat-card"
+            className="stats-summary"
             style={{
-              backgroundColor: themeColors.card,
-              borderColor: themeColors.border,
+              backgroundColor: themeColors.bgLight,
             }}
           >
-            <div className="stat-icon">👥</div>
-            <div className="stat-content">
-              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Total de Estudiantes</p>
-              <p className="stat-value" style={{ color: themeColors.text }}>{totalStudents}</p>
-            </div>
-          </div>
-
-          <div
-            className="stat-card"
-            style={{
-              backgroundColor: themeColors.card,
-              borderColor: themeColors.border,
-            }}
-          >
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Aprobados</p>
-              <p className="stat-value" style={{ color: COLORS.passed }}>{totalPassed}</p>
-            </div>
-          </div>
-
-          <div
-            className="stat-card"
-            style={{
-              backgroundColor: themeColors.card,
-              borderColor: themeColors.border,
-            }}
-          >
-            <div className="stat-icon">❌</div>
-            <div className="stat-content">
-              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Reprobados</p>
-              <p className="stat-value" style={{ color: COLORS.failed }}>{totalFailed}</p>
-            </div>
-          </div>
-
-          <div
-            className="stat-card"
-            style={{
-              backgroundColor: themeColors.card,
-              borderColor: themeColors.border,
-            }}
-          >
-            <div className="stat-icon">⏳</div>
-            <div className="stat-content">
-              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Pendientes</p>
-              <p className="stat-value" style={{ color: COLORS.pending }}>{totalPending}</p>
-            </div>
-          </div>
-
-          <div
-            className="stat-card"
-            style={{
-              backgroundColor: themeColors.card,
-              borderColor: themeColors.border,
-            }}
-          >
-            <div className="stat-icon">📊</div>
-            <div className="stat-content">
-              <p className="stat-label" style={{ color: themeColors.textSecondary }}>Tasa de Aprobación</p>
-              <p className="stat-value" style={{ color: themeColors.text }}>{overallPassPercentage}%</p>
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="modal-body"
-          style={{
-            color: themeColors.text,
-          }}
-        >
-          {viewType === 'bar' && (
             <div
-              className="chart-container"
+              className="stat-card"
               style={{
                 backgroundColor: themeColors.card,
                 borderColor: themeColors.border,
               }}
             >
-              <h3 className="chart-title" style={{ color: themeColors.text }}>Estudiantes por Nivel</h3>
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={barData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />
-                  <XAxis
-                    dataKey="name"
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                    tick={{ fontSize: 12, fill: themeColors.text }}
-                  />
-                  <YAxis tick={{ fontSize: 12, fill: themeColors.text }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: themeColors.card,
-                      border: `1px solid ${themeColors.border}`,
-                      borderRadius: '8px',
-                      color: themeColors.text,
-                    }}
-                    formatter={(value) => `${value} estudiantes`}
-                  />
-                  <Legend wrapperStyle={{ color: themeColors.text }} />
-                  <Bar dataKey="passed" fill={COLORS.passed} name="✅ Aprobados" />
-                  <Bar dataKey="failed" fill={COLORS.failed} name="❌ Reprobados" />
-                  <Bar dataKey="pending" fill={COLORS.pending} name="⏳ Pendientes" />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="stat-icon">👥</div>
+              <div className="stat-content">
+                <p className="stat-label" style={{ color: themeColors.textSecondary }}>Total de Estudiantes</p>
+                <p className="stat-value" style={{ color: themeColors.text }}>{totalStudents}</p>
+              </div>
             </div>
-          )}
 
-          {viewType === 'pie' && (
             <div
-              className="chart-container"
+              className="stat-card"
               style={{
                 backgroundColor: themeColors.card,
                 borderColor: themeColors.border,
               }}
             >
-              <h3 className="chart-title" style={{ color: themeColors.text }}>
-                {selectedLevel === 'ALL' ? 'Total General' : selectedLevel}
-              </h3>
-              <ResponsiveContainer width="100%" height={400}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={true}
-                    label={({ name, value, percent }) => `${name} ${value} (${(percent * 100).toFixed(1)}%)`}
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value) => `${value} estudiantes`}
-                    contentStyle={{
-                      backgroundColor: themeColors.card,
-                      border: `1px solid ${themeColors.border}`,
-                      borderRadius: '8px',
-                      color: themeColors.text,
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <div className="stat-icon">✅</div>
+              <div className="stat-content">
+                <p className="stat-label" style={{ color: themeColors.textSecondary }}>Aprobados</p>
+                <p className="stat-value" style={{ color: COLORS.passed }}>{totalPassed}</p>
+              </div>
             </div>
-          )}
 
-          {viewType === 'combined' && (
-            <div className="charts-grid">
+            <div
+              className="stat-card"
+              style={{
+                backgroundColor: themeColors.card,
+                borderColor: themeColors.border,
+              }}
+            >
+              <div className="stat-icon">❌</div>
+              <div className="stat-content">
+                <p className="stat-label" style={{ color: themeColors.textSecondary }}>Reprobados</p>
+                <p className="stat-value" style={{ color: COLORS.failed }}>{totalFailed}</p>
+              </div>
+            </div>
+
+            <div
+              className="stat-card"
+              style={{
+                backgroundColor: themeColors.card,
+                borderColor: themeColors.border,
+              }}
+            >
+              <div className="stat-icon">⏳</div>
+              <div className="stat-content">
+                <p className="stat-label" style={{ color: themeColors.textSecondary }}>Pendientes</p>
+                <p className="stat-value" style={{ color: COLORS.pending }}>{totalPending}</p>
+              </div>
+            </div>
+
+            <div
+              className="stat-card"
+              style={{
+                backgroundColor: themeColors.card,
+                borderColor: themeColors.border,
+              }}
+            >
+              <div className="stat-icon">📊</div>
+              <div className="stat-content">
+                <p className="stat-label" style={{ color: themeColors.textSecondary }}>Tasa de Aprobación</p>
+                <p className="stat-value" style={{ color: themeColors.text }}>{overallPassPercentage}%</p>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="modal-body"
+            style={{
+              color: themeColors.text,
+            }}
+          >
+            {viewType === 'bar' && (
               <div
                 className="chart-container"
                 style={{
@@ -432,33 +330,38 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                   borderColor: themeColors.border,
                 }}
               >
-                <h3 className="chart-title" style={{ color: themeColors.text }}>Por Nivel</h3>
+                <h3 className="chart-title" style={{ color: themeColors.text }}>Estudiantes por Nivel</h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={barData} margin={{ top: 20, right: 20, left: 0, bottom: 40 }}>
+                  <BarChart data={barData} margin={{ top: 15, right: 15, left: -30, bottom: 50 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />
                     <XAxis
                       dataKey="name"
                       angle={-45}
                       textAnchor="end"
                       height={80}
-                      tick={{ fontSize: 11, fill: themeColors.text }}
+                      tick={{ fontSize: 10, fill: themeColors.text }}
                     />
-                    <YAxis tick={{ fontSize: 11, fill: themeColors.text }} />
+                    <YAxis tick={{ fontSize: 10, fill: themeColors.text }} />
                     <Tooltip
-                      formatter={(value) => `${value}`}
                       contentStyle={{
                         backgroundColor: themeColors.card,
                         border: `1px solid ${themeColors.border}`,
+                        borderRadius: '8px',
                         color: themeColors.text,
+                        fontSize: '12px',
                       }}
+                      formatter={(value) => `${value}`}
                     />
-                    <Bar dataKey="passed" fill={COLORS.passed} />
-                    <Bar dataKey="failed" fill={COLORS.failed} />
-                    <Bar dataKey="pending" fill={COLORS.pending} />
+                    <Legend wrapperStyle={{ color: themeColors.text, fontSize: '12px' }} />
+                    <Bar dataKey="passed" fill={COLORS.passed} name="✅ Aprobados" />
+                    <Bar dataKey="failed" fill={COLORS.failed} name="❌ Reprobados" />
+                    <Bar dataKey="pending" fill={COLORS.pending} name="⏳ Pendientes" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            )}
 
+            {viewType === 'pie' && (
               <div
                 className="chart-container"
                 style={{
@@ -466,100 +369,181 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
                   borderColor: themeColors.border,
                 }}
               >
-                <h3 className="chart-title" style={{ color: themeColors.text }}>Total General</h3>
+                <h3 className="chart-title" style={{ color: themeColors.text }}>
+                  {selectedLevel === 'ALL' ? 'Total General' : selectedLevel}
+                </h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      outerRadius={100}
+                      labelLine={false}
+                      label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                      outerRadius={90}
                       fill="#8884d8"
                       dataKey="value"
-                      label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
                     >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.fill} />
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value) => `${value}`}
+                      formatter={(value) => `${value} est.`}
                       contentStyle={{
                         backgroundColor: themeColors.card,
                         border: `1px solid ${themeColors.border}`,
+                        borderRadius: '8px',
                         color: themeColors.text,
+                        fontSize: '12px',
                       }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Tabla de Detalles */}
-          <div className="details-section">
-            <h3 className="section-title" style={{ color: themeColors.text }}>📋 Detalle por Nivel</h3>
-            <div className="table-container">
-              <table
-                className="details-table"
-                style={{
-                  backgroundColor: themeColors.card,
-                  borderColor: themeColors.border,
-                }}
-              >
-                <thead>
-                  <tr style={{ backgroundColor: themeColors.bgSecondary }}>
-                    <th style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>Nivel</th>
-                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>Total</th>
-                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>✅ Aprobados</th>
-                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>❌ Reprobados</th>
-                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>⏳ Pendientes</th>
-                    <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>% Aprobación</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {levelStats.map((item, index) => (
-                    <tr key={index} style={{ backgroundColor: index % 2 === 0 ? themeColors.card : themeColors.bgSecondary }}>
-                      <td className="level-name" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>{item.name}</td>
-                      <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>{item.total}</td>
+            {viewType === 'combined' && (
+              <div className="charts-grid">
+                <div
+                  className="chart-container"
+                  style={{
+                    backgroundColor: themeColors.card,
+                    borderColor: themeColors.border,
+                  }}
+                >
+                  <h3 className="chart-title" style={{ color: themeColors.text }}>Por Nivel</h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={barData} margin={{ top: 15, right: 15, left: -30, bottom: 50 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={themeColors.gridColor} />
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={70}
+                        tick={{ fontSize: 9, fill: themeColors.text }}
+                      />
+                      <YAxis tick={{ fontSize: 9, fill: themeColors.text }} />
+                      <Tooltip
+                        formatter={(value) => `${value}`}
+                        contentStyle={{
+                          backgroundColor: themeColors.card,
+                          border: `1px solid ${themeColors.border}`,
+                          color: themeColors.text,
+                          fontSize: '11px',
+                        }}
+                      />
+                      <Bar dataKey="passed" fill={COLORS.passed} />
+                      <Bar dataKey="failed" fill={COLORS.failed} />
+                      <Bar dataKey="pending" fill={COLORS.pending} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div
+                  className="chart-container"
+                  style={{
+                    backgroundColor: themeColors.card,
+                    borderColor: themeColors.border,
+                  }}
+                >
+                  <h3 className="chart-title" style={{ color: themeColors.text }}>Total General</h3>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value) => `${value}`}
+                        contentStyle={{
+                          backgroundColor: themeColors.card,
+                          border: `1px solid ${themeColors.border}`,
+                          color: themeColors.text,
+                          fontSize: '11px',
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Tabla de Detalles */}
+            <div className="details-section">
+              <h3 className="section-title" style={{ color: themeColors.text }}>📋 Detalle por Nivel</h3>
+              <div className="table-container">
+                <table
+                  className="details-table"
+                  style={{
+                    backgroundColor: themeColors.card,
+                    borderColor: themeColors.border,
+                  }}
+                >
+                  <thead>
+                    <tr style={{ backgroundColor: themeColors.bgSecondary }}>
+                      <th style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>Nivel</th>
+                      <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>Total</th>
+                      <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>✅</th>
+                      <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>❌</th>
+                      <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>⏳</th>
+                      <th className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {levelStats.map((item, index) => (
+                      <tr key={index} style={{ backgroundColor: index % 2 === 0 ? themeColors.card : themeColors.bgSecondary }}>
+                        <td className="level-name" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>{item.name}</td>
+                        <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>{item.total}</td>
+                        <td className="text-center" style={{ color: COLORS.passed, borderBottomColor: themeColors.border }}>
+                          {item.passed}
+                        </td>
+                        <td className="text-center" style={{ color: COLORS.failed, borderBottomColor: themeColors.border }}>
+                          {item.failed}
+                        </td>
+                        <td className="text-center" style={{ color: COLORS.pending, borderBottomColor: themeColors.border }}>
+                          {item.pending}
+                        </td>
+                        <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>
+                          <strong>{item.passPercentage}%</strong>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="footer-row" style={{ backgroundColor: themeColors.bgSecondary, borderTopColor: themeColors.border }}>
+                      <td style={{ color: themeColors.text, borderBottomColor: themeColors.border }}><strong>TOTAL</strong></td>
+                      <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}><strong>{totalStudents}</strong></td>
                       <td className="text-center" style={{ color: COLORS.passed, borderBottomColor: themeColors.border }}>
-                        {item.passed}
+                        <strong>{totalPassed}</strong>
                       </td>
                       <td className="text-center" style={{ color: COLORS.failed, borderBottomColor: themeColors.border }}>
-                        {item.failed}
+                        <strong>{totalFailed}</strong>
                       </td>
                       <td className="text-center" style={{ color: COLORS.pending, borderBottomColor: themeColors.border }}>
-                        {item.pending}
+                        <strong>{totalPending}</strong>
                       </td>
                       <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>
-                        <strong>{item.passPercentage}%</strong>
+                        <strong>{overallPassPercentage}%</strong>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="footer-row" style={{ backgroundColor: themeColors.bgSecondary, borderTopColor: themeColors.border }}>
-                    <td style={{ color: themeColors.text, borderBottomColor: themeColors.border }}><strong>TOTAL</strong></td>
-                    <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}><strong>{totalStudents}</strong></td>
-                    <td className="text-center" style={{ color: COLORS.passed, borderBottomColor: themeColors.border }}>
-                      <strong>{totalPassed}</strong>
-                    </td>
-                    <td className="text-center" style={{ color: COLORS.failed, borderBottomColor: themeColors.border }}>
-                      <strong>{totalFailed}</strong>
-                    </td>
-                    <td className="text-center" style={{ color: COLORS.pending, borderBottomColor: themeColors.border }}>
-                      <strong>{totalPending}</strong>
-                    </td>
-                    <td className="text-center" style={{ color: themeColors.text, borderBottomColor: themeColors.border }}>
-                      <strong>{overallPassPercentage}%</strong>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           </div>
         </div>
 
+        {/* FOOTER - Sticky */}
         <div
           className="modal-footer"
           style={{
@@ -596,7 +580,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           justify-content: center;
           z-index: 1000;
           animation: fadeIn 0.3s ease-in-out;
-          padding: 20px;
+          padding: 10px;
           transition: background-color 300ms ease-in-out;
         }
 
@@ -606,29 +590,28 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           width: 100%;
           max-width: 1000px;
           max-height: 90vh;
-          overflow-y: auto;
-          animation: slideInUp 0.3s ease-in-out;
           display: flex;
           flex-direction: column;
+          animation: slideInUp 0.3s ease-in-out;
           transition: all 300ms ease-in-out;
+          overflow: hidden;
         }
 
         .modal-header {
           color: white;
-          padding: 24px;
+          padding: 16px;
           display: flex;
           justify-content: space-between;
           align-items: center;
           border-radius: 12px 12px 0 0;
-          position: sticky;
-          top: 0;
           z-index: 10;
           transition: background 300ms ease-in-out;
+          flex-shrink: 0;
         }
 
         .modal-title {
           margin: 0;
-          font-size: 20px;
+          font-size: 18px;
           font-weight: 700;
         }
 
@@ -639,13 +622,14 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           font-size: 24px;
           cursor: pointer;
           padding: 0;
-          width: 40px;
-          height: 40px;
+          width: 32px;
+          height: 32px;
           display: flex;
           align-items: center;
           justify-content: center;
           border-radius: 6px;
           transition: background-color 0.2s;
+          flex-shrink: 0;
         }
 
         .modal-close-btn:hover {
@@ -653,39 +637,41 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         }
 
         .statistics-controls {
-          padding: 16px 24px;
+          padding: 12px 16px;
           border-bottom: 1px solid;
           display: flex;
-          gap: 20px;
+          gap: 12px;
           align-items: flex-end;
           flex-wrap: wrap;
           transition: all 300ms ease-in-out;
+          flex-shrink: 0;
         }
 
         .control-group {
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          gap: 6px;
         }
 
         .control-group label {
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 600;
         }
 
         .button-group {
           display: flex;
-          gap: 8px;
+          gap: 6px;
         }
 
         .control-btn {
-          padding: 8px 16px;
-          border: 1.5px solid;
+          padding: 6px 12px;
+          border: 1px solid;
           border-radius: 6px;
           cursor: pointer;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 600;
           transition: all 0.2s;
+          white-space: nowrap;
         }
 
         .control-btn:hover {
@@ -693,10 +679,10 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         }
 
         .level-select {
-          padding: 8px 12px;
-          border: 1.5px solid;
+          padding: 6px 10px;
+          border: 1px solid;
           border-radius: 6px;
-          font-size: 12px;
+          font-size: 11px;
           cursor: pointer;
           transition: all 0.2s;
           font-family: inherit;
@@ -707,106 +693,155 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
         }
 
+        .chart-type-select {
+          padding: 6px 10px;
+          border: 1px solid;
+          border-radius: 6px;
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s;
+          font-family: inherit;
+        }
+
+        .chart-type-select:focus {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+        }
+
         .btn-export {
-          padding: 8px 16px;
+          padding: 6px 12px;
           background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
           color: white;
           border: none;
           border-radius: 6px;
           cursor: pointer;
-          font-size: 12px;
+          font-size: 11px;
           font-weight: 600;
           transition: all 0.2s;
+          white-space: nowrap;
         }
 
         .btn-export:hover {
           box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
         }
 
+        /* ✅ NUEVA ESTRUCTURA: Modal Body Wrapper con Scroll */
+        .modal-body-wrapper {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* Scrollbar personalizado */
+        .modal-body-wrapper::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .modal-body-wrapper::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .modal-body-wrapper::-webkit-scrollbar-thumb {
+          background: rgba(100, 116, 139, 0.5);
+          border-radius: 3px;
+        }
+
+        .modal-body-wrapper::-webkit-scrollbar-thumb:hover {
+          background: rgba(100, 116, 139, 0.8);
+        }
+
         .stats-summary {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 12px;
-          padding: 16px 24px;
+          grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+          gap: 10px;
+          padding: 12px 16px;
           transition: all 300ms ease-in-out;
+          flex-shrink: 0;
         }
 
         .stat-card {
-          padding: 12px;
+          padding: 10px;
           border-radius: 8px;
           border: 1px solid;
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 8px;
           transition: all 300ms ease-in-out;
         }
 
         .stat-icon {
-          font-size: 24px;
+          font-size: 20px;
+          flex-shrink: 0;
         }
 
         .stat-content {
           flex: 1;
+          min-width: 0;
         }
 
         .stat-label {
           margin: 0;
-          font-size: 11px;
+          font-size: 10px;
           font-weight: 600;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .stat-value {
           margin: 0;
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 700;
         }
 
         .modal-body {
-          flex: 1;
-          padding: 24px;
-          overflow-y: auto;
+          padding: 16px;
           transition: color 300ms ease-in-out;
         }
 
         .chart-container {
-          padding: 20px;
+          padding: 16px;
           border-radius: 8px;
           border: 1px solid;
-          margin-bottom: 20px;
+          margin-bottom: 16px;
           transition: all 300ms ease-in-out;
         }
 
         .charts-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-          gap: 20px;
-          margin-bottom: 20px;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 16px;
+          margin-bottom: 16px;
         }
 
         .chart-title {
-          margin: 0 0 16px;
-          font-size: 14px;
+          margin: 0 0 12px;
+          font-size: 13px;
           font-weight: 600;
         }
 
         .details-section {
-          margin-top: 20px;
+          margin-top: 16px;
         }
 
         .section-title {
-          margin: 0 0 12px;
-          font-size: 14px;
+          margin: 0 0 10px;
+          font-size: 13px;
           font-weight: 600;
         }
 
         .table-container {
           overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          border-radius: 8px;
         }
 
         .details-table {
           width: 100%;
           border-collapse: collapse;
-          font-size: 12px;
+          font-size: 11px;
           border: 1px solid;
           border-radius: 8px;
           overflow: hidden;
@@ -814,7 +849,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         }
 
         .details-table th {
-          padding: 12px;
+          padding: 8px;
           text-align: left;
           font-weight: 600;
           border-bottom: 2px solid;
@@ -822,7 +857,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
         }
 
         .details-table td {
-          padding: 12px;
+          padding: 8px;
           border-bottom: 1px solid;
           transition: all 300ms ease-in-out;
         }
@@ -833,6 +868,7 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
         .level-name {
           font-weight: 500;
+          min-width: 60px;
         }
 
         .text-center {
@@ -845,25 +881,25 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
 
         .modal-footer {
           display: flex;
-          gap: 12px;
+          gap: 8px;
           justify-content: flex-end;
-          padding: 16px 24px;
+          padding: 12px 16px;
           border-top: 1px solid;
           border-radius: 0 0 12px 12px;
-          position: sticky;
-          bottom: 0;
           transition: all 300ms ease-in-out;
+          flex-shrink: 0;
         }
 
         .btn-primary,
         .btn-secondary {
-          padding: 10px 20px;
+          padding: 8px 16px;
           border: none;
-          border-radius: 8px;
-          font-size: 13px;
+          border-radius: 6px;
+          font-size: 12px;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.2s;
+          white-space: nowrap;
         }
 
         .btn-primary {
@@ -900,7 +936,12 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           }
         }
 
-        @media (max-width: 768px) {
+        /* ========== TABLET (768px - 1024px) ========== */
+        @media (max-width: 1024px) {
+          .modal-container {
+            max-height: 92vh;
+          }
+
           .charts-grid {
             grid-template-columns: 1fr;
           }
@@ -908,14 +949,21 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           .statistics-controls {
             flex-direction: column;
             align-items: stretch;
+            gap: 10px;
+          }
+
+          .control-group {
+            width: 100%;
           }
 
           .button-group {
-            flex-direction: column;
+            width: 100%;
+            flex-wrap: wrap;
           }
 
           .control-btn {
-            width: 100%;
+            flex: 1;
+            min-width: 70px;
           }
 
           .level-select {
@@ -923,7 +971,294 @@ const ModalStatistics = ({ isOpen, onClose, data, onExportPDF }) => {
           }
 
           .stats-summary {
+            grid-template-columns: repeat(3, 1fr);
+          }
+
+          .details-table {
+            font-size: 10px;
+          }
+
+          .details-table th,
+          .details-table td {
+            padding: 6px;
+          }
+        }
+
+        /* ========== MOBILE (480px - 768px) ========== */
+        @media (max-width: 768px) {
+          .modal-overlay {
+            padding: 8px;
+          }
+
+          .modal-container {
+            max-height: 94vh;
+            border-radius: 8px;
+          }
+
+          .modal-header {
+            padding: 12px;
+          }
+
+          .modal-title {
+            font-size: 16px;
+          }
+
+          .modal-close-btn {
+            width: 28px;
+            height: 28px;
+            font-size: 20px;
+          }
+
+          .statistics-controls {
+            padding: 10px 12px;
+            gap: 8px;
+          }
+
+          .control-group {
+            width: 100%;
+          }
+
+          .control-group label {
+            font-size: 10px;
+          }
+
+          .button-group {
+            width: 100%;
+            flex-direction: column;
+            gap: 6px;
+          }
+
+          .control-btn {
+            width: 100%;
+            padding: 8px 10px;
+            font-size: 12px;
+          }
+
+          .level-select {
+            width: 100%;
+            padding: 8px 10px;
+            font-size: 12px;
+          }
+
+          .btn-export {
+            width: 100%;
+            padding: 8px 10px;
+            font-size: 12px;
+          }
+
+          .stats-summary {
             grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            padding: 10px 12px;
+          }
+
+          .stat-card {
+            padding: 8px;
+            gap: 6px;
+          }
+
+          .stat-icon {
+            font-size: 18px;
+          }
+
+          .stat-label {
+            font-size: 9px;
+          }
+
+          .stat-value {
+            font-size: 14px;
+          }
+
+          .modal-body {
+            padding: 12px;
+          }
+
+          .chart-container {
+            padding: 12px;
+            margin-bottom: 12px;
+          }
+
+          .chart-title {
+            font-size: 12px;
+            margin-bottom: 10px;
+          }
+
+          .charts-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .details-section {
+            margin-top: 12px;
+          }
+
+          .section-title {
+            font-size: 12px;
+            margin-bottom: 8px;
+          }
+
+          .details-table {
+            font-size: 9px;
+          }
+
+          .details-table th,
+          .details-table td {
+            padding: 6px 4px;
+          }
+
+          .modal-footer {
+            padding: 10px 12px;
+            gap: 6px;
+          }
+
+          .btn-primary,
+          .btn-secondary {
+            padding: 7px 12px;
+            font-size: 11px;
+            flex: 1;
+          }
+        }
+
+        /* ========== SMALL MOBILE (<480px) ========== */
+        @media (max-width: 480px) {
+          .modal-overlay {
+            padding: 6px;
+          }
+
+          .modal-container {
+            max-height: 95vh;
+            border-radius: 6px;
+          }
+
+          .modal-header {
+            padding: 10px;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+
+          .modal-title {
+            font-size: 14px;
+            margin: 0;
+          }
+
+          .modal-close-btn {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            width: 24px;
+            height: 24px;
+            font-size: 18px;
+          }
+
+          .statistics-controls {
+            padding: 8px 10px;
+            gap: 6px;
+          }
+
+          .control-group {
+            width: 100%;
+          }
+
+          .control-group label {
+            font-size: 9px;
+          }
+
+          .button-group {
+            width: 100%;
+            flex-direction: column;
+            gap: 4px;
+          }
+
+          .control-btn {
+            width: 100%;
+            padding: 7px 8px;
+            font-size: 11px;
+          }
+
+          .level-select {
+            width: 100%;
+            padding: 7px 8px;
+            font-size: 11px;
+          }
+
+          .btn-export {
+            width: 100%;
+            padding: 7px 8px;
+            font-size: 11px;
+          }
+
+          .stats-summary {
+            grid-template-columns: 1fr;
+            gap: 6px;
+            padding: 8px 10px;
+          }
+
+          .stat-card {
+            padding: 8px;
+            gap: 8px;
+          }
+
+          .stat-icon {
+            font-size: 16px;
+          }
+
+          .stat-label {
+            font-size: 8px;
+          }
+
+          .stat-value {
+            font-size: 12px;
+          }
+
+          .modal-body {
+            padding: 10px;
+          }
+
+          .chart-container {
+            padding: 10px;
+            margin-bottom: 10px;
+          }
+
+          .chart-title {
+            font-size: 11px;
+            margin-bottom: 8px;
+          }
+
+          .charts-grid {
+            grid-template-columns: 1fr;
+            gap: 10px;
+          }
+
+          .details-section {
+            margin-top: 10px;
+          }
+
+          .section-title {
+            font-size: 11px;
+            margin-bottom: 6px;
+          }
+
+          .details-table {
+            font-size: 8px;
+          }
+
+          .details-table th,
+          .details-table td {
+            padding: 4px 2px;
+          }
+
+          .modal-footer {
+            padding: 8px 10px;
+            gap: 4px;
+            flex-direction: column;
+          }
+
+          .btn-primary,
+          .btn-secondary {
+            padding: 6px 10px;
+            font-size: 10px;
+            width: 100%;
           }
         }
       `}</style>
