@@ -1,9 +1,6 @@
-// 💰 FinancesPage.jsx - GESTIÓN DE FINANZAS v5.5 FINAL CORREGIDO
-// ✅ ZONA HORARIA: CORREGIDA - Evita desfase usando getDateWithoutTimezone SIEMPRE
-// ✅ RECARGAR: Ahora limpia todos los filtros cuando presionas el botón
-// ✅ FECHAS: Sin desfases, muestra las fechas correctas seleccionadas
-// ✅ MODAL SIEMPRE: Se abre para cualquier tipo de reporte
-// ✅ NUEVO: FIRST_FRUITS (Primicias) agregado como concepto
+// 💰 FinancesPage.jsx - GESTIÓN DE FINANZAS v5.6 CON FILTROS ESTADÍSTICAS
+// ✅ Ahora pasa allFinances al modal de estadísticas
+// ✅ ModalFinanceStatistics puede filtrar por mes o año
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
@@ -36,8 +33,6 @@ const devWarn = (message, data = null) => {
 
 // ========== FUNCIÓN AUXILIAR: Convertir fecha sin problemas de zona horaria ==========
 const getDateWithoutTimezone = (dateString) => {
-  // dateString es formato "2024-03-26"
-  // Retorna un Date objeto que representa esa fecha a las 00:00:00 sin problemas de timezone
   const [year, month, day] = dateString.split('-').map(Number);
   return new Date(year, month - 1, day);
 };
@@ -69,8 +64,6 @@ const FinancesPage = () => {
   const [statisticsData, setStatisticsData] = useState(null);
   const [editingFinance, setEditingFinance] = useState(null);
 
-  // Enums para conceptos e métodos (del backend Java)
-  // ✅ NUEVO: FIRST_FRUITS y CELL_GROUP_OFFERING agregados
   const INCOME_CONCEPTS = ['TITHE', 'OFFERING', 'SEED_OFFERING', 'BUILDING_FUND', 'FIRST_FRUITS', 'CELL_GROUP_OFFERING'];
   const INCOME_METHODS = ['CASH', 'BANK_TRANSFER'];
 
@@ -111,6 +104,8 @@ const FinancesPage = () => {
         registrationDate: finance.registrationDate,
         isVerified: finance.isVerified || false,
         description: finance.description || '',
+        incomeConcept: finance.incomeConcept,
+        incomeMethod: finance.incomeMethod,
       }));
 
       devLog('✅ Finanzas procesadas - Cantidad:', processedFinances.length);
@@ -138,7 +133,6 @@ const FinancesPage = () => {
   const handleReloadAndClearFilters = async () => {
     devLog('🔄 Recargando datos y limpiando filtros...');
     
-    // Limpiar todos los filtros
     setSelectedConcept('ALL');
     setSelectedMethod('ALL');
     setSelectedVerification('ALL');
@@ -146,7 +140,6 @@ const FinancesPage = () => {
     setStartDate('');
     setEndDate('');
     
-    // Recargar datos
     await loadFinances();
     
     devLog('✅ Filtros limpiados y datos recargados');
@@ -156,26 +149,22 @@ const FinancesPage = () => {
   const applyFilters = () => {
     let filtered = [...allFinances];
 
-    // 📅 Ordenar por fecha (más recientes primero)
     filtered.sort((a, b) => {
       const dateA = new Date(a.registrationDate || 0).getTime();
       const dateB = new Date(b.registrationDate || 0).getTime();
       return dateB - dateA;
     });
 
-    // 🔍 Filtrar por concepto
     if (selectedConcept !== 'ALL') {
       devLog('🔍 Filtrando por concepto:', selectedConcept);
       filtered = filtered.filter(finance => finance.concept === selectedConcept);
     }
 
-    // 🔍 Filtrar por método de pago
     if (selectedMethod !== 'ALL') {
       devLog('🔍 Filtrando por método:', selectedMethod);
       filtered = filtered.filter(finance => finance.method === selectedMethod);
     }
 
-    // 🔍 Filtrar por verificación
     if (selectedVerification !== 'ALL') {
       devLog('🔍 Filtrando por verificación:', selectedVerification);
       if (selectedVerification === 'VERIFIED') {
@@ -185,29 +174,23 @@ const FinancesPage = () => {
       }
     }
 
-    // 📅 LÓGICA INTELIGENTE DE FILTRADO POR FECHA (SIN PROBLEMAS DE TIMEZONE)
     if (startDate && !endDate) {
-      // CASO 1: Solo "Desde" - Buscar SOLO ESE DÍA
       devLog('📅 Filtro: Solo "Desde" seleccionado');
-      const targetDate = startDate; // 2024-03-26
+      const targetDate = startDate;
       filtered = filtered.filter(finance => {
-        // Obtener la fecha del registro sin problemas de timezone
         const financeDate = new Date(finance.registrationDate);
         const financeDateString = getDateStringWithoutTimezone(financeDate);
         return financeDateString === targetDate;
       });
     } else if (startDate && endDate) {
-      // CASO 2: Ambos rellenos - Buscar el RANGO
       devLog('📅 Filtro: Rango de fechas desde', startDate, 'hasta', endDate);
       filtered = filtered.filter(finance => {
         const financeDate = new Date(finance.registrationDate);
         const financeDateString = getDateStringWithoutTimezone(financeDate);
         
-        // Comparar como strings para evitar problemas de timezone
         return financeDateString >= startDate && financeDateString <= endDate;
       });
     } else if (!startDate && endDate) {
-      // CASO 3: Solo "Hasta" - Buscar HASTA ESE DÍA
       devLog('📅 Filtro: Solo "Hasta" seleccionado');
       filtered = filtered.filter(finance => {
         const financeDate = new Date(finance.registrationDate);
@@ -216,7 +199,6 @@ const FinancesPage = () => {
       });
     }
 
-    // 🔍 Buscar por nombre de miembro
     if (searchText.trim()) {
       const search = searchText.toLowerCase();
       filtered = filtered.filter(finance =>
@@ -230,14 +212,12 @@ const FinancesPage = () => {
 
   // ========== DETECTAR SI HAY FECHAS SELECCIONADAS ==========
   const hasDatesSelected = () => {
-    // Abre modal siempre que haya al menos una fecha seleccionada
     return !!(startDate || endDate);
   };
 
   // ========== MANEJAR CLIC EN BOTÓN PDF ==========
   const handleExportPDF = async () => {
     try {
-      // SIEMPRE abre el modal si hay fechas seleccionadas
       if (hasDatesSelected()) {
         devLog('📅 Abriendo modal de opciones de reporte');
         setShowReportModal(true);
@@ -251,7 +231,6 @@ const FinancesPage = () => {
         return;
       }
 
-      // Si NO hay fechas seleccionadas, genera PDF con todos los registros
       devLog('📄 Generando PDF con todos los registros (sin filtro de fechas)');
 
       let title = 'Reporte de Ingresos Financieros';
@@ -292,12 +271,10 @@ const FinancesPage = () => {
     try {
       devLog('📄 Generando PDF - Tipo:', reportType);
 
-      // 🔧 CORRECCIÓN v5.5: Usar getDateWithoutTimezone SIEMPRE para evitar desfase
       let reportDateRange = '';
       let reportDateForPDF = startDate;
       
       if (startDate && endDate) {
-        // ✅ Usar getDateWithoutTimezone para ambas fechas
         const startDateObj = getDateWithoutTimezone(startDate);
         const endDateObj = getDateWithoutTimezone(endDate);
         const startFormatted = startDateObj.toLocaleDateString('es-CO');
@@ -312,7 +289,6 @@ const FinancesPage = () => {
           endObj: endDateObj
         });
       } else if (startDate) {
-        // ✅ Usar getDateWithoutTimezone
         const startDateObj = getDateWithoutTimezone(startDate);
         reportDateRange = startDateObj.toLocaleDateString('es-CO');
         
@@ -322,7 +298,6 @@ const FinancesPage = () => {
           dateObj: startDateObj
         });
       } else if (endDate) {
-        // ✅ Usar getDateWithoutTimezone
         const endDateObj = getDateWithoutTimezone(endDate);
         reportDateRange = endDateObj.toLocaleDateString('es-CO');
         reportDateForPDF = endDate;
@@ -338,7 +313,7 @@ const FinancesPage = () => {
         startDate: startDate,
         endDate: endDate,
         date: reportDateForPDF,
-        dateRange: reportDateRange,     // ✅ El rango correcto SIN DESFASE
+        dateRange: reportDateRange,
         finances: filteredFinances,
         reportType: reportType,
         statistics: calculateStatistics(),
@@ -532,7 +507,7 @@ const FinancesPage = () => {
       'SEED_OFFERING': '🌱 Ofrenda de Semilla',
       'BUILDING_FUND': '🏗️ Fondo de Construcción',
       'FIRST_FRUITS': '🍇 Primicias',
-      'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',  // ✅ NUEVO: Ofrenda de Grupo de Célula
+      'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',
     };
     return map[concept] || concept;
   };
@@ -814,6 +789,7 @@ const FinancesPage = () => {
         isOpen={showStatisticsModal}
         onClose={() => setShowStatisticsModal(false)}
         data={statisticsData}
+        allFinances={allFinances}
         onExportPDF={() => {
           const stats = calculateStatistics();
           generateFinancePDF(
@@ -823,7 +799,6 @@ const FinancesPage = () => {
         }}
       />
 
-      {/* MODAL: Se abre siempre cuando se presiona PDF */}
       <ModalDailyReportOptions
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}

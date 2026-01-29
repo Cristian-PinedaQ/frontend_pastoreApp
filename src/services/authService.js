@@ -7,9 +7,9 @@ class authService {
 
   // ============ AUTENTICACIÓN ============
 
-  // Obtener token guardado
+  // ✅ ACTUALIZADO: Obtener token guardado (ahora usa sessionStorage)
   getToken() {
-    return localStorage.getItem('token');
+    return sessionStorage.getItem('token');
   }
 
   // Headers con autenticación
@@ -26,7 +26,7 @@ class authService {
     return headers;
   }
 
-  // Login
+  // ✅ ACTUALIZADO: Login (guarda en sessionStorage)
   async login(username, password) {
     try {
       const response = await fetch(`${this.baseURL}/login`, {
@@ -44,9 +44,9 @@ class authService {
 
       const data = await response.json();
       
-      // Guardar token y usuario
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify({
+      // ✅ Guardar en sessionStorage (se limpia automáticamente al cerrar la pestaña)
+      sessionStorage.setItem('token', data.token);
+      sessionStorage.setItem('user', JSON.stringify({
         username: data.username,
         email: data.email,
         roles: data.roles
@@ -113,10 +113,10 @@ class authService {
     }
   }
 
-  // Logout
+  // ✅ ACTUALIZADO: Logout (limpia sessionStorage)
   logout() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
   }
 
   // ============ GESTIÓN DE USUARIOS ============
@@ -251,11 +251,11 @@ class authService {
   }
 
   /**
-   * Obtener datos del usuario actual del localStorage
+   * ✅ ACTUALIZADO: Obtener datos del usuario actual de sessionStorage
    * @returns {Object|null} Datos del usuario o null
    */
   getCurrentUser() {
-    const user = localStorage.getItem('user');
+    const user = sessionStorage.getItem('user');
     return user ? JSON.parse(user) : null;
   }
 

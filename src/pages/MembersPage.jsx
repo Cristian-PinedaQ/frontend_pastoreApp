@@ -1,61 +1,184 @@
-// 👥 MembersPage - Gestión de miembros CON DARK MODE COMPLETO
-// ✅ TOTALMENTE LEGIBLE EN MODO OSCURO
+// 👥 MembersPage MEJORADO - CON FILTROS AVANZADOS Y GENERADOR PDF
+// ✅ Filtros por: Género, Distrito, Líder
+// ✅ Botón limpiar filtros
+// ✅ Generar PDF del resultado filtrado
+// ✅ Diseño responsive mantenido
+// ✅ ACTUALIZADO: Click en nombre para ver detalle, acciones en modal
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import apiService from "../apiService";
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from "../context/AuthContext";
 import { MemberDetailModal } from "../components/MemberDetailModal";
 import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal";
+import { generateMembersPDF } from "../services/generateMembersPDF";
+import "../css/Memberspageresponsive.css";
 
+// ========== COMPONENTES REUTILIZABLES MEMOIZADOS ==========
+
+const FormInput = memo(({ label, gridColumn, ...props }) => (
+  <div className="members-page__form-group" style={{ gridColumn }}>
+    <label className="members-page__form-label">{label}</label>
+    <input className="members-page__form-input" {...props} />
+  </div>
+));
+
+FormInput.displayName = "FormInput";
+
+const FormSelect = memo(({ label, options, gridColumn, ...props }) => (
+  <div className="members-page__form-group" style={{ gridColumn }}>
+    <label className="members-page__form-label">{label}</label>
+    <select className="members-page__form-select" {...props}>
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  </div>
+));
+
+FormSelect.displayName = "FormSelect";
+
+// ========== COMPONENTE DE FILTROS ==========
+const FilterPanel = memo(
+  ({
+    filters,
+    onFilterChange,
+    onClearFilters,
+    genderOptions,
+    districtOptions,
+    leaders,
+    onExportPDF,
+    resultsCount,
+  }) => {
+    return (
+      <div className="members-page__filters-panel">
+        <div className="members-page__filters-header">
+          <h3>🔍 Filtros Avanzados</h3>
+          <button
+            onClick={onClearFilters}
+            className="members-page__btn-clear-filters"
+            title="Limpiar todos los filtros"
+          >
+            ✕ Limpiar
+          </button>
+        </div>
+
+        <div className="members-page__filters-grid">
+          {/* Filtro Género */}
+          <div className="members-page__filter-item">
+            <label className="members-page__filter-label">👤 Género</label>
+            <select
+              value={filters.gender}
+              onChange={(e) => onFilterChange("gender", e.target.value)}
+              className="members-page__filter-select"
+            >
+              <option value="">Todos</option>
+              {genderOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro Distrito */}
+          <div className="members-page__filter-item">
+            <label className="members-page__filter-label">📍 Distrito</label>
+            <select
+              value={filters.district}
+              onChange={(e) => onFilterChange("district", e.target.value)}
+              className="members-page__filter-select"
+            >
+              <option value="">Todos</option>
+              <option value="D1">Distrito 1</option>
+              <option value="D2">Distrito 2</option>
+              <option value="D3">Distrito 3</option>
+              <option value="PASTORES">Pastores</option>
+            </select>
+          </div>
+
+          {/* Filtro Líder */}
+          <div className="members-page__filter-item">
+            <label className="members-page__filter-label">👨‍💼 Líder</label>
+            <select
+              value={filters.leader}
+              onChange={(e) => onFilterChange("leader", e.target.value)}
+              className="members-page__filter-select"
+            >
+              <option value="">Todos</option>
+              {leaders.map((leader) => (
+                <option key={leader.id} value={leader.id}>
+                  {leader.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Estado de filtros */}
+          <div className="members-page__filter-info">
+            <span className="members-page__filter-badge">
+              📊 {resultsCount} resultado(s)
+            </span>
+          </div>
+        </div>
+
+        {/* Botón Exportar PDF */}
+        {resultsCount > 0 && (
+          <button
+            onClick={onExportPDF}
+            className="members-page__btn-export-pdf"
+            title="Descargar PDF con los resultados"
+          >
+            📄 Exportar a PDF
+          </button>
+        )}
+      </div>
+    );
+  },
+);
+
+FilterPanel.displayName = "FilterPanel";
+
+// ========== COMPONENTE PRINCIPAL ==========
 export const MembersPage = () => {
   // ========== DARK MODE ==========
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const savedMode = localStorage.getItem('darkMode');
-    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
+    const savedMode = localStorage.getItem("darkMode");
+    const htmlHasDarkClass =
+      document.documentElement.classList.contains("dark-mode");
 
-    setIsDarkMode(
-      savedMode === 'true' || htmlHasDarkClass || prefersDark
-    );
+    setIsDarkMode(savedMode === "true" || htmlHasDarkClass || prefersDark);
 
     const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+      setIsDarkMode(document.documentElement.classList.contains("dark-mode"));
     });
 
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class']
+      attributeFilter: ["class"],
     });
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e) => {
-      if (localStorage.getItem('darkMode') === null) {
+      if (localStorage.getItem("darkMode") === null) {
         setIsDarkMode(e.matches);
       }
     };
-    mediaQuery.addEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
 
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener('change', handleChange);
+      mediaQuery.removeEventListener("change", handleChange);
     };
   }, []);
 
-  // Tema
-  const theme = {
-    bg: isDarkMode ? '#0f172a' : '#ffffff',
-    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
-    bgHover: isDarkMode ? '#334155' : '#f3f4f6',
-    text: isDarkMode ? '#f1f5f9' : '#111827',
-    textSecondary: isDarkMode ? '#cbd5e1' : '#4b5563',
-    border: isDarkMode ? '#334155' : '#e5e7eb',
-    input: isDarkMode ? '#1e293b' : '#ffffff',
-    error: isDarkMode ? '#7f1d1d' : '#fee2e2',
-    errorText: isDarkMode ? '#fca5a5' : '#991b1b',
-  };
-
+  // ========== STATE ==========
   const { hasAnyRole } = useAuth();
   const [members, setMembers] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
@@ -65,6 +188,14 @@ export const MembersPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // ========== FILTROS AVANZADOS ==========
+  const [filters, setFilters] = useState({
+    gender: "",
+    district: "",
+    leader: "",
+  });
+
   const [pagination, setPagination] = useState({
     currentPage: 0,
     pageSize: 10,
@@ -81,11 +212,13 @@ export const MembersPage = () => {
   const formRef = useRef(null);
   const errorRef = useRef(null);
 
+  // ========== LEADER SEARCH STATE ==========
   const [leaderSearchTerm, setLeaderSearchTerm] = useState("");
   const [filteredLeaders, setFilteredLeaders] = useState([]);
   const [showLeaderDropdown, setShowLeaderDropdown] = useState(false);
   const [selectedLeader, setSelectedLeader] = useState(null);
 
+  // ========== FORM DATA ==========
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -103,6 +236,7 @@ export const MembersPage = () => {
     district: "",
   });
 
+  // ========== HOOKS ==========
   useEffect(() => {
     fetchAllMembers();
   }, []);
@@ -118,6 +252,7 @@ export const MembersPage = () => {
     }
   }, [formError]);
 
+  // ========== API FUNCTIONS ==========
   const fetchAllMembers = async () => {
     try {
       setLoading(true);
@@ -152,6 +287,7 @@ export const MembersPage = () => {
     }
   };
 
+  // ========== FORM HANDLERS ==========
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -172,7 +308,7 @@ export const MembersPage = () => {
     const filtered = allMembers.filter(
       (member) =>
         member.name?.toLowerCase().includes(value.toLowerCase()) ||
-        member.email?.toLowerCase().includes(value.toLowerCase())
+        member.email?.toLowerCase().includes(value.toLowerCase()),
     );
     setFilteredLeaders(filtered.slice(0, 5));
   };
@@ -259,6 +395,7 @@ export const MembersPage = () => {
     setEditingId(member.id);
     setShowForm(true);
     setFormError(null);
+    setShowDetailModal(false);
 
     setTimeout(() => {
       if (formRef.current) {
@@ -276,6 +413,7 @@ export const MembersPage = () => {
     try {
       await apiService.deleteMember(id);
       alert("✅ Miembro eliminado");
+      setShowDetailModal(false);
       fetchAllMembers();
     } catch (err) {
       alert("❌ Error: " + err.message);
@@ -300,16 +438,6 @@ export const MembersPage = () => {
       setEnrollmentHistory(history);
       setHistoryMemberName(memberName);
       setShowHistoryModal(true);
-    } catch (err) {
-      alert("❌ Error: " + err.message);
-    }
-  };
-
-  const handleEnrollNext = async (id) => {
-    try {
-      const response = await apiService.enrollMemberInNextLevel(id);
-      alert(`✅ ${response.message || "Miembro inscrito en siguiente nivel"}`);
-      fetchAllMembers();
     } catch (err) {
       alert("❌ Error: " + err.message);
     }
@@ -340,6 +468,47 @@ export const MembersPage = () => {
     setFormError(null);
   };
 
+  // ========== FILTROS ==========
+  const handleFilterChange = (filterName, value) => {
+    setFilters((prev) => ({
+      ...prev,
+      [filterName]: value,
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      gender: "",
+      district: "",
+      leader: "",
+    });
+    setSearchTerm("");
+  };
+
+  // ========== LÓGICA DE FILTRADO ==========
+  const applyFilters = (membersArray) => {
+    return membersArray.filter((member) => {
+      // Filtro por búsqueda de texto (nombre/email)
+      const matchesSearch =
+        !searchTerm.trim() ||
+        member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.email?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Filtro por género
+      const matchesGender = !filters.gender || member.gender === filters.gender;
+
+      // Filtro por distrito
+      const matchesDistrict =
+        !filters.district || member.district === filters.district;
+
+      // Filtro por líder
+      const matchesLeader =
+        !filters.leader || member.leader?.id === Number(filters.leader);
+
+      return matchesSearch && matchesGender && matchesDistrict && matchesLeader;
+    });
+  };
+
   const sortByName = (membersArray) => {
     return [...membersArray].sort((a, b) => {
       const nameA = (a.name || "").toLowerCase().trim();
@@ -348,409 +517,383 @@ export const MembersPage = () => {
     });
   };
 
-  const filteredMembers = allMembers.filter(
-    (member) =>
-      member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const displayMembers = searchTerm.trim() === "" 
-    ? sortByName(members) 
-    : sortByName(filteredMembers);
+  const filteredMembers = applyFilters(allMembers);
+  const displayMembers = sortByName(filteredMembers);
 
   const isSearching = searchTerm.trim() !== "";
+  const isFiltering =
+    filters.gender || filters.district || filters.leader || isSearching;
 
   const canEdit = hasAnyRole(["ROLE_PASTORES", "ROLE_GANANDO"]);
 
-  // Componente de Input Reutilizable
-  const Input = ({ label, ...props }) => (
-    <div style={{ gridColumn: props.gridColumn }}>
-      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: theme.text, marginBottom: '0.5rem' }}>
-        {label}
-      </label>
-      <input
-        {...props}
-        style={{
-          width: '100%',
-          padding: '0.5rem 1rem',
-          border: `2px solid ${theme.border}`,
-          borderRadius: '0.5rem',
-          backgroundColor: theme.input,
-          color: theme.text,
-          fontSize: '0.875rem',
-          boxSizing: 'border-box',
-          ...props.style
-        }}
-      />
-    </div>
+  // ========== EXPORTAR PDF ==========
+  const handleExportPDF = () => {
+    if (displayMembers.length === 0) {
+      alert("❌ No hay datos para exportar");
+      return;
+    }
+
+    try {
+      const filterSummary = [];
+      if (searchTerm) filterSummary.push(`Búsqueda: ${searchTerm}`);
+      if (filters.gender) filterSummary.push(`Género: ${filters.gender}`);
+      if (filters.district) filterSummary.push(`Distrito: ${filters.district}`);
+      if (filters.leader) {
+        const leaderName = allMembers.find(
+          (m) => m.id === Number(filters.leader),
+        )?.name;
+        filterSummary.push(`Líder: ${leaderName}`);
+      }
+
+      generateMembersPDF(displayMembers, filterSummary);
+    } catch (err) {
+      alert("❌ Error al generar PDF: " + err.message);
+    }
+  };
+
+  // ========== OBTENER LÍDERES ÚNICOS ==========
+  const uniqueLeaders = Array.from(
+    new Map(
+      allMembers.filter((m) => m.leader).map((m) => [m.leader.id, m.leader]),
+    ).values(),
   );
 
-  // Componente de Select Reutilizable
-  const Select = ({ label, options, ...props }) => (
-    <div style={{ gridColumn: props.gridColumn }}>
-      <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: theme.text, marginBottom: '0.5rem' }}>
-        {label}
-      </label>
-      <select
-        {...props}
-        style={{
-          width: '100%',
-          padding: '0.5rem 1rem',
-          border: `2px solid ${theme.border}`,
-          borderRadius: '0.5rem',
-          backgroundColor: theme.input,
-          color: theme.text,
-          fontSize: '0.875rem',
-          boxSizing: 'border-box',
-          ...props.style
-        }}
-      >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  );
+  const genderOptions = [
+    { value: "MASCULINO", label: "Masculino" },
+    { value: "FEMENINO", label: "Femenino" },
+  ];
 
   return (
-    <div style={{
-      backgroundColor: theme.bg,
-      color: theme.text,
-      minHeight: '100vh',
-      padding: '1.5rem',
-      transition: 'all 300ms ease-in-out',
-    }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {/* Encabezado */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
-          <div>
-            <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', margin: 0 }}>👥 Miembros</h1>
-            <p style={{ color: theme.textSecondary, fontSize: '0.875rem', marginTop: '0.25rem', margin: 0 }}>
-              {isSearching ? `${filteredMembers.length} resultados` : `Total: ${pagination.totalElements} miembros`}
+    <div className="members-page">
+      <div className="members-page-container">
+        {/* ========== HEADER ========== */}
+        <div className="members-page__header">
+          <div className="members-page__header-content">
+            <h1>👥 Miembros</h1>
+            <p>
+              {isFiltering
+                ? `${displayMembers.length} resultado(s) - Filtrado`
+                : `Total: ${pagination.totalElements} miembros`}
             </p>
           </div>
           {canEdit && (
             <button
-              onClick={() => { resetForm(); setShowForm(!showForm); }}
-              style={{
-                backgroundColor: '#2563eb',
-                color: 'white',
-                padding: '0.5rem 1.5rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: 'bold',
+              onClick={() => {
+                resetForm();
+                setShowForm(!showForm);
               }}
+              className="members-page__btn-add"
             >
               {showForm ? "Cancelar" : "+ Agregar"}
             </button>
           )}
         </div>
 
-        {/* Error */}
-        {error && (
-          <div style={{
-            backgroundColor: theme.error,
-            color: theme.errorText,
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            fontSize: '0.875rem',
-            border: `1px solid ${isDarkMode ? '#dc2626' : '#f87171'}`,
-          }}>
-            {error}
-          </div>
-        )}
+        {/* ========== ERROR MESSAGE ========== */}
+        {error && <div className="members-page__error">{error}</div>}
 
-        {/* Formulario */}
+        {/* ========== FORM ========== */}
         {showForm && canEdit && (
-          <div ref={formRef} style={{
-            backgroundColor: theme.bg,
-            borderRadius: '0.5rem',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-            padding: '1.5rem',
-            border: `1px solid ${theme.border}`,
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem', margin: 0 }}>
+          <div ref={formRef} className="members-page__form-container">
+            <h2 className="members-page__form-title">
               {editingId ? "✏️ Editar" : "➕ Nuevo"}
             </h2>
 
             {formError && (
-              <div ref={errorRef} style={{
-                marginBottom: '1rem',
-                backgroundColor: theme.error,
-                color: theme.errorText,
-                padding: '1rem',
-                borderRadius: '0.5rem',
-                fontSize: '0.875rem',
-                border: `1px solid ${isDarkMode ? '#991b1b' : '#fecaca'}`,
-              }}>
-                <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', margin: 0 }}>❌ Error:</p>
-                <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{formError}</p>
+              <div ref={errorRef} className="members-page__form-error">
+                <strong>❌ Error:</strong>
+                <p>{formError}</p>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: '1rem',
-            }}>
-              <Input label="Nombre Completo *" type="text" name="name" placeholder="Nombre" value={formData.name} onChange={handleInputChange} required gridColumn="1 / -1" />
-              <Input label="Email *" type="email" name="email" placeholder="email@ejemplo.com" value={formData.email} onChange={handleInputChange} required />
-              <Input label="Teléfono" type="tel" name="phone" placeholder="Teléfono" value={formData.phone} onChange={handleInputChange} />
+            <form onSubmit={handleSubmit} className="members-page__form">
+              <FormInput
+                label="Nombre Completo *"
+                type="text"
+                name="name"
+                placeholder="Nombre"
+                value={formData.name}
+                onChange={handleInputChange}
+                required
+                gridColumn="1 / -1"
+              />
 
-              <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 'bold', color: theme.text, marginBottom: '0.5rem' }}>Líder</label>
-                <input
-                  type="text"
-                  placeholder="Buscar líder..."
-                  value={leaderSearchTerm}
-                  onChange={(e) => handleLeaderSearch(e.target.value)}
-                  onFocus={() => leaderSearchTerm && setShowLeaderDropdown(true)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 1rem',
-                    paddingRight: '2.5rem',
-                    border: `2px solid ${theme.border}`,
-                    borderRadius: '0.5rem',
-                    backgroundColor: theme.input,
-                    color: theme.text,
-                    fontSize: '0.875rem',
-                    boxSizing: 'border-box',
-                  }}
-                />
+              <FormInput
+                label="Email *"
+                type="email"
+                name="email"
+                placeholder="email@ejemplo.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
+              />
 
-                {selectedLeader && (
-                  <button
-                    type="button"
-                    onClick={handleClearLeader}
-                    style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      color: theme.textSecondary,
-                      cursor: 'pointer',
-                      fontSize: '1.25rem',
-                    }}
-                  >
-                    ✕
-                  </button>
-                )}
+              <FormInput
+                label="Teléfono"
+                type="tel"
+                name="phone"
+                placeholder="Teléfono"
+                value={formData.phone}
+                onChange={handleInputChange}
+              />
 
-                {showLeaderDropdown && filteredLeaders.length > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    zIndex: 50,
-                    width: '100%',
-                    backgroundColor: theme.input,
-                    border: `1px solid ${theme.border}`,
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                    marginTop: '0.25rem',
-                    maxHeight: '12rem',
-                    overflowY: 'auto',
-                  }}>
-                    {filteredLeaders.map((leader) => (
-                      <button
-                        key={leader.id}
-                        type="button"
-                        onClick={() => handleSelectLeader(leader)}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '0.5rem 1rem',
-                          border: 'none',
-                          backgroundColor: 'transparent',
-                          cursor: 'pointer',
-                          borderBottom: `1px solid ${theme.border}`,
-                          transition: 'background-color 200ms',
-                          color: theme.text,
-                        }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = theme.bgHover}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                      >
-                        <div style={{ fontWeight: 'bold', fontSize: '0.875rem' }}>{leader.name}</div>
-                        <div style={{ fontSize: '0.75rem', color: theme.textSecondary }}>{leader.email}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              {/* ========== LEADER SEARCH ========== */}
+              <div className="members-page__leader-search">
+                <label className="members-page__form-label">Líder</label>
+                <div className="members-page__leader-input-wrapper">
+                  <input
+                    type="text"
+                    className="members-page__form-input"
+                    placeholder="Buscar líder..."
+                    value={leaderSearchTerm}
+                    onChange={(e) => handleLeaderSearch(e.target.value)}
+                    onFocus={() =>
+                      leaderSearchTerm && setShowLeaderDropdown(true)
+                    }
+                  />
+
+                  {selectedLeader && (
+                    <button
+                      type="button"
+                      className="members-page__leader-clear"
+                      onClick={handleClearLeader}
+                      title="Limpiar selección"
+                    >
+                      ✕
+                    </button>
+                  )}
+
+                  {showLeaderDropdown && filteredLeaders.length > 0 && (
+                    <div className="members-page__leader-dropdown">
+                      {filteredLeaders.map((leader) => (
+                        <button
+                          key={leader.id}
+                          type="button"
+                          className="members-page__leader-option"
+                          onClick={() => handleSelectLeader(leader)}
+                        >
+                          <div className="members-page__leader-option-name">
+                            {leader.name}
+                          </div>
+                          <div className="members-page__leader-option-email">
+                            {leader.email}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 {selectedLeader && (
-                  <div style={{
-                    marginTop: '0.5rem',
-                    padding: '0.5rem',
-                    backgroundColor: isDarkMode ? '#1e3a8a' : '#eff6ff',
-                    borderRadius: '0.5rem',
-                    border: `1px solid ${isDarkMode ? '#3b82f6' : '#bfdbfe'}`,
-                  }}>
-                    <p style={{ fontSize: '0.875rem', fontWeight: 'bold', margin: 0 }}>✅ {selectedLeader.name}</p>
+                  <div className="members-page__leader-selected">
+                    <p>✅ {selectedLeader.name}</p>
                   </div>
                 )}
               </div>
 
-              <Select label="Distrito" name="district" value={formData.district} onChange={handleInputChange} options={[
-                { value: '', label: 'Seleccionar' },
-                { value: 'D1', label: 'Distrito 1' },
-                { value: 'D2', label: 'Distrito 2' },
-                { value: 'D3', label: 'Distrito 3' },
-                { value: 'Pastores', label: 'Pastores' },
-              ]} />
+              <FormSelect
+                label="Distrito"
+                name="district"
+                value={formData.district}
+                onChange={handleInputChange}
+                options={[
+                  { value: "", label: "Seleccionar" },
+                  { value: "D1", label: "Distrito 1" },
+                  { value: "D2", label: "Distrito 2" },
+                  { value: "D3", label: "Distrito 3" },
+                  { value: "Pastores", label: "Pastores" },
+                ]}
+              />
 
-              <Select label="Tipo de Documento" name="documentType" value={formData.documentType} onChange={handleInputChange} options={[
-                { value: '', label: 'Seleccionar' },
-                { value: 'C.C.', label: 'Cedula' },
-                { value: 'T.I.', label: 'Tarjeta de identidad' },
-                { value: 'Pasaporte', label: 'Pasaporte' },
-                { value: 'C.E.', label: 'Cedula de Extranjeria' },
-                { value: 'Otro', label: 'Otro' },
-              ]} />
+              <FormSelect
+                label="Tipo de Documento"
+                name="documentType"
+                value={formData.documentType}
+                onChange={handleInputChange}
+                options={[
+                  { value: "", label: "Seleccionar" },
+                  { value: "C.C.", label: "Cedula" },
+                  { value: "T.I.", label: "Tarjeta de identidad" },
+                  { value: "Pasaporte", label: "Pasaporte" },
+                  { value: "C.E.", label: "Cedula de Extranjeria" },
+                  { value: "Otro", label: "Otro" },
+                ]}
+              />
 
-              <Input label="Número de Documento" type="text" name="document" placeholder="Número" value={formData.document} onChange={handleInputChange} />
+              <FormInput
+                label="Número de Documento"
+                type="text"
+                name="document"
+                placeholder="Número"
+                value={formData.document}
+                onChange={handleInputChange}
+              />
 
-              <Select label="Género" name="gender" value={formData.gender} onChange={handleInputChange} options={[
-                { value: '', label: 'Seleccionar' },
-                { value: 'Masculino', label: 'Masculino' },
-                { value: 'Femenino', label: 'Femenino' },
-              ]} />
+              <FormSelect
+                label="Género"
+                name="gender"
+                value={formData.gender}
+                onChange={handleInputChange}
+                options={[
+                  { value: "", label: "Seleccionar" },
+                  { value: "MASCULINO", label: "Masculino" },
+                  { value: "FEMENINO", label: "Femenino" },
+                ]}
+              />
 
-              <Select label="Estado Civil" name="maritalStatus" value={formData.maritalStatus} onChange={handleInputChange} options={[
-                { value: '', label: 'Seleccionar' },
-                { value: 'Soltero', label: 'Soltero' },
-                { value: 'Casado', label: 'Casado' },
-                { value: 'Union Libre', label: 'Union Libre' },
-                { value: 'Divorciado', label: 'Divorciado' },
-                { value: 'Viudo', label: 'Viudo' },
-              ]} />
+              <FormSelect
+                label="Estado Civil"
+                name="maritalStatus"
+                value={formData.maritalStatus}
+                onChange={handleInputChange}
+                options={[
+                  { value: "", label: "Seleccionar" },
+                  { value: "SOLTERO", label: "Soltero" },
+                  { value: "CASADO", label: "Casado" },
+                  { value: "UNION LIBRE", label: "Union Libre" },
+                  { value: "DIVORCIADO", label: "Divorciado" },
+                  { value: "SEPARADO", label: "Separado" },
+                  { value: "VIUDO", label: "Viudo" },
+                ]}
+              />
 
-              <Input label="Dirección" type="text" name="address" placeholder="Dirección" value={formData.address} onChange={handleInputChange} gridColumn="1 / -1" />
-              <Input label="Ciudad" type="text" name="city" placeholder="Ciudad" value={formData.city} onChange={handleInputChange} />
-              <Input label="Profesión" type="text" name="profession" placeholder="Profesión" value={formData.profession} onChange={handleInputChange} />
-              <Input label="Fecha de Nacimiento" type="date" name="birthdate" value={formData.birthdate} onChange={handleInputChange} />
+              <FormInput
+                label="Dirección"
+                type="text"
+                name="address"
+                placeholder="Dirección"
+                value={formData.address}
+                onChange={handleInputChange}
+                gridColumn="1 / -1"
+              />
 
-              <Select label="Estado Laboral" name="employmentStatus" value={formData.employmentStatus} onChange={handleInputChange} options={[
-                { value: '', label: 'Seleccionar' },
-                { value: 'Empleado', label: 'Empleado' },
-                { value: 'Desempleado', label: 'Desempleado' },
-                { value: 'Independiente', label: 'Independiente' },
-                { value: 'Estudiante', label: 'Estudiante' },
-                { value: 'Jubilado', label: 'Jubilado' },
-              ]} />
+              <FormInput
+                label="Ciudad"
+                type="text"
+                name="city"
+                placeholder="Ciudad"
+                value={formData.city}
+                onChange={handleInputChange}
+              />
 
-              <button
-                type="submit"
-                style={{
-                  gridColumn: '1 / -1',
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  padding: '0.5rem 1.5rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                }}
-              >
+              <FormInput
+                label="Profesión"
+                type="text"
+                name="profession"
+                placeholder="Profesión"
+                value={formData.profession}
+                onChange={handleInputChange}
+              />
+
+              <FormInput
+                label="Fecha de Nacimiento"
+                type="date"
+                name="birthdate"
+                value={formData.birthdate}
+                onChange={handleInputChange}
+              />
+
+              <FormSelect
+                label="Estado Laboral"
+                name="employmentStatus"
+                value={formData.employmentStatus}
+                onChange={handleInputChange}
+                options={[
+                  { value: "", label: "Seleccionar" },
+                  { value: "EMPLEADO", label: "Empleado" },
+                  { value: "DESEMPLEADO", label: "Desempleado" },
+                  { value: "INDEPENDIENTE", label: "Independiente" },
+                  { value: "ESTUDIANTE", label: "Estudiante" },
+                  { value: "NO LABORA", label: "No Labora" },
+                  { value: "PENSIONADO", label: "Pensionado" },
+                ]}
+              />
+
+              <button type="submit" className="members-page__form-submit">
                 {editingId ? "✏️ Actualizar" : "➕ Crear"}
               </button>
             </form>
           </div>
         )}
 
-        {/* Búsqueda */}
-        <div style={{
-          backgroundColor: theme.bg,
-          borderRadius: '0.5rem',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          padding: '1rem',
-          border: `1px solid ${theme.border}`,
-        }}>
+        {/* ========== SEARCH BAR ========== */}
+        <div className="members-page__search-container">
           <input
             type="text"
-            placeholder="🔍 Buscar..."
+            className="members-page__search-input"
+            placeholder="🔍 Buscar por nombre o email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.5rem 1rem',
-              border: `1px solid ${theme.border}`,
-              borderRadius: '0.5rem',
-              backgroundColor: theme.input,
-              color: theme.text,
-              fontSize: '0.875rem',
-              boxSizing: 'border-box',
-            }}
           />
-          {isSearching && (
-            <p style={{ fontSize: '0.75rem', color: theme.textSecondary, marginTop: '0.5rem', margin: 0 }}>
-              ✅ {filteredMembers.length} resultado(s)
-            </p>
-          )}
         </div>
 
-        {/* Tabla */}
+        {/* ========== FILTROS PANEL ========== */}
+        <FilterPanel
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          genderOptions={genderOptions}
+          districtOptions={[
+            { value: "D1", label: "Distrito 1" },
+            { value: "D2", label: "Distrito 2" },
+            { value: "D3", label: "Distrito 3" },
+            { value: "Pastores", label: "Pastores" },
+          ]}
+          leaders={uniqueLeaders}
+          onExportPDF={handleExportPDF}
+          resultsCount={displayMembers.length}
+        />
+
+        {/* ========== TABLE ========== */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>⏳ Cargando...</div>
+          <div className="members-page__loading">⏳ Cargando...</div>
         ) : displayMembers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: theme.textSecondary }}>
-            {isSearching ? "❌ Sin resultados" : "📭 No hay miembros"}
+          <div className="members-page__empty">
+            {isFiltering
+              ? "❌ Sin resultados con estos filtros"
+              : "📭 No hay miembros"}
           </div>
         ) : (
-          <div style={{
-            backgroundColor: theme.bg,
-            borderRadius: '0.5rem',
-            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-            border: `1px solid ${theme.border}`,
-            overflowX: 'auto',
-          }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead style={{ backgroundColor: theme.bgSecondary, borderBottom: `1px solid ${theme.border}` }}>
+          <div className="members-page__table-container">
+            <table className="members-page__table">
+              <thead>
                 <tr>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Nombre</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Email</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Teléfono</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Líder</th>
-                  {canEdit && <th style={{ padding: '1rem', textAlign: 'center', color: theme.text, fontWeight: 'bold', fontSize: '0.875rem' }}>Acciones</th>}
+                  <th>Nombre</th>
+                  <th>Teléfono</th>
+                  <th>Género</th>
+                  <th>Distrito</th>
+                  <th>Líder</th>
+                  <th className="members-page__email-column-header">Email</th>
                 </tr>
               </thead>
               <tbody>
                 {displayMembers.map((member) => (
-                  <tr key={member.id} style={{
-                    borderBottom: `1px solid ${theme.border}`,
-                    transition: 'background-color 200ms',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = theme.bgHover}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <td style={{ padding: '1rem', fontSize: '0.875rem', fontWeight: '500', color: theme.text }}>{member.name}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem', color: theme.text }}>{member.email}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem', color: theme.text }}>{member.phone || "-"}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.875rem', color: theme.text }}>
+                  <tr key={member.id} onClick={() => handleViewDetails(member)} style={{ cursor: "pointer" }}>
+                    <td>
+                      <strong className="members-page__member-name-clickable">{member.name}</strong>
+                    </td>
+                    <td>{member.phone || "-"}</td>
+                    <td>
+                      <span className="members-page__gender-badge">
+                        {member.gender === "MASCULINO" ? "👨" : "👩"}{" "}
+                        {member.gender === "MASCULINO" ? "M" : "F"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="members-page__district-badge">
+                        {member.district || "-"}
+                      </span>
+                    </td>
+                    <td>
                       {member.leader ? (
-                        <span style={{
-                          backgroundColor: isDarkMode ? '#1e3a8a' : '#bfdbfe',
-                          color: isDarkMode ? '#93c5fd' : '#0c4a6e',
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '0.25rem',
-                          fontSize: '0.75rem',
-                          fontWeight: 'bold',
-                        }}>
+                        <span className="members-page__leader-badge">
                           {member.leader.name}
                         </span>
-                      ) : <span style={{ color: theme.textSecondary }}>—</span>}
+                      ) : (
+                        <span className="members-page__no-leader">—</span>
+                      )}
                     </td>
-                    {canEdit && (
-                      <td style={{ padding: '1rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                          <button onClick={() => handleViewDetails(member)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Detalles">📇</button>
-                          <button onClick={() => handleEdit(member)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#f59e0b', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Editar">✏️</button>
-                          <button onClick={() => handleViewEnrollment(member.id, member.name)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Historial">📋</button>
-                          <button onClick={() => handleEnrollNext(member.id)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#8b5cf6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Siguiente">📈</button>
-                          <button onClick={() => handleDelete(member.id)} style={{ padding: '0.25rem 0.5rem', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer' }} title="Eliminar">❌</button>
-                        </div>
-                      </td>
-                    )}
+                    <td className="members-page__email-column">{member.email}</td>
                   </tr>
                 ))}
               </tbody>
@@ -758,7 +901,7 @@ export const MembersPage = () => {
           </div>
         )}
 
-        {/* Modales */}
+        {/* ========== MODALS ========== */}
         <EnrollmentHistoryModal
           isOpen={showHistoryModal}
           history={enrollmentHistory}
@@ -769,8 +912,15 @@ export const MembersPage = () => {
         {showDetailModal && selectedMember && (
           <MemberDetailModal
             member={selectedMember}
-            onClose={() => { setShowDetailModal(false); setSelectedMember(null); }}
+            onClose={() => {
+              setShowDetailModal(false);
+              setSelectedMember(null);
+            }}
             onUpdated={() => fetchAllMembers()}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onViewEnrollment={handleViewEnrollment}
+            canEdit={canEdit}
           />
         )}
       </div>

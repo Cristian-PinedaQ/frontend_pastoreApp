@@ -1,4 +1,5 @@
-// 🔌 Servicio API centralizado - VERSIÓN CORREGIDA PARA ESTUDIANTES POR COHORTE
+// 🔌 Servicio API centralizado - ACTUALIZADO PARA USAR sessionStorage
+// ✅ Ahora usa sessionStorage para el token (se limpia al cerrar la pestaña)
 // ✅ Rutas de endpoint corregidas
 // ✅ MEJORADO: Extrae errores de validación específicos del backend
 // ✅ NUEVO: Métodos para editar cohortes
@@ -7,7 +8,8 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api
 
 class ApiService {
   constructor() {
-    this.token = localStorage.getItem('token');
+    // ✅ ACTUALIZADO: Usar sessionStorage en lugar de localStorage
+    this.token = sessionStorage.getItem('token');
   }
 
   // ✅ Obtener headers con autenticación
@@ -102,14 +104,16 @@ class ApiService {
     });
   }
 
+  // ✅ ACTUALIZADO: Guardar token en sessionStorage
   setToken(token) {
     this.token = token;
-    localStorage.setItem('token', token);
+    sessionStorage.setItem('token', token);
   }
 
+  // ✅ ACTUALIZADO: Logout - limpiar sessionStorage
   logout() {
     this.token = null;
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
   }
 
   // ========== 👥 MIEMBROS ==========
