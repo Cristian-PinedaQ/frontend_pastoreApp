@@ -1,7 +1,8 @@
-// 📚 StudentsPage.jsx - CON DARK MODE COMPLETO
-// ✅ Cambio: Agregado filtro para "Cancelados" en el select de resultado
-// ✅ Cambio: Agregada lógica para filtrar por passed === null Y status === 'CANCELLED' separadamente
-// ✅ DARK MODE: Detección automática + tema dinámico
+// 📚 StudentsPage.jsx - VERSIÓN COMPLETA ACTUALIZADA v4
+// ✅ Estadísticas dinámicas según filtros aplicados
+// ✅ PDF generado con filtros aplicados
+// ✅ Mantiene toda la funcionalidad original
+// ✅ Compatible con LevelEnrollment enum
 
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
@@ -37,14 +38,18 @@ const StudentsPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // ✅ Estados para filtros
+  const [selectedYear, setSelectedYear] = useState('ALL');
   const [selectedLevel, setSelectedLevel] = useState('ALL');
-  const [selectedResultFilter, setSelectedResultFilter] = useState('ALL'); // ✅ Filtro de resultado
+  const [selectedResultFilter, setSelectedResultFilter] = useState('ALL');
   const [searchText, setSearchText] = useState('');
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
 
   const [statisticsData, setStatisticsData] = useState(null);
+  const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
+  const [activeFiltersInfo, setActiveFiltersInfo] = useState({});
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // ========== DARK MODE DETECTION ==========
@@ -96,13 +101,50 @@ const StudentsPage = () => {
     errorText: isDarkMode ? '#fecaca' : '#991b1b',
   };
 
+  // ========== TODOS LOS 11 NIVELES (del enum LevelEnrollment) ==========
+  const ALL_LEVEL_ENROLLMENTS = [
+    { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
+    { value: 'ENCUENTRO', label: 'Encuentro' },
+    { value: 'POST_ENCUENTRO', label: 'Post-encuentro' },
+    { value: 'BAUTIZOS', label: 'Bautizos' },
+    { value: 'EDIRD_1', label: 'EDIRD 1' },
+    { value: 'EDIRD_2', label: 'EDIRD 2' },
+    { value: 'EDIRD_3', label: 'EDIRD 3' },
+    { value: 'SANIDAD_INTEGRAL_RAICES', label: 'Sanidad Integral Raíces' },
+    { value: 'EDIRD_4', label: 'EDIRD 4' },
+    { value: 'ADIESTRAMIENTO', label: 'Adiestramiento' },
+    { value: 'GRADUACION', label: 'Graduación' },
+  ];
+
   useEffect(() => {
     loadStudents();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [allStudents, selectedLevel, selectedResultFilter, searchText]);
+  }, [allStudents, selectedYear, selectedLevel, selectedResultFilter, searchText]);
+
+  // ========== DETECTAR SI HAY FILTROS APLICADOS ==========
+  useEffect(() => {
+    const filtersActive = selectedYear !== 'ALL' || selectedLevel !== 'ALL' || selectedResultFilter !== 'ALL' || searchText.trim() !== '';
+    
+    setHasFiltersApplied(filtersActive);
+
+    // Crear info de filtros activos para mostrar en el modal
+    if (filtersActive) {
+      const info = {};
+      if (selectedYear !== 'ALL') info.year = selectedYear;
+      if (selectedLevel !== 'ALL') info.level = getLevelLabel(selectedLevel);
+      if (selectedResultFilter !== 'ALL') info.result = getResultFilterLabel(selectedResultFilter);
+      if (searchText.trim()) info.search = searchText;
+      
+      setActiveFiltersInfo(info);
+      devLog('🔍 Filtros aplicados:', info);
+    } else {
+      setActiveFiltersInfo({});
+      devLog('✅ Sin filtros aplicados');
+    }
+  }, [selectedYear, selectedLevel, selectedResultFilter, searchText]);
 
   const loadStudents = async () => {
     setLoading(true);
@@ -121,7 +163,7 @@ const StudentsPage = () => {
       }
 
       const processedStudents = enrollments.map(enrollment => {
-        const levelValue = extractLevel(enrollment);
+        const levelValue = enrollment.level || extractLevel(enrollment);
 
         return {
           id: enrollment.id,
@@ -188,6 +230,54 @@ const StudentsPage = () => {
     return null;
   };
 
+  // ========== OBTENER AÑOS DISPONIBLES ==========
+  const getAvailableYears = () => {
+    const yearsSet = new Set();
+    
+    allStudents.forEach(student => {
+      if (student.enrollmentDate) {
+        try {
+          const year = new Date(student.enrollmentDate).getFullYear();
+          if (!isNaN(year) && year > 1900) {
+            yearsSet.add(year.toString());
+          }
+        } catch (e) {
+          // Ignorar
+        }
+      }
+    });
+
+    return Array.from(yearsSet).sort((a, b) => b - a);
+  };
+
+  // ========== OBTENER NIVELES DISPONIBLES ==========
+  const getAvailableLevels = () => {
+    let studentsToCheck = allStudents;
+
+    if (selectedYear !== 'ALL') {
+      studentsToCheck = studentsToCheck.filter(student => {
+        if (student.enrollmentDate) {
+          try {
+            const year = new Date(student.enrollmentDate).getFullYear();
+            return year.toString() === selectedYear;
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
+      });
+    }
+
+    const levelsSet = new Set();
+    studentsToCheck.forEach(student => {
+      if (student.levelEnrollment) {
+        levelsSet.add(student.levelEnrollment);
+      }
+    });
+
+    return ALL_LEVEL_ENROLLMENTS.filter(level => levelsSet.has(level.value));
+  };
+
   // ========== APLICAR FILTROS ==========
   const applyFilters = () => {
     let filtered = [...allStudents];
@@ -196,18 +286,36 @@ const StudentsPage = () => {
     filtered.sort((a, b) => {
       const dateA = new Date(a.enrollmentDate || 0).getTime();
       const dateB = new Date(b.enrollmentDate || 0).getTime();
-      return dateB - dateA; // Descendente: más recientes primero
+      return dateB - dateA;
     });
 
-    if (selectedLevel !== 'ALL') {
-      devLog('🔍 Filtrando por nivel');
-      filtered = filtered.filter(student => student.levelEnrollment === selectedLevel);
-      devLog(`✅ Después de filtro de nivel: ${filtered.length} estudiantes`);
+    // ✅ Filtrar por AÑO
+    if (selectedYear !== 'ALL') {
+      devLog('🔍 Filtrando por año:', selectedYear);
+      filtered = filtered.filter(student => {
+        if (student.enrollmentDate) {
+          try {
+            const year = new Date(student.enrollmentDate).getFullYear();
+            return year.toString() === selectedYear;
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
+      });
+      devLog(`✅ Después de filtro de año: ${filtered.length} estudiantes`);
     } else {
-      devLog('✅ Mostrando todos los niveles');
+      devLog('✅ Mostrando todos los años');
     }
 
-    // ✅ Filtrar por resultado (Aprobado, Reprobado, Pendiente, Cancelado)
+    // ✅ Filtrar por NIVEL
+    if (selectedLevel !== 'ALL') {
+      devLog('🔍 Filtrando por nivel:', selectedLevel);
+      filtered = filtered.filter(student => student.levelEnrollment === selectedLevel);
+      devLog(`✅ Después de filtro de nivel: ${filtered.length} estudiantes`);
+    }
+
+    // ✅ Filtrar por resultado
     if (selectedResultFilter !== 'ALL') {
       devLog(`🔍 Filtrando por resultado: ${selectedResultFilter}`);
       if (selectedResultFilter === 'PASSED') {
@@ -215,10 +323,8 @@ const StudentsPage = () => {
       } else if (selectedResultFilter === 'FAILED') {
         filtered = filtered.filter(student => student.passed === false);
       } else if (selectedResultFilter === 'PENDING') {
-        // ✅ CORRECCIÓN: Excluir cancelados - mostrar solo passed === null Y status !== 'CANCELLED'
         filtered = filtered.filter(student => student.passed === null && student.status !== 'CANCELLED');
       } else if (selectedResultFilter === 'CANCELLED') {
-        // ✅ NUEVO: Filtrar por status === 'CANCELLED'
         filtered = filtered.filter(student => student.status === 'CANCELLED');
       }
       devLog(`✅ Después de filtro de resultado: ${filtered.length} estudiantes`);
@@ -264,14 +370,27 @@ const StudentsPage = () => {
     }
   };
 
-  const handleShowStatistics = async () => {
+  // ✅ ESTADÍSTICAS DINÁMICAS SEGÚN FILTROS ==========
+  const handleShowStatistics = () => {
     try {
-      devLog('📊 Generando estadísticas');
-      const stats = calculateStatistics();
-      setStatisticsData(stats);
+      devLog('📊 Generando estadísticas según filtros aplicados');
+      
+      // Usar datos filtrados si hay filtros, o todos los datos si no hay
+      const dataForStats = hasFiltersApplied ? filteredStudents : allStudents;
+      const stats = calculateStatistics(dataForStats);
+      
+      console.log('✅ Estadísticas generadas:', stats);
+      
+      setStatisticsData({
+        statistics: stats,
+        hasFilters: hasFiltersApplied,
+        filtersInfo: activeFiltersInfo,
+        dataCount: dataForStats.length,
+      });
       setShowStatisticsModal(true);
       
       logUserAction('view_statistics', {
+        hasFilters: hasFiltersApplied,
         timestamp: new Date().toISOString()
       });
     } catch (err) {
@@ -280,25 +399,25 @@ const StudentsPage = () => {
     }
   };
 
-  // ✅ Estadísticas separan Pendiente, Reprobado y Cancelado
-  const calculateStatistics = () => {
+  // ✅ CALCULAR ESTADÍSTICAS (ahora recibe un array de estudiantes como parámetro)
+  const calculateStatistics = (studentsArray) => {
     const stats = {};
 
-    ALL_LEVELS.forEach(level => {
-      const levelStudents = allStudents.filter(s => s.levelEnrollment === level);
+    ALL_LEVEL_ENROLLMENTS.forEach(levelObj => {
+      const levelStudents = studentsArray.filter(s => s.levelEnrollment === levelObj.value);
       const passed = levelStudents.filter(s => s.passed === true).length;
       const failed = levelStudents.filter(s => s.passed === false).length;
       const pending = levelStudents.filter(s => s.passed === null).length;
       const cancelled = levelStudents.filter(s => s.status === 'CANCELLED').length;
       const total = levelStudents.length;
 
-      stats[level] = {
-        label: getLevelLabel(level),
+      stats[levelObj.value] = {
+        label: levelObj.label,
         total,
         passed,
         failed,
         pending,
-        cancelled, // ✅ NUEVO: Campo para Cancelados
+        cancelled,
         passPercentage: total > 0 ? ((passed / total) * 100).toFixed(1) : 0,
       };
     });
@@ -306,11 +425,15 @@ const StudentsPage = () => {
     return stats;
   };
 
-  const handleExportPDF = async () => {
+  // ✅ EXPORTAR PDF CON FILTROS ==========
+  const handleExportPDF = () => {
     try {
-      devLog('📄 Generando PDF');
+      devLog('📄 Generando PDF con filtros aplicados');
 
-      // ✅ Generar título dinámico basado en filtro de resultado
+      // Usar datos filtrados si hay filtros, o todos si no
+      const dataForPDF = hasFiltersApplied ? filteredStudents : allStudents;
+      const statsForPDF = calculateStatistics(dataForPDF);
+
       let title = 'Listado de Estudiantes';
       if (selectedResultFilter === 'PASSED') {
         title = 'Estudiantes Aprobados';
@@ -325,16 +448,22 @@ const StudentsPage = () => {
       const data = {
         title: title,
         level: selectedLevel === 'ALL' ? 'Todos los Niveles' : getLevelLabel(selectedLevel),
+        year: selectedYear === 'ALL' ? 'Todos los Años' : selectedYear,
         date: new Date().toLocaleDateString('es-CO'),
-        students: filteredStudents,
-        statistics: calculateStatistics(),
+        students: dataForPDF,
+        statistics: statsForPDF,
+        hasFilters: hasFiltersApplied,
+        filtersInfo: activeFiltersInfo,
+        filterYear: selectedYear === 'ALL' ? null : selectedYear, // ✅ Para pdfGenerator v3
+        filterLevel: selectedLevel === 'ALL' ? null : selectedLevel, // ✅ Para pdfGenerator v3
       };
 
       generatePDF(data, 'students-report');
       
-      devLog('✅ PDF generado');
+      devLog('✅ PDF generado con éxito');
       
       logUserAction('export_pdf', {
+        hasFilters: hasFiltersApplied,
         timestamp: new Date().toISOString()
       });
     } catch (err) {
@@ -343,57 +472,31 @@ const StudentsPage = () => {
     }
   };
 
-  // ========== OBTENER ETIQUETA DE NIVEL ==========
   const getLevelLabel = (levelValue) => {
-    const levelMap = {
-      'PREENCUENTRO': 'Pre-encuentro',
-      'ENCUENTRO': 'Encuentro',
-      'POST_ENCUENTRO': 'Post-encuentro',
-      'BAUTIZOS': 'Bautizos',
-      'EDIRD_1': 'EDIRD 1',
-      'EDIRD_2': 'EDIRD 2',
-      'EDIRD_3': 'EDIRD 3',
-      'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces',
-      'EDIRD_4': 'EDIRD 4',
-      'ADIESTRAMIENTO': 'Adiestramiento',
-      'GRADUACION': 'Graduación',
-    };
-    return levelMap[levelValue] || levelValue;
+    const level = ALL_LEVEL_ENROLLMENTS.find(l => l.value === levelValue);
+    return level ? level.label : levelValue;
   };
 
-  // ✅ Todos los 11 niveles posibles
-  const ALL_LEVELS = [
-    'PREENCUENTRO',
-    'ENCUENTRO',
-    'POST_ENCUENTRO',
-    'BAUTIZOS',
-    'EDIRD_1',
-    'EDIRD_2',
-    'EDIRD_3',
-    'EDIRD_4',
-    'ADIESTRAMIENTO',
-    'SANIDAD_INTEGRAL_RAICES',
-    'GRADUACION',
-  ];
-
-  // ========== OBTENER ETIQUETA DE FILTRO DE RESULTADO ==========
   const getResultFilterLabel = (filterValue) => {
     const filterMap = {
       'ALL': '',
-      'PASSED': ' · Mostrando: Aprobados',
-      'FAILED': ' · Mostrando: Reprobados',
-      'PENDING': ' · Mostrando: Pendientes',
-      'CANCELLED': ' · Mostrando: Cancelados', // ✅ NUEVO
+      'PASSED': 'Aprobados',
+      'FAILED': 'Reprobados',
+      'PENDING': 'Pendientes',
+      'CANCELLED': 'Cancelados',
     };
     return filterMap[filterValue] || '';
   };
+
+  const availableYears = getAvailableYears();
+  const availableLevels = getAvailableLevels();
 
   return (
     <div className="students-page" style={{ backgroundColor: theme.bg, color: theme.text, transition: 'all 0.3s ease' }}>
       <div className="students-page-container">
         <div className="students-page__header">
           <h1>👥 Gestión de Estudiantes</h1>
-          <p>Visualiza y gestiona estudiantes por niveles de formación</p>
+          <p>Visualiza y gestiona estudiantes por niveles de formación y años</p>
         </div>
 
         <div className="students-page__controls">
@@ -416,6 +519,43 @@ const StudentsPage = () => {
             </div>
 
             <div className="students-page__filter-item">
+              <label>📅 Filtrar por Año</label>
+              <select
+                value={selectedYear}
+                onChange={(e) => {
+                  devLog('🔄 Cambiando filtro de año');
+                  setSelectedYear(e.target.value);
+                  setSelectedLevel('ALL');
+                }}
+                style={{
+                  backgroundColor: theme.bgSecondary,
+                  color: theme.text,
+                  borderColor: theme.border,
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                <option value="ALL">Todos los Años ({allStudents.length})</option>
+                {availableYears.map(year => {
+                  const count = allStudents.filter(s => {
+                    if (s.enrollmentDate) {
+                      try {
+                        return new Date(s.enrollmentDate).getFullYear().toString() === year;
+                      } catch (e) {
+                        return false;
+                      }
+                    }
+                    return false;
+                  }).length;
+                  return (
+                    <option key={year} value={year}>
+                      {year} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <div className="students-page__filter-item">
               <label>📌 Filtrar por Nivel</label>
               <select
                 value={selectedLevel}
@@ -430,12 +570,41 @@ const StudentsPage = () => {
                   transition: 'all 0.3s ease',
                 }}
               >
-                <option value="ALL">Todos los Niveles ({allStudents.length})</option>
-                {ALL_LEVELS.map(level => {
-                  const count = allStudents.filter(s => s.levelEnrollment === level).length;
+                <option value="ALL">Todos los Niveles ({
+                  selectedYear === 'ALL' 
+                    ? allStudents.length
+                    : allStudents.filter(s => {
+                        if (s.enrollmentDate) {
+                          try {
+                            return new Date(s.enrollmentDate).getFullYear().toString() === selectedYear;
+                          } catch (e) {
+                            return false;
+                          }
+                        }
+                        return false;
+                      }).length
+                })</option>
+                {availableLevels.map(level => {
+                  let count = 0;
+                  
+                  if (selectedYear === 'ALL') {
+                    count = allStudents.filter(s => s.levelEnrollment === level.value).length;
+                  } else {
+                    count = allStudents.filter(s => {
+                      if (s.enrollmentDate && s.levelEnrollment === level.value) {
+                        try {
+                          return new Date(s.enrollmentDate).getFullYear().toString() === selectedYear;
+                        } catch (e) {
+                          return false;
+                        }
+                      }
+                      return false;
+                    }).length;
+                  }
+
                   return (
-                    <option key={level} value={level}>
-                      {getLevelLabel(level)} ({count})
+                    <option key={level.value} value={level.value}>
+                      {level.label} ({count})
                     </option>
                   );
                 })}
@@ -480,7 +649,7 @@ const StudentsPage = () => {
               onClick={handleShowStatistics}
               title="Ver estadísticas y gráficos"
             >
-              📊 Estadísticas
+              📊 Estadísticas {hasFiltersApplied && '🔍'}
             </button>
 
             <button
@@ -488,7 +657,7 @@ const StudentsPage = () => {
               onClick={handleExportPDF}
               title="Descargar PDF"
             >
-              📄 PDF
+              📄 PDF {hasFiltersApplied && '🔍'}
             </button>
 
             <button
@@ -506,8 +675,7 @@ const StudentsPage = () => {
           <p>
             Mostrando <strong>{filteredStudents.length}</strong> de{' '}
             <strong>{allStudents.length}</strong> estudiantes
-            {selectedLevel !== 'ALL' && ` · Nivel: ${getLevelLabel(selectedLevel)}`}
-            {getResultFilterLabel(selectedResultFilter)}
+            {hasFiltersApplied && ' (🔍 Con filtros aplicados)'}
           </p>
         </div>
 
@@ -659,10 +827,7 @@ const StudentsPage = () => {
         isOpen={showStatisticsModal}
         onClose={() => setShowStatisticsModal(false)}
         data={statisticsData}
-        onExportPDF={() => {
-          const stats = calculateStatistics();
-          generatePDF({ statistics: stats, title: 'Estadísticas de Estudiantes' }, 'statistics-report');
-        }}
+        isDarkMode={isDarkMode}
       />
 
       <style>{`

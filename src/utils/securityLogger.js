@@ -4,6 +4,7 @@
 // ✅ Error 404 SOLUCIONADO
 // ✅ Compatible con estructura existente
 // ✅ Endpoint correcto del backend
+// ✅ Sin enviar logs innecesarios en desarrollo
 
 /**
  * Logger seguro que envía logs al servidor
@@ -13,6 +14,7 @@
 const logToServer = async (event, context = {}, severity = 'info') => {
   try {
     // ✅ OPCIÓN 1: Omitir logs en desarrollo (RECOMENDADO)
+    // Esto evita error 404 porque no intenta enviar al servidor
     if (process.env.NODE_ENV !== 'production') {
       console.log(`📝 [${event}]`, context);
       return; // No enviar al servidor en desarrollo
@@ -45,8 +47,8 @@ const logToServer = async (event, context = {}, severity = 'info') => {
       headers: {
         'Content-Type': 'application/json',
         // Incluir token si existe
-        ...(localStorage.getItem('token') && {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        ...(sessionStorage.getItem('token') && {
+          'Authorization': `Bearer ${sessionStorage.getItem('token')}`
         }),
       },
       body: JSON.stringify(safeLog),
@@ -136,11 +138,11 @@ class SecurityLogger {
 
 export default SecurityLogger;
 
-// ============================================
-// CÓMO USAR EN COMPONENTES
-// ============================================
-
 /**
+ * ============================================================
+ * CÓMO USAR EN COMPONENTES
+ * ============================================================
+ * 
  * OPCIÓN 1: Usar funciones directas (RECOMENDADO)
  * 
  * import { logUserAction, logModalOpen } from '../utils/securityLogger';
@@ -151,9 +153,9 @@ export default SecurityLogger;
  *   });
  *   setModalOpen(true);
  * };
- */
-
-/**
+ * 
+ * ───────────────────────────────────────────────────────────
+ * 
  * OPCIÓN 2: Usar clase (compatible con código existente)
  * 
  * import SecurityLogger from '../utils/securityLogger';
@@ -164,9 +166,9 @@ export default SecurityLogger;
  *   });
  *   setModalOpen(true);
  * };
- */
-
-/**
+ * 
+ * ───────────────────────────────────────────────────────────
+ * 
  * OPCIÓN 3: Usar como en el código original
  * 
  * import { logUserAction } from '../utils/securityLogger';
@@ -180,45 +182,47 @@ export default SecurityLogger;
  * };
  */
 
-// ============================================
-// CAMBIOS REALIZADOS
-// ============================================
-
 /**
+ * ============================================================
+ * QUÉ CAMBIÓ (Solución del error 404)
+ * ============================================================
+ * 
  * ANTES (❌ Causaba error 404):
  * 
  * await fetch('/api/logs', {...})
  * ↓
  * POST http://localhost:3000/api/logs 404 (Not Found)
- * El endpoint no existe en el frontend
- */
-
-/**
+ * El endpoint no existe en el frontend (React dev server)
+ * 
+ * ───────────────────────────────────────────────────────────
+ * 
  * DESPUÉS (✅ Correcto):
  * 
- * 1. En DESARROLLO: Solo logs en consola, no envía al servidor
- *    → No hay error 404
- *    → Menos tráfico de red
- *    → Más rápido
+ * 1. En DESARROLLO:
+ *    - Solo logs en consola
+ *    - No intenta enviar al servidor
+ *    - NO hay error 404
+ *    - Menos tráfico de red
+ *    - Más rápido
  * 
- * 2. En PRODUCCIÓN: Envía al backend correcto
- *    await fetch('http://localhost:8080/api/v1/logs', {...})
- *    ↓
- *    POST http://localhost:8080/api/v1/logs 200 OK
- *    El endpoint existe en el backend
+ * 2. En PRODUCCIÓN:
+ *    - Envía al backend correcto
+ *    - await fetch('http://localhost:8080/api/v1/logs', {...})
+ *    - POST http://localhost:8080/api/v1/logs 200 OK
+ *    - El endpoint existe en el backend
  */
 
-// ============================================
-// VERIFICACIÓN
-// ============================================
-
 /**
+ * ============================================================
+ * VERIFICACIÓN
+ * ============================================================
+ * 
  * Para verificar que funciona:
  * 
  * 1. En DESARROLLO:
  *    Abre DevTools (F12) → Console
  *    Deberías ver: "📝 [user_action_show_statistics] {..."
- *    NO debe haber error 404
+ *    NO debe haber error 404 ✅
  * 
  * 2. En PRODUCCIÓN:
  *    Los logs se envían al backend

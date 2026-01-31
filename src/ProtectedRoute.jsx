@@ -1,124 +1,202 @@
-/**
- * 🛡️ ProtectedRoute - Protección de rutas y validación de roles
- * 
- * ℹ️ VERSIÓN OPTIMIZADA PARA PRODUCCIÓN:
- * - Todos los console.log están comentados para mejor rendimiento
- * - Si necesitas debuggear, busca las líneas con "// 🔧 DEBUG" y descomenta
- * - Valida autenticación y permisos de forma segura sin exponer datos sensibles
- */
+// ============================================
+// ProtectedRoute.jsx - VERSIÓN MEJORADA
+// Con Logo Pastoreapp + Responsive + Dark Mode
+// ============================================
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-// ✅ CORREGIDO: Import relativo correcto
-import { logSecurityEvent } from './utils/securityLogger';
-
-/**
- * @param {JSX.Element} element - Componente a renderizar
- * @param {string|string[]} requiredRoles - Rol o roles necesarios
- * @param {boolean} requireAll - Si true, necesita TODOS los roles; si false, necesita AL MENOS uno
- */
-export const ProtectedRoute = ({
+import authService from './services/authService';
+import logoBlancoImg from './assets/Pastoreapp_blanco.png';
+import logoNegroImg from './assets/Pastoreappnegro.png';
+import './css/Protectedroute.css';
+import RequiredPasswordChange from './components/RequiredPasswordChange';
+const ProtectedRoute = ({
   element,
   requiredRoles = null,
   requireAll = false,
 }) => {
   const { isAuthenticated, user, hasRole, loading } = useAuth();
+  const [passwordChangeRequired, setPasswordChangeRequired] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // ✅ SEGURIDAD: Log seguro (sin exponer datos sensibles)
-  if (process.env.NODE_ENV === 'development') {
-    // 🔧 DEBUG (descomentar solo en desarrollo):
-    // console.log('🛡️ ProtectedRoute - Verificando acceso');
-    // console.log('🔐 Roles requeridos:', requiredRoles);
-    // NO loguear user completo - potencialmente sensible
-  }
+  // ✅ Detectar modo oscuro
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const hasDarkClass = document.documentElement.classList.contains('dark-mode');
+    setIsDarkMode(prefersDark || hasDarkClass);
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-screen">⏳ Cargando...</div>;
-  }
+    // Listener para cambios en el tema
+    const darkModeListener = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => setIsDarkMode(e.matches || document.documentElement.classList.contains('dark-mode'));
+    darkModeListener.addEventListener('change', handleChange);
 
-  // Si no está autenticado, redirigir a login
-  if (!isAuthenticated()) {
-    if (process.env.NODE_ENV === 'development') {
-      // 🔧 DEBUG (descomentar solo en desarrollo):
-      // console.warn('⚠️ Usuario no autenticado - redirigiendo a login');
-    }
-    
-    // Log seguro de evento de seguridad
-    logSecurityEvent('unauthorized_access_attempt', {
-      timestamp: new Date().toISOString(),
-      reason: 'not_authenticated'
+    // Listener para cambios de clase en el documento
+    const observer = new MutationObserver(() => {
+      const isDark = document.documentElement.classList.contains('dark-mode');
+      setIsDarkMode(isDark);
     });
-    
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    return () => {
+      darkModeListener.removeEventListener('change', handleChange);
+      observer.disconnect();
+    };
+  }, []);
+
+  // ✅ EFECTO: Verificar passwordChangeRequired desde sessionStorage
+  useEffect(() => {
+    try {
+      const storedUser = sessionStorage.getItem('user');
+      if (storedUser) {
+        const userObj = JSON.parse(storedUser);
+        const needsPasswordChange = userObj.passwordChangeRequired === true;
+        
+        //console.log('🔐 [ProtectedRoute] Verificación de passwordChangeRequired:');
+        //console.log('   Stored User:', userObj);
+        //console.log('   passwordChangeRequired:', needsPasswordChange);
+        
+        setPasswordChangeRequired(needsPasswordChange);
+      } else {
+        //console.log('⚠️ [ProtectedRoute] No hay user en sessionStorage');
+        setPasswordChangeRequired(false);
+      }
+    } catch (err) {
+      console.error('❌ [ProtectedRoute] Error leyendo sessionStorage:', err);
+      setPasswordChangeRequired(false);
+    }
+  }, [user]);
+
+  // ========== CARGANDO ==========
+  if (loading || passwordChangeRequired === null) {
+    return (
+      <div className="protected-route__loading-container">
+        <div className="protected-route__loading-content">
+          <div className="protected-route__spinner">⏳</div>
+          <p className="protected-route__loading-text">Validando acceso...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ========== NO AUTENTICADO ==========
+  if (!isAuthenticated()) {
+    console.warn('❌ [ProtectedRoute] No autenticado - redirigiendo a login');
     return <Navigate to="/login" replace />;
   }
 
-  // Si se especifican roles requeridos, validar
+  // ========== CAMBIO OBLIGATORIO DE CONTRASEÑA ==========
+if (passwordChangeRequired === true) {
+  //console.log('🔐 [ProtectedRoute] MOSTRANDO MODAL DE CAMBIO OBLIGATORIO');
+  
+  // ✅ Importar al inicio del archivo:
+  // import RequiredPasswordChange from './RequiredPasswordChange';
+  
+  return (
+    <RequiredPasswordChange 
+      onPasswordChanged={() => {
+        // Actualizar el usuario para que no vuelva a mostrar el modal
+        const currentUser = JSON.parse(sessionStorage.getItem('user'));
+        const updatedUser = {
+          ...currentUser,
+          passwordChangeRequired: false,
+          passwordChangedAtLeastOnce: true
+        };
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+        
+        // Redirigir al dashboard
+        window.location.href = '/dashboard';
+      }}
+    />
+  );
+}
+
+  // ========== VALIDACIÓN: Roles ==========
   if (requiredRoles) {
-    const rolesArray = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+    const rolesArray = Array.isArray(requiredRoles)
+      ? requiredRoles
+      : [requiredRoles];
+
     let hasPermission;
 
     if (requireAll) {
-      // Necesita TODOS los roles
-      hasPermission = rolesArray.every(role => hasRole(role));
+      hasPermission = rolesArray.every((role) => hasRole(role));
     } else {
-      // Necesita AL MENOS UNO
-      hasPermission = rolesArray.some(role => hasRole(role));
+      hasPermission = rolesArray.some((role) => hasRole(role));
     }
 
-    // ✅ SEGURIDAD: Si acceso denegado, registrar evento seguro (sin exponer datos)
     if (!hasPermission) {
-      if (process.env.NODE_ENV === 'development') {
-        // 🔧 DEBUG (descomentar solo en desarrollo):
-        // console.warn('❌ Acceso denegado - roles insuficientes');
-      }
-
-      logSecurityEvent('unauthorized_access_attempt', {
-        timestamp: new Date().toISOString(),
-        reason: 'insufficient_roles',
-        requiredRoles: rolesArray,
-        // NO incluir roles reales del usuario
-      });
-
+      console.warn('❌ [ProtectedRoute] Roles insuficientes');
       return <Navigate to="/unauthorized" replace />;
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      // 🔧 DEBUG (descomentar solo en desarrollo):
-      // console.log('✅ Acceso permitido');
     }
   }
 
+  // ========== ACCESO PERMITIDO ==========
+  //console.log('✅ [ProtectedRoute] ACCESO PERMITIDO');
   return element;
 };
 
 /**
- * 🚫 UnauthorizedPage - Página de acceso denegado
- * Mostrada cuando un usuario intenta acceder a una ruta sin permisos suficientes
+ * 🚫 UnauthorizedPage - Página 403
+ * Mostrada cuando el usuario no tiene permisos suficientes
  */
 export const UnauthorizedPage = () => {
-  const { user } = useAuth();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const hasDarkClass = document.documentElement.classList.contains('dark-mode');
+    setIsDarkMode(prefersDark || hasDarkClass);
+
+    const darkModeListener = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e) => setIsDarkMode(e.matches || document.documentElement.classList.contains('dark-mode'));
+    darkModeListener.addEventListener('change', handleChange);
+
+    return () => darkModeListener.removeEventListener('change', handleChange);
+  }, []);
+
+  const logoSrc = isDarkMode ? logoBlancoImg : logoNegroImg;
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-gray-100">
-      <div className="text-center bg-white p-8 rounded-lg shadow-lg">
-        <h1 className="text-4xl font-bold text-red-600 mb-4">403</h1>
-        <p className="text-2xl font-semibold text-gray-700 mb-4">Acceso Denegado</p>
-        <p className="text-gray-600 mb-6">
+    <div className="protected-route__modal-overlay">
+      <div className="protected-route__modal-container protected-route__modal-container--error">
+        
+        {/* Logo pequeño */}
+        <div className="protected-route__logo-wrapper--small">
+          <img 
+            src={logoSrc} 
+            alt="Pastoreapp Logo" 
+            className="protected-route__logo--small"
+          />
+        </div>
+
+        {/* Código de error */}
+        <h1 className="protected-route__error-code">403</h1>
+
+        {/* Título */}
+        <h2 className="protected-route__error-title">
+          Acceso Denegado
+        </h2>
+
+        {/* Descripción */}
+        <p className="protected-route__error-description">
           No tienes permisos para acceder a esta página.
         </p>
-        
-        {/* ✅ SEGURIDAD: Sin exponer datos sensibles del usuario */}
-        <div className="mb-6 p-4 bg-gray-50 rounded">
-          <p className="text-gray-700 font-semibold">¿Necesitas ayuda?</p>
-          <p className="text-gray-600 text-sm">
+
+        {/* Ayuda */}
+        <div className="protected-route__help-box">
+          <p className="protected-route__help-title">
+            ℹ️ ¿Necesitas ayuda?
+          </p>
+          <p className="protected-route__help-text">
             Contacta con un administrador si crees que esto es un error.
           </p>
         </div>
-        
+
+        {/* Botón de volver */}
         <a
           href="/dashboard"
-          className="inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          className="protected-route__btn-back"
         >
           ← Volver al Dashboard
         </a>

@@ -1,5 +1,7 @@
-// 📄 pdfGenerator.js - Generador de PDF para reportes de estudiantes
-// Usa jsPDF y autoTable para crear PDFs profesionales
+// 📄 pdfGenerator.js - Generador de PDF para reportes de estudiantes (v3 - MEJORADO)
+// ✅ Usa jsPDF y autoTable para crear PDFs profesionales con soporte para filtros
+// ✅ Muestra fecha correctamente: "Año 2025 - Fecha del reporte: 31/01/2025"
+// ✅ Compatible con ambas formas de llamada (desde StudentsPage y ModalStatistics)
 
 // Asegúrate de instalar:
 // npm install jspdf autotable
@@ -8,13 +10,54 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
 /**
- * Generar PDF de listado de estudiantes
- * @param {Object} data - Datos para el PDF
- * @param {string} filename - Nombre del archivo sin extensión
+ * Generar PDF de listado de estudiantes con filtros
+ * @param {Object} config - Configuración del PDF
+ * @param {string} filenameParam - Nombre del archivo (segundo parámetro, opcional)
  */
-export const generatePDF = (data, filename = 'reporte') => {
+export const generatePDF = (config, filenameParam = 'reporte') => {
   try {
-    console.log('📄 Iniciando generación de PDF...');
+    // Destructurar con flexibilidad para ambas estructuras de datos
+    const {
+      title,
+      level,
+      year,
+      date,
+      students = [],
+      statistics = {},
+      hasFilters = false,
+      filtersInfo = {},
+      // Compatibilidad con estructura anterior
+      data,
+      filteredStudents,
+      filteredStatistics,
+      filterLevel = null,
+      filterYear = null,
+      filterStatus = null,
+      filename: configFilename = null,
+    } = config;
+
+    // Determinar valores correctos según estructura de datos
+    const studentsData = students || filteredStudents || data?.students || [];
+    const statsData = statistics || filteredStatistics || data?.statistics || {};
+    const titleData = title || data?.title || 'Listado de Estudiantes';
+    const levelData = level || filterLevel || data?.level || 'Todos los Niveles';
+    const yearData = year || filterYear || data?.year || 'Todos los Años';
+    const filename = filenameParam || configFilename || 'reporte';
+    const statusFilter = filterStatus;
+
+    // ========== GENERAR FECHA CORRECTAMENTE ==========
+    // Si hay filtro de año: "Año 2025 - Fecha del reporte: 31/01/2025"
+    // Sin filtro de año: "Fecha del reporte: 31/01/2025"
+    let dateString = '';
+    if (yearData !== 'Todos los Años' && yearData !== 'ALL') {
+      const reportDate = new Date().toLocaleDateString('es-CO');
+      dateString = `Año ${yearData} - Fecha del reporte: ${reportDate}`;
+    } else {
+      const reportDate = date || new Date().toLocaleDateString('es-CO');
+      dateString = `Fecha del reporte: ${reportDate}`;
+    }
+
+    console.log('📄 Iniciando generación de PDF con filtros...');
 
     const doc = new jsPDF({
       orientation: 'portrait',
@@ -41,7 +84,7 @@ export const generatePDF = (data, filename = 'reporte') => {
 
     yPosition = 35;
 
-    // ========== INFORMACIÓN GENERAL ==========
+    // ========== INFORMACIÓN GENERAL CON FILTROS ==========
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
@@ -50,35 +93,51 @@ export const generatePDF = (data, filename = 'reporte') => {
 
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
-    doc.text(`Título: ${data.title || 'Listado de Estudiantes'}`, 15, yPosition);
+    doc.text(`Título: ${titleData}`, 15, yPosition);
     yPosition += 6;
-    doc.text(`Nivel: ${data.level || 'Todos los Niveles'}`, 15, yPosition);
+    doc.text(`Nivel: ${levelData}`, 15, yPosition);
     yPosition += 6;
-    doc.text(`Fecha: ${data.date}`, 15, yPosition);
+    doc.text(`${dateString}`, 15, yPosition);
     yPosition += 10;
 
-    // ========== TABLA DE ESTUDIANTES ==========
-    if (data.students && data.students.length > 0) {
+    // ========== TABLA DE ESTUDIANTES FILTRADA ==========
+    const studentsToDisplay = studentsData.length > 0 ? studentsData : [];
+    
+    if (studentsToDisplay.length > 0) {
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
-      doc.text('Listado de Estudiantes', 15, yPosition);
+      doc.text(`Listado de Estudiantes${yearData !== 'Todos los Años' && yearData !== 'ALL' ? ` - Año ${yearData}` : ''}`, 15, yPosition);
       yPosition += 8;
 
       const tableColumns = [
         { header: 'Estudiante', dataKey: 'studentName' },
         { header: 'Nivel', dataKey: 'levelEnrollment' },
+        { header: 'Año', dataKey: 'year' },
         { header: 'Estado', dataKey: 'status' },
         { header: 'Asistencia %', dataKey: 'attendancePercentage' },
         { header: 'Resultado', dataKey: 'passed' },
       ];
 
-      const tableData = data.students.map(student => ({
-        studentName: student.studentName || '',
-        levelEnrollment: student.levelEnrollment || '',
-        status: getStatusLabel(student.status) || '',
-        attendancePercentage: `${(student.attendancePercentage || 0).toFixed(1)}%`,
-        passed: student.passed === true ? '✅ Aprobado' : student.passed === false ? '❌ Reprobado' : '⏳ Pendiente',
-      }));
+      const tableData = studentsToDisplay.map(student => {
+        // Extraer año de la fecha de inscripción
+        let enrollYear = '-';
+        if (student.enrollmentDate) {
+          try {
+            enrollYear = new Date(student.enrollmentDate).getFullYear().toString();
+          } catch (e) {
+            enrollYear = '-';
+          }
+        }
+
+        return {
+          studentName: student.studentName || '',
+          levelEnrollment: student.levelEnrollment || '',
+          year: enrollYear,
+          status: getStatusLabel(student.status) || '',
+          attendancePercentage: `${(student.attendancePercentage || 0).toFixed(1)}%`,
+          passed: student.passed === true ? '✅ Aprobado' : student.passed === false ? '❌ Reprobado' : '⏳ Pendiente',
+        };
+      });
 
       autoTable(doc, {
         columns: tableColumns,
@@ -86,8 +145,8 @@ export const generatePDF = (data, filename = 'reporte') => {
         startY: yPosition,
         margin: { left: 15, right: 15 },
         styles: {
-          fontSize: 9,
-          cellPadding: 4,
+          fontSize: 8,
+          cellPadding: 3,
           overflow: 'linebreak',
         },
         headStyles: {
@@ -99,19 +158,26 @@ export const generatePDF = (data, filename = 'reporte') => {
           fillColor: [245, 247, 250],
         },
         columnStyles: {
-          0: { cellWidth: 50 },
-          1: { cellWidth: 35 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 30 },
+          0: { cellWidth: 45 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 30 },
         },
       });
 
       yPosition = doc.lastAutoTable.finalY + 10;
+    } else {
+      doc.setFontSize(10);
+      doc.text('No hay estudiantes que mostrar con los filtros seleccionados.', 15, yPosition);
+      yPosition += 10;
     }
 
-    // ========== ESTADÍSTICAS ==========
-    if (data.statistics && Object.keys(data.statistics).length > 0) {
+    // ========== ESTADÍSTICAS FILTRADAS ==========
+    const statsToDisplay = statsData && Object.keys(statsData).length > 0 ? statsData : {};
+    
+    if (Object.keys(statsToDisplay).length > 0) {
       // Nueva página si es necesario
       if (yPosition > pageHeight - 80) {
         doc.addPage();
@@ -131,25 +197,27 @@ export const generatePDF = (data, filename = 'reporte') => {
         { header: 'Total', dataKey: 'total' },
         { header: 'Aprobados', dataKey: 'passed' },
         { header: 'Reprobados', dataKey: 'failed' },
+        { header: 'Pendientes', dataKey: 'pending' },
         { header: '% Aprobación', dataKey: 'passPercentage' },
       ];
 
-      const statsData = Object.entries(data.statistics).map(([key, stat]) => ({
+      const statsDataArray = Object.entries(statsToDisplay).map(([key, stat]) => ({
         label: stat.label || key,
         total: stat.total || 0,
         passed: stat.passed || 0,
         failed: stat.failed || 0,
+        pending: stat.pending || 0,
         passPercentage: `${stat.passPercentage || 0}%`,
       }));
 
       autoTable(doc, {
         columns: statsColumns,
-        body: statsData,
+        body: statsDataArray,
         startY: yPosition,
         margin: { left: 15, right: 15 },
         styles: {
-          fontSize: 9,
-          cellPadding: 4,
+          fontSize: 8,
+          cellPadding: 3,
           overflow: 'linebreak',
         },
         headStyles: {
@@ -161,11 +229,12 @@ export const generatePDF = (data, filename = 'reporte') => {
           fillColor: [255, 251, 235],
         },
         columnStyles: {
-          0: { cellWidth: 50 },
-          1: { cellWidth: 25 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 35 },
+          0: { cellWidth: 40 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 20 },
+          5: { cellWidth: 30 },
         },
       });
 
@@ -173,7 +242,7 @@ export const generatePDF = (data, filename = 'reporte') => {
     }
 
     // ========== RESUMEN GENERAL ==========
-    if (data.statistics) {
+    if (Object.keys(statsToDisplay).length > 0) {
       if (yPosition > pageHeight - 50) {
         doc.addPage();
         yPosition = 15;
@@ -189,9 +258,10 @@ export const generatePDF = (data, filename = 'reporte') => {
       doc.setFont(undefined, 'normal');
       doc.setFontSize(10);
 
-      const totalStudents = Object.values(data.statistics).reduce((sum, s) => sum + (s.total || 0), 0);
-      const totalPassed = Object.values(data.statistics).reduce((sum, s) => sum + (s.passed || 0), 0);
-      const totalFailed = Object.values(data.statistics).reduce((sum, s) => sum + (s.failed || 0), 0);
+      const totalStudents = Object.values(statsToDisplay).reduce((sum, s) => sum + (s.total || 0), 0);
+      const totalPassed = Object.values(statsToDisplay).reduce((sum, s) => sum + (s.passed || 0), 0);
+      const totalFailed = Object.values(statsToDisplay).reduce((sum, s) => sum + (s.failed || 0), 0);
+      const totalPending = Object.values(statsToDisplay).reduce((sum, s) => sum + (s.pending || 0), 0);
       const overallPercentage = totalStudents > 0 ? ((totalPassed / totalStudents) * 100).toFixed(1) : 0;
 
       doc.text(`Total de Estudiantes: ${totalStudents}`, 15, yPosition);
@@ -199,6 +269,8 @@ export const generatePDF = (data, filename = 'reporte') => {
       doc.text(`Estudiantes Aprobados: ${totalPassed}`, 15, yPosition);
       yPosition += 7;
       doc.text(`Estudiantes Reprobados: ${totalFailed}`, 15, yPosition);
+      yPosition += 7;
+      doc.text(`Estudiantes Pendientes: ${totalPending}`, 15, yPosition);
       yPosition += 7;
       doc.text(`Tasa de Aprobación General: ${overallPercentage}%`, 15, yPosition);
     }
@@ -219,7 +291,20 @@ export const generatePDF = (data, filename = 'reporte') => {
 
     // ========== GUARDAR ==========
     const timestamp = new Date().toISOString().split('T')[0];
-    const fullFilename = `${filename}_${timestamp}.pdf`;
+    const filterParts = [];
+    
+    if (yearData !== 'Todos los Años' && yearData !== 'ALL') {
+      filterParts.push(yearData);
+    }
+    if (levelData !== 'Todos los Niveles' && levelData !== 'ALL') {
+      filterParts.push(levelData.replace(/\s+/g, '_'));
+    }
+    if (statusFilter) {
+      filterParts.push(statusFilter);
+    }
+    
+    const filterSuffix = filterParts.length > 0 ? `_${filterParts.join('_')}` : '';
+    const fullFilename = `${filename}${filterSuffix}_${timestamp}.pdf`;
 
     doc.save(fullFilename);
     console.log('✅ PDF generado exitosamente:', fullFilename);
@@ -232,12 +317,36 @@ export const generatePDF = (data, filename = 'reporte') => {
 };
 
 /**
- * Generar PDF de estadísticas con tablas
- * @param {Object} statistics - Datos de estadísticas
- * @param {string} filename - Nombre del archivo
+ * Generar PDF de estadísticas con tablas (versión filtrada)
+ * @param {Object} config - Configuración del PDF
+ * @param {string} filenameParam - Nombre del archivo (segundo parámetro, opcional)
  */
-export const generateStatisticsPDF = (statistics, filename = 'estadisticas') => {
+export const generateStatisticsPDF = (config, filenameParam = 'estadisticas') => {
   try {
+    const {
+      statistics,
+      filteredStatistics = null,
+      filename: configFilename,
+      filterYear = null,
+      filterLevel = null,
+      title,
+      date,
+      year,
+    } = config;
+
+    const filename = filenameParam || configFilename || 'estadisticas';
+    const yearData = year || filterYear;
+
+    // Generar fecha correctamente
+    let dateString = '';
+    if (yearData && yearData !== 'Todos los Años' && yearData !== 'ALL') {
+      const reportDate = new Date().toLocaleDateString('es-CO');
+      dateString = `Año ${yearData} - Fecha del reporte: ${reportDate}`;
+    } else {
+      const reportDate = date || new Date().toLocaleDateString('es-CO');
+      dateString = `Fecha del reporte: ${reportDate}`;
+    }
+
     console.log('📊 Iniciando generación de PDF de estadísticas...');
 
     const doc = new jsPDF({
@@ -257,7 +366,10 @@ export const generateStatisticsPDF = (statistics, filename = 'estadisticas') => 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
     doc.setFont(undefined, 'bold');
-    doc.text('📊 ESTADÍSTICAS DE ESTUDIANTES', pageWidth / 2, 12, { align: 'center' });
+    const pdfTitle = yearData && yearData !== 'Todos los Años' && yearData !== 'ALL'
+      ? `📊 ESTADÍSTICAS - AÑO ${yearData}`
+      : '📊 ESTADÍSTICAS DE ESTUDIANTES';
+    doc.text(pdfTitle, pageWidth / 2, 12, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setFont(undefined, 'normal');
@@ -272,19 +384,22 @@ export const generateStatisticsPDF = (statistics, filename = 'estadisticas') => 
     doc.text('Desempeño por Nivel', 15, yPosition);
     yPosition += 8;
 
+    const statsToDisplay = filteredStatistics || statistics;
     const columns = [
       { header: 'Nivel', dataKey: 'label' },
       { header: 'Total', dataKey: 'total' },
       { header: 'Aprobados', dataKey: 'passed' },
       { header: 'Reprobados', dataKey: 'failed' },
+      { header: 'Pendientes', dataKey: 'pending' },
       { header: '% Aprobación', dataKey: 'passPercentage' },
     ];
 
-    const rows = Object.entries(statistics).map(([key, stat]) => ({
+    const rows = Object.entries(statsToDisplay).map(([key, stat]) => ({
       label: stat.label,
       total: stat.total,
       passed: stat.passed,
       failed: stat.failed,
+      pending: stat.pending || 0,
       passPercentage: `${stat.passPercentage}%`,
     }));
 
@@ -307,11 +422,12 @@ export const generateStatisticsPDF = (statistics, filename = 'estadisticas') => 
         fillColor: [255, 251, 235],
       },
       columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 30 },
-        4: { cellWidth: 40 },
+        0: { cellWidth: 50 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 40 },
       },
     });
 
@@ -331,12 +447,14 @@ export const generateStatisticsPDF = (statistics, filename = 'estadisticas') => 
     const totalStudents = rows.reduce((sum, row) => sum + row.total, 0);
     const totalPassed = rows.reduce((sum, row) => sum + row.passed, 0);
     const totalFailed = rows.reduce((sum, row) => sum + row.failed, 0);
+    const totalPending = rows.reduce((sum, row) => sum + row.pending, 0);
     const overallPercentage = totalStudents > 0 ? ((totalPassed / totalStudents) * 100).toFixed(1) : 0;
 
     const summaryData = [
       { label: 'Total de Estudiantes', value: totalStudents },
       { label: 'Estudiantes Aprobados', value: totalPassed },
       { label: 'Estudiantes Reprobados', value: totalFailed },
+      { label: 'Estudiantes Pendientes', value: totalPending },
       { label: 'Tasa de Aprobación', value: `${overallPercentage}%` },
     ];
 
@@ -366,7 +484,17 @@ export const generateStatisticsPDF = (statistics, filename = 'estadisticas') => 
 
     // ========== GUARDAR ==========
     const timestamp = new Date().toISOString().split('T')[0];
-    const fullFilename = `${filename}_${timestamp}.pdf`;
+    const filterParts = [];
+    
+    if (yearData && yearData !== 'Todos los Años' && yearData !== 'ALL') {
+      filterParts.push(yearData);
+    }
+    if (filterLevel && filterLevel !== 'ALL') {
+      filterParts.push(filterLevel.replace(/\s+/g, '_'));
+    }
+    
+    const filterSuffix = filterParts.length > 0 ? `_${filterParts.join('_')}` : '';
+    const fullFilename = `${filename}${filterSuffix}_${timestamp}.pdf`;
 
     doc.save(fullFilename);
     console.log('✅ PDF de estadísticas generado:', fullFilename);

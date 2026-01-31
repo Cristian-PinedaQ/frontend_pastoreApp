@@ -1,23 +1,30 @@
-// 🔌 Servicio API centralizado - ACTUALIZADO PARA USAR sessionStorage
-// ✅ Ahora usa sessionStorage para el token (se limpia al cerrar la pestaña)
+// 🔌 Servicio API centralizado - ACTUALIZADO CON getHeaders() DINÁMICO
+// ✅ Obtiene el token CADA VEZ que se necesita (no en el constructor)
 // ✅ Rutas de endpoint corregidas
 // ✅ MEJORADO: Extrae errores de validación específicos del backend
 // ✅ NUEVO: Métodos para editar cohortes
 // ✅ FIXED: createFinance y updateFinance ahora incluyen recordedBy y registrationDate
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 class ApiService {
-  constructor() {
-    // ✅ ACTUALIZADO: Usar sessionStorage en lugar de localStorage
-    this.token = sessionStorage.getItem('token');
-  }
 
-  // ✅ Obtener headers con autenticación
+  // ✅ ACTUALIZADO: Obtener headers con autenticación DINÁMICAMENTE
   getHeaders() {
-    return {
+    const token = sessionStorage.getItem('token');
+    const headers = {
       'Content-Type': 'application/json',
-      ...(this.token && { Authorization: `Bearer ${this.token}` }),
     };
+
+    // ✅ IMPORTANTE: Agregar token si existe
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      //console.log('🔑 [ApiService] Authorization header agregado');
+    } else {
+      console.warn('⚠️ [ApiService] No hay token en sessionStorage');
+    }
+
+    return headers;
   }
 
   // ✅ Método genérico para requests
@@ -32,6 +39,7 @@ class ApiService {
       const response = await fetch(url, config);
 
       if (response.status === 401) {
+        console.warn('❌ [ApiService] Token expirado (401)');
         this.logout();
         window.location.href = '/login';
         throw new Error('Token expirado');
@@ -49,14 +57,14 @@ class ApiService {
 
         // 🔴 MEJORADO: Extraer errores de validación específicos por campo
         let errorMessage = '';
-        
+
         // Si hay fieldErrors (errores de validación), priorizar esos
         if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
           const fieldErrorsArray = Object.entries(errorData.fieldErrors)
             .map(([field, message]) => `${field}: ${message}`)
             .join(' | ');
           errorMessage = fieldErrorsArray;
-        } 
+        }
         // Sino, usar el mensaje general
         else if (typeof errorData === 'string') {
           errorMessage = errorData;
@@ -104,16 +112,17 @@ class ApiService {
     });
   }
 
-  // ✅ ACTUALIZADO: Guardar token en sessionStorage
+  // ✅ Guardar token en sessionStorage
   setToken(token) {
-    this.token = token;
     sessionStorage.setItem('token', token);
+    //console.log('✅ [ApiService] Token guardado en sessionStorage');
   }
 
-  // ✅ ACTUALIZADO: Logout - limpiar sessionStorage
+  // ✅ Logout - limpiar sessionStorage
   logout() {
-    this.token = null;
     sessionStorage.removeItem('token');
+    sessionStorage.removeItem('user');
+    //console.log('✅ [ApiService] Sesión cerrada');
   }
 
   // ========== 👥 MIEMBROS ==========
@@ -219,8 +228,8 @@ class ApiService {
    */
   async editEnrollment(enrollmentId, updateData) {
     try {
-      console.log('📝 [editEnrollment] Editando cohorte ID:', enrollmentId);
-      console.log('   Datos a actualizar:', updateData);
+      //console.log('📝 [editEnrollment] Editando cohorte ID:', enrollmentId);
+      //console.log('   Datos a actualizar:', updateData);
 
       const response = await this.request(`/enrollment/cohorts/${enrollmentId}/edit`, {
         method: 'PUT',
@@ -248,19 +257,19 @@ class ApiService {
    */
   async editEnrollmentWithStatus(enrollmentId, updateData, newStatus) {
     try {
-      console.log('📝 [editEnrollmentWithStatus] Editando cohorte ID:', enrollmentId);
-      console.log('   Datos a actualizar:', updateData);
-      console.log('   Nuevo estado:', newStatus);
+      //console.log('📝 [editEnrollmentWithStatus] Editando cohorte ID:', enrollmentId);
+      //console.log('   Datos a actualizar:', updateData);
+      //console.log('   Nuevo estado:', newStatus);
 
       const params = newStatus ? `?newStatus=${newStatus}` : '';
-      
+
       const response = await this.request(`/enrollment/cohorts/${enrollmentId}/edit-with-status${params}`, {
         method: 'PUT',
         body: JSON.stringify(updateData),
       });
 
-      console.log('✅ [editEnrollmentWithStatus] Éxito:', response);
-      
+      //console.log('✅ [editEnrollmentWithStatus] Éxito:', response);
+
       // Si la cohorte fue cancelada, advertencia especial
       if (newStatus === 'CANCELLED') {
         console.warn('🚫 ATENCIÓN: Se cancelaron todos los estudiantes inscritos en esta cohorte');
@@ -294,13 +303,13 @@ class ApiService {
    */
   async getStudentEnrollmentsByEnrollment(enrollmentId) {
     try {
-      console.log('📡 [Intento 1] Obteniendo estudiantes de cohorte ID:', enrollmentId);
+      //console.log('📡 [Intento 1] Obteniendo estudiantes de cohorte ID:', enrollmentId);
 
       // ✅ RUTA CORRECTA: /student-enrollment/by-cohort/{id}
       const response = await this.request(`/student-enrollment/by-cohort/${enrollmentId}`);
 
-      console.log('✅ [Intento 1] Estudiantes obtenidos:', response?.length || 0);
-      console.log('   Datos:', response);
+      //console.log('✅ [Intento 1] Estudiantes obtenidos:', response?.length || 0);
+      //console.log('   Datos:', response);
 
       return response;
     } catch (error) {
@@ -308,20 +317,20 @@ class ApiService {
 
       // Alternativa 2: Si el endpoint anterior no existe, intentar obtener desde enrollment
       try {
-        console.log('📡 [Intento 2] Intentando obtener estudiantes desde enrollment...');
+        //console.log('📡 [Intento 2] Intentando obtener estudiantes desde enrollment...');
         const enrollment = await this.request(`/enrollment/${enrollmentId}`);
         const students = enrollment?.studentEnrollments || [];
-        console.log('✅ [Intento 2] Estudiantes obtenidos (alternativa):', students.length);
+        //console.log('✅ [Intento 2] Estudiantes obtenidos (alternativa):', students.length);
         return students;
       } catch (err2) {
         console.error('❌ [Intento 2] Error:', err2.message);
 
         // Alternativa 3: Obtener todos los student enrollments y filtrar
         try {
-          console.log('📡 [Intento 3] Intentando obtener todos los student enrollments...');
+          //console.log('📡 [Intento 3] Intentando obtener todos los student enrollments...');
           const allStudentEnrollments = await this.request('/student-enrollment');
           const filtered = allStudentEnrollments?.filter(se => se.enrollmentId === enrollmentId) || [];
-          console.log('✅ [Intento 3] Estudiantes obtenidos (alternativa 2):', filtered.length);
+          //console.log('✅ [Intento 3] Estudiantes obtenidos (alternativa 2):', filtered.length);
           return filtered;
         } catch (err3) {
           console.error('❌ [Intento 3] Error:', err3.message);
@@ -417,7 +426,7 @@ class ApiService {
    * ✅ Crear nueva lección
    */
   async createLesson(lessonData) {
-    return this.request('/lesson', {
+    return this.request('/lesson/create', {
       method: 'POST',
       body: JSON.stringify(lessonData),
     });
@@ -468,8 +477,8 @@ class ApiService {
    * }
    */
   async recordAttendance(attendanceData) {
-    console.log('📤 [recordAttendance] INICIANDO');
-    console.log('  📋 Datos recibidos:', attendanceData);
+    //console.log('📤 [recordAttendance] INICIANDO');
+    //console.log('  📋 Datos recibidos:', attendanceData);
 
     try {
       // Validaciones
@@ -488,10 +497,10 @@ class ApiService {
         score: String(attendanceData.score)  // Nombre del enum: POCA_PARTICIPACION, etc
       };
 
-      console.log('📋 JSON a enviar en el body:');
-      console.log(JSON.stringify(bodyData, null, 2));
+      //console.log('📋 JSON a enviar en el body:');
+      //console.log(JSON.stringify(bodyData, null, 2));
 
-      console.log('📤 Enviando POST request con JSON en el body...');
+      //console.log('📤 Enviando POST request con JSON en el body...');
 
       // Enviar como JSON en el body (NO parámetros URL)
       const response = await this.request('/attendance/record', {
@@ -499,8 +508,8 @@ class ApiService {
         body: JSON.stringify(bodyData)  // ✅ JSON en el body
       });
 
-      console.log('✅ [recordAttendance] EXITOSA');
-      console.log('   Respuesta:', response);
+      //console.log('✅ [recordAttendance] EXITOSA');
+      //console.log('   Respuesta:', response);
       return response;
 
     } catch (error) {
@@ -584,11 +593,11 @@ class ApiService {
    */
   async getFinances(page = 0, limit = 10) {
     try {
-      console.log('📡 [getFinances] Obteniendo finanzas - Página:', page);
+      //console.log('📡 [getFinances] Obteniendo finanzas - Página:', page);
 
       const response = await this.request(`/finances?page=${page}&limit=${limit}`);
 
-      console.log('✅ [getFinances] Finanzas obtenidas:', response?.content?.length || 0);
+      //console.log('✅ [getFinances] Finanzas obtenidas:', response?.content?.length || 0);
       return response;
     } catch (error) {
       console.error('❌ [getFinances] Error:', error.message);
@@ -601,7 +610,7 @@ class ApiService {
    */
   async getFinanceById(id) {
     try {
-      console.log('📡 [getFinanceById] Obteniendo finanza ID:', id);
+      //console.log('📡 [getFinanceById] Obteniendo finanza ID:', id);
 
       const response = await this.request(`/finances/${id}`);
 
@@ -619,8 +628,8 @@ class ApiService {
    */
   async createFinance(financeData) {
     try {
-      console.log('📤 [createFinance] Creando nueva finanza');
-      console.log('   Datos:', financeData);
+      //console.log('📤 [createFinance] Creando nueva finanza');
+      //console.log('   Datos:', financeData);
 
       const body = {
         memberId: financeData.memberId,
@@ -634,7 +643,7 @@ class ApiService {
         isVerified: financeData.isVerified,  // ✅ AHORA INCLUIDO
       };
 
-      console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
+      //console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
 
       const response = await this.request('/finances', {
         method: 'POST',
@@ -655,8 +664,8 @@ class ApiService {
    */
   async updateFinance(id, financeData) {
     try {
-      console.log('📝 [updateFinance] Actualizando finanza ID:', id);
-      console.log('   Datos:', financeData);
+      //console.log('📝 [updateFinance] Actualizando finanza ID:', id);
+      //console.log('   Datos:', financeData);
 
       const body = {
         memberId: financeData.memberId,
@@ -670,14 +679,14 @@ class ApiService {
         isVerified: financeData.isVerified,  // ✅ AHORA INCLUIDO
       };
 
-      console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
+      //console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
 
       const response = await this.request(`/finances/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
       });
 
-      console.log('✅ [updateFinance] Finanza actualizada');
+      //console.log('✅ [updateFinance] Finanza actualizada');
       return response;
     } catch (error) {
       console.error('❌ [updateFinance] Error:', error.message);
@@ -690,7 +699,7 @@ class ApiService {
    */
   async deleteFinance(id) {
     try {
-      console.log('🗑️ [deleteFinance] Eliminando finanza ID:', id);
+      //console.log('🗑️ [deleteFinance] Eliminando finanza ID:', id);
 
       const response = await this.request(`/finances/${id}`, {
         method: 'DELETE',
@@ -709,11 +718,11 @@ class ApiService {
    */
   async getFinancesByMember(memberId, page = 0, limit = 10) {
     try {
-      console.log('📡 [getFinancesByMember] Obteniendo finanzas del miembro ID:', memberId);
+      //console.log('📡 [getFinancesByMember] Obteniendo finanzas del miembro ID:', memberId);
 
       const response = await this.request(`/finances/member/${memberId}?page=${page}&limit=${limit}`);
 
-      console.log('✅ [getFinancesByMember] Finanzas obtenidas:', response?.content?.length || 0);
+      //console.log('✅ [getFinancesByMember] Finanzas obtenidas:', response?.content?.length || 0);
       return response;
     } catch (error) {
       console.error('❌ [getFinancesByMember] Error:', error.message);
@@ -726,11 +735,11 @@ class ApiService {
    */
   async getTotalFinancesByMember(memberId) {
     try {
-      console.log('📡 [getTotalFinancesByMember] Obteniendo total del miembro ID:', memberId);
+      //console.log('📡 [getTotalFinancesByMember] Obteniendo total del miembro ID:', memberId);
 
       const response = await this.request(`/finances/member/${memberId}/total`);
 
-      console.log('✅ [getTotalFinancesByMember] Total obtenido:', response?.totalAmount);
+      //console.log('✅ [getTotalFinancesByMember] Total obtenido:', response?.totalAmount);
       return response;
     } catch (error) {
       console.error('❌ [getTotalFinancesByMember] Error:', error.message);
@@ -743,13 +752,13 @@ class ApiService {
    */
   async getFinancesByDateRange(startDate, endDate) {
     try {
-      console.log('📡 [getFinancesByDateRange] Obteniendo finanzas entre:', startDate, '-', endDate);
+      //console.log('📡 [getFinancesByDateRange] Obteniendo finanzas entre:', startDate, '-', endDate);
 
       const response = await this.request(
         `/finances/date-range?startDate=${startDate}&endDate=${endDate}`
       );
 
-      console.log('✅ [getFinancesByDateRange] Finanzas obtenidas:', response?.length || 0);
+      //console.log('✅ [getFinancesByDateRange] Finanzas obtenidas:', response?.length || 0);
       return response;
     } catch (error) {
       console.error('❌ [getFinancesByDateRange] Error:', error.message);
@@ -762,11 +771,11 @@ class ApiService {
    */
   async getFinancesByMonth(year, month) {
     try {
-      console.log('📡 [getFinancesByMonth] Obteniendo finanzas - Mes:', month, 'Año:', year);
+      //console.log('📡 [getFinancesByMonth] Obteniendo finanzas - Mes:', month, 'Año:', year);
 
       const response = await this.request(`/finances/month/${year}/${month}`);
 
-      console.log('✅ [getFinancesByMonth] Finanzas obtenidas:', response?.total || 0);
+      //console.log('✅ [getFinancesByMonth] Finanzas obtenidas:', response?.total || 0);
       return response;
     } catch (error) {
       console.error('❌ [getFinancesByMonth] Error:', error.message);
@@ -779,11 +788,11 @@ class ApiService {
    */
   async getFinancesByYear(year) {
     try {
-      console.log('📡 [getFinancesByYear] Obteniendo finanzas - Año:', year);
+      //console.log('📡 [getFinancesByYear] Obteniendo finanzas - Año:', year);
 
       const response = await this.request(`/finances/year/${year}`);
 
-      console.log('✅ [getFinancesByYear] Finanzas obtenidas:', response?.total || 0);
+      //console.log('✅ [getFinancesByYear] Finanzas obtenidas:', response?.total || 0);
       return response;
     } catch (error) {
       console.error('❌ [getFinancesByYear] Error:', error.message);
@@ -796,11 +805,11 @@ class ApiService {
    */
   async getFinancesByConcept(concept) {
     try {
-      console.log('📡 [getFinancesByConcept] Obteniendo finanzas - Concepto:', concept);
+      //console.log('📡 [getFinancesByConcept] Obteniendo finanzas - Concepto:', concept);
 
       const response = await this.request(`/finances/concept/${concept}`);
 
-      console.log('✅ [getFinancesByConcept] Finanzas obtenidas:', response?.total || 0);
+      //console.log('✅ [getFinancesByConcept] Finanzas obtenidas:', response?.total || 0);
       return response;
     } catch (error) {
       console.error('❌ [getFinancesByConcept] Error:', error.message);
@@ -813,11 +822,11 @@ class ApiService {
    */
   async getFinancesByMethod(method) {
     try {
-      console.log('📡 [getFinancesByMethod] Obteniendo finanzas - Método:', method);
+      //console.log('📡 [getFinancesByMethod] Obteniendo finanzas - Método:', method);
 
       const response = await this.request(`/finances/method/${method}`);
 
-      console.log('✅ [getFinancesByMethod] Finanzas obtenidas:', response?.total || 0);
+      //console.log('✅ [getFinancesByMethod] Finanzas obtenidas:', response?.total || 0);
       return response;
     } catch (error) {
       console.error('❌ [getFinancesByMethod] Error:', error.message);
@@ -830,11 +839,11 @@ class ApiService {
    */
   async getVerifiedFinances() {
     try {
-      console.log('📡 [getVerifiedFinances] Obteniendo finanzas verificadas');
+      //console.log('📡 [getVerifiedFinances] Obteniendo finanzas verificadas');
 
       const response = await this.request('/finances/verified');
 
-      console.log('✅ [getVerifiedFinances] Finanzas obtenidas:', response?.total || 0);
+      //console.log('✅ [getVerifiedFinances] Finanzas obtenidas:', response?.total || 0);
       return response;
     } catch (error) {
       console.error('❌ [getVerifiedFinances] Error:', error.message);
@@ -847,11 +856,11 @@ class ApiService {
    */
   async getUnverifiedFinances() {
     try {
-      console.log('📡 [getUnverifiedFinances] Obteniendo finanzas pendientes');
+      //console.log('📡 [getUnverifiedFinances] Obteniendo finanzas pendientes');
 
       const response = await this.request('/finances/unverified');
 
-      console.log('✅ [getUnverifiedFinances] Finanzas obtenidas:', response?.total || 0);
+      //console.log('✅ [getUnverifiedFinances] Finanzas obtenidas:', response?.total || 0);
       return response;
     } catch (error) {
       console.error('❌ [getUnverifiedFinances] Error:', error.message);
@@ -864,19 +873,192 @@ class ApiService {
    */
   async verifyFinance(id) {
     try {
-      console.log('✅ [verifyFinance] Verificando finanza ID:', id);
+      //console.log('✅ [verifyFinance] Verificando finanza ID:', id);
 
       const response = await this.request(`/finances/${id}/verify`, {
         method: 'PATCH',
       });
 
-      console.log('✅ [verifyFinance] Finanza verificada');
+      //console.log('✅ [verifyFinance] Finanza verificada');
       return response;
     } catch (error) {
       console.error('❌ [verifyFinance] Error:', error.message);
       throw error;
     }
   }
+  
+ // 📌 COPIAR Y PEGAR ESTOS MÉTODOS en tu apiService.js
+// Reemplazar los antiguos getStatisticsWithYears() y agregar los nuevos
+
+  /**
+   * ✅ NUEVO: Obtener estadísticas POR NIVEL DE FORMACIÓN (LevelEnrollment) agrupando todas las cohortes
+   * 
+   * ✅ ESTA ES LA VERSION MEJORADA - Agrupa por nivel, no por cohorte individual
+   * 
+   * Estructura de datos anidada por año:
+   * {
+   *   "2024": {
+   *     "PREENCUENTRO": { label, total, passed, failed, pending, passPercentage },
+   *     "ENCUENTRO": { ... },
+   *     ...
+   *   },
+   *   "2023": { ... }
+   * }
+   * 
+   * ✅ Compatible con ModalStatistics filtro por año
+   */
+  async getStatisticsByLevelAndYear() {
+    try {
+      console.log('📊 [getStatisticsByLevelAndYear] INICIANDO - Agrupando por NIVEL y AÑO');
+
+      // 1. Obtener TODOS los estudiantes
+      const enrollments = await this.getEnrollments();
+      console.log(`📋 Cohortes obtenidas: ${enrollments.length}`);
+
+      // 2. Diccionario temporal para acumular datos
+      const levelYearData = {};
+
+      // 3. Para cada cohorte, obtener sus estudiantes
+      for (const enrollment of enrollments) {
+        const enrollmentId = enrollment.id;
+        const cohortName = enrollment.cohortName || enrollment.name;
+
+        try {
+          const students = await this.getStudentEnrollmentsByEnrollment(enrollmentId);
+
+          if (!students || students.length === 0) {
+            console.log(`   ⚠️ ${cohortName} - Sin estudiantes`);
+            continue;
+          }
+
+          console.log(`   ✅ ${cohortName} - ${students.length} estudiantes`);
+
+          // 4. Para cada estudiante, extraer año y nivel
+          students.forEach(student => {
+            // Obtener el año del enrollment_date
+            let year = 'SIN_AÑO';
+            if (student.enrollmentDate || student.enrollment_date) {
+              try {
+                const date = new Date(student.enrollmentDate || student.enrollment_date);
+                const extractedYear = date.getFullYear();
+                if (!isNaN(extractedYear) && extractedYear > 1900) {
+                  year = extractedYear.toString();
+                }
+              } catch (e) {
+                // Mantener SIN_AÑO
+              }
+            }
+
+            // Obtener el nivel (levelEnrollment o level)
+            let level = student.levelEnrollment || student.level || 'SIN_NIVEL';
+
+            // Inicializar estructura si no existe
+            if (!levelYearData[year]) {
+              levelYearData[year] = {};
+            }
+            if (!levelYearData[year][level]) {
+              levelYearData[year][level] = {
+                label: this.getLevelLabel(level),
+                levelEnrollment: level,
+                total: 0,
+                passed: 0,
+                failed: 0,
+                pending: 0,
+                students: []
+              };
+            }
+
+            // Acumular datos
+            levelYearData[year][level].total += 1;
+            levelYearData[year][level].students.push(student);
+
+            if (student.passed === true) {
+              levelYearData[year][level].passed += 1;
+            } else if (student.passed === false) {
+              levelYearData[year][level].failed += 1;
+            } else {
+              levelYearData[year][level].pending += 1;
+            }
+          });
+
+        } catch (error) {
+          console.warn(`   ❌ ${cohortName} - Error:`, error.message);
+        }
+      }
+
+      // 5. TRANSFORMAR a formato final y calcular porcentajes
+      const result = {};
+
+      Object.keys(levelYearData)
+        .sort((a, b) => {
+          if (a === 'SIN_AÑO') return 1;
+          if (b === 'SIN_AÑO') return -1;
+          return b - a; // Descendente
+        })
+        .forEach(year => {
+          result[year] = {};
+
+          // Ordenar niveles según enum
+          const levelOrder = [
+            'PREENCUENTRO', 'ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS',
+            'EDIRD_1', 'EDIRD_2', 'EDIRD_3', 'SANIDAD_INTEGRAL_RAICES', 'EDIRD_4',
+            'ADIESTRAMIENTO', 'GRADUACION'
+          ];
+
+          levelOrder.forEach(levelKey => {
+            if (levelYearData[year][levelKey]) {
+              const levelData = levelYearData[year][levelKey];
+              const passPercentage = levelData.total > 0
+                ? ((levelData.passed / levelData.total) * 100).toFixed(1)
+                : 0;
+
+              result[year][levelKey] = {
+                label: levelData.label,
+                total: levelData.total,
+                passed: levelData.passed,
+                failed: levelData.failed,
+                pending: levelData.pending,
+                passPercentage: parseFloat(passPercentage),
+              };
+
+              console.log(`   📊 ${year} - ${levelData.label}: ${levelData.total} est., ${levelData.passed} aprobados (${passPercentage}%)`);
+            }
+          });
+        });
+
+      console.log('✅ [getStatisticsByLevelAndYear] Completado - Años encontrados:', Object.keys(result).length);
+      console.log('   Estructura:', JSON.stringify(Object.keys(result), null, 2));
+
+      return result;
+
+    } catch (error) {
+      console.error('❌ [getStatisticsByLevelAndYear] Error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ Helper: Traducir nombre del nivel al español
+   */
+  getLevelLabel(levelEnrollment) {
+    const levelMap = {
+      'PREENCUENTRO': 'Pre-encuentro',
+      'ENCUENTRO': 'Encuentro',
+      'POST_ENCUENTRO': 'Post-encuentro',
+      'BAUTIZOS': 'Bautizos',
+      'EDIRD_1': 'EDIRD 1',
+      'EDIRD_2': 'EDIRD 2',
+      'EDIRD_3': 'EDIRD 3',
+      'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces',
+      'EDIRD_4': 'EDIRD 4',
+      'ADIESTRAMIENTO': 'Adiestramiento',
+      'GRADUACION': 'Graduación',
+    };
+    return levelMap[levelEnrollment] || levelEnrollment;
+  }
+
+// FIN DE MÉTODOS NUEVOS
+
 }
 
 const apiService = new ApiService();
