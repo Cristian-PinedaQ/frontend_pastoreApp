@@ -1,12 +1,48 @@
-// ✅ LoginPage.jsx - CON LOGO BLANCO EN AMBOS MODOS
+// ============================================
+// LoginPage.jsx - SEGURIDAD MEJORADA
+// ============================================
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-// ✅ FIX: Imports dentro de src/ (sin ../)
 import { useAuth } from './context/AuthContext';
 import logoBlancoImg from './assets/Pastoreapp_blanco.png';
-import './css/Login.css';  // Importar estilos CSS
+import './css/Login.css';
+
+// 🔐 Debug condicional
+const DEBUG = process.env.REACT_APP_DEBUG === "true";
+
+const log = (message, data) => {
+  if (DEBUG) {
+    console.log(message, data);
+  }
+};
+
+const logError = (message, error) => {
+  console.error(message, error);
+};
+
+// ✅ Validación de entrada
+const validateLoginInput = (username, password) => {
+  const errors = [];
+
+  if (!username || typeof username !== 'string') {
+    errors.push('Usuario requerido');
+  } else if (username.trim().length < 3) {
+    errors.push('Usuario debe tener al menos 3 caracteres');
+  } else if (username.trim().length > 50) {
+    errors.push('Usuario no puede exceder 50 caracteres');
+  }
+
+  if (!password || typeof password !== 'string') {
+    errors.push('Contraseña requerida');
+  } else if (password.length < 8) {
+    errors.push('Contraseña debe tener al menos 8 caracteres');
+  } else if (password.length > 128) {
+    errors.push('Contraseña no puede exceder 128 caracteres');
+  }
+
+  return errors;
+};
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -22,23 +58,39 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
 
   // Si ya está autenticado, redirigir al dashboard
   useEffect(() => {
-    if (isAuthenticated && isAuthenticated()) {
-      navigate('/dashboard');
+    try {
+      if (isAuthenticated && isAuthenticated()) {
+        log('✅ [LoginPage] Ya autenticado, redirigiendo a dashboard');
+        navigate('/dashboard');
+      }
+    } catch (error) {
+      logError('❌ [LoginPage] Error en verificación de autenticación:', error);
     }
   }, [isAuthenticated, navigate]);
 
+  // ✅ Limpiar errores cuando el usuario escribe
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    
+    // ✅ Sanitizar entrada (remover caracteres peligrosos NO ES NECESARIO aquí, 
+    // el backend debe hacerlo, pero validamos longitud)
+    if (value.length > 128) {
+      return; // Prevenir que escriba más de 128 caracteres
+    }
+
     setCredentials({
       ...credentials,
       [name]: value,
     });
+
     // Limpiar errores al escribir
-    if (error) {
+    if (error || validationErrors.length > 0) {
       setError('');
+      setValidationErrors([]);
     }
   };
 
@@ -47,41 +99,45 @@ const LoginPage = () => {
     setLoading(true);
     setError('');
     setSuccess('');
+    setValidationErrors([]);
 
     try {
-      if (!credentials.username || !credentials.password) {
-        setError('Por favor completa todos los campos');
+      // ✅ Validación de entrada ANTES de enviar
+      const errors = validateLoginInput(credentials.username, credentials.password);
+
+      if (errors.length > 0) {
+        setValidationErrors(errors);
         setLoading(false);
         return;
       }
 
-      console.log('📝 [LoginPage] Intentando login con:', credentials.username);
+      log('🔐 [LoginPage] Iniciando login');
 
       // ✅ CAMBIO: Usar login del contexto en lugar de authService
-      const response = await login(credentials.username, credentials.password);
+      await login(credentials.username, credentials.password);
 
-      console.log('✅ [LoginPage] Login exitoso');
-      console.log('   Response:', response);
-      console.log('   Token guardado:', sessionStorage.getItem('token') ? 'SÍ' : 'NO');
-      console.log('   User guardado:', sessionStorage.getItem('user') ? 'SÍ' : 'NO');
+      log('✅ [LoginPage] Login exitoso');
+      log('   Token guardado:', !!sessionStorage.getItem('token'));
+      log('   User guardado:', !!sessionStorage.getItem('user'));
 
       setSuccess('✅ Login exitoso. Redirigiendo...');
 
       setTimeout(() => {
-        const from = location.state?.from?.pathname || '/dashboard';
-        console.log('   Redirigiendo a:', from);
-        navigate(from);
+        try {
+          const from = location.state?.from?.pathname || '/dashboard';
+          log('   Redirigiendo a:', from);
+          navigate(from);
+        } catch (navError) {
+          logError('❌ [LoginPage] Error en redirección:', navError);
+          navigate('/dashboard');
+        }
       }, 500);
-    } catch (err) {
-      console.error('❌ [LoginPage] Error:', err.message);
 
-      if (err.message.includes('401') || err.message.includes('credenciales')) {
-        setError('Usuario o contraseña incorrectos');
-      } else if (err.message.includes('conexión') || err.message.includes('network')) {
-        setError('Error de conexión. Verifica tu internet e intenta nuevamente');
-      } else {
-        setError(err.message || 'Error al iniciar sesión');
-      }
+    } catch (err) {
+      logError('❌ [LoginPage] Error en login:', err.message);
+
+      // ✅ Mensaje de error genérico (no expone detalles)
+      setError('Credenciales inválidas. Por favor intenta nuevamente.');
     } finally {
       setLoading(false);
     }
@@ -98,9 +154,9 @@ const LoginPage = () => {
           {/* Header con Logo Blanco */}
           <div className="login-header">
             <div className="login-logo-wrapper">
-              <img 
-                src={logoBlancoImg} 
-                alt="Pastoreapp Logo" 
+              <img
+                src={logoBlancoImg}
+                alt="Pastoreapp Logo"
                 className="login-logo"
               />
             </div>
@@ -108,7 +164,22 @@ const LoginPage = () => {
             <p>Gestión Pastoral<br /> Sistema de Administración</p>
           </div>
 
-          {/* Errores */}
+          {/* Errores de validación */}
+          {validationErrors.length > 0 && (
+            <div className="login-alert login-error">
+              <span>⚠️</span>
+              <div>
+                <strong>Validación</strong>
+                <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                  {validationErrors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {/* Errores generales */}
           {error && (
             <div className="login-alert login-error">
               <span>❌</span>
@@ -131,7 +202,7 @@ const LoginPage = () => {
           )}
 
           {/* Formulario */}
-          <form onSubmit={handleSubmit} className="login-form">
+          <form onSubmit={handleSubmit} className="login-form" noValidate>
             {/* Usuario */}
             <div className="login-form-group">
               <label htmlFor="username">
@@ -147,7 +218,10 @@ const LoginPage = () => {
                 disabled={loading}
                 autoComplete="username"
                 required
+                minLength="3"
+                maxLength="50"
                 className="login-input"
+                aria-label="Usuario o Email"
               />
             </div>
 
@@ -167,8 +241,10 @@ const LoginPage = () => {
                   disabled={loading}
                   autoComplete="current-password"
                   required
-                  minLength="6"
+                  minLength="8"
+                  maxLength="128"
                   className="login-input"
+                  aria-label="Contraseña"
                 />
                 <button
                   type="button"
@@ -176,6 +252,7 @@ const LoginPage = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={loading}
                   title="Mostrar/Ocultar contraseña"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
                   {showPassword ? '👁️' : '🙈'}
                 </button>
@@ -185,7 +262,7 @@ const LoginPage = () => {
             {/* Botón Login */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || validationErrors.length > 0}
               className="login-submit-btn"
             >
               {loading ? (

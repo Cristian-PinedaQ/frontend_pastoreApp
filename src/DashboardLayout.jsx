@@ -5,10 +5,12 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import './css/DashboardLayout.css'; // Importar CSS
+import DashboardTopbar from './components/DashboardTopbar';
+
 
 export const DashboardLayout = () => {
   // ========== DARK MODE AUTOMÁTICO ==========
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -188,10 +190,13 @@ export const DashboardLayout = () => {
       <div className="dashboard-layout__main">
         
         {/* Top Bar */}
+        
         <header className="dashboard-layout__topbar">
+          
           <div className="dashboard-layout__topbar-left">
+          <DashboardTopbar user={user} />
             <h2 className="dashboard-layout__topbar-title">
-              {user?.name || 'IGLESIA RAIZ DE DAVID'}
+              {user?.name || 'Iglesia Raiz de David'}
             </h2>
           </div>
           <div className="dashboard-layout__topbar-welcome">

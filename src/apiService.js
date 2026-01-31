@@ -1,33 +1,77 @@
-// 🔌 Servicio API centralizado - ACTUALIZADO CON getHeaders() DINÁMICO
-// ✅ Obtiene el token CADA VEZ que se necesita (no en el constructor)
-// ✅ Rutas de endpoint corregidas
-// ✅ MEJORADO: Extrae errores de validación específicos del backend
-// ✅ NUEVO: Métodos para editar cohortes
-// ✅ FIXED: createFinance y updateFinance ahora incluyen recordedBy y registrationDate
+// 🔌 Servicio API centralizado - SEGURIDAD MEJORADA
+// ✅ Debug condicional (no expone datos en producción)
+// ✅ Validación de entrada
+// ✅ Mensajes de error genéricos
+// ✅ Export con nombre (ESLint compliance)
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
+// 🔐 Variable para habilitar/deshabilitar logs de debug
+const DEBUG = process.env.REACT_APP_DEBUG === "true";
+
+const log = (message, data) => {
+  if (DEBUG) {
+    console.log(message, data);
+  }
+};
+
+const logError = (message, error) => {
+  console.error(message, error);
+};
+
+// ✅ Validación de entrada
+const validateId = (id, fieldName = 'ID') => {
+  if (!id || isNaN(id) || parseInt(id) <= 0) {
+    throw new Error(`${fieldName} inválido`);
+  }
+};
+
+const validatePageParams = (page, limit) => {
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  
+  if (isNaN(pageNum) || pageNum < 0 || isNaN(limitNum) || limitNum <= 0) {
+    throw new Error('Parámetros de paginación inválidos');
+  }
+};
+
+const validateString = (value, fieldName, minLength = 1, maxLength = 255) => {
+  if (!value || typeof value !== 'string') {
+    throw new Error(`${fieldName} requerido`);
+  }
+  if (value.trim().length < minLength || value.trim().length > maxLength) {
+    throw new Error(`${fieldName} inválido`);
+  }
+};
+
+const validateNumber = (value, fieldName, min = 0) => {
+  const num = parseFloat(value);
+  if (isNaN(num) || num < min) {
+    throw new Error(`${fieldName} inválido`);
+  }
+  return num;
+};
+
 class ApiService {
 
-  // ✅ ACTUALIZADO: Obtener headers con autenticación DINÁMICAMENTE
+  // ✅ Obtener headers con autenticación DINÁMICAMENTE
   getHeaders() {
     const token = sessionStorage.getItem('token');
     const headers = {
       'Content-Type': 'application/json',
     };
 
-    // ✅ IMPORTANTE: Agregar token si existe
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-      //console.log('🔑 [ApiService] Authorization header agregado');
+      log('🔑 [ApiService] Token incluido en headers');
     } else {
-      console.warn('⚠️ [ApiService] No hay token en sessionStorage');
+      log('⚠️ [ApiService] Sin token en sessionStorage');
     }
 
     return headers;
   }
 
-  // ✅ Método genérico para requests
+  // ✅ Método genérico para requests CON SEGURIDAD MEJORADA
   async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
@@ -36,13 +80,20 @@ class ApiService {
     };
 
     try {
+      log('📡 [request] Iniciando:', { method: config.method || 'GET', endpoint });
+
       const response = await fetch(url, config);
 
+      // ✅ Manejo de token expirado
       if (response.status === 401) {
-        console.warn('❌ [ApiService] Token expirado (401)');
-        this.logout();
-        window.location.href = '/login';
-        throw new Error('Token expirado');
+        log('⚠️ [request] Token expirado (401)');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        
+        // Notificar al AuthContext sin hacer redirección forzada
+        window.dispatchEvent(new CustomEvent('authTokenExpired'));
+        
+        throw new Error('Sesión expirada');
       }
 
       if (!response.ok) {
@@ -53,20 +104,18 @@ class ApiService {
           errorData = { message: `Error ${response.status}` };
         }
 
-        console.error('❌ ERROR DEL SERVIDOR:', JSON.stringify(errorData, null, 2));
+        logError('❌ [request] Error del servidor:', JSON.stringify(errorData));
 
-        // 🔴 MEJORADO: Extraer errores de validación específicos por campo
+        // ✅ Extraer errores de validación específicos
         let errorMessage = '';
 
-        // Si hay fieldErrors (errores de validación), priorizar esos
         if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
-          const fieldErrorsArray = Object.entries(errorData.fieldErrors)
+          // Errores de validación por campo
+          const fieldErrors = Object.entries(errorData.fieldErrors)
             .map(([field, message]) => `${field}: ${message}`)
             .join(' | ');
-          errorMessage = fieldErrorsArray;
-        }
-        // Sino, usar el mensaje general
-        else if (typeof errorData === 'string') {
+          errorMessage = fieldErrors;
+        } else if (typeof errorData === 'string') {
           errorMessage = errorData;
         } else if (errorData.message) {
           errorMessage = typeof errorData.message === 'string'
@@ -77,848 +126,882 @@ class ApiService {
             ? errorData.error
             : JSON.stringify(errorData.error);
         } else {
-          errorMessage = `Error ${response.status}: ${JSON.stringify(errorData)}`;
+          // ✅ Mensaje genérico en producción
+          errorMessage = DEBUG ? JSON.stringify(errorData) : 'Error en la solicitud';
         }
 
-        console.error('❌ MENSAJE DE ERROR:', errorMessage);
+        logError('❌ [request] Mensaje:', errorMessage);
         throw new Error(errorMessage);
       }
 
-      return await response.json();
+      const data = await response.json();
+      log('✅ [request] Exitoso');
+      return data;
+
     } catch (error) {
-      console.error('🔴 Error en API:', error.message);
+      logError('🔴 [request] Error:', error.message);
       throw error;
     }
   }
 
   // ========== 🔐 AUTENTICACIÓN ==========
   async login(username, password) {
-    const data = await this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    });
+    try {
+      validateString(username, 'Username', 3, 50);
+      validateString(password, 'Password', 8, 128);
 
-    if (data.token) {
-      this.setToken(data.token);
+      const data = await this.request('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (data.token) {
+        this.setToken(data.token);
+      }
+
+      return data;
+    } catch (error) {
+      logError('❌ [login] Error:', error.message);
+      throw error;
     }
-
-    return data;
   }
 
   async register(userData) {
-    return this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
+    try {
+      if (!userData || typeof userData !== 'object') {
+        throw new Error('Datos de registro inválidos');
+      }
+
+      return this.request('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(userData),
+      });
+    } catch (error) {
+      logError('❌ [register] Error:', error.message);
+      throw error;
+    }
   }
 
   // ✅ Guardar token en sessionStorage
   setToken(token) {
+    if (!token || typeof token !== 'string') {
+      throw new Error('Token inválido');
+    }
     sessionStorage.setItem('token', token);
-    //console.log('✅ [ApiService] Token guardado en sessionStorage');
+    log('✅ [setToken] Token guardado');
   }
 
   // ✅ Logout - limpiar sessionStorage
   logout() {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
-    //console.log('✅ [ApiService] Sesión cerrada');
+    log('👋 [logout] Sesión cerrada');
   }
 
   // ========== 👥 MIEMBROS ==========
   async getMembers(page = 0, limit = 10) {
-    return this.request(`/member?page=${page}&limit=${limit}`);
+    try {
+      validatePageParams(page, limit);
+      return this.request(`/member?page=${page}&limit=${limit}`);
+    } catch (error) {
+      logError('❌ [getMembers] Error:', error.message);
+      throw error;
+    }
   }
 
   async getMemberById(id) {
-    return this.request(`/member/find/${id}`);
+    try {
+      validateId(id, 'memberId');
+      return this.request(`/member/find/${id}`);
+    } catch (error) {
+      logError('❌ [getMemberById] Error:', error.message);
+      throw error;
+    }
   }
 
   async getAllMembers() {
-    return this.request('/member/findAll');
+    try {
+      return this.request('/member/findAll');
+    } catch (error) {
+      logError('❌ [getAllMembers] Error:', error.message);
+      throw error;
+    }
   }
 
   async createMember(memberData) {
-    return this.request('/member/save', {
-      method: 'POST',
-      body: JSON.stringify(memberData),
-    });
+    try {
+      if (!memberData || typeof memberData !== 'object') {
+        throw new Error('Datos de miembro inválidos');
+      }
+      return this.request('/member/save', {
+        method: 'POST',
+        body: JSON.stringify(memberData),
+      });
+    } catch (error) {
+      logError('❌ [createMember] Error:', error.message);
+      throw error;
+    }
   }
 
   async updateMember(id, memberData) {
-    return this.request(`/member/patch/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(memberData),
-    });
+    try {
+      validateId(id, 'memberId');
+      if (!memberData || typeof memberData !== 'object') {
+        throw new Error('Datos de miembro inválidos');
+      }
+      return this.request(`/member/patch/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(memberData),
+      });
+    } catch (error) {
+      logError('❌ [updateMember] Error:', error.message);
+      throw error;
+    }
   }
 
   async deleteMember(id) {
-    return this.request(`/member/delete/${id}`, {
-      method: 'DELETE',
-    });
+    try {
+      validateId(id, 'memberId');
+      return this.request(`/member/delete/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      logError('❌ [deleteMember] Error:', error.message);
+      throw error;
+    }
   }
 
   async enrollMemberInNextLevel(id) {
-    return this.request(`/member/enroll-next-level/${id}`, {
-      method: 'POST',
-    });
+    try {
+      validateId(id, 'memberId');
+      return this.request(`/member/enroll-next-level/${id}`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      logError('❌ [enrollMemberInNextLevel] Error:', error.message);
+      throw error;
+    }
   }
 
   async getMemberEnrollmentHistory(id) {
-    return this.request(`/member/enrollment-history/${id}`);
+    try {
+      validateId(id, 'memberId');
+      return this.request(`/member/enrollment-history/${id}`);
+    } catch (error) {
+      logError('❌ [getMemberEnrollmentHistory] Error:', error.message);
+      throw error;
+    }
   }
 
   // ========== 📋 COHORTES (ENROLLMENTS) ==========
-  /**
-   * ✅ Obtener TODAS las cohortes
-   */
+
   async getEnrollments() {
-    return this.request('/enrollment/cohorts/findAll');
+    try {
+      return this.request('/enrollment/cohorts/findAll');
+    } catch (error) {
+      logError('❌ [getEnrollments] Error:', error.message);
+      throw error;
+    }
   }
+
   async getEnrollmentsCard() {
-    return this.request('/enrollment');
+    try {
+      return this.request('/enrollment');
+    } catch (error) {
+      logError('❌ [getEnrollmentsCard] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * Obtener cohortes con paginación
-   */
   async getEnrollmentsPaginated(page = 0, limit = 10) {
-    return this.request(`/enrollment?page=${page}&limit=${limit}`);
+    try {
+      validatePageParams(page, limit);
+      return this.request(`/enrollment?page=${page}&limit=${limit}`);
+    } catch (error) {
+      logError('❌ [getEnrollmentsPaginated] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * ✅ Obtener una cohorte específica por ID
-   */
   async getEnrollmentById(id) {
-    return this.request(`/enrollment/cohorts/find/${id}`);
+    try {
+      validateId(id, 'enrollmentId');
+      return this.request(`/enrollment/cohorts/find/${id}`);
+    } catch (error) {
+      logError('❌ [getEnrollmentById] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * Obtener cohortes disponibles por nivel
-   */
   async getAvailableCohortsByLevel(level) {
-    return this.request(`/enrollment/available-cohorts/${level}`);
+    try {
+      validateString(level, 'Level', 1, 50);
+      return this.request(`/enrollment/available-cohorts/${level}`);
+    } catch (error) {
+      logError('❌ [getAvailableCohortsByLevel] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * ✅ Crear nueva cohorte
-   */
   async createEnrollment(enrollmentData) {
-    return this.request('/enrollment/create-cohort', {
-      method: 'POST',
-      body: JSON.stringify(enrollmentData),
-    });
+    try {
+      if (!enrollmentData || typeof enrollmentData !== 'object') {
+        throw new Error('Datos de cohorte inválidos');
+      }
+      return this.request('/enrollment/create-cohort', {
+        method: 'POST',
+        body: JSON.stringify(enrollmentData),
+      });
+    } catch (error) {
+      logError('❌ [createEnrollment] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * ✅ Actualizar ESTADO de una cohorte
-   */
   async updateEnrollmentStatus(id, status) {
-    return this.request(`/enrollment/cohort/${id}/status?status=${status}`, {
-      method: 'PUT',
-    });
+    try {
+      validateId(id, 'enrollmentId');
+      validateString(status, 'Status', 1, 50);
+      return this.request(`/enrollment/cohort/${id}/status?status=${encodeURIComponent(status)}`, {
+        method: 'PUT',
+      });
+    } catch (error) {
+      logError('❌ [updateEnrollmentStatus] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * ✅ NUEVO: Editar una cohorte existente
-   * PUT /api/v1/enrollment/cohorts/{id}/edit
-   * 
-   * Permite editar: cohortName, level, startDate, endDate, maxStudents,
-   * minAttendancePercentage, minAverageScore, teacher
-   */
   async editEnrollment(enrollmentId, updateData) {
     try {
-      //console.log('📝 [editEnrollment] Editando cohorte ID:', enrollmentId);
-      //console.log('   Datos a actualizar:', updateData);
+      validateId(enrollmentId, 'enrollmentId');
+      if (!updateData || typeof updateData !== 'object') {
+        throw new Error('Datos de actualización inválidos');
+      }
+
+      log('📝 [editEnrollment] Editando cohorte ID:', enrollmentId);
 
       const response = await this.request(`/enrollment/cohorts/${enrollmentId}/edit`, {
         method: 'PUT',
         body: JSON.stringify(updateData),
       });
 
-      console.log('✅ [editEnrollment] Éxito:', response);
+      log('✅ [editEnrollment] Éxito');
       return response;
     } catch (error) {
-      console.error('❌ [editEnrollment] Error:', error.message);
+      logError('❌ [editEnrollment] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ NUEVO: Editar cohorte y cambiar estado (con cancelación cascada si aplica)
-   * PUT /api/v1/enrollment/cohorts/{id}/edit-with-status?newStatus=X
-   * 
-   * 🔴 IMPORTANTE: Si newStatus = CANCELLED, automáticamente cancela todos los estudiantes inscritos
-   * 
-   * @param {number} enrollmentId - ID de la cohorte
-   * @param {object} updateData - Datos a actualizar (mismo formato que editEnrollment)
-   * @param {string} newStatus - Nuevo estado (PENDING, ACTIVE, SUSPENDED, CANCELLED, COMPLETED)
-   * @returns {Promise} Respuesta del servidor
-   */
   async editEnrollmentWithStatus(enrollmentId, updateData, newStatus) {
     try {
-      //console.log('📝 [editEnrollmentWithStatus] Editando cohorte ID:', enrollmentId);
-      //console.log('   Datos a actualizar:', updateData);
-      //console.log('   Nuevo estado:', newStatus);
+      validateId(enrollmentId, 'enrollmentId');
+      if (!updateData || typeof updateData !== 'object') {
+        throw new Error('Datos de actualización inválidos');
+      }
+      if (newStatus && typeof newStatus !== 'string') {
+        throw new Error('Status inválido');
+      }
 
-      const params = newStatus ? `?newStatus=${newStatus}` : '';
+      log('📝 [editEnrollmentWithStatus] Editando cohorte ID:', enrollmentId);
+
+      const params = newStatus ? `?newStatus=${encodeURIComponent(newStatus)}` : '';
 
       const response = await this.request(`/enrollment/cohorts/${enrollmentId}/edit-with-status${params}`, {
         method: 'PUT',
         body: JSON.stringify(updateData),
       });
 
-      //console.log('✅ [editEnrollmentWithStatus] Éxito:', response);
-
-      // Si la cohorte fue cancelada, advertencia especial
       if (newStatus === 'CANCELLED') {
-        console.warn('🚫 ATENCIÓN: Se cancelaron todos los estudiantes inscritos en esta cohorte');
+        console.warn('🚫 ATENCIÓN: Se cancelaron estudiantes inscritos en esta cohorte');
       }
 
       return response;
     } catch (error) {
-      console.error('❌ [editEnrollmentWithStatus] Error:', error.message);
+      logError('❌ [editEnrollmentWithStatus] Error:', error.message);
       throw error;
     }
   }
 
   // ========== 🎓 INSCRIPCIONES DE ESTUDIANTES ==========
-  /**
-   * ✅ Obtener todas las inscripciones
-   */
+
   async getStudentEnrollments(page = 0, limit = 10) {
-    return this.request(`/student-enrollment?page=${page}&limit=${limit}`);
-  }
-
-  /**
-   * Obtener inscripción por ID
-   */
-  async getStudentEnrollmentById(id) {
-    return this.request(`/student-enrollment/${id}`);
-  }
-
-  /**
-   * ✅ CORREGIDO: Obtener estudiantes de una cohorte específica
-   * Ruta correcta: /api/v1/student-enrollment/by-cohort/{enrollmentId}
-   */
-  async getStudentEnrollmentsByEnrollment(enrollmentId) {
     try {
-      //console.log('📡 [Intento 1] Obteniendo estudiantes de cohorte ID:', enrollmentId);
-
-      // ✅ RUTA CORRECTA: /student-enrollment/by-cohort/{id}
-      const response = await this.request(`/student-enrollment/by-cohort/${enrollmentId}`);
-
-      //console.log('✅ [Intento 1] Estudiantes obtenidos:', response?.length || 0);
-      //console.log('   Datos:', response);
-
-      return response;
+      validatePageParams(page, limit);
+      return this.request(`/student-enrollment?page=${page}&limit=${limit}`);
     } catch (error) {
-      console.warn('⚠️ [Intento 1] Error:', error.message);
-
-      // Alternativa 2: Si el endpoint anterior no existe, intentar obtener desde enrollment
-      try {
-        //console.log('📡 [Intento 2] Intentando obtener estudiantes desde enrollment...');
-        const enrollment = await this.request(`/enrollment/${enrollmentId}`);
-        const students = enrollment?.studentEnrollments || [];
-        //console.log('✅ [Intento 2] Estudiantes obtenidos (alternativa):', students.length);
-        return students;
-      } catch (err2) {
-        console.error('❌ [Intento 2] Error:', err2.message);
-
-        // Alternativa 3: Obtener todos los student enrollments y filtrar
-        try {
-          //console.log('📡 [Intento 3] Intentando obtener todos los student enrollments...');
-          const allStudentEnrollments = await this.request('/student-enrollment');
-          const filtered = allStudentEnrollments?.filter(se => se.enrollmentId === enrollmentId) || [];
-          //console.log('✅ [Intento 3] Estudiantes obtenidos (alternativa 2):', filtered.length);
-          return filtered;
-        } catch (err3) {
-          console.error('❌ [Intento 3] Error:', err3.message);
-          console.error('❌ NO SE PUDO OBTENER ESTUDIANTES DE NINGUNA FORMA');
-          return [];
-        }
-      }
-    }
-  }
-
-  /**
-   * Obtener inscripciones de un miembro específico
-   */
-  async getStudentEnrollmentsByMember(memberId) {
-    return this.request(`/student-enrollment/by-member/${memberId}`);
-  }
-
-  /**
-   * Crear nueva inscripción de estudiante
-   */
-  async createStudentEnrollment(memberId, enrollmentId) {
-    return this.request(`/student-enrollment?memberId=${memberId}&enrollmentId=${enrollmentId}`, {
-      method: 'POST',
-    });
-  }
-
-  /**
-   * Actualizar inscripción de estudiante
-   */
-  async updateStudentEnrollment(id, updateData) {
-    let url = `/student-enrollment/${id}?`;
-    const params = [];
-    if (updateData.status) params.push(`status=${updateData.status}`);
-    if (updateData.finalAttendancePercentage !== undefined)
-      params.push(`finalAttendancePercentage=${updateData.finalAttendancePercentage}`);
-    if (updateData.passed !== undefined) params.push(`passed=${updateData.passed}`);
-
-    url += params.join('&');
-
-    return this.request(url, {
-      method: 'PUT',
-    });
-  }
-
-  /**
-   * Dar de baja a un estudiante
-   */
-  async withdrawStudentFromCohort(id) {
-    return this.request(`/student-enrollment/${id}/withdraw`, {
-      method: 'POST',
-    });
-  }
-
-  /**
-   * Eliminar inscripción
-   */
-  async deleteStudentEnrollment(id) {
-    return this.request(`/student-enrollment/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  /**
-   * Obtener reporte detallado de una inscripción
-   */
-  async getStudentDetailedReport(id) {
-    return this.request(`/student-enrollment/${id}/detailed-report`);
-  }
-
-  // ========== 📖 LECCIONES ==========
-  /**
-   * ✅ Obtener lecciones con paginación
-   */
-  async getLessons(page = 0, limit = 10) {
-    return this.request(`/lesson?page=${page}&limit=${limit}`);
-  }
-
-  /**
-   * Obtener una lección por ID
-   */
-  async getLessonById(id) {
-    return this.request(`/lesson/${id}`);
-  }
-
-  /**
-   * ✅ Obtener lecciones de una cohorte específica
-   */
-  async getLessonsByEnrollment(enrollmentId) {
-    return this.request(`/lesson/enrollment/${enrollmentId}`);
-  }
-
-  /**
-   * ✅ Crear nueva lección
-   */
-  async createLesson(lessonData) {
-    return this.request('/lesson/create', {
-      method: 'POST',
-      body: JSON.stringify(lessonData),
-    });
-  }
-
-  /**
-   * ✅ Crear plan de lecciones predeterminado por nivel
-   * Solo PASTORES y AREAS pueden crear
-   */
-  async createDefaultLessonPlan(enrollmentId) {
-    return this.request(`/lesson/create-plan/${enrollmentId}`, {
-      method: 'POST',
-    });
-  }
-
-  /**
-   * Actualizar lección
-   */
-  async updateLesson(id, lessonData) {
-    return this.request(`/lesson/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(lessonData),
-    });
-  }
-
-  /**
-   * Eliminar lección
-   */
-  async deleteLesson(id) {
-    return this.request(`/lesson/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // ========== ✅ ASISTENCIAS ==========
-  /**
-   * ✅ Registrar asistencia de un estudiante
-   * 🔴 IMPORTANTE: El backend espera JSON en el body (@RequestBody)
-   * NO parámetros en la URL
-   * 
-   * Formato esperado por el backend:
-   * {
-   *   "studentEnrollmentId": 15,
-   *   "lessonId": 17,
-   *   "present": true,
-   *   "recordedBy": "admin",
-   *   "score": "POCA_PARTICIPACION"
-   * }
-   */
-  async recordAttendance(attendanceData) {
-    //console.log('📤 [recordAttendance] INICIANDO');
-    //console.log('  📋 Datos recibidos:', attendanceData);
-
-    try {
-      // Validaciones
-      if (!attendanceData.studentEnrollmentId) throw new Error('studentEnrollmentId requerido');
-      if (!attendanceData.lessonId) throw new Error('lessonId requerido');
-      if (!attendanceData.recordedBy) throw new Error('recordedBy requerido');
-      if (attendanceData.present === undefined && attendanceData.present === null) throw new Error('present requerido');
-      if (!attendanceData.score) throw new Error('score requerido');
-
-      // Construir el body JSON exactamente como espera el backend
-      const bodyData = {
-        studentEnrollmentId: Number(attendanceData.studentEnrollmentId),
-        lessonId: Number(attendanceData.lessonId),
-        present: attendanceData.present === true,  // boolean true/false
-        recordedBy: String(attendanceData.recordedBy),
-        score: String(attendanceData.score)  // Nombre del enum: POCA_PARTICIPACION, etc
-      };
-
-      //console.log('📋 JSON a enviar en el body:');
-      //console.log(JSON.stringify(bodyData, null, 2));
-
-      //console.log('📤 Enviando POST request con JSON en el body...');
-
-      // Enviar como JSON en el body (NO parámetros URL)
-      const response = await this.request('/attendance/record', {
-        method: 'POST',
-        body: JSON.stringify(bodyData)  // ✅ JSON en el body
-      });
-
-      //console.log('✅ [recordAttendance] EXITOSA');
-      //console.log('   Respuesta:', response);
-      return response;
-
-    } catch (error) {
-      console.error('❌ [recordAttendance] ERROR:');
-      console.error('   Mensaje:', error.message);
-      console.error('   Datos intentados:', {
-        studentEnrollmentId: attendanceData.studentEnrollmentId,
-        lessonId: attendanceData.lessonId,
-        present: attendanceData.present,
-        recordedBy: attendanceData.recordedBy,
-        score: attendanceData.score
-      });
+      logError('❌ [getStudentEnrollments] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener asistencias de una lección
-   */
+  async getStudentEnrollmentById(id) {
+    try {
+      validateId(id, 'studentEnrollmentId');
+      return this.request(`/student-enrollment/${id}`);
+    } catch (error) {
+      logError('❌ [getStudentEnrollmentById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getStudentEnrollmentsByEnrollment(enrollmentId) {
+    try {
+      validateId(enrollmentId, 'enrollmentId');
+
+      log('📡 [getStudentEnrollmentsByEnrollment] Obteniendo estudiantes de cohorte:', enrollmentId);
+
+      try {
+        const response = await this.request(`/student-enrollment/by-cohort/${enrollmentId}`);
+        log('✅ [getStudentEnrollmentsByEnrollment] Exitoso');
+        return response;
+      } catch (error1) {
+        log('⚠️ [getStudentEnrollmentsByEnrollment] Intento 1 falló, intentando alternativa...');
+
+        try {
+          const enrollment = await this.request(`/enrollment/${enrollmentId}`);
+          const students = enrollment?.studentEnrollments || [];
+          log('✅ [getStudentEnrollmentsByEnrollment] Exitoso (alternativa)');
+          return students;
+        } catch (error2) {
+          log('⚠️ [getStudentEnrollmentsByEnrollment] Intento 2 falló, intentando intento 3...');
+
+          try {
+            const allStudentEnrollments = await this.request('/student-enrollment');
+            const filtered = allStudentEnrollments?.filter(se => se.enrollmentId === enrollmentId) || [];
+            log('✅ [getStudentEnrollmentsByEnrollment] Exitoso (alternativa 2)');
+            return filtered;
+          } catch (error3) {
+            logError('❌ [getStudentEnrollmentsByEnrollment] Todos los intentos fallaron');
+            return [];
+          }
+        }
+      }
+    } catch (error) {
+      logError('❌ [getStudentEnrollmentsByEnrollment] Error de validación:', error.message);
+      throw error;
+    }
+  }
+
+  async getStudentEnrollmentsByMember(memberId) {
+    try {
+      validateId(memberId, 'memberId');
+      return this.request(`/student-enrollment/by-member/${memberId}`);
+    } catch (error) {
+      logError('❌ [getStudentEnrollmentsByMember] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async createStudentEnrollment(memberId, enrollmentId) {
+    try {
+      validateId(memberId, 'memberId');
+      validateId(enrollmentId, 'enrollmentId');
+      return this.request(`/student-enrollment?memberId=${memberId}&enrollmentId=${enrollmentId}`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      logError('❌ [createStudentEnrollment] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async updateStudentEnrollment(id, updateData) {
+    try {
+      validateId(id, 'studentEnrollmentId');
+      if (!updateData || typeof updateData !== 'object') {
+        throw new Error('Datos de actualización inválidos');
+      }
+
+      let url = `/student-enrollment/${id}?`;
+      const params = [];
+      
+      if (updateData.status) params.push(`status=${encodeURIComponent(updateData.status)}`);
+      if (updateData.finalAttendancePercentage !== undefined) {
+        validateNumber(updateData.finalAttendancePercentage, 'finalAttendancePercentage', 0);
+        params.push(`finalAttendancePercentage=${updateData.finalAttendancePercentage}`);
+      }
+      if (updateData.passed !== undefined) params.push(`passed=${updateData.passed}`);
+
+      url += params.join('&');
+
+      return this.request(url, {
+        method: 'PUT',
+      });
+    } catch (error) {
+      logError('❌ [updateStudentEnrollment] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async withdrawStudentFromCohort(id) {
+    try {
+      validateId(id, 'studentEnrollmentId');
+      return this.request(`/student-enrollment/${id}/withdraw`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      logError('❌ [withdrawStudentFromCohort] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteStudentEnrollment(id) {
+    try {
+      validateId(id, 'studentEnrollmentId');
+      return this.request(`/student-enrollment/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      logError('❌ [deleteStudentEnrollment] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getStudentDetailedReport(id) {
+    try {
+      validateId(id, 'studentEnrollmentId');
+      return this.request(`/student-enrollment/${id}/detailed-report`);
+    } catch (error) {
+      logError('❌ [getStudentDetailedReport] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 📖 LECCIONES ==========
+
+  async getLessons(page = 0, limit = 10) {
+    try {
+      validatePageParams(page, limit);
+      return this.request(`/lesson?page=${page}&limit=${limit}`);
+    } catch (error) {
+      logError('❌ [getLessons] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getLessonById(id) {
+    try {
+      validateId(id, 'lessonId');
+      return this.request(`/lesson/${id}`);
+    } catch (error) {
+      logError('❌ [getLessonById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getLessonsByEnrollment(enrollmentId) {
+    try {
+      validateId(enrollmentId, 'enrollmentId');
+      return this.request(`/lesson/enrollment/${enrollmentId}`);
+    } catch (error) {
+      logError('❌ [getLessonsByEnrollment] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async createLesson(lessonData) {
+    try {
+      if (!lessonData || typeof lessonData !== 'object') {
+        throw new Error('Datos de lección inválidos');
+      }
+      return this.request('/lesson/create', {
+        method: 'POST',
+        body: JSON.stringify(lessonData),
+      });
+    } catch (error) {
+      logError('❌ [createLesson] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async createDefaultLessonPlan(enrollmentId) {
+    try {
+      validateId(enrollmentId, 'enrollmentId');
+      return this.request(`/lesson/create-plan/${enrollmentId}`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      logError('❌ [createDefaultLessonPlan] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async updateLesson(id, lessonData) {
+    try {
+      validateId(id, 'lessonId');
+      if (!lessonData || typeof lessonData !== 'object') {
+        throw new Error('Datos de lección inválidos');
+      }
+      return this.request(`/lesson/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(lessonData),
+      });
+    } catch (error) {
+      logError('❌ [updateLesson] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteLesson(id) {
+    try {
+      validateId(id, 'lessonId');
+      return this.request(`/lesson/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      logError('❌ [deleteLesson] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== ✅ ASISTENCIAS ==========
+
+  async recordAttendance(attendanceData) {
+    try {
+      // ✅ Validaciones
+      if (!attendanceData || typeof attendanceData !== 'object') {
+        throw new Error('Datos de asistencia inválidos');
+      }
+
+      validateId(attendanceData.studentEnrollmentId, 'studentEnrollmentId');
+      validateId(attendanceData.lessonId, 'lessonId');
+      validateString(attendanceData.recordedBy, 'recordedBy', 1, 100);
+      validateString(attendanceData.score, 'score', 1, 50);
+
+      if (attendanceData.present === undefined || attendanceData.present === null) {
+        throw new Error('present requerido');
+      }
+
+      const bodyData = {
+        studentEnrollmentId: Number(attendanceData.studentEnrollmentId),
+        lessonId: Number(attendanceData.lessonId),
+        present: attendanceData.present === true,
+        recordedBy: String(attendanceData.recordedBy),
+        score: String(attendanceData.score)
+      };
+
+      log('📤 [recordAttendance] Enviando asistencia');
+
+      const response = await this.request('/attendance/record', {
+        method: 'POST',
+        body: JSON.stringify(bodyData)
+      });
+
+      log('✅ [recordAttendance] Éxito');
+      return response;
+
+    } catch (error) {
+      logError('❌ [recordAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
   async getAttendancesByLesson(lessonId) {
-    return this.request(`/attendance/lesson/${lessonId}`);
+    try {
+      validateId(lessonId, 'lessonId');
+      return this.request(`/attendance/lesson/${lessonId}`);
+    } catch (error) {
+      logError('❌ [getAttendancesByLesson] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * Inicializar asistencias para una lección
-   */
   async initializeLessonAttendance(lessonId) {
-    return this.request(`/attendance/lesson/${lessonId}/initialize`, {
-      method: 'POST',
-    });
+    try {
+      validateId(lessonId, 'lessonId');
+      return this.request(`/attendance/lesson/${lessonId}/initialize`, {
+        method: 'POST',
+      });
+    } catch (error) {
+      logError('❌ [initializeLessonAttendance] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * Obtener reporte de asistencia de un estudiante
-   */
   async getStudentAttendanceReport(studentId) {
-    return this.request(`/attendance/student/${studentId}/report`);
+    try {
+      validateId(studentId, 'studentId');
+      return this.request(`/attendance/student/${studentId}/report`);
+    } catch (error) {
+      logError('❌ [getStudentAttendanceReport] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * Actualizar asistencia
-   */
   async updateAttendance(id, attendanceData) {
-    return this.request(`/attendance/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(attendanceData),
-    });
+    try {
+      validateId(id, 'attendanceId');
+      if (!attendanceData || typeof attendanceData !== 'object') {
+        throw new Error('Datos de asistencia inválidos');
+      }
+      return this.request(`/attendance/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(attendanceData),
+      });
+    } catch (error) {
+      logError('❌ [updateAttendance] Error:', error.message);
+      throw error;
+    }
   }
 
   // ========== 👤 USUARIOS ==========
-  /**
-   * Obtener todos los usuarios
-   */
+
   async getUsers() {
-    return this.request('/users');
+    try {
+      return this.request('/users');
+    } catch (error) {
+      logError('❌ [getUsers] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * Actualizar usuario
-   */
   async updateUser(id, userData) {
-    return this.request(`/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    });
+    try {
+      validateId(id, 'userId');
+      if (!userData || typeof userData !== 'object') {
+        throw new Error('Datos de usuario inválidos');
+      }
+      return this.request(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(userData),
+      });
+    } catch (error) {
+      logError('❌ [updateUser] Error:', error.message);
+      throw error;
+    }
   }
 
-  /**
-   * Eliminar usuario
-   */
   async deleteUser(id) {
-    return this.request(`/users/${id}`, {
-      method: 'DELETE',
-    });
+    try {
+      validateId(id, 'userId');
+      return this.request(`/users/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      logError('❌ [deleteUser] Error:', error.message);
+      throw error;
+    }
   }
 
   // ========== 💰 FINANZAS ==========
 
-  /**
-   * ✅ Obtener todas las finanzas paginado
-   */
   async getFinances(page = 0, limit = 10) {
     try {
-      //console.log('📡 [getFinances] Obteniendo finanzas - Página:', page);
-
-      const response = await this.request(`/finances?page=${page}&limit=${limit}`);
-
-      //console.log('✅ [getFinances] Finanzas obtenidas:', response?.content?.length || 0);
-      return response;
+      validatePageParams(page, limit);
+      log('📊 [getFinances] Obteniendo finanzas');
+      return this.request(`/finances?page=${page}&limit=${limit}`);
     } catch (error) {
-      console.error('❌ [getFinances] Error:', error.message);
+      logError('❌ [getFinances] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener una finanza por ID
-   */
   async getFinanceById(id) {
     try {
-      //console.log('📡 [getFinanceById] Obteniendo finanza ID:', id);
-
-      const response = await this.request(`/finances/${id}`);
-
-      console.log('✅ [getFinanceById] Finanza obtenida');
-      return response;
+      validateId(id, 'financeId');
+      return this.request(`/finances/${id}`);
     } catch (error) {
-      console.error('❌ [getFinanceById] Error:', error.message);
+      logError('❌ [getFinanceById] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Crear nueva finanza
-   * 🔧 FIXED: Ahora incluye recordedBy, registrationDate e isVerified
-   */
   async createFinance(financeData) {
     try {
-      //console.log('📤 [createFinance] Creando nueva finanza');
-      //console.log('   Datos:', financeData);
+      if (!financeData || typeof financeData !== 'object') {
+        throw new Error('Datos de finanza inválidos');
+      }
 
       const body = {
-        memberId: financeData.memberId,
+        memberId: validateNumber(financeData.memberId, 'memberId'),
         memberName: financeData.memberName,
-        amount: financeData.amount,
+        amount: validateNumber(financeData.amount, 'amount'),
         incomeConcept: financeData.incomeConcept,
         incomeMethod: financeData.incomeMethod,
         description: financeData.description || '',
-        recordedBy: financeData.recordedBy,  // ✅ INCLUIDO
-        registrationDate: financeData.registrationDate,  // ✅ INCLUIDO
-        isVerified: financeData.isVerified,  // ✅ AHORA INCLUIDO
+        recordedBy: financeData.recordedBy,
+        registrationDate: financeData.registrationDate,
+        isVerified: financeData.isVerified || false,
       };
 
-      //console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
+      log('📤 [createFinance] Creando finanza');
 
       const response = await this.request('/finances', {
         method: 'POST',
         body: JSON.stringify(body),
       });
 
-      console.log('✅ [createFinance] Finanza creada - ID:', response?.id);
+      log('✅ [createFinance] Éxito - ID:', response?.id);
       return response;
     } catch (error) {
-      console.error('❌ [createFinance] Error:', error.message);
+      logError('❌ [createFinance] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Actualizar finanza
-   * 🔧 FIXED: Ahora incluye recordedBy, registrationDate e isVerified
-   */
   async updateFinance(id, financeData) {
     try {
-      //console.log('📝 [updateFinance] Actualizando finanza ID:', id);
-      //console.log('   Datos:', financeData);
+      validateId(id, 'financeId');
+      if (!financeData || typeof financeData !== 'object') {
+        throw new Error('Datos de finanza inválidos');
+      }
 
       const body = {
-        memberId: financeData.memberId,
+        memberId: validateNumber(financeData.memberId, 'memberId'),
         memberName: financeData.memberName,
-        amount: financeData.amount,
+        amount: validateNumber(financeData.amount, 'amount'),
         incomeConcept: financeData.incomeConcept,
         incomeMethod: financeData.incomeMethod,
         description: financeData.description || '',
-        recordedBy: financeData.recordedBy,  // ✅ INCLUIDO
-        registrationDate: financeData.registrationDate,  // ✅ INCLUIDO
-        isVerified: financeData.isVerified,  // ✅ AHORA INCLUIDO
+        recordedBy: financeData.recordedBy,
+        registrationDate: financeData.registrationDate,
+        isVerified: financeData.isVerified || false,
       };
 
-      //console.log('📋 Body a enviar:', JSON.stringify(body, null, 2));
+      log('📝 [updateFinance] Actualizando finanza ID:', id);
 
       const response = await this.request(`/finances/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(body),
       });
 
-      //console.log('✅ [updateFinance] Finanza actualizada');
+      log('✅ [updateFinance] Éxito');
       return response;
     } catch (error) {
-      console.error('❌ [updateFinance] Error:', error.message);
+      logError('❌ [updateFinance] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Eliminar finanza
-   */
   async deleteFinance(id) {
     try {
-      //console.log('🗑️ [deleteFinance] Eliminando finanza ID:', id);
-
+      validateId(id, 'financeId');
       const response = await this.request(`/finances/${id}`, {
         method: 'DELETE',
       });
-
-      console.log('✅ [deleteFinance] Finanza eliminada');
+      log('✅ [deleteFinance] Éxito');
       return response;
     } catch (error) {
-      console.error('❌ [deleteFinance] Error:', error.message);
+      logError('❌ [deleteFinance] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas por miembro
-   */
   async getFinancesByMember(memberId, page = 0, limit = 10) {
     try {
-      //console.log('📡 [getFinancesByMember] Obteniendo finanzas del miembro ID:', memberId);
-
-      const response = await this.request(`/finances/member/${memberId}?page=${page}&limit=${limit}`);
-
-      //console.log('✅ [getFinancesByMember] Finanzas obtenidas:', response?.content?.length || 0);
-      return response;
+      validateId(memberId, 'memberId');
+      validatePageParams(page, limit);
+      return this.request(`/finances/member/${memberId}?page=${page}&limit=${limit}`);
     } catch (error) {
-      console.error('❌ [getFinancesByMember] Error:', error.message);
+      logError('❌ [getFinancesByMember] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener total de finanzas por miembro
-   */
   async getTotalFinancesByMember(memberId) {
     try {
-      //console.log('📡 [getTotalFinancesByMember] Obteniendo total del miembro ID:', memberId);
-
-      const response = await this.request(`/finances/member/${memberId}/total`);
-
-      //console.log('✅ [getTotalFinancesByMember] Total obtenido:', response?.totalAmount);
-      return response;
+      validateId(memberId, 'memberId');
+      return this.request(`/finances/member/${memberId}/total`);
     } catch (error) {
-      console.error('❌ [getTotalFinancesByMember] Error:', error.message);
+      logError('❌ [getTotalFinancesByMember] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas por rango de fechas
-   */
   async getFinancesByDateRange(startDate, endDate) {
     try {
-      //console.log('📡 [getFinancesByDateRange] Obteniendo finanzas entre:', startDate, '-', endDate);
-
-      const response = await this.request(
-        `/finances/date-range?startDate=${startDate}&endDate=${endDate}`
-      );
-
-      //console.log('✅ [getFinancesByDateRange] Finanzas obtenidas:', response?.length || 0);
-      return response;
+      validateString(startDate, 'startDate', 1, 20);
+      validateString(endDate, 'endDate', 1, 20);
+      return this.request(`/finances/date-range?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`);
     } catch (error) {
-      console.error('❌ [getFinancesByDateRange] Error:', error.message);
+      logError('❌ [getFinancesByDateRange] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas por mes
-   */
   async getFinancesByMonth(year, month) {
     try {
-      //console.log('📡 [getFinancesByMonth] Obteniendo finanzas - Mes:', month, 'Año:', year);
-
-      const response = await this.request(`/finances/month/${year}/${month}`);
-
-      //console.log('✅ [getFinancesByMonth] Finanzas obtenidas:', response?.total || 0);
-      return response;
+      validateNumber(year, 'year', 1900);
+      validateNumber(month, 'month', 1, 12);
+      return this.request(`/finances/month/${year}/${month}`);
     } catch (error) {
-      console.error('❌ [getFinancesByMonth] Error:', error.message);
+      logError('❌ [getFinancesByMonth] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas por año
-   */
   async getFinancesByYear(year) {
     try {
-      //console.log('📡 [getFinancesByYear] Obteniendo finanzas - Año:', year);
-
-      const response = await this.request(`/finances/year/${year}`);
-
-      //console.log('✅ [getFinancesByYear] Finanzas obtenidas:', response?.total || 0);
-      return response;
+      validateNumber(year, 'year', 1900);
+      return this.request(`/finances/year/${year}`);
     } catch (error) {
-      console.error('❌ [getFinancesByYear] Error:', error.message);
+      logError('❌ [getFinancesByYear] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas por concepto
-   */
   async getFinancesByConcept(concept) {
     try {
-      //console.log('📡 [getFinancesByConcept] Obteniendo finanzas - Concepto:', concept);
-
-      const response = await this.request(`/finances/concept/${concept}`);
-
-      //console.log('✅ [getFinancesByConcept] Finanzas obtenidas:', response?.total || 0);
-      return response;
+      validateString(concept, 'concept', 1, 100);
+      return this.request(`/finances/concept/${encodeURIComponent(concept)}`);
     } catch (error) {
-      console.error('❌ [getFinancesByConcept] Error:', error.message);
+      logError('❌ [getFinancesByConcept] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas por método de pago
-   */
   async getFinancesByMethod(method) {
     try {
-      //console.log('📡 [getFinancesByMethod] Obteniendo finanzas - Método:', method);
-
-      const response = await this.request(`/finances/method/${method}`);
-
-      //console.log('✅ [getFinancesByMethod] Finanzas obtenidas:', response?.total || 0);
-      return response;
+      validateString(method, 'method', 1, 100);
+      return this.request(`/finances/method/${encodeURIComponent(method)}`);
     } catch (error) {
-      console.error('❌ [getFinancesByMethod] Error:', error.message);
+      logError('❌ [getFinancesByMethod] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas verificadas
-   */
   async getVerifiedFinances() {
     try {
-      //console.log('📡 [getVerifiedFinances] Obteniendo finanzas verificadas');
-
-      const response = await this.request('/finances/verified');
-
-      //console.log('✅ [getVerifiedFinances] Finanzas obtenidas:', response?.total || 0);
-      return response;
+      return this.request('/finances/verified');
     } catch (error) {
-      console.error('❌ [getVerifiedFinances] Error:', error.message);
+      logError('❌ [getVerifiedFinances] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Obtener finanzas no verificadas
-   */
   async getUnverifiedFinances() {
     try {
-      //console.log('📡 [getUnverifiedFinances] Obteniendo finanzas pendientes');
-
-      const response = await this.request('/finances/unverified');
-
-      //console.log('✅ [getUnverifiedFinances] Finanzas obtenidas:', response?.total || 0);
-      return response;
+      return this.request('/finances/unverified');
     } catch (error) {
-      console.error('❌ [getUnverifiedFinances] Error:', error.message);
+      logError('❌ [getUnverifiedFinances] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * ✅ Verificar una finanza
-   */
   async verifyFinance(id) {
     try {
-      //console.log('✅ [verifyFinance] Verificando finanza ID:', id);
-
-      const response = await this.request(`/finances/${id}/verify`, {
+      validateId(id, 'financeId');
+      return this.request(`/finances/${id}/verify`, {
         method: 'PATCH',
       });
-
-      //console.log('✅ [verifyFinance] Finanza verificada');
-      return response;
     } catch (error) {
-      console.error('❌ [verifyFinance] Error:', error.message);
+      logError('❌ [verifyFinance] Error:', error.message);
       throw error;
     }
   }
-  
- // 📌 COPIAR Y PEGAR ESTOS MÉTODOS en tu apiService.js
-// Reemplazar los antiguos getStatisticsWithYears() y agregar los nuevos
 
-  /**
-   * ✅ NUEVO: Obtener estadísticas POR NIVEL DE FORMACIÓN (LevelEnrollment) agrupando todas las cohortes
-   * 
-   * ✅ ESTA ES LA VERSION MEJORADA - Agrupa por nivel, no por cohorte individual
-   * 
-   * Estructura de datos anidada por año:
-   * {
-   *   "2024": {
-   *     "PREENCUENTRO": { label, total, passed, failed, pending, passPercentage },
-   *     "ENCUENTRO": { ... },
-   *     ...
-   *   },
-   *   "2023": { ... }
-   * }
-   * 
-   * ✅ Compatible con ModalStatistics filtro por año
-   */
+  // ========== 📊 ESTADÍSTICAS ==========
+
   async getStatisticsByLevelAndYear() {
     try {
-      console.log('📊 [getStatisticsByLevelAndYear] INICIANDO - Agrupando por NIVEL y AÑO');
+      log('📊 [getStatisticsByLevelAndYear] Iniciando');
 
-      // 1. Obtener TODOS los estudiantes
       const enrollments = await this.getEnrollments();
-      console.log(`📋 Cohortes obtenidas: ${enrollments.length}`);
+      log(`📋 Cohortes obtenidas: ${enrollments.length}`);
 
-      // 2. Diccionario temporal para acumular datos
       const levelYearData = {};
 
-      // 3. Para cada cohorte, obtener sus estudiantes
       for (const enrollment of enrollments) {
         const enrollmentId = enrollment.id;
         const cohortName = enrollment.cohortName || enrollment.name;
@@ -927,15 +1010,13 @@ class ApiService {
           const students = await this.getStudentEnrollmentsByEnrollment(enrollmentId);
 
           if (!students || students.length === 0) {
-            console.log(`   ⚠️ ${cohortName} - Sin estudiantes`);
+            log(`⚠️ ${cohortName} - Sin estudiantes`);
             continue;
           }
 
-          console.log(`   ✅ ${cohortName} - ${students.length} estudiantes`);
+          log(`✅ ${cohortName} - ${students.length} estudiantes`);
 
-          // 4. Para cada estudiante, extraer año y nivel
           students.forEach(student => {
-            // Obtener el año del enrollment_date
             let year = 'SIN_AÑO';
             if (student.enrollmentDate || student.enrollment_date) {
               try {
@@ -949,10 +1030,8 @@ class ApiService {
               }
             }
 
-            // Obtener el nivel (levelEnrollment o level)
             let level = student.levelEnrollment || student.level || 'SIN_NIVEL';
 
-            // Inicializar estructura si no existe
             if (!levelYearData[year]) {
               levelYearData[year] = {};
             }
@@ -968,7 +1047,6 @@ class ApiService {
               };
             }
 
-            // Acumular datos
             levelYearData[year][level].total += 1;
             levelYearData[year][level].students.push(student);
 
@@ -982,23 +1060,21 @@ class ApiService {
           });
 
         } catch (error) {
-          console.warn(`   ❌ ${cohortName} - Error:`, error.message);
+          console.warn(`⚠️ ${cohortName} - Error:`, error.message);
         }
       }
 
-      // 5. TRANSFORMAR a formato final y calcular porcentajes
       const result = {};
 
       Object.keys(levelYearData)
         .sort((a, b) => {
           if (a === 'SIN_AÑO') return 1;
           if (b === 'SIN_AÑO') return -1;
-          return b - a; // Descendente
+          return b - a;
         })
         .forEach(year => {
           result[year] = {};
 
-          // Ordenar niveles según enum
           const levelOrder = [
             'PREENCUENTRO', 'ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS',
             'EDIRD_1', 'EDIRD_2', 'EDIRD_3', 'SANIDAD_INTEGRAL_RAICES', 'EDIRD_4',
@@ -1021,24 +1097,22 @@ class ApiService {
                 passPercentage: parseFloat(passPercentage),
               };
 
-              console.log(`   📊 ${year} - ${levelData.label}: ${levelData.total} est., ${levelData.passed} aprobados (${passPercentage}%)`);
+              log(`📊 ${year} - ${levelData.label}: ${levelData.total} estudiantes, ${levelData.passed} aprobados`);
             }
           });
         });
 
-      console.log('✅ [getStatisticsByLevelAndYear] Completado - Años encontrados:', Object.keys(result).length);
-      console.log('   Estructura:', JSON.stringify(Object.keys(result), null, 2));
-
+      log('✅ [getStatisticsByLevelAndYear] Completado');
       return result;
 
     } catch (error) {
-      console.error('❌ [getStatisticsByLevelAndYear] Error:', error);
+      logError('❌ [getStatisticsByLevelAndYear] Error:', error);
       throw error;
     }
   }
 
   /**
-   * ✅ Helper: Traducir nombre del nivel al español
+   * ✅ Helper: Traducir nombre del nivel
    */
   getLevelLabel(levelEnrollment) {
     const levelMap = {
@@ -1056,9 +1130,6 @@ class ApiService {
     };
     return levelMap[levelEnrollment] || levelEnrollment;
   }
-
-// FIN DE MÉTODOS NUEVOS
-
 }
 
 const apiService = new ApiService();
