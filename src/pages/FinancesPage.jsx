@@ -1,8 +1,9 @@
-// 💰 FinancesPage.jsx - GESTIÓN DE FINANZAS v5.6 CON FILTROS ESTADÍSTICAS
-// ✅ Ahora pasa allFinances al modal de estadísticas
-// ✅ ModalFinanceStatistics puede filtrar por mes o año
+// ============================================
+// FinancesPage.jsx - SEGURIDAD MEJORADA
+// Gestión de finanzas con validaciones de seguridad
+// ============================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
 import ModalAddFinance from '../components/ModalAddFinance';
 import ModalFinanceStatistics from '../components/ModalFinanceStatistics';
@@ -11,38 +12,90 @@ import { generateFinancePDF, generateDailyFinancePDF } from '../services/finance
 import { logSecurityEvent, logUserAction } from '../utils/securityLogger';
 import '../css/FinancesPage.css';
 
-const devLog = (message, data = null) => {
-  if (process.env.NODE_ENV === 'development') {
-    if (data) {
-      console.log(message, data);
-    } else {
-      console.log(message);
-    }
+// 🔐 Debug condicional
+const DEBUG = process.env.REACT_APP_DEBUG === "true";
+
+const log = (message, data) => {
+  if (DEBUG) {
+    console.log(`[FinancesPage] ${message}`, data || '');
   }
 };
 
-const devWarn = (message, data = null) => {
-  if (process.env.NODE_ENV === 'development') {
-    if (data) {
-      console.warn(message, data);
-    } else {
-      console.warn(message);
-    }
-  }
+const logError = (message, error) => {
+  console.error(`[FinancesPage] ${message}`, error);
 };
 
-// ========== FUNCIÓN AUXILIAR: Convertir fecha sin problemas de zona horaria ==========
+// ✅ Sanitización de HTML
+const escapeHtml = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, m => map[m]);
+};
+
+// ✅ Validación de búsqueda
+const validateSearchText = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  if (text.length > 100) return text.substring(0, 100);
+  return text.trim();
+};
+
+// ✅ Validación de cantidad
+const validateAmount = (amount) => {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return 0;
+  if (num < 0) return 0;
+  if (num > 999999999) return 999999999;
+  return num;
+};
+
+// ========== FUNCIONES AUXILIARES ==========
 const getDateWithoutTimezone = (dateString) => {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day);
+  try {
+    if (!dateString || typeof dateString !== 'string') return new Date();
+    const [year, month, day] = dateString.split('-').map(Number);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) return new Date();
+    return new Date(year, month - 1, day);
+  } catch (error) {
+    logError('Error en getDateWithoutTimezone:', error);
+    return new Date();
+  }
 };
 
-// ========== FUNCIÓN AUXILIAR: Obtener fecha en formato YYYY-MM-DD sin timezone ==========
 const getDateStringWithoutTimezone = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  try {
+    if (!(date instanceof Date)) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch (error) {
+    logError('Error en getDateStringWithoutTimezone:', error);
+    return '';
+  }
+};
+
+// ========== CONSTANTES FUERA DEL COMPONENTE ==========
+const INCOME_CONCEPTS = ['TITHE', 'OFFERING', 'SEED_OFFERING', 'BUILDING_FUND', 'FIRST_FRUITS', 'CELL_GROUP_OFFERING'];
+const INCOME_METHODS = ['CASH', 'BANK_TRANSFER'];
+
+const CONCEPT_LABELS = {
+  'TITHE': '💵 Diezmo',
+  'OFFERING': '🎁 Ofrenda',
+  'SEED_OFFERING': '🌱 Ofrenda de Semilla',
+  'BUILDING_FUND': '🏗️ Fondo de Construcción',
+  'FIRST_FRUITS': '🍇 Primicias',
+  'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',
+};
+
+const METHOD_LABELS = {
+  'CASH': '💵 Efectivo',
+  'BANK_TRANSFER': '🏦 Transferencia Bancaria',
 };
 
 const FinancesPage = () => {
@@ -64,32 +117,21 @@ const FinancesPage = () => {
   const [statisticsData, setStatisticsData] = useState(null);
   const [editingFinance, setEditingFinance] = useState(null);
 
-  const INCOME_CONCEPTS = ['TITHE', 'OFFERING', 'SEED_OFFERING', 'BUILDING_FUND', 'FIRST_FRUITS', 'CELL_GROUP_OFFERING'];
-  const INCOME_METHODS = ['CASH', 'BANK_TRANSFER'];
-
-  useEffect(() => {
-    loadFinances();
-  }, []);
-
-  useEffect(() => {
-    applyFilters();
-  }, [allFinances, selectedConcept, selectedMethod, selectedVerification, searchText, startDate, endDate]);
-
-  // ========== CARGAR FINANZAS ==========
-  const loadFinances = async () => {
+  // ========== LOAD FINANCES ==========
+  const loadFinances = useCallback(async () => {
     setLoading(true);
     setError('');
 
     try {
-      devLog('💰 Cargando ingresos financieros...');
+      log('Cargando ingresos financieros');
 
       const response = await apiService.getFinances(0, 100);
       const finances = response?.content || [];
 
-      devLog('✅ Finanzas cargadas - Cantidad:', finances.length);
+      log('Finanzas cargadas', { count: finances.length });
 
       if (!finances || finances.length === 0) {
-        devWarn('⚠️ No hay registros financieros disponibles');
+        log('No hay registros financieros');
         setAllFinances([]);
         return;
       }
@@ -97,18 +139,18 @@ const FinancesPage = () => {
       const processedFinances = finances.map(finance => ({
         id: finance.id,
         memberId: finance.memberId,
-        memberName: finance.memberName || 'Sin nombre',
-        amount: finance.amount || 0,
+        memberName: escapeHtml(finance.memberName || 'Sin nombre'),
+        amount: validateAmount(finance.amount),
         concept: finance.incomeConcept || 'OTRO',
         method: finance.incomeMethod || 'EFECTIVO',
         registrationDate: finance.registrationDate,
-        isVerified: finance.isVerified || false,
-        description: finance.description || '',
+        isVerified: finance.isVerified === true,
+        description: escapeHtml(finance.description || ''),
         incomeConcept: finance.incomeConcept,
         incomeMethod: finance.incomeMethod,
       }));
 
-      devLog('✅ Finanzas procesadas - Cantidad:', processedFinances.length);
+      log('Finanzas procesadas', { count: processedFinances.length });
       setAllFinances(processedFinances);
 
       logUserAction('load_finances', {
@@ -117,8 +159,8 @@ const FinancesPage = () => {
       });
 
     } catch (err) {
-      devWarn('❌ Error cargando finanzas:', err.message);
-      setError('Error al cargar registros financieros: ' + err.message);
+      logError('Error cargando finanzas:', err);
+      setError('Error al cargar registros financieros');
 
       logSecurityEvent('finance_load_error', {
         errorType: 'api_error',
@@ -127,118 +169,201 @@ const FinancesPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // ========== RECARGAR Y LIMPIAR TODOS LOS FILTROS ==========
-  const handleReloadAndClearFilters = async () => {
-    devLog('🔄 Recargando datos y limpiando filtros...');
-    
-    setSelectedConcept('ALL');
-    setSelectedMethod('ALL');
-    setSelectedVerification('ALL');
-    setSearchText('');
-    setStartDate('');
-    setEndDate('');
-    
-    await loadFinances();
-    
-    devLog('✅ Filtros limpiados y datos recargados');
-  };
-
-  // ========== LÓGICA DE FILTROS ==========
-  const applyFilters = () => {
-    let filtered = [...allFinances];
-
-    filtered.sort((a, b) => {
-      const dateA = new Date(a.registrationDate || 0).getTime();
-      const dateB = new Date(b.registrationDate || 0).getTime();
-      return dateB - dateA;
-    });
-
-    if (selectedConcept !== 'ALL') {
-      devLog('🔍 Filtrando por concepto:', selectedConcept);
-      filtered = filtered.filter(finance => finance.concept === selectedConcept);
-    }
-
-    if (selectedMethod !== 'ALL') {
-      devLog('🔍 Filtrando por método:', selectedMethod);
-      filtered = filtered.filter(finance => finance.method === selectedMethod);
-    }
-
-    if (selectedVerification !== 'ALL') {
-      devLog('🔍 Filtrando por verificación:', selectedVerification);
-      if (selectedVerification === 'VERIFIED') {
-        filtered = filtered.filter(finance => finance.isVerified === true);
-      } else if (selectedVerification === 'UNVERIFIED') {
-        filtered = filtered.filter(finance => finance.isVerified === false);
-      }
-    }
-
-    if (startDate && !endDate) {
-      devLog('📅 Filtro: Solo "Desde" seleccionado');
-      const targetDate = startDate;
-      filtered = filtered.filter(finance => {
-        const financeDate = new Date(finance.registrationDate);
-        const financeDateString = getDateStringWithoutTimezone(financeDate);
-        return financeDateString === targetDate;
-      });
-    } else if (startDate && endDate) {
-      devLog('📅 Filtro: Rango de fechas desde', startDate, 'hasta', endDate);
-      filtered = filtered.filter(finance => {
-        const financeDate = new Date(finance.registrationDate);
-        const financeDateString = getDateStringWithoutTimezone(financeDate);
-        
-        return financeDateString >= startDate && financeDateString <= endDate;
-      });
-    } else if (!startDate && endDate) {
-      devLog('📅 Filtro: Solo "Hasta" seleccionado');
-      filtered = filtered.filter(finance => {
-        const financeDate = new Date(finance.registrationDate);
-        const financeDateString = getDateStringWithoutTimezone(financeDate);
-        return financeDateString <= endDate;
-      });
-    }
-
-    if (searchText.trim()) {
-      const search = searchText.toLowerCase();
-      filtered = filtered.filter(finance =>
-        finance.memberName.toLowerCase().includes(search)
-      );
-    }
-
-    devLog('📊 Resultado final de filtros:', `${filtered.length} registros`);
-    setFilteredFinances(filtered);
-  };
-
-  // ========== DETECTAR SI HAY FECHAS SELECCIONADAS ==========
-  const hasDatesSelected = () => {
-    return !!(startDate || endDate);
-  };
-
-  // ========== MANEJAR CLIC EN BOTÓN PDF ==========
-  const handleExportPDF = async () => {
+  // ========== RELOAD AND CLEAR FILTERS ==========
+  const handleReloadAndClearFilters = useCallback(async () => {
     try {
-      if (hasDatesSelected()) {
-        devLog('📅 Abriendo modal de opciones de reporte');
+      log('Recargando datos y limpiando filtros');
+
+      setSelectedConcept('ALL');
+      setSelectedMethod('ALL');
+      setSelectedVerification('ALL');
+      setSearchText('');
+      setStartDate('');
+      setEndDate('');
+
+      await loadFinances();
+
+      log('Filtros limpiados y datos recargados');
+    } catch (error) {
+      logError('Error recargando:', error);
+      setError('Error al recargar datos');
+    }
+  }, [loadFinances]);
+
+  // ========== APPLY FILTERS ==========
+  const applyFilters = useCallback(() => {
+    try {
+      let filtered = [...allFinances];
+
+      // Ordenar por fecha (más recientes primero)
+      filtered.sort((a, b) => {
+        try {
+          const dateA = new Date(a.registrationDate || 0).getTime();
+          const dateB = new Date(b.registrationDate || 0).getTime();
+          return dateB - dateA;
+        } catch (e) {
+          return 0;
+        }
+      });
+
+      // Filtrar por concepto
+      if (selectedConcept !== 'ALL' && INCOME_CONCEPTS.includes(selectedConcept)) {
+        filtered = filtered.filter(finance => finance.concept === selectedConcept);
+      }
+
+      // Filtrar por método
+      if (selectedMethod !== 'ALL' && INCOME_METHODS.includes(selectedMethod)) {
+        filtered = filtered.filter(finance => finance.method === selectedMethod);
+      }
+
+      // Filtrar por verificación
+      if (selectedVerification !== 'ALL') {
+        if (selectedVerification === 'VERIFIED') {
+          filtered = filtered.filter(finance => finance.isVerified === true);
+        } else if (selectedVerification === 'UNVERIFIED') {
+          filtered = filtered.filter(finance => finance.isVerified === false);
+        }
+      }
+
+      // Filtrar por fechas
+      if (startDate && !endDate) {
+        const targetDate = startDate;
+        filtered = filtered.filter(finance => {
+          try {
+            const financeDate = new Date(finance.registrationDate);
+            const financeDateString = getDateStringWithoutTimezone(financeDate);
+            return financeDateString === targetDate;
+          } catch (e) {
+            return false;
+          }
+        });
+      } else if (startDate && endDate) {
+        filtered = filtered.filter(finance => {
+          try {
+            const financeDate = new Date(finance.registrationDate);
+            const financeDateString = getDateStringWithoutTimezone(financeDate);
+            return financeDateString >= startDate && financeDateString <= endDate;
+          } catch (e) {
+            return false;
+          }
+        });
+      } else if (!startDate && endDate) {
+        filtered = filtered.filter(finance => {
+          try {
+            const financeDate = new Date(finance.registrationDate);
+            const financeDateString = getDateStringWithoutTimezone(financeDate);
+            return financeDateString <= endDate;
+          } catch (e) {
+            return false;
+          }
+        });
+      }
+
+      // Filtrar por búsqueda
+      if (searchText.trim()) {
+        const search = searchText.toLowerCase();
+        filtered = filtered.filter(finance =>
+          finance.memberName.toLowerCase().includes(search)
+        );
+      }
+
+      log('Filtros aplicados', { count: filtered.length });
+      setFilteredFinances(filtered);
+    } catch (error) {
+      logError('Error aplicando filtros:', error);
+      setFilteredFinances(allFinances);
+    }
+  }, [allFinances, selectedConcept, selectedMethod, selectedVerification, searchText, startDate, endDate]);
+
+  // ========== INIT LOAD ==========
+  useEffect(() => {
+    loadFinances();
+  }, [loadFinances]);
+
+  // ========== APPLY FILTERS ON CHANGE ==========
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
+
+  // ========== CALCULATE STATISTICS ==========
+  const calculateStatistics = useCallback(() => {
+    try {
+      const stats = {
+        totalRecords: allFinances.length,
+        totalAmount: 0,
+        verifiedAmount: 0,
+        unverifiedAmount: 0,
+        verifiedCount: 0,
+        unverifiedCount: 0,
+        byConcept: {},
+        byMethod: {},
+      };
+
+      allFinances.forEach(finance => {
+        const amount = validateAmount(finance.amount);
+        stats.totalAmount += amount;
+
+        if (finance.isVerified) {
+          stats.verifiedAmount += amount;
+          stats.verifiedCount += 1;
+        } else {
+          stats.unverifiedAmount += amount;
+          stats.unverifiedCount += 1;
+        }
+
+        const concept = finance.concept || 'OTRO';
+        if (!stats.byConcept[concept]) {
+          stats.byConcept[concept] = { count: 0, total: 0 };
+        }
+        stats.byConcept[concept].count += 1;
+        stats.byConcept[concept].total += amount;
+
+        const method = finance.method || 'EFECTIVO';
+        if (!stats.byMethod[method]) {
+          stats.byMethod[method] = { count: 0, total: 0 };
+        }
+        stats.byMethod[method].count += 1;
+        stats.byMethod[method].total += amount;
+      });
+
+      return stats;
+    } catch (error) {
+      logError('Error calculando estadísticas:', error);
+      return {
+        totalRecords: 0,
+        totalAmount: 0,
+        verifiedAmount: 0,
+        unverifiedAmount: 0,
+        verifiedCount: 0,
+        unverifiedCount: 0,
+        byConcept: {},
+        byMethod: {},
+      };
+    }
+  }, [allFinances]);
+
+  // ========== EXPORT PDF ==========
+  const handleExportPDF = useCallback(async () => {
+    try {
+      log('Generando PDF');
+
+      if (startDate || endDate) {
         setShowReportModal(true);
 
         logUserAction('open_report_modal', {
-          startDate: startDate,
-          endDate: endDate,
+          startDate,
+          endDate,
           recordCount: filteredFinances.length,
           timestamp: new Date().toISOString()
         });
         return;
       }
 
-      devLog('📄 Generando PDF con todos los registros (sin filtro de fechas)');
-
       let title = 'Reporte de Ingresos Financieros';
       if (selectedConcept !== 'ALL') {
         title = `Ingresos: ${getConceptLabel(selectedConcept)}`;
-      }
-      if (selectedMethod !== 'ALL') {
-        title += ` - ${getMethodLabel(selectedMethod)}`;
       }
 
       const data = {
@@ -251,104 +376,99 @@ const FinancesPage = () => {
 
       generateFinancePDF(data, 'financial-report');
 
-      devLog('✅ PDF generado');
+      log('PDF generado exitosamente');
 
       logUserAction('export_finance_pdf', {
         type: 'traditional',
         recordCount: filteredFinances.length,
-        dateRange: 'sin filtro',
         timestamp: new Date().toISOString()
       });
 
     } catch (err) {
-      devWarn('❌ Error generando PDF:', err.message);
-      alert('Error al generar PDF: ' + err.message);
+      logError('Error generando PDF:', err);
+      setError('Error al generar PDF');
     }
-  };
+  }, [startDate, endDate, selectedConcept, filteredFinances, calculateStatistics]);
 
-  // ========== MANEJAR CONFIRMACIÓN DE REPORTE ==========
-  const handleConfirmReport = (reportType) => {
+  // ========== CONFIRM REPORT ==========
+  const handleConfirmReport = useCallback((reportType) => {
     try {
-      devLog('📄 Generando PDF - Tipo:', reportType);
+      log('Generando reporte', { type: reportType });
 
       let reportDateRange = '';
       let reportDateForPDF = startDate;
-      
+
       if (startDate && endDate) {
-        const startDateObj = getDateWithoutTimezone(startDate);
-        const endDateObj = getDateWithoutTimezone(endDate);
-        const startFormatted = startDateObj.toLocaleDateString('es-CO');
-        const endFormatted = endDateObj.toLocaleDateString('es-CO');
-        reportDateRange = `${startFormatted} - ${endFormatted}`;
-        reportDateForPDF = `${startDate} a ${endDate}`;
-        
-        devLog('📅 Rango:', {
-          input: `${startDate} - ${endDate}`,
-          output: reportDateRange,
-          startObj: startDateObj,
-          endObj: endDateObj
-        });
+        try {
+          const startDateObj = getDateWithoutTimezone(startDate);
+          const endDateObj = getDateWithoutTimezone(endDate);
+          const startFormatted = startDateObj.toLocaleDateString('es-CO');
+          const endFormatted = endDateObj.toLocaleDateString('es-CO');
+          reportDateRange = `${startFormatted} - ${endFormatted}`;
+          reportDateForPDF = `${startDate} a ${endDate}`;
+        } catch (e) {
+          logError('Error formateando rango de fechas:', e);
+        }
       } else if (startDate) {
-        const startDateObj = getDateWithoutTimezone(startDate);
-        reportDateRange = startDateObj.toLocaleDateString('es-CO');
-        
-        devLog('📅 Desde:', {
-          input: startDate,
-          output: reportDateRange,
-          dateObj: startDateObj
-        });
+        try {
+          const startDateObj = getDateWithoutTimezone(startDate);
+          reportDateRange = startDateObj.toLocaleDateString('es-CO');
+        } catch (e) {
+          logError('Error formateando fecha:', e);
+        }
       } else if (endDate) {
-        const endDateObj = getDateWithoutTimezone(endDate);
-        reportDateRange = endDateObj.toLocaleDateString('es-CO');
-        reportDateForPDF = endDate;
-        
-        devLog('📅 Hasta:', {
-          input: endDate,
-          output: reportDateRange,
-          dateObj: endDateObj
-        });
+        try {
+          const endDateObj = getDateWithoutTimezone(endDate);
+          reportDateRange = endDateObj.toLocaleDateString('es-CO');
+          reportDateForPDF = endDate;
+        } catch (e) {
+          logError('Error formateando fecha:', e);
+        }
       }
 
       const data = {
-        startDate: startDate,
-        endDate: endDate,
+        startDate,
+        endDate,
         date: reportDateForPDF,
         dateRange: reportDateRange,
         finances: filteredFinances,
-        reportType: reportType,
+        reportType,
         statistics: calculateStatistics(),
       };
 
-      devLog('📋 Datos al PDF:', data);
-
       generateDailyFinancePDF(data, 'reporte-ingresos');
 
-      devLog('✅ PDF generado correctamente');
+      log('PDF generado correctamente');
 
       logUserAction('generate_report_pdf', {
-        startDate: startDate,
-        endDate: endDate,
-        reportType: reportType,
+        startDate,
+        endDate,
+        reportType,
         recordCount: filteredFinances.length,
-        dateRange: reportDateRange,
         timestamp: new Date().toISOString()
       });
 
       setShowReportModal(false);
       alert('Reporte generado exitosamente');
     } catch (err) {
-      devWarn('❌ Error generando PDF:', err.message);
-      alert('Error al generar reporte: ' + err.message);
+      logError('Error generando PDF:', err);
+      setError('Error al generar reporte');
     }
-  };
+  }, [startDate, endDate, filteredFinances, calculateStatistics]);
 
-  const handleAddFinance = async (financeData) => {
+  // ========== ADD FINANCE ==========
+  const handleAddFinance = useCallback(async (financeData) => {
     try {
-      devLog('➕ Creando nuevo ingreso');
+      log('Creando nuevo ingreso');
+
+      if (!financeData || typeof financeData !== 'object') {
+        setError('Datos de ingreso inválidos');
+        return;
+      }
 
       await apiService.createFinance(financeData);
 
-      devLog('✅ Ingreso creado');
+      log('Ingreso creado exitosamente');
 
       logUserAction('create_finance', {
         amount: financeData.amount,
@@ -360,25 +480,34 @@ const FinancesPage = () => {
       setShowAddModal(false);
       loadFinances();
     } catch (err) {
-      devWarn('❌ Error creando ingreso:', err.message);
-      alert('Error al registrar ingreso: ' + err.message);
+      logError('Error creando ingreso:', err);
+      setError('Error al registrar ingreso');
 
       logSecurityEvent('finance_create_error', {
         errorType: 'api_error',
         timestamp: new Date().toISOString()
       });
     }
-  };
+  }, [loadFinances]);
 
-  const handleEditFinance = async (financeData) => {
-    if (!editingFinance) return;
-
+  // ========== EDIT FINANCE ==========
+  const handleEditFinance = useCallback(async (financeData) => {
     try {
-      devLog('✏️ Actualizando ingreso');
+      if (!editingFinance || !editingFinance.id) {
+        setError('ID de registro inválido');
+        return;
+      }
+
+      if (!financeData || typeof financeData !== 'object') {
+        setError('Datos de ingreso inválidos');
+        return;
+      }
+
+      log('Actualizando ingreso', { financeId: editingFinance.id });
 
       await apiService.updateFinance(editingFinance.id, financeData);
 
-      devLog('✅ Ingreso actualizado');
+      log('Ingreso actualizado exitosamente');
 
       logUserAction('update_finance', {
         financeId: editingFinance.id,
@@ -390,22 +519,28 @@ const FinancesPage = () => {
       setEditingFinance(null);
       loadFinances();
     } catch (err) {
-      devWarn('❌ Error actualizando ingreso:', err.message);
-      alert('Error al actualizar ingreso: ' + err.message);
+      logError('Error actualizando ingreso:', err);
+      setError('Error al actualizar ingreso');
     }
-  };
+  }, [editingFinance, loadFinances]);
 
-  const handleVerifyFinance = async (financeId) => {
-    if (!window.confirm('¿Deseas verificar este registro?')) {
-      return;
-    }
-
+  // ========== VERIFY FINANCE ==========
+  const handleVerifyFinance = useCallback(async (financeId) => {
     try {
-      devLog('✅ Verificando ingreso');
+      if (!financeId || typeof financeId !== 'number') {
+        setError('ID de registro inválido');
+        return;
+      }
+
+      if (!window.confirm('¿Deseas verificar este registro?')) {
+        return;
+      }
+
+      log('Verificando ingreso', { financeId });
 
       await apiService.verifyFinance(financeId);
 
-      devLog('✅ Ingreso verificado');
+      log('Ingreso verificado exitosamente');
 
       logUserAction('verify_finance', {
         financeId,
@@ -415,22 +550,28 @@ const FinancesPage = () => {
       alert('Registro verificado exitosamente');
       loadFinances();
     } catch (err) {
-      devWarn('❌ Error verificando ingreso:', err.message);
-      alert('Error al verificar ingreso: ' + err.message);
+      logError('Error verificando ingreso:', err);
+      setError('Error al verificar ingreso');
     }
-  };
+  }, [loadFinances]);
 
-  const handleDeleteFinance = async (financeId) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este registro?')) {
-      return;
-    }
-
+  // ========== DELETE FINANCE ==========
+  const handleDeleteFinance = useCallback(async (financeId) => {
     try {
-      devLog('🗑️ Eliminando ingreso');
+      if (!financeId || typeof financeId !== 'number') {
+        setError('ID de registro inválido');
+        return;
+      }
+
+      if (!window.confirm('¿Estás seguro de que deseas eliminar este registro?')) {
+        return;
+      }
+
+      log('Eliminando ingreso', { financeId });
 
       await apiService.deleteFinance(financeId);
 
-      devLog('✅ Ingreso eliminado');
+      log('Ingreso eliminado exitosamente');
 
       logUserAction('delete_finance', {
         financeId,
@@ -440,14 +581,15 @@ const FinancesPage = () => {
       alert('Registro eliminado exitosamente');
       loadFinances();
     } catch (err) {
-      devWarn('❌ Error eliminando ingreso:', err.message);
-      alert('Error al eliminar registro: ' + err.message);
+      logError('Error eliminando ingreso:', err);
+      setError('Error al eliminar registro');
     }
-  };
+  }, [loadFinances]);
 
-  const handleShowStatistics = async () => {
+  // ========== SHOW STATISTICS ==========
+  const handleShowStatistics = useCallback(() => {
     try {
-      devLog('📊 Generando estadísticas');
+      log('Mostrando estadísticas');
       const stats = calculateStatistics();
       setStatisticsData(stats);
       setShowStatisticsModal(true);
@@ -456,68 +598,20 @@ const FinancesPage = () => {
         timestamp: new Date().toISOString()
       });
     } catch (err) {
-      devWarn('❌ Error generando estadísticas:', err.message);
-      alert('Error al generar estadísticas: ' + err.message);
+      logError('Error mostrando estadísticas:', err);
+      setError('Error al generar estadísticas');
     }
-  };
+  }, [calculateStatistics]);
 
-  const calculateStatistics = () => {
-    const stats = {
-      totalRecords: allFinances.length,
-      totalAmount: 0,
-      verifiedAmount: 0,
-      unverifiedAmount: 0,
-      verifiedCount: 0,
-      unverifiedCount: 0,
-      byConcept: {},
-      byMethod: {},
-    };
-
-    allFinances.forEach(finance => {
-      stats.totalAmount += finance.amount || 0;
-
-      if (finance.isVerified) {
-        stats.verifiedAmount += finance.amount || 0;
-        stats.verifiedCount += 1;
-      } else {
-        stats.unverifiedAmount += finance.amount || 0;
-        stats.unverifiedCount += 1;
-      }
-
-      if (!stats.byConcept[finance.concept]) {
-        stats.byConcept[finance.concept] = { count: 0, total: 0 };
-      }
-      stats.byConcept[finance.concept].count += 1;
-      stats.byConcept[finance.concept].total += finance.amount || 0;
-
-      if (!stats.byMethod[finance.method]) {
-        stats.byMethod[finance.method] = { count: 0, total: 0 };
-      }
-      stats.byMethod[finance.method].count += 1;
-      stats.byMethod[finance.method].total += finance.amount || 0;
-    });
-
-    return stats;
-  };
-
+  // ========== HELPER FUNCTIONS ==========
   const getConceptLabel = (concept) => {
-    const map = {
-      'TITHE': '💵 Diezmo',
-      'OFFERING': '🎁 Ofrenda',
-      'SEED_OFFERING': '🌱 Ofrenda de Semilla',
-      'BUILDING_FUND': '🏗️ Fondo de Construcción',
-      'FIRST_FRUITS': '🍇 Primicias',
-      'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',
-    };
-    return map[concept] || concept;
+    if (!concept || typeof concept !== 'string') return concept;
+    return CONCEPT_LABELS[concept] || concept;
   };
 
   const getMethodLabel = (method) => {
-    const map = {
-      'CASH': '💵 Efectivo',
-      'BANK_TRANSFER': '🏦 Transferencia Bancaria',
-    };
-    return map[method] || method;
+    if (!method || typeof method !== 'string') return method;
+    return METHOD_LABELS[method] || method;
   };
 
   const getVerificationLabel = (isVerified) => {
@@ -540,7 +634,8 @@ const FinancesPage = () => {
                 type="text"
                 placeholder="Nombre del miembro..."
                 value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
+                onChange={(e) => setSearchText(validateSearchText(e.target.value))}
+                maxLength="100"
               />
             </div>
 
@@ -791,11 +886,16 @@ const FinancesPage = () => {
         data={statisticsData}
         allFinances={allFinances}
         onExportPDF={() => {
-          const stats = calculateStatistics();
-          generateFinancePDF(
-            { statistics: stats, title: 'Estadísticas de Finanzas' },
-            'finance-statistics-report'
-          );
+          try {
+            const stats = calculateStatistics();
+            generateFinancePDF(
+              { statistics: stats, title: 'Estadísticas de Finanzas' },
+              'finance-statistics-report'
+            );
+          } catch (error) {
+            logError('Error exportando estadísticas:', error);
+            setError('Error al exportar estadísticas');
+          }
         }}
       />
 
@@ -807,6 +907,12 @@ const FinancesPage = () => {
         financesData={filteredFinances}
         dateRange={startDate && endDate ? `${startDate} - ${endDate}` : null}
       />
+
+      <style>{`
+        .finances-page {
+          transition: all 0.3s ease;
+        }
+      `}</style>
     </div>
   );
 };

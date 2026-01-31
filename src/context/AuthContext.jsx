@@ -1,20 +1,52 @@
 // ============================================
-// AuthContext.js - CON LOGGING EXPANDIDO
+// AuthContext.js - SEGURIDAD MEJORADA
 // ============================================
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import authService from "../services/authService";
 import { logSecurityEvent } from "../utils/securityLogger";
 import { jwtDecode } from "jwt-decode";
 
 const AuthContext = createContext(null);
 
+// 🔐 Variable para habilitar/deshabilitar logs de debug
+const DEBUG = process.env.REACT_APP_DEBUG === "true";
+
+const log = (message, data) => {
+  if (DEBUG) {
+    console.log(message, data);
+  }
+};
+
+const logError = (message, error) => {
+  console.error(message, error);
+};
+
+// ✅ Validación de entrada
+const validateLoginInput = (username, password) => {
+  if (!username || typeof username !== "string") {
+    throw new Error("Usuario requerido");
+  }
+
+  if (username.trim().length < 3 || username.trim().length > 50) {
+    throw new Error("Usuario inválido");
+  }
+
+  if (!password || typeof password !== "string") {
+    throw new Error("Contraseña requerida");
+  }
+
+  if (password.length < 8 || password.length > 128) {
+    throw new Error("Contraseña inválida");
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  let tokenRefreshTimer = null;
+  const tokenRefreshTimer = useRef(null);
 
   const isTokenExpired = (token) => {
     try {
@@ -24,21 +56,75 @@ export const AuthProvider = ({ children }) => {
       const expiresIn = decoded.exp - now;
       return expiresIn < 60;
     } catch (error) {
-      console.error("❌ Error decodificando token:", error.message);
+      logError("❌ Error decodificando token:", error.message);
       return true;
     }
   };
 
+  const clearTokenRefreshTimer = useCallback(() => {
+    if (tokenRefreshTimer.current) {
+      clearTimeout(tokenRefreshTimer.current);
+      tokenRefreshTimer.current = null;
+    }
+  }, []);
+
+  const logout = useCallback(() => {
+    log("👋 [AuthContext] Cerrando sesión...");
+
+    setUser(null);
+    setError(null);
+
+    // ✅ Limpiar sessionStorage (no localStorage)
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
+
+    authService.logout();
+
+    clearTokenRefreshTimer();
+
+    logSecurityEvent("logout", {
+      timestamp: new Date().toISOString(),
+    });
+  }, [clearTokenRefreshTimer]);
+
+  const setupTokenRefreshTimer = useCallback(
+    (token) => {
+      clearTokenRefreshTimer();
+
+      try {
+        const decoded = jwtDecode(token);
+        const expiration = decoded.exp * 1000;
+        const now = Date.now();
+
+        const logoutIn = expiration - now - 60 * 1000;
+
+        if (logoutIn > 0) {
+          tokenRefreshTimer.current = setTimeout(() => {
+            logout();
+            setError(
+              "Tu sesión ha expirado. Por favor inicia sesión nuevamente.",
+            );
+
+            logSecurityEvent("session_expired", {
+              timestamp: new Date().toISOString(),
+            });
+          }, logoutIn);
+        } else {
+          logout();
+        }
+      } catch (error) {
+        logError("❌ Error configurando timer:", error);
+      }
+    },
+    [clearTokenRefreshTimer, logout],
+  );
+
   useEffect(() => {
     const initAuth = async () => {
       try {
-        let token = sessionStorage.getItem("token");
-        let storedUser = sessionStorage.getItem("user");
-
-        if (!token) {
-          token = localStorage.getItem("token");
-          storedUser = localStorage.getItem("user");
-        }
+        // ✅ Solo sessionStorage (sin fallback a localStorage)
+        const token = sessionStorage.getItem("token");
+        const storedUser = sessionStorage.getItem("user");
 
         if (storedUser && token) {
           if (isTokenExpired(token)) {
@@ -48,8 +134,6 @@ export const AuthProvider = ({ children }) => {
 
             sessionStorage.removeItem("user");
             sessionStorage.removeItem("token");
-            localStorage.removeItem("user");
-            localStorage.removeItem("token");
             authService.logout();
             setUser(null);
           } else {
@@ -74,7 +158,7 @@ export const AuthProvider = ({ children }) => {
                 timestamp: new Date().toISOString(),
               });
             } catch (parseError) {
-              console.error("❌ Error parseando usuario:", parseError);
+              logError("❌ Error parseando usuario:", parseError);
               authService.logout();
               setUser(null);
             }
@@ -83,7 +167,7 @@ export const AuthProvider = ({ children }) => {
           setUser(null);
         }
       } catch (error) {
-        console.error("❌ Error inicializando autenticación:", error);
+        logError("❌ Error inicializando autenticación:", error);
         setError(error.message);
         setUser(null);
         authService.logout();
@@ -97,20 +181,20 @@ export const AuthProvider = ({ children }) => {
     return () => {
       clearTokenRefreshTimer();
     };
-  }, []);
+  }, [setupTokenRefreshTimer, clearTokenRefreshTimer]);
 
-  // ✅ Login CON LOGGING COMPLETO Y EXPANDIDO
+  // ✅ Login CON SEGURIDAD MEJORADA
   const login = async (username, password) => {
     setError(null);
     setLoading(true);
 
     try {
-      console.log("🔐 [AuthContext] Iniciando login para:", username);
+      // ✅ Validación de entrada
+      validateLoginInput(username, password);
+
+      log("🔐 [AuthContext] Iniciando login", { username });
 
       const response = await authService.login(username, password);
-
-      console.log("📥 [AuthContext] Response JSON completo:");
-      console.log(JSON.stringify(response, null, 2));
 
       if (!response || !response.token) {
         throw new Error("Respuesta inválida del servidor");
@@ -120,37 +204,16 @@ export const AuthProvider = ({ children }) => {
         throw new Error("Token recibido está expirado");
       }
 
-      // 🔍 LOG EXPANDIDO: Ver EXACTAMENTE qué hay en response
-      console.log("🔍 [AuthContext] ===== ANÁLISIS DE RESPONSE =====");
-
-      console.log("📍 NIVEL RAÍZ (response.*):");
-      console.log(
-        "   response.passwordChangeRequired:",
-        response.passwordChangeRequired,
-      );
-      console.log(
-        "   response.passwordChangedAtLeastOnce:",
-        response.passwordChangedAtLeastOnce,
-      );
-
-      console.log("📍 NIVEL ANIDADO (response.user.*):");
-      if (response.user) {
-        console.log(
-          "   response.user.passwordChangeRequired:",
-          response.user.passwordChangeRequired,
-        );
-        console.log(
-          "   response.user.passwordChangedAtLeastOnce:",
-          response.user.passwordChangedAtLeastOnce,
-        );
-        console.log("   TODO response.user:");
-        console.log(response.user);
-      } else {
-        console.log("   ⚠️ response.user es undefined/null");
+      // 🔍 LOG SEGURO: Solo en modo DEBUG
+      if (DEBUG) {
+        log("📍 ANÁLISIS DE RESPONSE (DEBUG):", {
+          hasToken: !!response.token,
+          hasUser: !!response.user,
+          passwordChangeRequired: response.passwordChangeRequired,
+        });
       }
 
       // ✅ Preparar datos del usuario
-      // Buscar en AMBOS lugares (nivel raíz Y nivel anidado)
       const pwdChangeRequired =
         response.passwordChangeRequired !== undefined
           ? response.passwordChangeRequired
@@ -160,10 +223,6 @@ export const AuthProvider = ({ children }) => {
         response.passwordChangedAtLeastOnce !== undefined
           ? response.passwordChangedAtLeastOnce
           : response.user?.passwordChangedAtLeastOnce || false;
-
-      console.log("📦 [AuthContext] Valores FINALES calculados:");
-      console.log("   pwdChangeRequired:", pwdChangeRequired);
-      console.log("   pwdChangedAtLeastOnce:", pwdChangedAtLeastOnce);
 
       const userData = {
         id: response.id || response.user?.id,
@@ -179,20 +238,20 @@ export const AuthProvider = ({ children }) => {
         passwordChangedAtLeastOnce: pwdChangedAtLeastOnce,
       };
 
-      console.log("📦 [AuthContext] userData FINAL ANTES de guardar:");
-      console.log(userData);
+      if (DEBUG) {
+        log("📦 [AuthContext] userData FINAL:", userData);
+      }
 
-      // Guardar en sessionStorage
+      // ✅ Guardar en sessionStorage (solo sessionStorage, no localStorage)
       setUser(userData);
       const userJSON = JSON.stringify(userData);
-      console.log("💾 [AuthContext] Guardando en sessionStorage:", userJSON);
       sessionStorage.setItem("user", userJSON);
       sessionStorage.setItem("token", response.token);
 
-      // ✅ VERIFICACIÓN: Leer lo que se guardó
-      const verificacion = JSON.parse(sessionStorage.getItem("user"));
-      console.log("✅ [AuthContext] Verificación final en sessionStorage:");
-      console.log(verificacion);
+      if (DEBUG) {
+        const verificacion = JSON.parse(sessionStorage.getItem("user"));
+        log("✅ [AuthContext] Verificación en sessionStorage:", verificacion);
+      }
 
       setupTokenRefreshTimer(response.token);
 
@@ -203,14 +262,18 @@ export const AuthProvider = ({ children }) => {
 
       return response;
     } catch (err) {
-      const errorMsg = err.message || "Error al iniciar sesión";
-      setError(errorMsg);
+      // ✅ Mensaje de error genérico en seguridad (no exponer detalles)
+      const genericErrorMsg = "Credenciales inválidas";
+      const detailedErrorMsg = err.message || "Error al iniciar sesión";
 
-      console.error("❌ [AuthContext] Error en login:", errorMsg);
+      setError(genericErrorMsg);
 
+      logError("❌ [AuthContext] Error en login:", detailedErrorMsg);
+
+      // ✅ Log seguro: sin exponer detalles específicos
       logSecurityEvent("login_failure", {
         timestamp: new Date().toISOString(),
-        reason: errorMsg,
+        // NO incluir: reason, errorMsg, detalles específicos
       });
 
       throw err;
@@ -224,6 +287,11 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
 
     try {
+      // ✅ Validación básica
+      if (!userData || typeof userData !== "object") {
+        throw new Error("Datos de registro inválidos");
+      }
+
       const response = await authService.register(userData);
 
       logSecurityEvent("registration_success", {
@@ -237,7 +305,6 @@ export const AuthProvider = ({ children }) => {
 
       logSecurityEvent("registration_failure", {
         timestamp: new Date().toISOString(),
-        reason: errorMsg,
       });
 
       throw err;
@@ -246,65 +313,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    console.log("👋 [AuthContext] Cerrando sesión...");
 
-    setUser(null);
-    setError(null);
 
-    sessionStorage.removeItem("user");
-    sessionStorage.removeItem("token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("token");
 
-    authService.logout();
-
-    clearTokenRefreshTimer();
-
-    logSecurityEvent("logout", {
-      timestamp: new Date().toISOString(),
-    });
-  };
-
-  const setupTokenRefreshTimer = (token) => {
-    clearTokenRefreshTimer();
-
-    try {
-      const decoded = jwtDecode(token);
-      const expiration = decoded.exp * 1000;
-      const now = Date.now();
-
-      const logoutIn = expiration - now - 60 * 1000;
-
-      if (logoutIn > 0) {
-        tokenRefreshTimer = setTimeout(() => {
-          logout();
-          setError(
-            "Tu sesión ha expirado. Por favor inicia sesión nuevamente.",
-          );
-
-          logSecurityEvent("session_expired", {
-            timestamp: new Date().toISOString(),
-          });
-        }, logoutIn);
-      } else {
-        logout();
-      }
-    } catch (error) {
-      console.error("❌ Error configurando timer:", error);
-    }
-  };
-
-  const clearTokenRefreshTimer = () => {
-    if (tokenRefreshTimer) {
-      clearTimeout(tokenRefreshTimer);
-      tokenRefreshTimer = null;
-    }
-  };
 
   const isAuthenticated = () => {
-    const token =
-      sessionStorage.getItem("token") || localStorage.getItem("token");
+    // ✅ Solo sessionStorage
+    const token = sessionStorage.getItem("token");
 
     if (!token || !user) {
       return false;
@@ -363,7 +378,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const getToken = () => {
-    return sessionStorage.getItem("token") || localStorage.getItem("token");
+    // ✅ Solo sessionStorage
+    return sessionStorage.getItem("token");
   };
 
   const value = {

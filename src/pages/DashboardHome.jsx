@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
 import { useAuth } from '../context/AuthContext';
 import "../css/DashboardHome.css";
-import logoBlancoIcon from '../assets/Pastoreappblanco.png';
-import logoNegroIcon from '../assets/Pastoreappnegro.png';
+import logoDora from '../assets/LOGO_PNG_DORADO.png';
 
 export const DashboardHome = () => {
   const { user } = useAuth();
@@ -116,7 +115,7 @@ export const DashboardHome = () => {
           }}>
             {/* Logo dinámico reemplazando emoji */}
             <img
-              src={isDarkMode ? logoBlancoIcon : logoNegroIcon}
+              src={isDarkMode ? logoDora : logoDora}
               alt="PastoreApp Logo"
               style={{
                 height: 'clamp(80px, 15vw, 140px)',
@@ -131,11 +130,12 @@ export const DashboardHome = () => {
                 marginRight: isDarkMode ? '-12px': '2px',
               }}
             />
-            <div>
+          </div>
+          <div>
               <h1 style={{
                 fontSize: 'clamp(24px, 5vw, 36px)',
                 fontWeight: '700',
-                margin: '0',
+                margin: '10px',
                 lineHeight: '1.2',
                 textAlign: 'center',
               }}>
@@ -150,7 +150,6 @@ export const DashboardHome = () => {
                 Bienvenido, {user?.username?.split(" ")[0]}! 👋
               </p>
             </div>
-          </div>
         </div>
 
         {error && (

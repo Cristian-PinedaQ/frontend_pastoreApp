@@ -1,5 +1,54 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
+// 🔐 Variable para habilitar/deshabilitar logs de debug
+const DEBUG = process.env.REACT_APP_DEBUG === "true";
+
+const log = (message, data) => {
+  if (DEBUG) {
+    console.log(message, data);
+  }
+};
+
+const logError = (message, error) => {
+  console.error(message, error);
+};
+
+// ✅ Validación de entrada
+const validateUsername = (username) => {
+  if (!username || typeof username !== 'string') {
+    throw new Error('Usuario inválido');
+  }
+  if (username.trim().length < 3 || username.trim().length > 50) {
+    throw new Error('Usuario debe tener entre 3 y 50 caracteres');
+  }
+};
+
+const validatePassword = (password) => {
+  if (!password || typeof password !== 'string') {
+    throw new Error('Contraseña inválida');
+  }
+  if (password.length < 8 || password.length > 128) {
+    throw new Error('Contraseña debe tener entre 8 y 128 caracteres');
+  }
+};
+
+const validateEmail = (email) => {
+  if (!email || typeof email !== 'string') {
+    throw new Error('Email inválido');
+  }
+  // Validación básica de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error('Email no válido');
+  }
+};
+
+const validateUserId = (userId) => {
+  if (!userId || isNaN(userId) || parseInt(userId) <= 0) {
+    throw new Error('ID de usuario inválido');
+  }
+};
+
 class authService {
   constructor() {
     this.baseURL = `${API_BASE_URL}/auth`;
@@ -7,7 +56,7 @@ class authService {
 
   // ============ AUTENTICACIÓN ============
 
-  // ✅ ACTUALIZADO: Obtener token guardado (ahora usa sessionStorage)
+  // ✅ Obtener token guardado
   getToken() {
     return sessionStorage.getItem('token');
   }
@@ -26,9 +75,15 @@ class authService {
     return headers;
   }
 
-  // ✅ ACTUALIZADO: Login (guarda en sessionStorage CON passwordChangeRequired)
+  // ✅ Login CON SEGURIDAD MEJORADA
   async login(username, password) {
     try {
+      // ✅ Validación de entrada
+      validateUsername(username);
+      validatePassword(password);
+
+      log('🔐 [login] Iniciando login', { username });
+
       const response = await fetch(`${this.baseURL}/login`, {
         method: 'POST',
         headers: {
@@ -38,95 +93,118 @@ class authService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al iniciar sesión');
+        // ✅ Mensaje genérico en cliente (sin exponer detalles)
+        throw new Error('Credenciales inválidas');
       }
 
       const data = await response.json();
-      
+
+      if (!data.token) {
+        throw new Error('Token no recibido del servidor');
+      }
+
       // ✅ Guardar en sessionStorage (se limpia automáticamente al cerrar la pestaña)
       sessionStorage.setItem('token', data.token);
       sessionStorage.setItem('user', JSON.stringify({
+        id: data.id,
         username: data.username,
         email: data.email,
+        name: data.name,
         roles: data.roles,
-        passwordChangeRequired: data.passwordChangeRequired,        // ✅ AGREGAR
-        passwordChangedAtLeastOnce: data.passwordChangedAtLeastOnce // ✅ AGREGAR
+        passwordChangeRequired: data.passwordChangeRequired || false,
+        passwordChangedAtLeastOnce: data.passwordChangedAtLeastOnce || false
       }));
+
+      log('✅ [login] Login exitoso');
 
       return {
         token: data.token,
-        user: {
-          username: data.username,
-          email: data.email,
-          roles: data.roles,
-          passwordChangeRequired: data.passwordChangeRequired,        // ✅ AGREGAR
-          passwordChangedAtLeastOnce: data.passwordChangedAtLeastOnce // ✅ AGREGAR
-        }
+        id: data.id,
+        username: data.username,
+        email: data.email,
+        name: data.name,
+        roles: data.roles,
+        passwordChangeRequired: data.passwordChangeRequired || false,
+        passwordChangedAtLeastOnce: data.passwordChangedAtLeastOnce || false
       };
     } catch (error) {
-      throw new Error(error.message || 'Error de conexión');
+      // ✅ No exponer detalles específicos en error
+      logError('❌ [login] Error:', error.message);
+      throw new Error('Error de autenticación');
     }
   }
 
   // Registro de nuevo usuario
   async register(username, email, password, roleName) {
     try {
-      console.log("📨 Enviando datos al backend:", { username, email, roleName });
+      // ✅ Validación de entrada
+      validateUsername(username);
+      validateEmail(email);
+      validatePassword(password);
+      if (!roleName || typeof roleName !== 'string' || roleName.trim().length === 0) {
+        throw new Error('Rol inválido');
+      }
 
-      // ✅ CORRECCIÓN: Usar this.baseURL y estructura correcta
+      log('📨 [register] Registrando usuario:', { username, email });
+
       const res = await fetch(`${this.baseURL}/register`, {
-        method: "POST",
-        headers: this.getHeaders(),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           username,
           email,
           password,
-          roleName: roleName.toUpperCase() // ✅ Asegurar que sea mayúscula
+          roleName: roleName.toUpperCase()
         })
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || 'Error registrando usuario');
+        // ✅ Mensaje genérico
+        throw new Error('Error al registrar usuario');
       }
 
       const data = await res.json();
-      console.log("⬅️ Respuesta backend al registrar:", data);
+      log('✅ [register] Usuario registrado correctamente');
 
-      // NO guardar token ni user en register
-      return data; 
+      return data;
     } catch (error) {
-      console.error("❌ Error al registrar usuario:", error);
-      throw error;
+      logError('❌ [register] Error:', error.message);
+      throw new Error('Error al registrar usuario');
     }
   }
 
-  // Verificar si el token es válido
+  // ✅ Verificar si el token es válido (sin exponer detalles)
   isTokenValid() {
-    const token = this.getToken();
-    if (!token) return false;
-
     try {
-      // Decodificar payload del JWT
+      const token = this.getToken();
+      if (!token) return false;
+
+      // ⚠️ Solo decodifica - no valida firma (el backend lo hace)
       const payload = JSON.parse(atob(token.split('.')[1]));
+      
       // Verificar si ha expirado
+      if (!payload.exp) return false;
+      
       return payload.exp * 1000 > Date.now();
     } catch (error) {
+      logError('❌ [isTokenValid] Error validando token:', error.message);
       return false;
     }
   }
 
-  // ✅ ACTUALIZADO: Logout (limpia sessionStorage)
+  // ✅ Logout (limpia sessionStorage)
   logout() {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+    log('👋 [logout] Sesión cerrada');
   }
 
   // ============ GESTIÓN DE CONTRASEÑA ============
 
   /**
-   * ✅ NUEVO: Cambiar contraseña del usuario actual
+   * ✅ Cambiar contraseña del usuario actual
    * POST /api/v1/auth/change-password
    * @param {string} oldPassword - Contraseña actual
    * @param {string} newPassword - Nueva contraseña
@@ -134,7 +212,15 @@ class authService {
    */
   async changePassword(oldPassword, newPassword) {
     try {
-      console.log('🔐 [changePassword] Iniciando cambio de contraseña');
+      // ✅ Validación de entrada
+      validatePassword(oldPassword);
+      validatePassword(newPassword);
+
+      if (oldPassword === newPassword) {
+        throw new Error('La nueva contraseña debe ser diferente');
+      }
+
+      log('🔐 [changePassword] Cambiando contraseña');
 
       const response = await fetch(`${this.baseURL}/change-password`, {
         method: 'POST',
@@ -147,29 +233,28 @@ class authService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = errorData.message || errorData.error || 'Error al cambiar contraseña';
-        console.error('❌ [changePassword] Error:', errorMessage);
-        throw new Error(errorMessage);
+        // ✅ Mensaje genérico
+        throw new Error('Error al cambiar contraseña');
       }
 
       const data = await response.json();
-      console.log('✅ [changePassword] Contraseña cambiada exitosamente');
+      log('✅ [changePassword] Contraseña cambiada exitosamente');
+      
       return data;
     } catch (error) {
-      console.error('❌ [changePassword] Error completo:', error);
-      throw error;
+      logError('❌ [changePassword] Error:', error.message);
+      throw new Error('Error al cambiar contraseña');
     }
   }
 
   /**
-   * ✅ NUEVO: Verificar si el usuario necesita cambiar contraseña
+   * ✅ Verificar si el usuario necesita cambiar contraseña
    * GET /api/v1/auth/check-password-change-required
    * @returns {Promise<Object>} { changeRequired: boolean }
    */
   async checkPasswordChangeRequired() {
     try {
-      console.log('🔍 [checkPasswordChangeRequired] Verificando si es necesario cambio');
+      log('🔍 [checkPasswordChangeRequired] Verificando cambio de contraseña');
 
       const response = await fetch(`${this.baseURL}/check-password-change-required`, {
         method: 'GET',
@@ -179,17 +264,17 @@ class authService {
       if (!response.ok) {
         // Si retorna 401, el usuario no está autenticado
         if (response.status === 401) {
-          console.warn('⚠️ [checkPasswordChangeRequired] Usuario no autenticado');
           return { changeRequired: false };
         }
         throw new Error('Error al verificar cambio de contraseña');
       }
 
       const data = await response.json();
-      console.log('✅ [checkPasswordChangeRequired] Cambio requerido:', data.changeRequired);
+      log('✅ [checkPasswordChangeRequired] Resultado:', data);
+      
       return data;
     } catch (error) {
-      console.error('❌ [checkPasswordChangeRequired] Error:', error);
+      logError('❌ [checkPasswordChangeRequired] Error:', error.message);
       return { changeRequired: false };
     }
   }
@@ -202,6 +287,8 @@ class authService {
    */
   async getAllUsers() {
     try {
+      log('📋 [getAllUsers] Obteniendo usuarios');
+
       const response = await fetch(`${this.baseURL}/users`, {
         method: 'GET',
         headers: this.getHeaders()
@@ -209,18 +296,18 @@ class authService {
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('No autenticado. Por favor inicia sesión nuevamente.');
+          throw new Error('No autenticado');
         }
         if (response.status === 403) {
-          throw new Error('No tienes permisos para ver usuarios. Solo PASTORES pueden hacerlo.');
+          throw new Error('Sin permisos');
         }
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al obtener usuarios');
+        throw new Error('Error al obtener usuarios');
       }
 
       return await response.json();
     } catch (error) {
-      throw new Error(error.message || 'Error al obtener usuarios');
+      logError('❌ [getAllUsers] Error:', error.message);
+      throw new Error('Error al obtener usuarios');
     }
   }
 
@@ -231,6 +318,11 @@ class authService {
    */
   async getUserById(userId) {
     try {
+      // ✅ Validación de entrada
+      validateUserId(userId);
+
+      log('👤 [getUserById] Obteniendo usuario:', { userId });
+
       const response = await fetch(`${this.baseURL}/users/${userId}`, {
         method: 'GET',
         headers: this.getHeaders()
@@ -238,18 +330,18 @@ class authService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error(`Usuario con ID ${userId} no encontrado`);
+          throw new Error('Usuario no encontrado');
         }
         if (response.status === 401) {
           throw new Error('No autenticado');
         }
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al obtener usuario');
+        throw new Error('Error al obtener usuario');
       }
 
       return await response.json();
     } catch (error) {
-      throw new Error(error.message || 'Error al obtener usuario');
+      logError('❌ [getUserById] Error:', error.message);
+      throw new Error('Error al obtener usuario');
     }
   }
 
@@ -263,11 +355,29 @@ class authService {
    */
   async updateUser(userId, username, email, password) {
     try {
+      // ✅ Validación de entrada
+      validateUserId(userId);
+
       const body = {};
-      
-      if (username) body.username = username;
-      if (email) body.email = email;
-      if (password) body.password = password;
+
+      if (username) {
+        validateUsername(username);
+        body.username = username;
+      }
+      if (email) {
+        validateEmail(email);
+        body.email = email;
+      }
+      if (password) {
+        validatePassword(password);
+        body.password = password;
+      }
+
+      if (Object.keys(body).length === 0) {
+        throw new Error('Debe proporcionar al menos un campo para actualizar');
+      }
+
+      log('✏️ [updateUser] Actualizando usuario:', { userId });
 
       const response = await fetch(`${this.baseURL}/users/${userId}`, {
         method: 'PUT',
@@ -277,32 +387,36 @@ class authService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error(`Usuario con ID ${userId} no encontrado`);
+          throw new Error('Usuario no encontrado');
         }
         if (response.status === 403) {
-          throw new Error('No tienes permisos para actualizar este usuario');
+          throw new Error('Sin permisos');
         }
         if (response.status === 400) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Datos inválidos. El email o username ya están en uso.');
+          throw new Error('Datos inválidos');
         }
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al actualizar usuario');
+        throw new Error('Error al actualizar usuario');
       }
 
       return await response.json();
     } catch (error) {
-      throw new Error(error.message || 'Error al actualizar usuario');
+      logError('❌ [updateUser] Error:', error.message);
+      throw new Error('Error al actualizar usuario');
     }
   }
 
   /**
    * Eliminar un usuario
    * @param {number} userId - ID del usuario a eliminar
-   * @returns {Promise<void>}
+   * @returns {Promise<boolean>}
    */
   async deleteUser(userId) {
     try {
+      // ✅ Validación de entrada
+      validateUserId(userId);
+
+      log('🗑️ [deleteUser] Eliminando usuario:', { userId });
+
       const response = await fetch(`${this.baseURL}/users/${userId}`, {
         method: 'DELETE',
         headers: this.getHeaders()
@@ -310,56 +424,89 @@ class authService {
 
       if (!response.ok) {
         if (response.status === 404) {
-          throw new Error(`Usuario con ID ${userId} no encontrado`);
+          throw new Error('Usuario no encontrado');
         }
         if (response.status === 403) {
-          throw new Error('No tienes permisos para eliminar usuarios');
+          throw new Error('Sin permisos');
         }
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al eliminar usuario');
+        throw new Error('Error al eliminar usuario');
       }
 
+      log('✅ [deleteUser] Usuario eliminado');
       return response.ok;
     } catch (error) {
-      throw new Error(error.message || 'Error al eliminar usuario');
+      logError('❌ [deleteUser] Error:', error.message);
+      throw new Error('Error al eliminar usuario');
     }
   }
 
   /**
-   * ✅ ACTUALIZADO: Obtener datos del usuario actual de sessionStorage
+   * ✅ Obtener datos del usuario actual de sessionStorage
    * @returns {Object|null} Datos del usuario o null
    */
   getCurrentUser() {
-    const user = sessionStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    try {
+      const user = sessionStorage.getItem('user');
+      return user ? JSON.parse(user) : null;
+    } catch (error) {
+      logError('❌ [getCurrentUser] Error parseando usuario:', error.message);
+      return null;
+    }
   }
 
   /**
-   * ✅ CORREGIDO: Verifica si el usuario tiene un rol específico
+   * ✅ Verifica si el usuario tiene un rol específico
    * Soporta roles con y sin prefijo ROLE_
-   * 
-   * Ejemplos:
-   * - hasRole('PASTORES') - funciona si el rol es "PASTORES" o "ROLE_PASTORES"
-   * - hasRole('PROFESORES') - funciona si el rol es "PROFESORES" o "ROLE_PROFESORES"
    * 
    * @param {string} role - Nombre del rol
    * @returns {boolean} True si el usuario tiene el rol
    */
   hasRole(role) {
+    try {
+      const user = this.getCurrentUser();
+      
+      if (!user || !user.roles || !Array.isArray(user.roles)) {
+        return false;
+      }
+
+      if (!role || typeof role !== 'string') {
+        return false;
+      }
+
+      // ✅ Soportar ambos formatos: PASTORES y ROLE_PASTORES
+      const roleWithPrefix = `ROLE_${role.toUpperCase()}`;
+      const roleWithoutPrefix = role.toUpperCase();
+
+      return user.roles.some((r) => {
+        if (typeof r === 'string') {
+          return r.toUpperCase() === roleWithPrefix || r.toUpperCase() === roleWithoutPrefix;
+        }
+        if (typeof r === 'object' && r.name) {
+          return r.name.toUpperCase() === roleWithPrefix || r.name.toUpperCase() === roleWithoutPrefix;
+        }
+        return false;
+      });
+    } catch (error) {
+      logError('❌ [hasRole] Error verificando rol:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * ✅ Verifica si el usuario está autenticado
+   * @returns {boolean}
+   */
+  isAuthenticated() {
+    const token = this.getToken();
     const user = this.getCurrentUser();
-    if (!user || !user.roles) {
+    
+    if (!token || !user) {
       return false;
     }
 
-    // ✅ Soportar ambos formatos: PASTORES y ROLE_PASTORES
-    const roleWithPrefix = `ROLE_${role}`;
-    const roleWithoutPrefix = role;
-    
-    const hasRoleWithPrefix = user.roles.includes(roleWithPrefix);
-    const hasRoleWithoutPrefix = user.roles.includes(roleWithoutPrefix);
-    
-    return hasRoleWithPrefix || hasRoleWithoutPrefix;
+    return this.isTokenValid();
   }
 }
 
-export default new authService();
+const authServiceInstance = new authService();
+export default authServiceInstance;

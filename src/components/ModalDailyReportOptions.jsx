@@ -1,86 +1,220 @@
-// 📅 ModalDailyReportOptions.jsx - VERSIÓN GENÉRICA PARA CUALQUIER REPORTE
-// ✅ Funciona con un solo día, rango de fechas o sin fechas
-// ✅ Opciones más visibles y fáciles de seleccionar
-// ✅ Debugging incorporado
-// ✅ Estilos mejorados
+// ============================================
+// ModalDailyReportOptions.jsx - SEGURIDAD MEJORADA
+// Modal para opciones de reporte con validaciones
+// ============================================
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+
+// 🔐 Debug condicional
+const DEBUG = process.env.REACT_APP_DEBUG === "true";
+
+const log = (message, data) => {
+  if (DEBUG) {
+    console.log(`[ModalDailyReportOptions] ${message}`, data || '');
+  }
+};
+
+const logError = (message, error) => {
+  console.error(`[ModalDailyReportOptions] ${message}`, error);
+};
+
+// ✅ Sanitización de HTML
+const escapeHtml = (text) => {
+  if (!text || typeof text !== 'string') return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, m => map[m]);
+};
+
+// ✅ Validación de cantidad
+const validateAmount = (amount) => {
+  const num = parseFloat(amount);
+  if (isNaN(num)) return 0;
+  if (num < 0) return 0;
+  if (num > 999999999) return 999999999;
+  return num;
+};
+
+// ========== CONSTANTES FUERA DEL COMPONENTE ==========
+const CONCEPT_MAP = {
+  'TITHE': '💵 Diezmo',
+  'OFFERING': '🎁 Ofrenda',
+  'SEED_OFFERING': '🌱 Ofrenda de Semilla',
+  'BUILDING_FUND': '🏗️ Fondo de Construcción',
+  'FIRST_FRUITS': '🍇 Primicias',
+  'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',
+};
 
 const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, financesData, dateRange }) => {
-  const [reportType, setReportType] = useState('summary'); // 'summary' o 'members'
+  const [reportType, setReportType] = useState('summary');
 
-  // Debug: Log cuando cambia el reportType
+  // ========== VALIDAR PROPS ==========
   useEffect(() => {
-    console.log('📊 [DEBUG] reportType cambió a:', reportType);
-  }, [reportType]);
+    try {
+      if (!isOpen) return;
 
-  // Debug: Log cuando abre el modal
+      if (!onClose || typeof onClose !== 'function') {
+        logError('onClose inválido:', typeof onClose);
+      }
+      if (!onConfirm || typeof onConfirm !== 'function') {
+        logError('onConfirm inválido:', typeof onConfirm);
+      }
+      if (financesData && !Array.isArray(financesData)) {
+        logError('financesData debe ser un array');
+      }
+
+      log('Modal abierto con props válidos');
+    } catch (error) {
+      logError('Error validando props:', error);
+    }
+  }, [isOpen, onClose, onConfirm, financesData]);
+
+  // ========== REPORT TYPE CHANGE ==========
   useEffect(() => {
     if (isOpen) {
-      console.log('📊 [DEBUG] Modal abierto');
-      console.log('📊 [DEBUG] financesData:', financesData);
-      console.log('📊 [DEBUG] selectedDate:', selectedDate);
-      console.log('📊 [DEBUG] dateRange:', dateRange);
+      log('reportType cambió a:', reportType);
     }
-  }, [isOpen, financesData, selectedDate, dateRange]);
+  }, [reportType, isOpen]);
 
+  // ========== CALCULATE DAILY STATS ==========
   const dailyStats = useMemo(() => {
-    if (!financesData || financesData.length === 0) {
+    try {
+      if (!financesData || !Array.isArray(financesData) || financesData.length === 0) {
+        return {
+          totalAmount: 0,
+          byConcept: {},
+          totalRecords: 0,
+          finances: [],
+        };
+      }
+
+      const stats = {
+        totalAmount: 0,
+        byConcept: {},
+        totalRecords: financesData.length,
+        finances: financesData,
+      };
+
+      financesData.forEach(finance => {
+        try {
+          const amount = validateAmount(finance.amount);
+          stats.totalAmount += amount;
+
+          const concept = finance.concept || 'OTRO';
+          if (!stats.byConcept[concept]) {
+            stats.byConcept[concept] = { count: 0, total: 0 };
+          }
+          stats.byConcept[concept].count += 1;
+          stats.byConcept[concept].total += amount;
+        } catch (error) {
+          logError('Error procesando finance:', error);
+        }
+      });
+
+      log('Stats calculado', { totalRecords: stats.totalRecords, totalAmount: stats.totalAmount });
+      return stats;
+    } catch (error) {
+      logError('Error calculando stats:', error);
       return {
         totalAmount: 0,
         byConcept: {},
         totalRecords: 0,
+        finances: [],
       };
     }
-
-    const stats = {
-      totalAmount: 0,
-      byConcept: {},
-      totalRecords: financesData.length,
-      finances: financesData,
-    };
-
-    financesData.forEach(finance => {
-      stats.totalAmount += finance.amount || 0;
-
-      if (!stats.byConcept[finance.concept]) {
-        stats.byConcept[finance.concept] = { count: 0, total: 0 };
-      }
-      stats.byConcept[finance.concept].count += 1;
-      stats.byConcept[finance.concept].total += finance.amount || 0;
-    });
-
-    console.log('📊 [DEBUG] stats calculado:', stats);
-    return stats;
   }, [financesData]);
 
-  const handleConfirm = () => {
-    console.log('📊 [DEBUG] Generando PDF con tipo:', reportType);
-    onConfirm(reportType);
-    setReportType('summary');
-  };
+  // ========== HANDLE CONFIRM ==========
+  const handleConfirm = useCallback(() => {
+    try {
+      if (!onConfirm || typeof onConfirm !== 'function') {
+        logError('onConfirm no es una función válida');
+        return;
+      }
+
+      if (!reportType || typeof reportType !== 'string') {
+        logError('reportType inválido:', reportType);
+        return;
+      }
+
+      log('Generando PDF con tipo:', reportType);
+      onConfirm(reportType);
+      setReportType('summary');
+    } catch (error) {
+      logError('Error en handleConfirm:', error);
+    }
+  }, [onConfirm, reportType]);
+
+  // ========== HANDLE CLOSE ==========
+  const handleClose = useCallback(() => {
+    try {
+      if (onClose && typeof onClose === 'function') {
+        onClose();
+      }
+    } catch (error) {
+      logError('Error en handleClose:', error);
+    }
+  }, [onClose]);
+
+  // ========== HANDLE REPORT TYPE CHANGE ==========
+  const handleReportTypeChange = useCallback((value) => {
+    try {
+      if (value === 'summary' || value === 'members') {
+        log('Tipo de reporte seleccionado:', value);
+        setReportType(value);
+      }
+    } catch (error) {
+      logError('Error cambiando reportType:', error);
+    }
+  }, []);
 
   if (!isOpen) return null;
 
-  // Determinar si es un rango o un solo día
-  const isRangeReport = !!dateRange;
+  // ========== DETERMINE REPORT TITLE AND DATE ==========
+  const isRangeReport = !!(dateRange && typeof dateRange === 'string');
   const reportTitle = isRangeReport ? 'Reporte de Ingresos' : 'Reporte Diario de Ingresos';
-  const displayDate = dateRange || (selectedDate ? new Date(selectedDate).toLocaleDateString('es-CO') : 'Sin fecha');
 
-  const conceptMap = {
-    'TITHE': '💵 Diezmo',
-    'OFFERING': '🎁 Ofrenda',
-    'SEED_OFFERING': '🌱 Ofrenda de Semilla',
-    'BUILDING_FUND': '🏗️ Fondo de Construcción',
-  };
+  let displayDate = 'Sin fecha';
+  try {
+    if (dateRange && typeof dateRange === 'string') {
+      displayDate = dateRange;
+    } else if (selectedDate && typeof selectedDate === 'string') {
+      displayDate = new Date(selectedDate).toLocaleDateString('es-CO');
+    }
+  } catch (error) {
+    logError('Error formateando fecha:', error);
+  }
+
+  let selectedDateFormatted = '';
+  try {
+    if (selectedDate && typeof selectedDate === 'string') {
+      const dateObj = new Date(selectedDate);
+      if (!isNaN(dateObj.getTime())) {
+        selectedDateFormatted = dateObj.toLocaleDateString('es-CO', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
+    }
+  } catch (error) {
+    logError('Error formateando selectedDate:', error);
+    selectedDateFormatted = selectedDate || 'Sin fecha';
+  }
 
   return (
-    <div className="modal-overlay-daily-report" onClick={onClose}>
+    <div className="modal-overlay-daily-report" onClick={handleClose}>
       <div className="modal-container-daily-report" onClick={(e) => e.stopPropagation()}>
         {/* HEADER */}
         <div className="modal-header-daily-report">
-          <h2>📅 {reportTitle}</h2>
-          <button className="modal-close-btn-daily" onClick={onClose}>✕</button>
+          <h2>{reportTitle}</h2>
+          <button className="modal-close-btn-daily" onClick={handleClose} aria-label="Cerrar modal">✕</button>
         </div>
 
         {/* BODY */}
@@ -88,14 +222,17 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           {/* Fecha del reporte */}
           <div className="modal-date-info-daily-report">
             <h3>📆 Período del Reporte</h3>
-            <p>{displayDate}</p>
+            <p>{escapeHtml(displayDate)}</p>
           </div>
+
           {/* Fecha Seleccionada */}
-          <div className="date-info-daily">
-            <p className="date-selected">
-              📆 Fecha Seleccionada: <strong>{new Date(selectedDate).toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</strong>
-            </p>
-          </div>
+          {selectedDateFormatted && (
+            <div className="date-info-daily">
+              <p className="date-selected">
+                📆 Fecha Seleccionada: <strong>{escapeHtml(selectedDateFormatted)}</strong>
+              </p>
+            </div>
+          )}
 
           {/* Resumen Rápido */}
           <div className="quick-summary-daily">
@@ -125,7 +262,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
               <div className="concepts-grid-daily">
                 {Object.entries(dailyStats.byConcept).map(([key, value]) => (
                   <div key={key} className="concept-item-daily">
-                    <p className="concept-name-daily">{conceptMap[key] || key}</p>
+                    <p className="concept-name-daily">{CONCEPT_MAP[key] || key}</p>
                     <p className="concept-count-daily">{value.count} registros</p>
                     <p className="concept-amount-daily">
                       $ {(value.total || 0).toLocaleString('es-CO')}
@@ -136,7 +273,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             </div>
           )}
 
-          {/* SECCIÓN IMPORTANTE: OPCIONES DE REPORTE */}
+          {/* OPCIONES DE REPORTE */}
           <div className="report-options-section-daily">
             <h3 className="report-options-title-daily">Tipo de Reporte</h3>
             <p className="report-options-subtitle-daily">Selecciona cómo deseas ver los datos en el PDF</p>
@@ -150,10 +287,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
                     name="reportType"
                     value="summary"
                     checked={reportType === 'summary'}
-                    onChange={(e) => {
-                      console.log('📊 [DEBUG] Seleccionando:', e.target.value);
-                      setReportType(e.target.value);
-                    }}
+                    onChange={(e) => handleReportTypeChange(e.target.value)}
                     className="radio-input-daily"
                   />
                   <span className="radio-checkmark-daily"></span>
@@ -174,10 +308,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
                     name="reportType"
                     value="members"
                     checked={reportType === 'members'}
-                    onChange={(e) => {
-                      console.log('📊 [DEBUG] Seleccionando:', e.target.value);
-                      setReportType(e.target.value);
-                    }}
+                    onChange={(e) => handleReportTypeChange(e.target.value)}
                     className="radio-input-daily"
                   />
                   <span className="radio-checkmark-daily"></span>
@@ -206,9 +337,9 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
                   <tbody>
                     {dailyStats.finances.map((finance, idx) => (
                       <tr key={idx}>
-                        <td>{finance.memberName || 'Sin nombre'}</td>
-                        <td>{conceptMap[finance.concept] || finance.concept}</td>
-                        <td>$ {(finance.amount || 0).toLocaleString('es-CO')}</td>
+                        <td>{escapeHtml(finance.memberName || 'Sin nombre')}</td>
+                        <td>{CONCEPT_MAP[finance.concept] || escapeHtml(finance.concept)}</td>
+                        <td>$ {(validateAmount(finance.amount) || 0).toLocaleString('es-CO')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -220,19 +351,20 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
 
         {/* FOOTER */}
         <div className="modal-footer-daily-report">
-          <button className="btn-cancel-daily" onClick={onClose}>
+          <button className="btn-cancel-daily" onClick={handleClose} aria-label="Cancelar">
             ✕ Cancelar
           </button>
-          <button 
-            className="btn-generate-daily" 
+          <button
+            className="btn-generate-daily"
             onClick={handleConfirm}
             disabled={false}
+            aria-label="Generar PDF"
           >
             📄 Generar PDF ({reportType === 'summary' ? 'Resumen' : 'Con Miembros'})
           </button>
         </div>
 
-        <style jsx>{`
+        <style>{`
           /* ========== OVERLAY ========== */
           .modal-overlay-daily-report {
             position: fixed;
@@ -425,7 +557,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             color: #059669;
           }
 
-          /* ========== OPCIONES DE REPORTE (IMPORTANTE) ========== */
+          /* ========== OPCIONES DE REPORTE ========== */
           .report-options-section-daily {
             background: #f9fafb;
             border: 2px solid #e5e7eb;
