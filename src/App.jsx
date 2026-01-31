@@ -1,81 +1,94 @@
-// ✅ App.jsx - Configuración de rutas y providers
+// ✅ App.jsx - VERSIÓN DEFINITIVA PARA TU PROYECTO
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';  // ✅ CORRECTO
-import { ProtectedRoute, UnauthorizedPage } from './ProtectedRoute';
-import { LoginPage } from './LoginPage';
-import { RegisterPage } from './RegisterPage';
+import { AuthProvider } from './context/AuthContext';
+
+// ✅ CORRECCIÓN 1: RegisterPage es NAMED EXPORT (con {})
+import LoginPage from './LoginPage';
+import { RegisterPage } from './RegisterPage';  // ← Con {}
+
+// ✅ ProtectedRoute con UnauthorizedPage
+import ProtectedRoute, { UnauthorizedPage } from './ProtectedRoute';
+
+// Layouts
 import { DashboardLayout } from './DashboardLayout';
+
+// Páginas del dashboard
 import { DashboardHome } from './pages/DashboardHome';
 import { MembersPage } from './pages/MembersPage';
-import  EnrollmentsPage  from './pages/EnrollmentsPage';
-import  StudentsPage  from './pages/StudentsPage';
-import  UsersPage  from './pages/UsersPage';
-import  FinancesPage  from './pages/FinancesPage';
-import {
-  LessonsPage,
-  AttendancePage,
-} from './pages/index';
+import EnrollmentsPage from './pages/EnrollmentsPage';
+import StudentsPage from './pages/StudentsPage';
+import UsersPage from './pages/UsersPage';
+import FinancesPage from './pages/FinancesPage';
+import { LessonsPage, AttendancePage } from './pages/index';
 
 function App() {
   return (
     <BrowserRouter
       future={{
         v7_relativeSplatPath: true,
-        v7_startTransition: true
+        v7_startTransition: true,
       }}
     >
       <AuthProvider>
         <Routes>
-          {/* 🔓 Rutas Públicas */}
+          {/* ========== RUTAS PÚBLICAS ========== */}
+
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/register" element={<RegisterPage />} />  {/* ← RegisterPage */}
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-          {/* 🛡️ Rutas Protegidas - Dashboard */}
+          {/* ========== DASHBOARD PROTEGIDO ========== */}
+
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute
-                element={<DashboardLayout />}
-              />
+              <ProtectedRoute element={<DashboardLayout />} />
             }
           >
+            {/* Dashboard Home */}
             <Route index element={<DashboardHome />} />
 
-            {/* Miembros - Todos autenticados */}
+            {/* Miembros */}
             <Route
               path="members"
               element={
-                <ProtectedRoute
-                  element={<MembersPage />}
-                />
+                <ProtectedRoute element={<MembersPage />} />
               }
             />
 
-            {/* Inscripciones - PASTORES, AREAS */}
+            {/* Inscripciones */}
             <Route
               path="enrollments"
               element={
                 <ProtectedRoute
                   element={<EnrollmentsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_GANANDO', 'ROLE_AREAS', 'ROLE_PROFESORES']}
+                  requiredRoles={[
+                    'ROLE_PASTORES',
+                    'ROLE_GANANDO',
+                    'ROLE_AREAS',
+                    'ROLE_PROFESORES',
+                  ]}
                 />
               }
             />
 
-            {/* Estudiantes - PASTORES, AREAS */}
+            {/* Estudiantes */}
             <Route
               path="students"
               element={
                 <ProtectedRoute
                   element={<StudentsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_GANANDO', 'ROLE_AREAS']}
+                  requiredRoles={[
+                    'ROLE_PASTORES',
+                    'ROLE_GANANDO',
+                    'ROLE_AREAS',
+                  ]}
                 />
               }
             />
 
-            {/* Lecciones - PASTORES, AREAS */}
+            {/* Lecciones */}
             <Route
               path="lessons"
               element={
@@ -86,18 +99,22 @@ function App() {
               }
             />
 
-            {/* Asistencias - PASTORES, AREAS, PROFESORES */}
+            {/* Asistencias */}
             <Route
               path="attendance"
               element={
                 <ProtectedRoute
                   element={<AttendancePage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_PROFESORES']}
+                  requiredRoles={[
+                    'ROLE_PASTORES',
+                    'ROLE_AREAS',
+                    'ROLE_PROFESORES',
+                  ]}
                 />
               }
             />
 
-            {/* Finanzas - PASTORES, AREAS */}
+            {/* Finanzas */}
             <Route
               path="finances"
               element={
@@ -108,7 +125,7 @@ function App() {
               }
             />
 
-            {/* Usuarios - PASTORES solo */}
+            {/* Usuarios */}
             <Route
               path="users"
               element={
@@ -121,7 +138,8 @@ function App() {
             />
           </Route>
 
-          {/* 🏠 Redirecciones */}
+          {/* ========== REDIRECCIONES ========== */}
+
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

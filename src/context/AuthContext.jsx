@@ -1,9 +1,13 @@
-// 🔐 AuthContext - Maneja autenticación, roles y expiración JWT
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { jwtDecode } from "jwt-decode";
-import apiService from "../apiService";
+// ============================================
+// AuthContext.js - CON LOGGING EXPANDIDO
+// ============================================
 
-const AuthContext = createContext();
+import React, { createContext, useContext, useState, useEffect } from "react";
+import authService from "../services/authService";
+import { logSecurityEvent } from "../utils/securityLogger";
+import { jwtDecode } from "jwt-decode";
+
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -12,168 +16,299 @@ export const AuthProvider = ({ children }) => {
 
   let tokenRefreshTimer = null;
 
-  // ⚡ Verificar expiración del token
   const isTokenExpired = (token) => {
     try {
+      if (!token) return true;
       const decoded = jwtDecode(token);
       const now = Date.now() / 1000;
-      return decoded.exp - now < 60;
-    } catch {
+      const expiresIn = decoded.exp - now;
+      return expiresIn < 60;
+    } catch (error) {
+      console.error("❌ Error decodificando token:", error.message);
       return true;
     }
   };
 
-  // ⚡ Cargar sesión desde localStorage
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("user");
-
-    if (token && savedUser) {
+    const initAuth = async () => {
       try {
-        if (isTokenExpired(token)) {
-          logout();
-          return;
+        let token = sessionStorage.getItem("token");
+        let storedUser = sessionStorage.getItem("user");
+
+        if (!token) {
+          token = localStorage.getItem("token");
+          storedUser = localStorage.getItem("user");
         }
 
-        const userParsed = JSON.parse(savedUser);
-        setUser({
-          ...userParsed,
-          roles: Array.isArray(userParsed.roles) ? userParsed.roles : [],
-        });
+        if (storedUser && token) {
+          if (isTokenExpired(token)) {
+            logSecurityEvent("token_expired", {
+              timestamp: new Date().toISOString(),
+            });
 
-        apiService.setToken(token);
-      } catch {
-        logout();
+            sessionStorage.removeItem("user");
+            sessionStorage.removeItem("token");
+            localStorage.removeItem("user");
+            localStorage.removeItem("token");
+            authService.logout();
+            setUser(null);
+          } else {
+            try {
+              const userParsed = JSON.parse(storedUser);
+
+              const roles = Array.isArray(userParsed.roles)
+                ? userParsed.roles
+                : userParsed.roles
+                  ? [userParsed.roles]
+                  : [];
+
+              const userData = {
+                ...userParsed,
+                roles,
+              };
+
+              setUser(userData);
+              setupTokenRefreshTimer(token);
+
+              logSecurityEvent("session_restored", {
+                timestamp: new Date().toISOString(),
+              });
+            } catch (parseError) {
+              console.error("❌ Error parseando usuario:", parseError);
+              authService.logout();
+              setUser(null);
+            }
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("❌ Error inicializando autenticación:", error);
+        setError(error.message);
+        setUser(null);
+        authService.logout();
+      } finally {
+        setLoading(false);
       }
-    }
+    };
 
-    setLoading(false);
+    initAuth();
+
+    return () => {
+      clearTokenRefreshTimer();
+    };
   }, []);
 
-  // 🔓 Login
+  // ✅ Login CON LOGGING COMPLETO Y EXPANDIDO
   const login = async (username, password) => {
     setError(null);
     setLoading(true);
 
     try {
-      const response = await apiService.login(username, password);
+      console.log("🔐 [AuthContext] Iniciando login para:", username);
+
+      const response = await authService.login(username, password);
+
+      console.log("📥 [AuthContext] Response JSON completo:");
+      console.log(JSON.stringify(response, null, 2));
+
+      if (!response || !response.token) {
+        throw new Error("Respuesta inválida del servidor");
+      }
+
+      if (isTokenExpired(response.token)) {
+        throw new Error("Token recibido está expirado");
+      }
+
+      // 🔍 LOG EXPANDIDO: Ver EXACTAMENTE qué hay en response
+      console.log("🔍 [AuthContext] ===== ANÁLISIS DE RESPONSE =====");
+
+      console.log("📍 NIVEL RAÍZ (response.*):");
+      console.log(
+        "   response.passwordChangeRequired:",
+        response.passwordChangeRequired,
+      );
+      console.log(
+        "   response.passwordChangedAtLeastOnce:",
+        response.passwordChangedAtLeastOnce,
+      );
+
+      console.log("📍 NIVEL ANIDADO (response.user.*):");
+      if (response.user) {
+        console.log(
+          "   response.user.passwordChangeRequired:",
+          response.user.passwordChangeRequired,
+        );
+        console.log(
+          "   response.user.passwordChangedAtLeastOnce:",
+          response.user.passwordChangedAtLeastOnce,
+        );
+        console.log("   TODO response.user:");
+        console.log(response.user);
+      } else {
+        console.log("   ⚠️ response.user es undefined/null");
+      }
+
+      // ✅ Preparar datos del usuario
+      // Buscar en AMBOS lugares (nivel raíz Y nivel anidado)
+      const pwdChangeRequired =
+        response.passwordChangeRequired !== undefined
+          ? response.passwordChangeRequired
+          : response.user?.passwordChangeRequired || false;
+
+      const pwdChangedAtLeastOnce =
+        response.passwordChangedAtLeastOnce !== undefined
+          ? response.passwordChangedAtLeastOnce
+          : response.user?.passwordChangedAtLeastOnce || false;
+
+      console.log("📦 [AuthContext] Valores FINALES calculados:");
+      console.log("   pwdChangeRequired:", pwdChangeRequired);
+      console.log("   pwdChangedAtLeastOnce:", pwdChangedAtLeastOnce);
 
       const userData = {
-        id: response.id,
-        username: response.username,
-        name: response.name,
-        email: response.email,
+        id: response.id || response.user?.id,
+        username: response.username || response.user?.username,
+        name: response.name || response.user?.name,
+        email: response.email || response.user?.email,
         roles: Array.isArray(response.roles)
           ? response.roles
           : response.roles
-          ? [response.roles]
-          : [],
+            ? [response.roles]
+            : response.user?.roles || [],
+        passwordChangeRequired: pwdChangeRequired,
+        passwordChangedAtLeastOnce: pwdChangedAtLeastOnce,
       };
 
-      if (isTokenExpired(response.token)) {
-        throw new Error("El token está expirado");
-      }
+      console.log("📦 [AuthContext] userData FINAL ANTES de guardar:");
+      console.log(userData);
 
+      // Guardar en sessionStorage
       setUser(userData);
-      localStorage.setItem("user", JSON.stringify(userData));
-      localStorage.setItem("token", response.token);
+      const userJSON = JSON.stringify(userData);
+      console.log("💾 [AuthContext] Guardando en sessionStorage:", userJSON);
+      sessionStorage.setItem("user", userJSON);
+      sessionStorage.setItem("token", response.token);
+
+      // ✅ VERIFICACIÓN: Leer lo que se guardó
+      const verificacion = JSON.parse(sessionStorage.getItem("user"));
+      console.log("✅ [AuthContext] Verificación final en sessionStorage:");
+      console.log(verificacion);
 
       setupTokenRefreshTimer(response.token);
 
+      logSecurityEvent("login_success", {
+        timestamp: new Date().toISOString(),
+        username: userData.username,
+      });
+
       return response;
     } catch (err) {
-      setError(err.message);
+      const errorMsg = err.message || "Error al iniciar sesión";
+      setError(errorMsg);
+
+      console.error("❌ [AuthContext] Error en login:", errorMsg);
+
+      logSecurityEvent("login_failure", {
+        timestamp: new Date().toISOString(),
+        reason: errorMsg,
+      });
+
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // 📝 Registro
   const register = async (userData) => {
     setError(null);
     setLoading(true);
+
     try {
-      return await apiService.register(userData);
+      const response = await authService.register(userData);
+
+      logSecurityEvent("registration_success", {
+        timestamp: new Date().toISOString(),
+      });
+
+      return response;
     } catch (err) {
-      setError(err.message);
+      const errorMsg = err.message || "Error al registrarse";
+      setError(errorMsg);
+
+      logSecurityEvent("registration_failure", {
+        timestamp: new Date().toISOString(),
+        reason: errorMsg,
+      });
+
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // 🚪 Cerrar sesión
   const logout = () => {
+    console.log("👋 [AuthContext] Cerrando sesión...");
+
     setUser(null);
+    setError(null);
+
+    sessionStorage.removeItem("user");
+    sessionStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    apiService.logout();
+
+    authService.logout();
+
     clearTokenRefreshTimer();
+
+    logSecurityEvent("logout", {
+      timestamp: new Date().toISOString(),
+    });
   };
 
-  // ⏳ Timer para cierre automático
   const setupTokenRefreshTimer = (token) => {
     clearTokenRefreshTimer();
+
     try {
       const decoded = jwtDecode(token);
       const expiration = decoded.exp * 1000;
       const now = Date.now();
 
-      const logoutIn = expiration - now - 60000;
+      const logoutIn = expiration - now - 60 * 1000;
 
       if (logoutIn > 0) {
         tokenRefreshTimer = setTimeout(() => {
           logout();
-          setError("Tu sesión ha expirado. Inicia sesión nuevamente.");
+          setError(
+            "Tu sesión ha expirado. Por favor inicia sesión nuevamente.",
+          );
+
+          logSecurityEvent("session_expired", {
+            timestamp: new Date().toISOString(),
+          });
         }, logoutIn);
       } else {
         logout();
       }
-    } catch {}
+    } catch (error) {
+      console.error("❌ Error configurando timer:", error);
+    }
   };
 
   const clearTokenRefreshTimer = () => {
-    if (tokenRefreshTimer) clearTimeout(tokenRefreshTimer);
+    if (tokenRefreshTimer) {
+      clearTimeout(tokenRefreshTimer);
+      tokenRefreshTimer = null;
+    }
   };
 
-  // 🔐 Verificar si el usuario tiene un rol
-  const hasRole = (requiredRole) => {
-    if (!user || !user.roles) return false;
-
-    const normalizedRequired = requiredRole.includes("ROLE_")
-      ? requiredRole
-      : `ROLE_${requiredRole.toUpperCase()}`;
-
-    return user.roles.some((role) => {
-      if (typeof role === "string") {
-        const normalizedRole = role.includes("ROLE_")
-          ? role
-          : `ROLE_${role.toUpperCase()}`;
-        return normalizedRole === normalizedRequired;
-      }
-
-      if (typeof role === "object" && role.name) {
-        const normalizedName = role.name.includes("ROLE_")
-          ? role.name
-          : `ROLE_${role.name.toUpperCase()}`;
-        return normalizedName === normalizedRequired;
-      }
-
-      return false;
-    });
-  };
-
-  // 🔐 Verificar si tiene alguno de varios roles
-  const hasAnyRole = (roles) => {
-    if (!Array.isArray(roles)) return hasRole(roles);
-    return roles.some((r) => hasRole(r));
-  };
-
-  // 🔐 Verifica si está autenticado
   const isAuthenticated = () => {
-    const token = localStorage.getItem("token");
-    if (!token || !user) return false;
+    const token =
+      sessionStorage.getItem("token") || localStorage.getItem("token");
+
+    if (!token || !user) {
+      return false;
+    }
 
     if (isTokenExpired(token)) {
       logout();
@@ -183,6 +318,54 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
+  const hasRole = (requiredRole) => {
+    if (!user || !user.roles || user.roles.length === 0) {
+      return false;
+    }
+
+    const normalizedRequired = requiredRole.includes("ROLE_")
+      ? requiredRole.toUpperCase()
+      : `ROLE_${requiredRole.toUpperCase()}`;
+
+    return user.roles.some((role) => {
+      let normalizedRole = role;
+
+      if (typeof role === "object" && role.name) {
+        normalizedRole = role.name;
+      }
+
+      if (typeof normalizedRole === "string") {
+        normalizedRole = normalizedRole.includes("ROLE_")
+          ? normalizedRole.toUpperCase()
+          : `ROLE_${normalizedRole.toUpperCase()}`;
+
+        return normalizedRole === normalizedRequired;
+      }
+
+      return false;
+    });
+  };
+
+  const hasAnyRole = (requiredRoles) => {
+    if (!Array.isArray(requiredRoles)) {
+      return hasRole(requiredRoles);
+    }
+
+    return requiredRoles.some((role) => hasRole(role));
+  };
+
+  const hasAllRoles = (requiredRoles) => {
+    if (!Array.isArray(requiredRoles)) {
+      return hasRole(requiredRoles);
+    }
+
+    return requiredRoles.every((role) => hasRole(role));
+  };
+
+  const getToken = () => {
+    return sessionStorage.getItem("token") || localStorage.getItem("token");
+  };
+
   const value = {
     user,
     loading,
@@ -190,15 +373,25 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    isAuthenticated,
     hasRole,
     hasAnyRole,
-    isAuthenticated,
+    hasAllRoles,
     isTokenExpired,
+    getToken,
   };
 
-  return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("❌ useAuth debe ser usado dentro de AuthProvider");
+  }
+
+  return context;
+};
+
+export default AuthContext;

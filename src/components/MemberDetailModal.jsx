@@ -1,6 +1,7 @@
 // 📋 MemberDetailModal.jsx - Vista detallada de miembro e inscripciones
 // ✅ MEJORADO: Soporte completo para Dark Mode
 // ✅ ACTUALIZADO: Botones de acciones integrados en el modal
+// ✅ OPTIMIZADO: Usa absolute en lugar de fixed para ocupar el contenedor padre
 import React, { useState, useEffect } from "react";
 import apiService from "../apiService";
 
@@ -114,9 +115,9 @@ export const MemberDetailModal = ({
     }
   };
 
-  // ✅ IMPORTANTE: Modal debe estar dentro del DOM
+  // ✅ OPTIMIZADO: Modal ocupa 100% del contenedor padre
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-3xl my-8">
         {/* Encabezado */}
         <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-800 dark:to-blue-900 text-white p-6 flex justify-between items-center rounded-t-lg">

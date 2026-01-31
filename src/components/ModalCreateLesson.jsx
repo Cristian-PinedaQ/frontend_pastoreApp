@@ -58,37 +58,37 @@ const ModalCreateLesson = ({ isOpen, onClose, enrollmentId, onLessonCreated }) =
 
   // Tema
   const theme = {
-    bg: isDarkMode ? '#0f172a' : '#ffffff',
-    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
-    bgLight: isDarkMode ? '#1a2332' : '#f3f4f6',
-    text: isDarkMode ? '#f1f5f9' : '#374151',
-    textSecondary: isDarkMode ? '#cbd5e1' : '#6b7280',
-    textTertiary: isDarkMode ? '#94a3b8' : '#9ca3af',
-    border: isDarkMode ? '#334155' : '#e5e7eb',
-    borderLight: isDarkMode ? '#475569' : '#f0f0f0',
-    header: isDarkMode
-      ? 'linear-gradient(135deg, #1e40af 0%, #059669 100%)'
-      : 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
-    input: isDarkMode ? '#1e293b' : '#ffffff',
-    inputBorder: isDarkMode ? '#334155' : '#e5e7eb',
-    inputBorderFocus: '#2563eb',
-    inputFocusShadow: 'rgba(37, 99, 235, 0.1)',
-    button: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-    buttonHover: '0 4px 12px rgba(37, 99, 235, 0.4)',
-    info: isDarkMode ? '#0c4a6e' : '#0c4a6e',
-    infoBg: isDarkMode ? '#082f49' : '#e0f2fe',
-    infoBorder: '#0284c7',
-    warning: isDarkMode ? '#92400e' : '#92400e',
-    warningBg: isDarkMode ? '#78350f' : '#fef3c7',
-    warningBorder: '#f59e0b',
-    error: isDarkMode ? '#991b1b' : '#991b1b',
-    errorBg: isDarkMode ? '#7f1d1d' : '#fee2e2',
-    errorBorder: '#ef4444',
-    success: isDarkMode ? '#059669' : '#10b981',
-    successBg: isDarkMode ? '#064e3b' : '#d1fae5',
-    successText: isDarkMode ? '#86efac' : '#065f46',
-    card: isDarkMode ? '#1e293b' : '#ffffff',
-  };
+  bg: isDarkMode ? '#0f172a' : '#ffffff',
+  bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
+  bgLight: isDarkMode ? '#1a2332' : '#f3f4f6',
+  text: isDarkMode ? '#f1f5f9' : '#374151',
+  textSecondary: isDarkMode ? '#cbd5e1' : '#6b7280',
+  textTertiary: isDarkMode ? '#94a3b8' : '#9ca3af',
+  border: isDarkMode ? '#334155' : '#e5e7eb',
+  borderLight: isDarkMode ? '#475569' : '#f0f0f0',
+  header: isDarkMode
+    ? 'linear-gradient(135deg, #1e40af 0%, #059669 100%)'
+    : 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
+  input: isDarkMode ? '#1e293b' : '#ffffff',
+  inputBorder: isDarkMode ? '#334155' : '#e5e7eb',
+  inputBorderFocus: '#2563eb',
+  inputFocusShadow: 'rgba(37, 99, 235, 0.1)',
+  button: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+  buttonHover: '0 4px 12px rgba(37, 99, 235, 0.4)',
+  info: isDarkMode ? '#0c4a6e' : '#0c4a6e',
+  infoBg: isDarkMode ? '#082f49' : '#e0f2fe',
+  infoBorder: '#0284c7',
+  warning: isDarkMode ? '#fcd34d' : '#92400e',
+  warningBg: isDarkMode ? '#78350f' : '#fef3c7',
+  warningBorder: '#f59e0b',
+  error: isDarkMode ? '#fca5a5' : '#991b1b',
+  errorBg: isDarkMode ? '#7f1d1d' : '#fee2e2',
+  errorBorder: '#ef4444',
+  success: isDarkMode ? '#059669' : '#10b981',
+  successBg: isDarkMode ? '#064e3b' : '#d1fae5',
+  successText: isDarkMode ? '#86efac' : '#065f46',
+  card: isDarkMode ? '#1e293b' : '#ffffff',
+};
 
   const handleChange = (e) => {
     const { name, value } = e.target;

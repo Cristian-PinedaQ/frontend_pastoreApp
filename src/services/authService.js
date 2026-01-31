@@ -26,7 +26,7 @@ class authService {
     return headers;
   }
 
-  // ✅ ACTUALIZADO: Login (guarda en sessionStorage)
+  // ✅ ACTUALIZADO: Login (guarda en sessionStorage CON passwordChangeRequired)
   async login(username, password) {
     try {
       const response = await fetch(`${this.baseURL}/login`, {
@@ -49,7 +49,9 @@ class authService {
       sessionStorage.setItem('user', JSON.stringify({
         username: data.username,
         email: data.email,
-        roles: data.roles
+        roles: data.roles,
+        passwordChangeRequired: data.passwordChangeRequired,        // ✅ AGREGAR
+        passwordChangedAtLeastOnce: data.passwordChangedAtLeastOnce // ✅ AGREGAR
       }));
 
       return {
@@ -57,7 +59,9 @@ class authService {
         user: {
           username: data.username,
           email: data.email,
-          roles: data.roles
+          roles: data.roles,
+          passwordChangeRequired: data.passwordChangeRequired,        // ✅ AGREGAR
+          passwordChangedAtLeastOnce: data.passwordChangedAtLeastOnce // ✅ AGREGAR
         }
       };
     } catch (error) {
@@ -117,6 +121,77 @@ class authService {
   logout() {
     sessionStorage.removeItem('token');
     sessionStorage.removeItem('user');
+  }
+
+  // ============ GESTIÓN DE CONTRASEÑA ============
+
+  /**
+   * ✅ NUEVO: Cambiar contraseña del usuario actual
+   * POST /api/v1/auth/change-password
+   * @param {string} oldPassword - Contraseña actual
+   * @param {string} newPassword - Nueva contraseña
+   * @returns {Promise<Object>} Respuesta del servidor
+   */
+  async changePassword(oldPassword, newPassword) {
+    try {
+      console.log('🔐 [changePassword] Iniciando cambio de contraseña');
+
+      const response = await fetch(`${this.baseURL}/change-password`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+          confirmPassword: newPassword
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = errorData.message || errorData.error || 'Error al cambiar contraseña';
+        console.error('❌ [changePassword] Error:', errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('✅ [changePassword] Contraseña cambiada exitosamente');
+      return data;
+    } catch (error) {
+      console.error('❌ [changePassword] Error completo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ✅ NUEVO: Verificar si el usuario necesita cambiar contraseña
+   * GET /api/v1/auth/check-password-change-required
+   * @returns {Promise<Object>} { changeRequired: boolean }
+   */
+  async checkPasswordChangeRequired() {
+    try {
+      console.log('🔍 [checkPasswordChangeRequired] Verificando si es necesario cambio');
+
+      const response = await fetch(`${this.baseURL}/check-password-change-required`, {
+        method: 'GET',
+        headers: this.getHeaders()
+      });
+
+      if (!response.ok) {
+        // Si retorna 401, el usuario no está autenticado
+        if (response.status === 401) {
+          console.warn('⚠️ [checkPasswordChangeRequired] Usuario no autenticado');
+          return { changeRequired: false };
+        }
+        throw new Error('Error al verificar cambio de contraseña');
+      }
+
+      const data = await response.json();
+      console.log('✅ [checkPasswordChangeRequired] Cambio requerido:', data.changeRequired);
+      return data;
+    } catch (error) {
+      console.error('❌ [checkPasswordChangeRequired] Error:', error);
+      return { changeRequired: false };
+    }
   }
 
   // ============ GESTIÓN DE USUARIOS ============
