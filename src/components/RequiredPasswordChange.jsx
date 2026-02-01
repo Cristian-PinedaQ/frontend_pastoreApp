@@ -20,7 +20,7 @@ const RequiredPasswordChange = ({ accessToken, onPasswordChanged }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [formData, setFormData] = useState({
-    oldPassword: 'CHANGE_ME_123!',
+    oldPassword: 'AdminSeguro123!',
     newPassword: '',
     confirmPassword: '',
   });
