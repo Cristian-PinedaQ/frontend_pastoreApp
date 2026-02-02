@@ -482,6 +482,23 @@ body {
   }
 
   .dashboard-layout__sidebar-user {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-sm);
+    border-top: 1px solid var(--sidebar-border);
+  }
+
+  .dashboard-layout__user-info {
+    display: none;
+  }
+
+  .dashboard-layout__logout-btn {
+    width: 100%;
+    justify-content: center;
+    padding: var(--spacing-sm);
+  }
+
+  .dashboard-layout__logout-btn span:not(.dashboard-layout__logout-icon) {
     display: none;
   }
 
@@ -564,7 +581,29 @@ body {
   }
 
   .dashboard-layout__sidebar-user {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-xs);
+    border-top: 1px solid var(--sidebar-border);
+  }
+
+  .dashboard-layout__user-info {
     display: none;
+  }
+
+  .dashboard-layout__logout-btn {
+    width: 100%;
+    justify-content: center;
+    padding: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+  }
+
+  .dashboard-layout__logout-btn span:not(.dashboard-layout__logout-icon) {
+    display: none;
+  }
+
+  .dashboard-layout__logout-icon {
+    font-size: 1.25rem;
   }
 
   .dashboard-layout__main {
