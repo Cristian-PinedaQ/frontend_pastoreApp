@@ -1,10 +1,7 @@
-
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
-
-// 🌐 BASE URL de la API
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://76.13.119.25:8080/api/v1';
 
 const log = (message, data) => {
   if (DEBUG) {
@@ -26,12 +23,26 @@ const validateUsername = (username) => {
   }
 };
 
+// ✅ CORREGIDO: Alineado con UsersPage.jsx
 const validatePassword = (password) => {
   if (!password || typeof password !== 'string') {
     throw new Error('Contraseña inválida');
   }
-  if (password.length < 8 || password.length > 128) {
-    throw new Error('Contraseña debe tener entre 8 y 128 caracteres');
+  if (password.length < 12 || password.length > 128) {
+    throw new Error('Contraseña debe tener entre 12 y 128 caracteres');
+  }
+  // ✅ Validación de complejidad
+  if (!/[A-Z]/.test(password)) {
+    throw new Error('Contraseña debe contener al menos una mayúscula');
+  }
+  if (!/[a-z]/.test(password)) {
+    throw new Error('Contraseña debe contener al menos una minúscula');
+  }
+  if (!/[0-9]/.test(password)) {
+    throw new Error('Contraseña debe contener al menos un número');
+  }
+  if (!/[!@#$%^&*()_+=\-[\]{};':"\\|,.<>/?]/.test(password)) {
+    throw new Error('Contraseña debe contener al menos un carácter especial');
   }
 };
 
@@ -83,7 +94,11 @@ class authService {
     try {
       // ✅ Validación de entrada
       validateUsername(username);
-      validatePassword(password);
+      // ✅ NOTA: Login usa validación más permisiva (8 caracteres) 
+      // para permitir login con contraseñas antiguas
+      if (!password || password.length < 8) {
+        throw new Error('Contraseña debe tener al menos 8 caracteres');
+      }
 
       log('🔐 [login] Iniciando login', { username });
 
@@ -96,8 +111,13 @@ class authService {
       });
 
       if (!response.ok) {
-        // ✅ Mensaje genérico en cliente (sin exponer detalles)
-        throw new Error('Credenciales inválidas');
+        if (response.status === 401) {
+          throw new Error('Credenciales inválidas');
+        }
+        if (response.status === 403) {
+          throw new Error('Cuenta deshabilitada');
+        }
+        throw new Error('Error de autenticación');
       }
 
       const data = await response.json();
@@ -131,13 +151,12 @@ class authService {
         passwordChangedAtLeastOnce: data.passwordChangedAtLeastOnce || false
       };
     } catch (error) {
-      // ✅ No exponer detalles específicos en error
       logError('❌ [login] Error:', error.message);
-      throw new Error('Error de autenticación');
+      throw error;
     }
   }
 
-  // Registro de nuevo usuario
+  // ✅ CORREGIDO: Registro de nuevo usuario
   async register(username, email, password, roleName) {
     try {
       // ✅ Validación de entrada
@@ -152,9 +171,7 @@ class authService {
 
       const res = await fetch(`${this.baseURL}/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: this.getHeaders(), // ✅ CORREGIDO: Ahora incluye token JWT
         body: JSON.stringify({
           username,
           email,
@@ -164,7 +181,16 @@ class authService {
       });
 
       if (!res.ok) {
-        // ✅ Mensaje genérico
+        // ✅ Manejo específico de errores
+        if (res.status === 403) {
+          throw new Error('No tienes permisos para registrar usuarios');
+        }
+        if (res.status === 409) {
+          throw new Error('El usuario ya existe');
+        }
+        if (res.status === 400) {
+          throw new Error('Datos inválidos');
+        }
         throw new Error('Error al registrar usuario');
       }
 
@@ -174,7 +200,7 @@ class authService {
       return data;
     } catch (error) {
       logError('❌ [register] Error:', error.message);
-      throw new Error('Error al registrar usuario');
+      throw error;
     }
   }
 
@@ -216,7 +242,9 @@ class authService {
   async changePassword(oldPassword, newPassword) {
     try {
       // ✅ Validación de entrada
-      validatePassword(oldPassword);
+      if (!oldPassword || oldPassword.length < 8) {
+        throw new Error('Contraseña actual inválida');
+      }
       validatePassword(newPassword);
 
       if (oldPassword === newPassword) {
@@ -236,7 +264,12 @@ class authService {
       });
 
       if (!response.ok) {
-        // ✅ Mensaje genérico
+        if (response.status === 400) {
+          throw new Error('Contraseña actual incorrecta');
+        }
+        if (response.status === 401) {
+          throw new Error('Sesión expirada');
+        }
         throw new Error('Error al cambiar contraseña');
       }
 
@@ -246,7 +279,7 @@ class authService {
       return data;
     } catch (error) {
       logError('❌ [changePassword] Error:', error.message);
-      throw new Error('Error al cambiar contraseña');
+      throw error;
     }
   }
 
@@ -307,10 +340,12 @@ class authService {
         throw new Error('Error al obtener usuarios');
       }
 
-      return await response.json();
+      const data = await response.json();
+      log('✅ [getAllUsers] Usuarios obtenidos:', data.length);
+      return data;
     } catch (error) {
       logError('❌ [getAllUsers] Error:', error.message);
-      throw new Error('Error al obtener usuarios');
+      throw error;
     }
   }
 
@@ -338,18 +373,23 @@ class authService {
         if (response.status === 401) {
           throw new Error('No autenticado');
         }
+        if (response.status === 403) {
+          throw new Error('Sin permisos');
+        }
         throw new Error('Error al obtener usuario');
       }
 
-      return await response.json();
+      const data = await response.json();
+      log('✅ [getUserById] Usuario obtenido');
+      return data;
     } catch (error) {
       logError('❌ [getUserById] Error:', error.message);
-      throw new Error('Error al obtener usuario');
+      throw error;
     }
   }
 
   /**
-   * Actualizar un usuario existente
+   * ✅ MEJORADO: Actualizar un usuario existente
    * @param {number} userId - ID del usuario
    * @param {string} username - Nuevo username (opcional)
    * @param {string} email - Nuevo email (opcional)
@@ -398,13 +438,18 @@ class authService {
         if (response.status === 400) {
           throw new Error('Datos inválidos');
         }
+        if (response.status === 409) {
+          throw new Error('El usuario ya existe');
+        }
         throw new Error('Error al actualizar usuario');
       }
 
-      return await response.json();
+      const data = await response.json();
+      log('✅ [updateUser] Usuario actualizado');
+      return data;
     } catch (error) {
       logError('❌ [updateUser] Error:', error.message);
-      throw new Error('Error al actualizar usuario');
+      throw error;
     }
   }
 
@@ -436,10 +481,10 @@ class authService {
       }
 
       log('✅ [deleteUser] Usuario eliminado');
-      return response.ok;
+      return true;
     } catch (error) {
       logError('❌ [deleteUser] Error:', error.message);
-      throw new Error('Error al eliminar usuario');
+      throw error;
     }
   }
 

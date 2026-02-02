@@ -37,7 +37,7 @@ const logToServer = async (event, context = {}, severity = 'info') => {
 
     // ✅ CORRECTO: Usar endpoint del backend (http://localhost:8080)
     // NO: /api/logs (eso sería localhost:3000 - frontend)
-    const apiUrl = process.env.REACT_APP_API_URL || 'http://76.13.119.25:8080/api/v1';
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
     const logEndpoint = `${apiUrl}/logs`;
 
    // console.log(`📤 Enviando log a: ${logEndpoint}`);
