@@ -16,6 +16,7 @@ import autoTable from 'jspdf-autotable';
  */
 export const generatePDF = (config, filenameParam = 'reporte') => {
   try {
+    // ✅ ARREGLADO: Eliminadas variables no usadas (hasFilters, filtersInfo)
     // Destructurar con flexibilidad para ambas estructuras de datos
     const {
       title,
@@ -24,8 +25,6 @@ export const generatePDF = (config, filenameParam = 'reporte') => {
       date,
       students = [],
       statistics = {},
-      hasFilters = false,
-      filtersInfo = {},
       // Compatibilidad con estructura anterior
       data,
       filteredStudents,
@@ -48,13 +47,13 @@ export const generatePDF = (config, filenameParam = 'reporte') => {
     // ========== GENERAR FECHA CORRECTAMENTE ==========
     // Si hay filtro de año: "Año 2025 - Fecha del reporte: 31/01/2025"
     // Sin filtro de año: "Fecha del reporte: 31/01/2025"
-    let dateString = '';
+    let dateStringValue = '';
     if (yearData !== 'Todos los Años' && yearData !== 'ALL') {
       const reportDate = new Date().toLocaleDateString('es-CO');
-      dateString = `Año ${yearData} - Fecha del reporte: ${reportDate}`;
+      dateStringValue = `Año ${yearData} - Fecha del reporte: ${reportDate}`;
     } else {
       const reportDate = date || new Date().toLocaleDateString('es-CO');
-      dateString = `Fecha del reporte: ${reportDate}`;
+      dateStringValue = `Fecha del reporte: ${reportDate}`;
     }
 
     console.log('📄 Iniciando generación de PDF con filtros...');
@@ -97,7 +96,7 @@ export const generatePDF = (config, filenameParam = 'reporte') => {
     yPosition += 6;
     doc.text(`Nivel: ${levelData}`, 15, yPosition);
     yPosition += 6;
-    doc.text(`${dateString}`, 15, yPosition);
+    doc.text(`${dateStringValue}`, 15, yPosition);
     yPosition += 10;
 
     // ========== TABLA DE ESTUDIANTES FILTRADA ==========
@@ -323,29 +322,18 @@ export const generatePDF = (config, filenameParam = 'reporte') => {
  */
 export const generateStatisticsPDF = (config, filenameParam = 'estadisticas') => {
   try {
+    // ✅ ARREGLADO: Eliminadas variables no usadas (title, date)
     const {
       statistics,
       filteredStatistics = null,
       filename: configFilename,
       filterYear = null,
       filterLevel = null,
-      title,
-      date,
       year,
     } = config;
 
     const filename = filenameParam || configFilename || 'estadisticas';
     const yearData = year || filterYear;
-
-    // Generar fecha correctamente
-    let dateString = '';
-    if (yearData && yearData !== 'Todos los Años' && yearData !== 'ALL') {
-      const reportDate = new Date().toLocaleDateString('es-CO');
-      dateString = `Año ${yearData} - Fecha del reporte: ${reportDate}`;
-    } else {
-      const reportDate = date || new Date().toLocaleDateString('es-CO');
-      dateString = `Fecha del reporte: ${reportDate}`;
-    }
 
     console.log('📊 Iniciando generación de PDF de estadísticas...');
 

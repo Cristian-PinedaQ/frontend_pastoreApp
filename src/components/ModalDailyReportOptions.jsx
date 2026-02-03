@@ -1,6 +1,6 @@
 // ============================================
-// ModalDailyReportOptions.jsx - SEGURIDAD MEJORADA
-// Modal para opciones de reporte con validaciones
+// ModalDailyReportOptions.jsx - CON MODO OSCURO
+// Modal para opciones de reporte + Dark Mode
 // ============================================
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -50,8 +50,22 @@ const CONCEPT_MAP = {
   'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',
 };
 
+// ========== DETECTAR PREFERENCIA DE MODO OSCURO ==========
+const detectSystemDarkMode = () => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+};
+
 const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, financesData, dateRange }) => {
   const [reportType, setReportType] = useState('summary');
+  const [darkMode, setDarkMode] = useState(false);
+
+  // ========== INICIALIZAR MODO OSCURO ==========
+  useEffect(() => {
+    const prefersDark = detectSystemDarkMode();
+    setDarkMode(prefersDark);
+    log('Sistema prefiere:', prefersDark ? 'OSCURO' : 'CLARO');
+  }, []);
 
   // ========== VALIDAR PROPS ==========
   useEffect(() => {
@@ -173,6 +187,15 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
     }
   }, []);
 
+  // ========== TOGGLE DARK MODE ==========
+  const toggleDarkMode = useCallback(() => {
+    setDarkMode(prev => {
+      const newMode = !prev;
+      log('Modo oscuro toggled a:', newMode);
+      return newMode;
+    });
+  }, []);
+
   if (!isOpen) return null;
 
   // ========== DETERMINE REPORT TITLE AND DATE ==========
@@ -209,12 +232,34 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
   }
 
   return (
-    <div className="modal-overlay-daily-report" onClick={handleClose}>
-      <div className="modal-container-daily-report" onClick={(e) => e.stopPropagation()}>
-        {/* HEADER */}
+    <div 
+      className={`modal-overlay-daily-report ${darkMode ? 'dark-mode' : ''}`}
+      onClick={handleClose}
+    >
+      <div 
+        className="modal-container-daily-report" 
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* HEADER CON TOGGLE DARK MODE */}
         <div className="modal-header-daily-report">
           <h2>{reportTitle}</h2>
-          <button className="modal-close-btn-daily" onClick={handleClose} aria-label="Cerrar modal">✕</button>
+          <div className="header-controls">
+            <button 
+              className="btn-dark-mode-toggle" 
+              onClick={toggleDarkMode}
+              aria-label="Cambiar a modo oscuro"
+              title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            >
+              {darkMode ? '☀️' : '🌙'}
+            </button>
+            <button 
+              className="modal-close-btn-daily" 
+              onClick={handleClose} 
+              aria-label="Cerrar modal"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* BODY */}
@@ -365,6 +410,47 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
         </div>
 
         <style>{`
+          /* ========== CSS VARIABLES POR TEMA ========== */
+          .modal-overlay-daily-report {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f9fafb;
+            --bg-tertiary: #ecfdf5;
+            --text-primary: #1f2937;
+            --text-secondary: #666666;
+            --text-tertiary: #999999;
+            --border-color: #e5e7eb;
+            --border-light: #a7f3d0;
+            --accent-primary: #059669;
+            --accent-secondary: #10b981;
+            --overlay-bg: rgba(0, 0, 0, 0.5);
+            --card-hover-bg: #f0fdf4;
+            --header-start: #059669;
+            --header-end: #10b981;
+            --summary-bg: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            --summary-border: #a7f3d0;
+            --summary-text: #065f46;
+          }
+
+          .modal-overlay-daily-report.dark-mode {
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #0d4a3b;
+            --text-primary: #f5f5f5;
+            --text-secondary: #b0b0b0;
+            --text-tertiary: #808080;
+            --border-color: #404040;
+            --border-light: #1a5d4a;
+            --accent-primary: #10b981;
+            --accent-secondary: #34d399;
+            --overlay-bg: rgba(0, 0, 0, 0.8);
+            --card-hover-bg: #0f3d2f;
+            --header-start: #059669;
+            --header-end: #10b981;
+            --summary-bg: linear-gradient(135deg, #0d4a3b 0%, #1a5d4a 100%);
+            --summary-border: #1a5d4a;
+            --summary-text: #86efac;
+          }
+
           /* ========== OVERLAY ========== */
           .modal-overlay-daily-report {
             position: fixed;
@@ -372,7 +458,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: var(--overlay-bg);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -383,7 +469,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
 
           /* ========== CONTAINER ========== */
           .modal-container-daily-report {
-            background: white;
+            background: var(--bg-primary);
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             width: 100%;
@@ -393,11 +479,13 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             animation: slideInUpDaily 0.3s ease-in-out;
             display: flex;
             flex-direction: column;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
           }
 
           /* ========== HEADER ========== */
           .modal-header-daily-report {
-            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            background: linear-gradient(135deg, var(--header-start) 0%, var(--header-end) 100%);
             color: white;
             padding: 20px 24px;
             display: flex;
@@ -413,6 +501,34 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             margin: 0;
             font-size: 18px;
             font-weight: 700;
+          }
+
+          .header-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+          }
+
+          .btn-dark-mode-toggle {
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 8px 12px;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+          }
+
+          .btn-dark-mode-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: scale(1.05);
           }
 
           .modal-close-btn-daily {
@@ -440,21 +556,40 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             flex: 1;
             padding: 24px;
             overflow-y: auto;
+            background: var(--bg-primary);
           }
 
           /* ========== FECHA ========== */
+          .modal-date-info-daily-report {
+            margin-bottom: 20px;
+          }
+
+          .modal-date-info-daily-report h3 {
+            margin: 0 0 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+          }
+
+          .modal-date-info-daily-report p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+          }
+
           .date-info-daily {
-            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-            border: 1px solid #a7f3d0;
+            background: var(--summary-bg);
+            border: 1px solid var(--summary-border);
             padding: 16px;
             border-radius: 8px;
             margin-bottom: 20px;
+            transition: all 0.2s ease;
           }
 
           .date-selected {
             margin: 0;
             font-size: 14px;
-            color: #065f46;
+            color: var(--summary-text);
             font-weight: 500;
           }
 
@@ -467,8 +602,8 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           }
 
           .summary-card-daily {
-            background: white;
-            border: 1px solid #e5e7eb;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             padding: 16px;
             border-radius: 8px;
             display: flex;
@@ -478,8 +613,9 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           }
 
           .summary-card-daily:hover {
-            border-color: #10b981;
+            border-color: var(--accent-secondary);
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+            background: var(--card-hover-bg);
           }
 
           .summary-icon-daily {
@@ -493,7 +629,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           .summary-label-daily {
             margin: 0;
             font-size: 11px;
-            color: #999;
+            color: var(--text-tertiary);
             font-weight: 600;
             text-transform: uppercase;
           }
@@ -502,7 +638,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             margin: 4px 0 0;
             font-size: 16px;
             font-weight: 700;
-            color: #059669;
+            color: var(--accent-primary);
           }
 
           /* ========== DESGLOSE POR CONCEPTO ========== */
@@ -514,7 +650,7 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             margin: 0 0 12px;
             font-size: 14px;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
           }
 
           .concepts-grid-daily {
@@ -524,8 +660,8 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           }
 
           .concept-item-daily {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
             padding: 12px;
             border-radius: 8px;
             text-align: center;
@@ -533,50 +669,51 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           }
 
           .concept-item-daily:hover {
-            border-color: #10b981;
-            background: #ecfdf5;
+            border-color: var(--accent-secondary);
+            background: var(--card-hover-bg);
           }
 
           .concept-name-daily {
             margin: 0 0 4px;
             font-size: 12px;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
           }
 
           .concept-count-daily {
             margin: 0;
             font-size: 11px;
-            color: #999;
+            color: var(--text-tertiary);
           }
 
           .concept-amount-daily {
             margin: 6px 0 0;
             font-size: 13px;
             font-weight: 700;
-            color: #059669;
+            color: var(--accent-primary);
           }
 
           /* ========== OPCIONES DE REPORTE ========== */
           .report-options-section-daily {
-            background: #f9fafb;
-            border: 2px solid #e5e7eb;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 24px;
+            transition: all 0.2s ease;
           }
 
           .report-options-title-daily {
             margin: 0 0 8px;
             font-size: 16px;
             font-weight: 700;
-            color: #333;
+            color: var(--text-primary);
           }
 
           .report-options-subtitle-daily {
             margin: 0 0 16px;
             font-size: 12px;
-            color: #666;
+            color: var(--text-secondary);
           }
 
           /* ========== OPCIÓN INDIVIDUAL ========== */
@@ -589,21 +726,21 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             align-items: center;
             gap: 16px;
             padding: 16px;
-            border: 2px solid #e5e7eb;
+            border: 2px solid var(--border-color);
             border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s ease;
-            background: white;
+            background: var(--bg-primary);
           }
 
           .report-option-label-daily:hover {
-            border-color: #10b981;
-            background: #f0fdf4;
+            border-color: var(--accent-secondary);
+            background: var(--card-hover-bg);
           }
 
           .report-option-label-daily.active-daily {
-            border-color: #059669;
-            background: #ecfdf5;
+            border-color: var(--accent-primary);
+            background: var(--bg-tertiary);
             box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15);
           }
 
@@ -630,8 +767,8 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             left: 0;
             width: 24px;
             height: 24px;
-            background-color: white;
-            border: 2px solid #d1d5db;
+            background-color: var(--bg-primary);
+            border: 2px solid var(--border-color);
             border-radius: 50%;
             transition: all 0.2s;
             display: flex;
@@ -640,8 +777,8 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           }
 
           .radio-input-daily:checked + .radio-checkmark-daily {
-            border-color: #059669;
-            background-color: #059669;
+            border-color: var(--accent-primary);
+            background-color: var(--accent-primary);
           }
 
           .radio-input-daily:checked + .radio-checkmark-daily:after {
@@ -659,36 +796,36 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             margin: 0;
             font-size: 14px;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
           }
 
           .option-info-daily p {
             margin: 4px 0 0;
             font-size: 12px;
-            color: #666;
+            color: var(--text-secondary);
           }
 
           /* ========== PREVISUALIZACIÓN ========== */
           .preview-section-daily {
             margin-bottom: 20px;
-            background: #f9fafb;
+            background: var(--bg-secondary);
             padding: 16px;
             border-radius: 8px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border-color);
           }
 
           .preview-section-daily h3 {
             margin: 0 0 12px;
             font-size: 13px;
             font-weight: 600;
-            color: #333;
+            color: var(--text-primary);
           }
 
           .table-scroll-daily {
             overflow-x: auto;
             max-height: 300px;
             overflow-y: auto;
-            border: 1px solid #e5e7eb;
+            border: 1px solid var(--border-color);
             border-radius: 6px;
           }
 
@@ -696,11 +833,11 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             width: 100%;
             border-collapse: collapse;
             font-size: 11px;
-            background: white;
+            background: var(--bg-primary);
           }
 
           .members-preview-table thead {
-            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            background: var(--summary-bg);
             position: sticky;
             top: 0;
           }
@@ -709,17 +846,18 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             padding: 8px;
             text-align: left;
             font-weight: 600;
-            color: #065f46;
-            border-bottom: 1px solid #a7f3d0;
+            color: var(--summary-text);
+            border-bottom: 1px solid var(--summary-border);
           }
 
           .members-preview-table td {
             padding: 8px;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
           }
 
           .members-preview-table tbody tr:hover {
-            background: #f0fdf4;
+            background: var(--card-hover-bg);
           }
 
           /* ========== FOOTER ========== */
@@ -728,8 +866,8 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             gap: 12px;
             justify-content: flex-end;
             padding: 16px 24px;
-            border-top: 1px solid #e5e7eb;
-            background: #f9fafb;
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-secondary);
             border-radius: 0 0 12px 12px;
             position: sticky;
             bottom: 0;
@@ -747,16 +885,17 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
           }
 
           .btn-cancel-daily {
-            background: #e5e7eb;
-            color: #333;
+            background: var(--border-color);
+            color: var(--text-primary);
           }
 
           .btn-cancel-daily:hover {
-            background: #d1d5db;
+            background: var(--border-light);
+            opacity: 0.8;
           }
 
           .btn-generate-daily {
-            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
             color: white;
           }
 
@@ -786,6 +925,24 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
             }
           }
 
+          /* ========== SCROLLBAR PERSONALIZADO ========== */
+          .modal-container-daily-report::-webkit-scrollbar {
+            width: 8px;
+          }
+
+          .modal-container-daily-report::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+          }
+
+          .modal-container-daily-report::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+          }
+
+          .modal-container-daily-report::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-secondary);
+          }
+
           /* ========== RESPONSIVE ========== */
           @media (max-width: 640px) {
             .modal-body-daily-report {
@@ -812,6 +969,17 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
 
             .radio-wrapper-daily {
               margin: 0 auto;
+            }
+
+            .header-controls {
+              gap: 4px;
+            }
+
+            .btn-dark-mode-toggle,
+            .modal-close-btn-daily {
+              width: 32px;
+              height: 32px;
+              font-size: 16px;
             }
           }
         `}</style>

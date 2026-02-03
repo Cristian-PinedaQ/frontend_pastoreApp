@@ -1,8 +1,9 @@
 // ✅ ModalRecordAttendance.jsx - v2 CON MODO OSCURO
 // Modal mejorado para registrar asistencias
 // Legible automáticamente en modo oscuro
+// ✅ ARREGLADO: useCallback para getUserAuthenticated y loadData
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import apiService from "../apiService";
 
 const ModalRecordAttendance = ({
@@ -89,8 +90,26 @@ const ModalRecordAttendance = ({
     { value: "EXCELENTE_PARTICIPACION", label: "🌟 Excelente participación" },
   ];
 
+  // Decodificar JWT
+  const parseJwt = (token) => {
+    try {
+      const base64Url = token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(jsonPayload);
+    } catch (err) {
+      throw new Error("Token inválido");
+    }
+  };
+
   // ========== OBTENER USUARIO AUTENTICADO ==========
-  const getUserAuthenticated = () => {
+  // ✅ ARREGLADO: Envuelto en useCallback
+  const getUserAuthenticated = useCallback(() => {
     try {
       const userData = localStorage.getItem("user");
       if (userData) {
@@ -124,39 +143,10 @@ const ModalRecordAttendance = ({
       console.error("❌ Error obteniendo usuario:", err);
       return "Usuario";
     }
-  };
-
-  // Decodificar JWT
-  const parseJwt = (token) => {
-    try {
-      const base64Url = token.split(".")[1];
-      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-      const jsonPayload = decodeURIComponent(
-        atob(base64)
-          .split("")
-          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-          .join("")
-      );
-      return JSON.parse(jsonPayload);
-    } catch (err) {
-      throw new Error("Token inválido");
-    }
-  };
-
-  // Cargar usuario al montar componente
-  useEffect(() => {
-    const userName = getUserAuthenticated();
-    setRecordedBy(userName);
   }, []);
 
-  // Cargar lecciones y estudiantes al abrir el modal
-  useEffect(() => {
-    if (isOpen && enrollmentId) {
-      loadData();
-    }
-  }, [isOpen, enrollmentId]);
-
-  const loadData = async () => {
+  // ✅ ARREGLADO: Envuelto en useCallback
+  const loadData = useCallback(async () => {
     setLoadingData(true);
     setError("");
 
@@ -181,7 +171,20 @@ const ModalRecordAttendance = ({
     } finally {
       setLoadingData(false);
     }
-  };
+  }, [enrollmentId]);
+
+  // Cargar usuario al montar componente
+  useEffect(() => {
+    const userName = getUserAuthenticated();
+    setRecordedBy(userName);
+  }, [getUserAuthenticated]);
+
+  // Cargar lecciones y estudiantes al abrir el modal
+  useEffect(() => {
+    if (isOpen && enrollmentId) {
+      loadData();
+    }
+  }, [isOpen, enrollmentId, loadData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

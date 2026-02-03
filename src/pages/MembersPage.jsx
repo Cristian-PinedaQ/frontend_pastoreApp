@@ -5,7 +5,7 @@
 // ✅ Diseño responsive mantenido
 // ✅ ACTUALIZADO: Click en nombre para ver detalle, acciones en modal
 
-import React, { useState, useEffect, useRef, memo } from "react";
+import React, { useState, useEffect, useRef, memo, useCallback } from "react";
 import apiService from "../apiService";
 import { useAuth } from "../context/AuthContext";
 import { MemberDetailModal } from "../components/MemberDetailModal";
@@ -142,45 +142,8 @@ FilterPanel.displayName = "FilterPanel";
 
 // ========== COMPONENTE PRINCIPAL ==========
 export const MembersPage = () => {
-  // ========== DARK MODE ==========
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const savedMode = localStorage.getItem("darkMode");
-    const htmlHasDarkClass =
-      document.documentElement.classList.contains("dark-mode");
-
-    setIsDarkMode(savedMode === "true" || htmlHasDarkClass || prefersDark);
-
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains("dark-mode"));
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (e) => {
-      if (localStorage.getItem("darkMode") === null) {
-        setIsDarkMode(e.matches);
-      }
-    };
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener("change", handleChange);
-    };
-  }, []);
-
   // ========== STATE ==========
   const { hasAnyRole } = useAuth();
-  const [members, setMembers] = useState([]);
   const [allMembers, setAllMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -236,10 +199,26 @@ export const MembersPage = () => {
     district: "",
   });
 
+  // ========== API FUNCTIONS ==========
+  // ✅ ARREGLADO: Envuelto en useCallback para dependencia correcta
+  const fetchAllMembers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiService.getAllMembers();
+      setAllMembers(response || []);
+      fetchMembers(0);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // ========== HOOKS ==========
   useEffect(() => {
     fetchAllMembers();
-  }, []);
+  }, [fetchAllMembers]);
 
   useEffect(() => {
     if (formError && errorRef.current) {
@@ -252,28 +231,12 @@ export const MembersPage = () => {
     }
   }, [formError]);
 
-  // ========== API FUNCTIONS ==========
-  const fetchAllMembers = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiService.getAllMembers();
-      setAllMembers(response || []);
-      fetchMembers(0);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchMembers = async (page = 0) => {
     try {
       setLoading(true);
       setError(null);
       const response = await apiService.getMembers(page, 10);
 
-      setMembers(response.content || []);
       setPagination({
         currentPage: response.currentPage || 0,
         pageSize: response.pageSize || 10,
@@ -929,4 +892,3 @@ export const MembersPage = () => {
 };
 
 export default MembersPage;
-

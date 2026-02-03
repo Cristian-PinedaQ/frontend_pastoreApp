@@ -4,18 +4,38 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
+    
+    <!-- Descripción clara para pestañas/historial -->
     <meta
       name="description"
       content="Gestión Pastoral - Sistema de administración para congregaciones"
     />
-
+    
+    <!-- Desindexar de buscadores -->
+    <meta name="robots" content="noindex, nofollow" />
+    
     <!-- Favicon -->
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
+    
+    <!-- Rendimiento: Precargar fuentes si las usas -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Open Graph (si se comparte en Slack, Teams, etc) -->
+    <meta property="og:title" content="Gestión Pastoral" />
+    <meta property="og:description" content="Sistema de administración para congregaciones" />
+    <meta property="og:image" content="%PUBLIC_URL%/og-image.png" />
+    <meta property="og:type" content="website" />
 
     <title>Gestión Pastoral</title>
   </head>
   <body>
-    <noscript>Necesitas habilitar JavaScript para ejecutar esta aplicación.</noscript>
+   <noscript>
+  <p style="padding: 20px; text-align: center;">
+    JavaScript debe estar habilitado para usar esta aplicación.
+  </p>
+</noscript>
     <div id="root"></div>
   </body>
 </html>

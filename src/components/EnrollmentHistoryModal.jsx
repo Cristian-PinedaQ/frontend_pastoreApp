@@ -1,5 +1,6 @@
 // 📋 EnrollmentHistoryModal.jsx - v2 CON MODO OSCURO COMPLETO
 // Modal estilizado para historial de inscripciones con soporte automático de dark mode
+// ✅ ARREGLADO: Eliminadas variables no usadas (bgButtonSecondary, textButtonSecondary)
 
 import React, { useEffect, useState } from 'react';
 
@@ -117,8 +118,6 @@ export const EnrollmentHistoryModal = ({
   const bgEmptyState = isDarkMode ? 'bg-slate-800/50' : 'bg-gray-50';
   const textEmpty = isDarkMode ? 'text-slate-400' : 'text-gray-500';
   const bgButton = isDarkMode ? 'bg-blue-700 hover:bg-blue-600' : 'bg-blue-600 hover:bg-blue-700';
-  const bgButtonSecondary = isDarkMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-200 hover:bg-gray-300';
-  const textButtonSecondary = isDarkMode ? 'text-slate-100' : 'text-gray-700';
 
   return (
     <>

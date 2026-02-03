@@ -1,7 +1,8 @@
 // ✅ ModalLessonAttendanceDetail.jsx - CON DARK MODE Y SELECTOR DE PARTICIPACIÓN
 // Modal para ver asistencias por lección con tabla intuitiva
+// ✅ ARREGLADO: loadData envuelto en useCallback para dependencias
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
 
 const ModalLessonAttendanceDetail = ({ 
@@ -84,13 +85,8 @@ const ModalLessonAttendanceDetail = ({
     { value: 'EXCELENTE_PARTICIPACION', label: '🌟 Excelente participación' },
   ];
 
-  useEffect(() => {
-    if (isOpen && lesson?.id && enrollment?.id) {
-      loadData();
-    }
-  }, [isOpen, lesson?.id, enrollment?.id]);
-
-  const loadData = async () => {
+  // ✅ ARREGLADO: Envolver loadData en useCallback
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError('');
     setParticipationScores({});
@@ -127,7 +123,13 @@ const ModalLessonAttendanceDetail = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [lesson.id, enrollment.id]);
+
+  useEffect(() => {
+    if (isOpen && lesson?.id && enrollment?.id) {
+      loadData();
+    }
+  }, [isOpen, lesson?.id, enrollment?.id, loadData]);
 
   const getStudentAttendance = (studentEnrollmentId) => {
     return attendances.find(a => a.studentEnrollmentId === studentEnrollmentId);

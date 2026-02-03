@@ -2,11 +2,21 @@
 // UsersPage.jsx - VERSIÓN SEGURA CON DARK MODE
 // ============================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import authService from "../services/authService";
 import { logError } from "../utils/securityLogger";
 import { throttle } from "lodash";
+
+// ✅ ARREGLADO: ERROR_MESSAGES fuera del componente (constante)
+const ERROR_MESSAGES = {
+  UNAUTHORIZED: "No tienes permisos para acceder a esta página",
+  VALIDATION_ERROR: "Datos inválidos. Por favor verifica los campos",
+  SERVER_ERROR: "Error al procesar la solicitud. Intenta más tarde",
+  NETWORK_ERROR: "Error de conexión. Verifica tu internet",
+  CONFLICT: "El usuario ya existe",
+  NOT_FOUND: "El usuario no fue encontrado",
+};
 
 const UsersPage = () => {
   // ========== DARK MODE ==========
@@ -80,27 +90,6 @@ const UsersPage = () => {
     role: "PROFESORES",
   });
 
-  // ✅ SEGURIDAD: Mapeo de errores seguros
-  const ERROR_MESSAGES = {
-    UNAUTHORIZED: "No tienes permisos para acceder a esta página",
-    VALIDATION_ERROR: "Datos inválidos. Por favor verifica los campos",
-    SERVER_ERROR: "Error al procesar la solicitud. Intenta más tarde",
-    NETWORK_ERROR: "Error de conexión. Verifica tu internet",
-    CONFLICT: "El usuario ya existe",
-    NOT_FOUND: "El usuario no fue encontrado",
-  };
-
-  // ✅ SEGURIDAD: Logger seguro sin exponer detalles
-  const handleError = (errorCode, context = "") => {
-    logError({
-      code: errorCode,
-      context,
-      timestamp: new Date().toISOString(),
-      userId: user?.id,
-    });
-    setError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.SERVER_ERROR);
-  };
-
   // ✅ SEGURIDAD: Validación de contraseña fuerte
   const validatePassword = (password) => {
     const errors = [];
@@ -108,25 +97,27 @@ const UsersPage = () => {
     if (!/[A-Z]/.test(password)) errors.push("Debe contener mayúscula");
     if (!/[a-z]/.test(password)) errors.push("Debe contener minúscula");
     if (!/[0-9]/.test(password)) errors.push("Debe contener número");
-    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+    // ✅ ARREGLADO: Regex sin escapes innecesarios
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       errors.push("Debe contener carácter especial");
     }
     return { valid: errors.length === 0, errors };
   };
 
-  // ✅ SEGURIDAD: Solo PASTORES pueden acceder
-  useEffect(() => {
-    if (!hasRole("PASTORES")) {
-      setError(ERROR_MESSAGES.UNAUTHORIZED);
-      return;
-    }
-    loadUsers();
-  }, [hasRole]);
+  // ✅ SEGURIDAD: Logger seguro sin exponer detalles
+  // ✅ ARREGLADO: Envuelto en useCallback
+  const handleError = useCallback((errorCode, context = "") => {
+    logError({
+      code: errorCode,
+      context,
+      timestamp: new Date().toISOString(),
+      userId: user?.id,
+    });
+    setError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.SERVER_ERROR);
+  }, [user?.id]);
 
-  /**
-   * ✅ SEGURIDAD: Carga usuarios con validación backend
-   */
-  const loadUsers = async () => {
+  // ✅ ARREGLADO: Agregada handleError a dependencias
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     setError("");
     setSuccess("");
@@ -156,7 +147,16 @@ const UsersPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [handleError]);
+
+  // ✅ SEGURIDAD: Solo PASTORES pueden acceder
+  useEffect(() => {
+    if (!hasRole("PASTORES")) {
+      setError(ERROR_MESSAGES.UNAUTHORIZED);
+      return;
+    }
+    loadUsers();
+  }, [hasRole, loadUsers]);
 
   /**
    * ✅ SEGURIDAD: Enmascarar email en la UI

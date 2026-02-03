@@ -2,7 +2,9 @@
 // ✅ MEJORADO: Soporte completo para Dark Mode
 // ✅ ACTUALIZADO: Botones de acciones integrados en el modal
 // ✅ OPTIMIZADO: Usa absolute en lugar de fixed para ocupar el contenedor padre
-import React, { useState, useEffect } from "react";
+// ✅ ARREGLADO: 3 warnings de ESLint (selectedEnrollment, loadEnrollments dependency, ==)
+
+import React, { useState, useEffect, useCallback } from "react";
 import apiService from "../apiService";
 
 export const MemberDetailModal = ({
@@ -18,15 +20,10 @@ export const MemberDetailModal = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("info");
-  const [selectedEnrollment, setSelectedEnrollment] = useState(null);
   const [enrollmentDetail, setEnrollmentDetail] = useState(null);
 
-  useEffect(() => {
-    console.log("✅ Modal abierto para:", member.name);
-    loadEnrollments();
-  }, [member]);
-
-  const loadEnrollments = async () => {
+  // ✅ ARREGLADO: Envolver loadEnrollments en useCallback
+  const loadEnrollments = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -42,7 +39,12 @@ export const MemberDetailModal = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [member.id]);
+
+  useEffect(() => {
+    console.log("✅ Modal abierto para:", member.name);
+    loadEnrollments();
+  }, [member.name, loadEnrollments]);
 
   const handleViewEnrollmentDetail = async (enrollment) => {
     try {
@@ -75,7 +77,6 @@ export const MemberDetailModal = ({
         lessons: lessons,
       });
 
-      setSelectedEnrollment(enrollment);
       setActiveTab("enrollmentDetail");
     } catch (err) {
       console.error("❌ Error:", err);
@@ -124,7 +125,7 @@ export const MemberDetailModal = ({
           <div>
             <h1 className="text-2xl font-bold">{member.name}</h1>
             <p className="text-blue-50 text-sm mt-1">
-              {member.isActive == true ? "🟢 Activo" : "🔴 Inactivo"}
+              {member.isActive === true ? "🟢 Activo" : "🔴 Inactivo"}
             </p>
           </div>
           <button

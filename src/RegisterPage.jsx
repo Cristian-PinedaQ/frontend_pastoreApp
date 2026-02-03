@@ -1,11 +1,13 @@
 // 📝 RegisterPage - Formulario de Registro
+// ✅ ARREGLADO: hasRole no se usa, se eliminó de la desestructuración
+
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
-  const { register, loading, error, hasRole } = useAuth();
+  const { register, loading, error } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',

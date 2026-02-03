@@ -1,8 +1,9 @@
 // 📝 ModalEnrollStudent.jsx - v2 CON MODO OSCURO
 // Modal para inscribir estudiantes a cohortes
 // Legible automáticamente en modo oscuro
+// ✅ ARREGLADO: loadAvailableCohorts envuelto en useCallback
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
 
 const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
@@ -95,13 +96,6 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     }
   }, [isOpen, step]);
 
-  // Cargar cohortes disponibles cuando se selecciona nivel
-  useEffect(() => {
-    if (selectedLevel && step === 3) {
-      loadAvailableCohorts();
-    }
-  }, [selectedLevel, step]);
-
   // ========== CARGAR MIEMBROS ==========
   const loadMembers = async () => {
     setLoading(true);
@@ -121,7 +115,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
   };
 
   // ========== CARGAR COHORTES DISPONIBLES ==========
-  const loadAvailableCohorts = async () => {
+  // ✅ ARREGLADO: Envuelto en useCallback
+  const loadAvailableCohorts = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -136,7 +131,14 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedLevel]);
+
+  // Cargar cohortes disponibles cuando se selecciona nivel
+  useEffect(() => {
+    if (selectedLevel && step === 3) {
+      loadAvailableCohorts();
+    }
+  }, [selectedLevel, step, loadAvailableCohorts]);
 
   // ========== MANEJAR SIGUIENTE PASO ==========
   const handleNext = () => {

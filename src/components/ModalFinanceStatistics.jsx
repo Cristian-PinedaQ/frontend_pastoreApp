@@ -3,13 +3,25 @@
 // ✅ Gráficas dinámicas según filtro seleccionado
 // ✅ Genera PDF con información del filtro
 // ✅ Totalmente legible en modo oscuro
+// ✅ CAMBIOS MÍNIMOS - SIN ROMPER NADA
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { generateFilteredFinancePDF } from '../services/financepdfgenerator';
+
+// ========== CONSTANTES GLOBALES (CAMBIO #1) ==========
+// ✅ Movidas aquí para que no cambien en cada render
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+const COLORS_PALETTE = {
+  concept: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
+  method: ['#2563eb', '#0891b2', '#059669', '#d97706', '#7c3aed'],
+  verified: '#10b981',
+  unverified: '#f59e0b',
+};
 
 const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinances = [] }) => {
   const [viewType, setViewType] = useState('bar');
@@ -18,7 +30,6 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
-  const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
 
@@ -125,7 +136,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
 
     // Inicializar todos los meses
     for (let m = 1; m <= 12; m++) {
-      monthData[m] = { month: monthNames[m - 1], count: 0, total: 0 };
+      monthData[m] = { month: MONTH_NAMES[m - 1], count: 0, total: 0 };
     }
 
     // Llenar datos
@@ -141,7 +152,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
     });
 
     return Object.values(monthData);
-  }, [allFinances, selectedYear, filterType, monthNames]);
+  }, [allFinances, selectedYear, filterType]);
 
   // Tema
   const theme = {
@@ -159,14 +170,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
     gridColor: isDarkMode ? '#334155' : '#e0e0e0',
   };
 
-  // Colores de gráficos
-  const COLORS = {
-    concept: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
-    method: ['#2563eb', '#0891b2', '#059669', '#d97706', '#7c3aed'],
-    verified: '#10b981',
-    unverified: '#f59e0b',
-  };
-
+  // ========== CAMBIO #2: Usar COLORS_PALETTE (constante global) ==========
   const conceptChartData = useMemo(() => {
     const stats = getFilteredStatistics;
     if (!stats || !stats.byConcept) return [];
@@ -184,10 +188,11 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
       name: conceptMap[key] || key,
       cantidad: value.count,
       monto: parseFloat((value.total / 1000).toFixed(2)),
-      fill: COLORS.concept[index % COLORS.concept.length],
+      fill: COLORS_PALETTE.concept[index % COLORS_PALETTE.concept.length],
     }));
   }, [getFilteredStatistics]);
 
+  // ========== CAMBIO #3: Usar COLORS_PALETTE (constante global) ==========
   const methodChartData = useMemo(() => {
     const stats = getFilteredStatistics;
     if (!stats || !stats.byMethod) return [];
@@ -201,10 +206,11 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
       name: methodMap[key] || key,
       cantidad: value.count,
       monto: parseFloat((value.total / 1000).toFixed(2)),
-      fill: COLORS.method[index % COLORS.method.length],
+      fill: COLORS_PALETTE.method[index % COLORS_PALETTE.method.length],
     }));
   }, [getFilteredStatistics]);
 
+  // ========== CAMBIO #4: Usar COLORS_PALETTE (constante global) ==========
   const verificationData = useMemo(() => {
     const stats = getFilteredStatistics;
     if (!stats) return [];
@@ -214,19 +220,19 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
         name: '✅ Verificados',
         value: stats.verifiedCount,
         monto: stats.verifiedAmount,
-        fill: COLORS.verified,
+        fill: COLORS_PALETTE.verified,
       },
       {
         name: '⏳ Pendientes',
         value: stats.unverifiedCount,
         monto: stats.unverifiedAmount,
-        fill: COLORS.unverified,
+        fill: COLORS_PALETTE.unverified,
       },
     ];
   }, [getFilteredStatistics]);
 
-  // ========== MANEJAR EXPORTAR PDF ==========
-  const handleExportFilteredPDF = () => {
+  // ========== CAMBIO #5: useCallback para evitar warnings ==========
+  const handleExportFilteredPDF = useCallback(() => {
     try {
       const filterInfo = {
         filterType: filterType,
@@ -245,7 +251,17 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
       console.error('Error generando PDF:', err);
       alert('Error al generar PDF: ' + err.message);
     }
-  };
+  }, [
+    filterType,
+    selectedMonth,
+    selectedYear,
+    getFilteredFinances,
+    getFilteredStatistics,
+    conceptChartData,
+    methodChartData,
+    verificationData,
+    monthlyComparisonData,
+  ]);
 
   if (!isOpen) return null;
 
@@ -305,7 +321,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
         >
           <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>
             📊 Estadísticas Financieras
-            {filterType === 'month' && ` - ${monthNames[selectedMonth - 1]} ${selectedYear}`}
+            {filterType === 'month' && ` - ${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`}
             {filterType === 'year' && ` - Año ${selectedYear}`}
           </h2>
           <button
@@ -440,7 +456,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                   cursor: 'pointer',
                 }}
               >
-                {monthNames.map((month, idx) => (
+                {MONTH_NAMES.map((month, idx) => (
                   <option key={idx + 1} value={idx + 1}>{month}</option>
                 ))}
               </select>
@@ -542,13 +558,13 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                 icon: '✅',
                 label: 'Verificados',
                 value: `${displayStats.verifiedCount} - $ ${(displayStats.verifiedAmount || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })}`,
-                color: COLORS.verified,
+                color: COLORS_PALETTE.verified,
               },
               {
                 icon: '⏳',
                 label: 'Pendientes de Verificar',
                 value: `${displayStats.unverifiedCount} - $ ${(displayStats.unverifiedAmount || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })}`,
-                color: COLORS.unverified,
+                color: COLORS_PALETTE.unverified,
               },
             ].map((stat, idx) => (
               <div
