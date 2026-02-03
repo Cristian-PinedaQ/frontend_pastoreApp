@@ -30,93 +30,73 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
   const [recordedBy, setRecordedBy] = useState('');
 
   // ✅ CORREGIDO: Obtener SOLO el username
-  const getRecordedBy = () => {
-    console.log('🔍 [getRecordedBy] Obteniendo usuario...');
+  // ✅ VERSIÓN LIMPIA: Sin console.log
+const getRecordedBy = () => {
+  // Intento 1: sessionStorage['username'] (directo)
+  let user = sessionStorage.getItem('username');
+  if (user && typeof user === 'string' && !user.startsWith('{')) {
+    return user;
+  }
 
-    // Intento 1: localStorage['username'] (directo)
-    let user = localStorage.getItem('username');
-    console.log('   localStorage[username]:', user);
-    if (user && typeof user === 'string' && !user.startsWith('{')) {
-      // Es un string simple, no un JSON
-      console.log('✅ Usuario directo:', user);
-      return user;
-    }
-
-    // Intento 2: localStorage['user'] (objeto JSON stringificado)
-    let userObj = localStorage.getItem('user');
-    console.log('   localStorage[user]:', userObj);
-    if (userObj) {
-      try {
-        // Parsear el JSON stringificado
-        const parsed = JSON.parse(userObj);
-        console.log('   Parsed user:', parsed);
-        
-        // Extraer solo el username
-        if (parsed.username) {
-          console.log('✅ Username extraído de user:', parsed.username);
-          return parsed.username;
-        }
-      } catch (e) {
-        console.warn('⚠️ No se pudo parsear user:', e.message);
-      }
-    }
-
-    // Intento 3: localStorage['currentUser']
-    let currentUser = localStorage.getItem('currentUser');
-    console.log('   localStorage[currentUser]:', currentUser);
-    if (currentUser) {
-      try {
-        const parsed = JSON.parse(currentUser);
-        if (parsed.username) {
-          console.log('✅ Username extraído de currentUser:', parsed.username);
-          return parsed.username;
-        }
-      } catch (e) {
-        console.warn('⚠️ No se pudo parsear currentUser:', e.message);
-      }
-    }
-
-    // Intento 4: localStorage['email']
-    let email = localStorage.getItem('email');
-    console.log('   localStorage[email]:', email);
-    if (email) {
-      console.log('✅ Email encontrado:', email);
-      return email;
-    }
-
-    // Intento 5: Decodificar JWT
+  // Intento 2: sessionStorage['user'] (objeto JSON stringificado)
+  let userObj = sessionStorage.getItem('user');
+  if (userObj) {
     try {
-      const token = localStorage.getItem('token');
-      console.log('   token existe:', !!token);
-      
-      if (token) {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const base64Url = parts[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-          const jsonPayload = decodeURIComponent(
-            atob(base64)
-              .split('')
-              .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-              .join('')
-          );
-          const decoded = JSON.parse(jsonPayload);
-          console.log('   JWT decodificado:', decoded);
-          
-          const username = decoded.username || decoded.sub || decoded.user || decoded.email;
-          if (username) {
-            console.log('✅ Username del JWT:', username);
-            return username;
-          }
+      const parsed = JSON.parse(userObj);
+      if (parsed.username) {
+        return parsed.username;
+      }
+    } catch (e) {
+      // Ignorar error de parseo
+    }
+  }
+
+  // Intento 3: sessionStorage['currentUser']
+  let currentUser = sessionStorage.getItem('currentUser');
+  if (currentUser) {
+    try {
+      const parsed = JSON.parse(currentUser);
+      if (parsed.username) {
+        return parsed.username;
+      }
+    } catch (e) {
+      // Ignorar error de parseo
+    }
+  }
+
+  // Intento 4: sessionStorage['email']
+  let email = sessionStorage.getItem('email');
+  if (email) {
+    return email;
+  }
+
+  // Intento 5: Decodificar JWT
+  try {
+    const token = sessionStorage.getItem('token');
+    if (token) {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const base64Url = parts[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split('')
+            .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        const decoded = JSON.parse(jsonPayload);
+        const username = decoded.username || decoded.sub || decoded.user || decoded.email;
+        if (username) {
+          return username;
         }
       }
-    } catch (error) {
-      console.warn('⚠️ Error JWT:', error.message);
     }
+  } catch (error) {
+    // Ignorar error JWT
+  }
 
-    console.warn('❌ NO se encontró username');
-    return '';
-  };
+  return '';
+};
 
   // Cargar miembros
   useEffect(() => {

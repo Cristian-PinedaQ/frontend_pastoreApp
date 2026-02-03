@@ -701,7 +701,7 @@ export const MembersPage = () => {
                   { value: "D1", label: "Distrito 1" },
                   { value: "D2", label: "Distrito 2" },
                   { value: "D3", label: "Distrito 3" },
-                  { value: "Pastores", label: "Pastores" },
+                  { value: "PASTORES", label: "Pastores" },
                 ]}
               />
 
@@ -837,7 +837,7 @@ export const MembersPage = () => {
             { value: "D1", label: "Distrito 1" },
             { value: "D2", label: "Distrito 2" },
             { value: "D3", label: "Distrito 3" },
-            { value: "Pastores", label: "Pastores" },
+            { value: "PASTORES", label: "Pastores" },
           ]}
           leaders={uniqueLeaders}
           onExportPDF={handleExportPDF}
@@ -929,3 +929,4 @@ export const MembersPage = () => {
 };
 
 export default MembersPage;
+
