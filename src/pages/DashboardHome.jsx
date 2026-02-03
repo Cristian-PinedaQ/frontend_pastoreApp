@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
 import { useAuth } from '../context/AuthContext';
 import "../css/DashboardHome.css";
-import logoDora from '../assets/LOGO_PNG_DORADO.png';
+import logoDora from '../assets/LOGO_PNG_DORADO.avif';
 
 export const DashboardHome = () => {
   const { user } = useAuth();
