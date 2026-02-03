@@ -3,7 +3,9 @@
 // ✅ Validación de entrada
 // ✅ Mensajes de error genéricos
 // ✅ Export con nombre (ESLint compliance)
-
+//Produccion
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+//desarrollo
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
