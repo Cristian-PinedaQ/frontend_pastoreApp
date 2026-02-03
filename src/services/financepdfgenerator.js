@@ -1,15 +1,228 @@
-// 📄 financePdfGenerator.js - v7 CON SOPORTE COMPLETO PARA FILTROS
+// 📄 financePdfGenerator.js - v8 CON SOPORTE COMPLETO PARA FILTROS Y REPORTES DIARIOS
+// ✅ generateDailyFinancePDF: Ahora incluye tabla de detalles cuando reportType === 'members'
 // ✅ generateFilteredFinancePDF: Genera PDF con filtros por mes/año
-// ✅ Soporta comparativa mes a mes para filtro anual
-// ✅ Título dinámico según filtro seleccionado
+// ✅ Mantiene compatibilidad con código existente
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// ========== FUNCIÓN AUXILIAR: Obtener fecha sin problemas de zona horaria ==========
-const getDateWithoutTimezone = (dateString) => {
-  const [year, month, day] = dateString.split('-').map(Number);
-  return new Date(year, month - 1, day);
+/**
+ * ✅ MEJORADO: Generar PDF diario CON TABLA DE DETALLES
+ * Ahora soporta dos tipos de reporte:
+ * - 'summary': Solo resumen por concepto
+ * - 'members': Incluye tabla detallada de todos los registros
+ * 
+ * @param {Object} data - Datos del reporte
+ * @param {string} data.dateRange - Rango de fechas (ej: "2024-01-01 - 2024-01-31")
+ * @param {string} data.reportType - 'summary' o 'members' 
+ * @param {Array} data.finances - Array de registros financieros con datos filtrados
+ * @param {Object} data.statistics - Estadísticas calculadas (totalRecords, totalAmount, byConcept, etc)
+ * @param {string} filename - Nombre base del archivo
+ */
+export const generateDailyFinancePDF = (data, filename = 'reporte-diario') => {
+  try {
+    console.log('📄 Iniciando generación de PDF diario...');
+    console.log('   Tipo de reporte:', data.reportType);
+    console.log('   Registros a incluir:', data.finances?.length || 0);
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let yPosition = 15;
+
+    // ========== HEADER ==========
+    doc.setFillColor(5, 150, 105);
+    doc.rect(0, 0, pageWidth, 25, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text('REPORTE DE INGRESOS FINANCIEROS', pageWidth / 2, 12, { align: 'center' });
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(
+      data.dateRange || new Date().toLocaleDateString('es-CO'),
+      pageWidth / 2,
+      20,
+      { align: 'center' }
+    );
+
+    yPosition = 35;
+
+    // ========== INFORMACIÓN GENERAL ==========
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.text('Información del Reporte', 15, yPosition);
+    yPosition += 6;
+
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Período: ${data.dateRange || 'Sin especificar'}`, 15, yPosition);
+    yPosition += 4;
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString()}`, 15, yPosition);
+    yPosition += 10;
+
+    // ========== RESUMEN DE TOTALES ==========
+    const stats = data.statistics || {};
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(5, 150, 105);
+    doc.text('Resumen Financiero', 15, yPosition);
+    yPosition += 6;
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(10);
+    doc.text(`Total de Registros: ${stats.totalRecords || data.totalRecords || 0}`, 15, yPosition);
+    yPosition += 5;
+    doc.text(`Monto Total: $ ${(stats.totalAmount || data.totalAmount || 0).toLocaleString('es-CO')}`, 15, yPosition);
+    yPosition += 5;
+    doc.text(`Verificados: ${stats.verifiedCount || 0} registros`, 15, yPosition);
+    yPosition += 5;
+    doc.text(`Pendientes: ${stats.unverifiedCount || 0} registros`, 15, yPosition);
+    yPosition += 10;
+
+    // ========== DESGLOSE POR CONCEPTO ==========
+    if (stats.byConcept && Object.keys(stats.byConcept).length > 0) {
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(5, 150, 105);
+      doc.text('Desglose por Concepto', 15, yPosition);
+      yPosition += 6;
+
+      const conceptColumns = [
+        { header: 'Concepto', dataKey: 'name' },
+        { header: 'Registros', dataKey: 'cantidad' },
+        { header: 'Monto Total', dataKey: 'monto' },
+      ];
+
+      const conceptData = Object.entries(stats.byConcept).map(([key, value]) => ({
+        name: getConceptLabel(key),
+        cantidad: value.count,
+        monto: `$ ${(value.total || 0).toLocaleString('es-CO')}`,
+      }));
+
+      autoTable(doc, {
+        columns: conceptColumns,
+        body: conceptData,
+        startY: yPosition,
+        margin: { left: 15, right: 15 },
+        styles: {
+          fontSize: 9,
+          cellPadding: 4,
+          overflow: 'linebreak',
+        },
+        headStyles: {
+          fillColor: [5, 150, 105],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [240, 253, 244],
+        },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ========== TABLA DETALLADA DE REGISTROS (SOLO SI reportType === 'members') ==========
+    if (data.reportType === 'members' && data.finances && Array.isArray(data.finances) && data.finances.length > 0) {
+      // Validar si necesitamos nueva página
+      if (yPosition > pageHeight - 80) {
+        doc.addPage();
+        yPosition = 15;
+      }
+
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(5, 150, 105);
+      doc.text('Detalle de Registros', 15, yPosition);
+      yPosition += 8;
+
+      const detailColumns = [
+        { header: 'Miembro', dataKey: 'memberName' },
+        { header: 'Concepto', dataKey: 'concept' },
+        { header: 'Monto', dataKey: 'amount' },
+        { header: 'Método', dataKey: 'method' },
+        { header: 'Estado', dataKey: 'status' },
+        { header: 'Registrado por', dataKey: 'recordedBy' },
+        { header: 'Fecha', dataKey: 'date' },
+      ];
+
+      const detailData = data.finances.map(f => ({
+        memberName: f.memberName || 'Sin nombre',
+        concept: getConceptLabel(f.concept || f.incomeConcept),
+        amount: `$ ${(f.amount || 0).toLocaleString('es-CO')}`,
+        method: getMethodLabel(f.method || f.incomeMethod),
+        status: f.isVerified ? 'Verificado' : 'Pendiente',
+        recordedBy: f.recordedBy || '-',
+        date: f.registrationDate 
+          ? new Date(f.registrationDate).toLocaleDateString('es-CO')
+          : '-',
+      }));
+
+      autoTable(doc, {
+        columns: detailColumns,
+        body: detailData,
+        startY: yPosition,
+        margin: { left: 15, right: 15 },
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+          overflow: 'linebreak',
+        },
+        headStyles: {
+          fillColor: [5, 150, 105],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        alternateRowStyles: {
+          fillColor: [240, 253, 244],
+        },
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 18 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 20 },
+        },
+      });
+
+      yPosition = doc.lastAutoTable.finalY + 10;
+    }
+
+    // ========== NOTA AL PIE ==========
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(150, 150, 150);
+    doc.text(
+      `Reporte generado automáticamente • ${new Date().toLocaleDateString('es-CO')}`,
+      pageWidth / 2,
+      pageHeight - 10,
+      { align: 'center' }
+    );
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const fullFilename = `${filename}_${timestamp}.pdf`;
+
+    doc.save(fullFilename);
+    console.log('✅ PDF generado exitosamente:', fullFilename);
+
+  } catch (error) {
+    console.error('❌ Error generando PDF:', error);
+    alert('Error al generar PDF: ' + error.message);
+    throw error;
+  }
 };
 
 /**
@@ -269,6 +482,7 @@ export const generateFilteredFinancePDF = (filterInfo) => {
         { header: 'Monto', dataKey: 'amount' },
         { header: 'Método', dataKey: 'method' },
         { header: 'Estado', dataKey: 'status' },
+        { header: 'Registrado por', dataKey: 'recordedBy' },
         { header: 'Fecha', dataKey: 'date' },
       ];
 
@@ -278,6 +492,7 @@ export const generateFilteredFinancePDF = (filterInfo) => {
         amount: `$ ${(f.amount || 0).toLocaleString('es-CO')}`,
         method: getMethodLabel(f.method || f.incomeMethod),
         status: f.isVerified ? 'Verificado' : 'Pendiente',
+        recordedBy: f.recordedBy || '-',
         date: f.registrationDate 
           ? new Date(f.registrationDate).toLocaleDateString('es-CO')
           : '-',
@@ -302,12 +517,13 @@ export const generateFilteredFinancePDF = (filterInfo) => {
           fillColor: [240, 253, 244],
         },
         columnStyles: {
-          0: { cellWidth: 35 },
-          1: { cellWidth: 30 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 25 },
-          4: { cellWidth: 20 },
+          0: { cellWidth: 30 },
+          1: { cellWidth: 25 },
+          2: { cellWidth: 20 },
+          3: { cellWidth: 20 },
+          4: { cellWidth: 18 },
           5: { cellWidth: 25 },
+          6: { cellWidth: 20 },
         },
       });
 
@@ -326,110 +542,20 @@ export const generateFilteredFinancePDF = (filterInfo) => {
     );
 
     // ========== GUARDAR ==========
-    let filename = 'reporte-financiero';
+    let reportFilename = 'reporte-financiero';
 
     if (filterInfo.filterType === 'month') {
       const monthName = monthNames[filterInfo.selectedMonth - 1].toLowerCase();
-      filename = `reporte-${monthName}-${filterInfo.selectedYear}`;
+      reportFilename = `reporte-${monthName}-${filterInfo.selectedYear}`;
     } else if (filterInfo.filterType === 'year') {
-      filename = `reporte-anual-${filterInfo.selectedYear}`;
+      reportFilename = `reporte-anual-${filterInfo.selectedYear}`;
     }
 
     const timestamp = new Date().toISOString().split('T')[0];
-    const fullFilename = `${filename}_${timestamp}.pdf`;
+    const fullFilename = `${reportFilename}_${timestamp}.pdf`;
 
     doc.save(fullFilename);
     console.log('✅ PDF generado exitosamente:', fullFilename);
-
-  } catch (error) {
-    console.error('❌ Error generando PDF:', error);
-    alert('Error al generar PDF: ' + error.message);
-    throw error;
-  }
-};
-
-/**
- * Generador de PDF original (mantenido para compatibilidad)
- */
-export const generateDailyFinancePDF = (data, filename = 'reporte-diario') => {
-  try {
-    console.log('📄 Iniciando generación de PDF diario...');
-
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    let yPosition = 15;
-
-    // ========== HEADER ==========
-    doc.setFillColor(5, 150, 105);
-    doc.rect(0, 0, pageWidth, 25, 'F');
-
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text('REPORTE DE INGRESOS FINANCIEROS', pageWidth / 2, 12, { align: 'center' });
-
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(
-      data.dateRange || new Date().toLocaleDateString('es-CO'),
-      pageWidth / 2,
-      20,
-      { align: 'center' }
-    );
-
-    yPosition = 35;
-
-    // ========== INFORMACIÓN GENERAL ==========
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.text('Información del Reporte', 15, yPosition);
-    yPosition += 6;
-
-    doc.setFontSize(9);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Período: ${data.dateRange || 'Sin especificar'}`, 15, yPosition);
-    yPosition += 4;
-    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO')} ${new Date().toLocaleTimeString()}`, 15, yPosition);
-    yPosition += 10;
-
-    // ========== RESUMEN DE TOTALES ==========
-    doc.setFontSize(11);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(5, 150, 105);
-    doc.text('Resumen Financiero', 15, yPosition);
-    yPosition += 6;
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFont(undefined, 'normal');
-    doc.setFontSize(10);
-    doc.text(`Total de Registros: ${data.totalRecords || 0}`, 15, yPosition);
-    yPosition += 5;
-    doc.text(`Monto Total: $ ${(data.totalAmount || 0).toLocaleString('es-CO')}`, 15, yPosition);
-    yPosition += 10;
-
-    // ========== NOTA AL PIE ==========
-    doc.setFontSize(8);
-    doc.setFont(undefined, 'normal');
-    doc.setTextColor(150, 150, 150);
-    doc.text(
-      `Reporte generado automáticamente • ${new Date().toLocaleDateString('es-CO')}`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: 'center' }
-    );
-
-    const timestamp = new Date().toISOString().split('T')[0];
-    const fullFilename = `${filename}_${timestamp}.pdf`;
-
-    doc.save(fullFilename);
-    console.log('✅ PDF generado:', fullFilename);
 
   } catch (error) {
     console.error('❌ Error generando PDF:', error);
@@ -452,7 +578,6 @@ export const generateFinancePDF = (data, filename = 'reporte-financiero') => {
     });
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
     let yPosition = 15;
 
     // HEADER
