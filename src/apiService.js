@@ -56,6 +56,16 @@ const validateNumber = (value, fieldName, min = 0) => {
 
 class ApiService {
 
+  // ✅ Obtener usuario actual del sessionStorage
+  getCurrentUser() {
+    try {
+      const user = sessionStorage.getItem('user');
+      return user ? JSON.parse(user) : null;
+    } catch (error) {
+      logError('❌ [getCurrentUser] Error parseando usuario:', error.message);
+      return null;
+    }
+  }
   // ✅ Obtener headers con autenticación DINÁMICAMENTE
   getHeaders() {
     const token = sessionStorage.getItem('token');
@@ -809,10 +819,18 @@ class ApiService {
     }
   }
 
-  async createFinance(financeData) {
+async createFinance(financeData) {
     try {
       if (!financeData || typeof financeData !== 'object') {
         throw new Error('Datos de finanza inválidos');
+      }
+
+      // ✅ Auto-llenar recordedBy con username del usuario actual
+      let recordedBy = financeData.recordedBy;
+      if (!recordedBy) {
+        const currentUser = this.getCurrentUser();
+        recordedBy = currentUser?.username || 'Sistema';
+        log('📝 [createFinance] recordedBy auto-llenado con:', recordedBy);
       }
 
       const body = {
@@ -822,7 +840,7 @@ class ApiService {
         incomeConcept: financeData.incomeConcept,
         incomeMethod: financeData.incomeMethod,
         description: financeData.description || '',
-        recordedBy: financeData.recordedBy,
+        recordedBy: recordedBy,
         registrationDate: financeData.registrationDate,
         isVerified: financeData.isVerified || false,
       };
@@ -849,6 +867,14 @@ class ApiService {
         throw new Error('Datos de finanza inválidos');
       }
 
+      // ✅ Auto-llenar recordedBy con username del usuario actual
+      let recordedBy = financeData.recordedBy;
+      if (!recordedBy) {
+        const currentUser = this.getCurrentUser();
+        recordedBy = currentUser?.username || 'Sistema';
+        log('📝 [updateFinance] recordedBy auto-llenado con:', recordedBy);
+      }
+
       const body = {
         memberId: validateNumber(financeData.memberId, 'memberId'),
         memberName: financeData.memberName,
@@ -856,7 +882,7 @@ class ApiService {
         incomeConcept: financeData.incomeConcept,
         incomeMethod: financeData.incomeMethod,
         description: financeData.description || '',
-        recordedBy: financeData.recordedBy,
+        recordedBy: recordedBy,
         registrationDate: financeData.registrationDate,
         isVerified: financeData.isVerified || false,
       };
@@ -875,7 +901,6 @@ class ApiService {
       throw error;
     }
   }
-
   async deleteFinance(id) {
     try {
       validateId(id, 'financeId');
