@@ -21,6 +21,7 @@ import StudentsPage from './pages/StudentsPage';
 import UsersPage from './pages/UsersPage';
 import FinancesPage from './pages/FinancesPage';
 import { LessonsPage, AttendancePage } from './pages/index';
+import ActivityPage from './pages/ActivityPage';
 
 function App() {
   return (
@@ -120,6 +121,17 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<FinancesPage />}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
+                />
+              }
+            />
+
+            {/* Finanzas */}
+            <Route
+              path="Activity"
+              element={
+                <ProtectedRoute
+                  element={<ActivityPage />}
                   requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
                 />
               }
