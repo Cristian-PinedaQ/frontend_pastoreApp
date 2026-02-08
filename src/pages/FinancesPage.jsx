@@ -13,6 +13,7 @@ import {
   generateDailyFinancePDF,
 } from "../services/financepdfgenerator";
 import { logSecurityEvent, logUserAction } from "../utils/securityLogger";
+import { transformForDisplay, prepareForBackend } from "../services/nameHelper"; // Importar nameHelper
 import "../css/FinancesPage.css";
 
 // 🔐 Debug condicional
@@ -162,10 +163,16 @@ const FinancesPage = () => {
       }));
 
       log("Finanzas procesadas", { count: processedFinances.length });
-      setAllFinances(processedFinances);
+      
+      // Aplicar transformaciones de nombres para mostrar en el frontend
+      const transformedFinances = processedFinances.map(finance => 
+        transformForDisplay(finance, ['memberName'])
+      );
+      
+      setAllFinances(transformedFinances);
 
       logUserAction("load_finances", {
-        financeCount: processedFinances.length,
+        financeCount: transformedFinances.length,
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -421,7 +428,7 @@ const FinancesPage = () => {
       logError("Error generando PDF:", err);
       setError("Error al generar PDF");
     }
-  }, [startDate, endDate, selectedConcept, filteredFinances, calculateStatistics, searchText, selectedMethod, selectedVerification],);
+  }, [startDate, endDate, selectedConcept, filteredFinances, calculateStatistics, searchText, selectedMethod, selectedVerification]);
 
   // ========== CONFIRM REPORT ==========
   const handleConfirmReport = useCallback(
@@ -513,7 +520,10 @@ const FinancesPage = () => {
           return;
         }
 
-        await apiService.createFinance(financeData);
+        // Preparar datos para backend (mantener nombres originales)
+        const backendData = prepareForBackend(financeData, ['memberName']);
+        
+        await apiService.createFinance(backendData);
 
         log("Ingreso creado exitosamente");
 
@@ -555,7 +565,10 @@ const FinancesPage = () => {
 
         log("Actualizando ingreso", { financeId: editingFinance.id });
 
-        await apiService.updateFinance(editingFinance.id, financeData);
+        // Preparar datos para backend (mantener nombres originales)
+        const backendData = prepareForBackend(financeData, ['memberName']);
+        
+        await apiService.updateFinance(editingFinance.id, backendData);
 
         log("Ingreso actualizado exitosamente");
 

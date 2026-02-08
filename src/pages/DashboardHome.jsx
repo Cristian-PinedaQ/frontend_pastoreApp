@@ -81,6 +81,7 @@ export const DashboardHome = () => {
         });
       } catch (err) {
         setError("No se pudieron cargar las estadísticas");
+        console.error("Error al cargar estadísticas:", err);
       } finally {
         setLoading(false);
       }
@@ -105,51 +106,19 @@ export const DashboardHome = () => {
     <div className="dashboard-page">
       <div className="page-container">
         <div className="page-header">
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '-12px',
-            width: '100%',
-            flexWrap: 'nowrap',
-          }}>
-            {/* Logo dinámico reemplazando emoji */}
+          <div className="logo-container">
             <img
-              src={isDarkMode ? logoDora : logoDora}
+              src={logoDora}
               alt="PastoreApp Logo"
-              style={{
-                height: 'clamp(80px, 15vw, 140px)',
-                width: 'auto',
-                maxWidth: '100%',
-                objectFit: 'contain',
-                transition: 'all 0.3s ease',
-                display: 'block',
-                lineHeight: '0',
-                flexShrink: 0,
-                minWidth: 'clamp(80px, 15vw, 140px)',
-                marginRight: isDarkMode ? '-12px': '2px',
-              }}
+              className={`dashboard-logo ${isDarkMode ? 'dark' : 'light'}`}
             />
           </div>
-          <div>
-              <h1 style={{
-                fontSize: 'clamp(24px, 5vw, 36px)',
-                fontWeight: '700',
-                margin: '10px',
-                lineHeight: '1.2',
-                textAlign: 'center',
-              }}>
-                Panel Principal
-              </h1>
-              <p style={{
-                fontSize: 'clamp(12px, 3vw, 16px)',
-                margin: '4px 0 0 0',
-                fontWeight: '500',
-                textAlign: 'center',
-              }}>
-                Bienvenido, {user?.username?.split(" ")[0]}! 👋
-              </p>
-            </div>
+          <div className="header-content">
+            <h1 className="dashboard-title">Panel Principal</h1>
+            <p className="dashboard-welcome">
+              Bienvenido, {user?.username?.split(" ")[0] || 'Usuario'}! 👋
+            </p>
+          </div>
         </div>
 
         {error && (
@@ -159,12 +128,42 @@ export const DashboardHome = () => {
         )}
 
         <div className="stats-grid">
-          <StatCard title="Membresia Activa" value={stats.totalMembers} icon="👥" gradient="stat-card-primary" />
-          <StatCard title="ROCIOS DE VIDA" value={stats.totalMembersFemale} icon="💝" gradient="stat-card-rocios" />
-          <StatCard title="RADICALES" value={stats.totalMembersMale} icon="⚔️" gradient="stat-card-radicales" />
-          <StatCard title="CBI" value={stats.totalLessons} icon="🏘️" gradient="stat-card-secondary" />
-          <StatCard title="LIDERAZGO" value={stats.totalAttendance} icon="🦺" gradient="stat-card-danger" />
-          <StatCard title="PROCESOS ACTIVOS" value={stats.totalEnrollments} icon="🗂️" gradient="stat-card-export" />
+          <StatCard 
+            title="Membresia Activa" 
+            value={stats.totalMembers} 
+            icon="👥" 
+            gradient="stat-card-primary" 
+          />
+          <StatCard 
+            title="ROCIOS DE VIDA" 
+            value={stats.totalMembersFemale} 
+            icon="💝" 
+            gradient="stat-card-rocios" 
+          />
+          <StatCard 
+            title="RADICALES" 
+            value={stats.totalMembersMale} 
+            icon="⚔️" 
+            gradient="stat-card-radicales" 
+          />
+          <StatCard 
+            title="CBI" 
+            value={stats.totalLessons} 
+            icon="🏘️" 
+            gradient="stat-card-secondary" 
+          />
+          <StatCard 
+            title="LIDERAZGO" 
+            value={stats.totalAttendance} 
+            icon="🦺" 
+            gradient="stat-card-danger" 
+          />
+          <StatCard 
+            title="PROCESOS ACTIVOS" 
+            value={stats.totalEnrollments} 
+            icon="🗂️" 
+            gradient="stat-card-export" 
+          />
         </div>
 
         <div className="quick-access-section">
@@ -198,7 +197,7 @@ export const DashboardHome = () => {
           </p>
 
           <div className="role-info">
-            <strong>Tu Rol:</strong> {user?.roles?.map(r => r.username || r).join(', ')}
+            <strong>Tu Rol:</strong> {user?.roles?.map(r => r.username || r).join(', ') || 'Usuario'}
           </div>
         </div>
       </div>

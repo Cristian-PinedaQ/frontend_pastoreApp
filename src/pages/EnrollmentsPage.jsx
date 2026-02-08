@@ -1,6 +1,7 @@
 // ============================================
 // EnrollmentsPage.jsx - SEGURIDAD MEJORADA
 // Gestión de cohortes con validaciones de seguridad
+// ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
 // ============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -10,7 +11,11 @@ import { throttle } from 'lodash';
 import ModalCreateLesson from '../components/ModalCreateLesson';
 import ModalRecordAttendance from '../components/ModalRecordAttendance';
 import ModalLessonAttendanceDetail from '../components/ModalLessonAttendanceDetail';
+import nameHelper from '../services/nameHelper'; // ✅ Importar el helper
 import '../css/EnrollmentsPage.css';
+
+// Extraer funciones del helper
+const { getDisplayName } = nameHelper;
 
 // 🔐 Debug condicional
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -25,7 +30,7 @@ const logError = (message, error) => {
   console.error(`[EnrollmentsPage] ${message}`, error);
 };
 
-// ✅ Sanitización de HTML
+// ✅ Sanitización de HTML (manteniendo nombres originales para seguridad)
 const escapeHtml = (text) => {
   if (!text || typeof text !== 'string') return '';
   const map = {
@@ -257,6 +262,7 @@ const EnrollmentsPage = () => {
     }
   };
 
+  // ✅ ACTUALIZADO: Usar getDisplayName para mostrar, pero guardar nombre original
   const handleSelectTeacher = (teacher) => {
     try {
       if (!teacher || !teacher.id || typeof teacher.id !== 'number') {
@@ -264,11 +270,14 @@ const EnrollmentsPage = () => {
         return;
       }
 
+      // Guardar nombre ORIGINAL para el backend
       setFormData((prev) => ({
         ...prev,
-        teacher: { id: teacher.id, name: escapeHtml(teacher.name) },
+        teacher: { id: teacher.id, name: teacher.name }, // Nombre ORIGINAL
       }));
-      setTeacherSearchTerm(escapeHtml(teacher.name));
+      
+      // Mostrar nombre transformado en el input
+      setTeacherSearchTerm(getDisplayName(teacher.name));
       setShowTeacherDropdown(false);
       setFilteredTeachers([]);
       
@@ -314,6 +323,7 @@ const EnrollmentsPage = () => {
     }
   };
 
+  // ✅ ACTUALIZADO: Usar getDisplayName para mostrar, pero guardar nombre original
   const handleEditSelectTeacher = (teacher) => {
     try {
       if (!teacher || !teacher.id || typeof teacher.id !== 'number') {
@@ -321,11 +331,14 @@ const EnrollmentsPage = () => {
         return;
       }
 
+      // Guardar nombre ORIGINAL para el backend
       setEditFormData((prev) => ({
         ...prev,
-        teacher: { id: teacher.id, name: escapeHtml(teacher.name) },
+        teacher: { id: teacher.id, name: teacher.name }, // Nombre ORIGINAL
       }));
-      setEditTeacherSearchTerm(escapeHtml(teacher.name));
+      
+      // Mostrar nombre transformado en el input
+      setEditTeacherSearchTerm(getDisplayName(teacher.name));
       setEditShowTeacherDropdown(false);
       setEditFilteredTeachers([]);
     } catch (error) {
@@ -509,7 +522,8 @@ const EnrollmentsPage = () => {
       });
 
       if (selectedEnrollment.teacher?.name) {
-        setEditTeacherSearchTerm(escapeHtml(selectedEnrollment.teacher.name));
+        // Mostrar nombre transformado en el input
+        setEditTeacherSearchTerm(getDisplayName(selectedEnrollment.teacher.name));
       }
 
       setShowEditModal(true);
@@ -729,46 +743,56 @@ const EnrollmentsPage = () => {
     return errors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // ✅ IMPORTANTE: El formulario envía nombres ORIGINALES al backend
+  // ========== FORM SUBMIT HANDLER (Versión mejorada) ==========
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    try {
-      setError('');
+  try {
+    setError('');
 
-      const validationErrors = validateForm();
-      if (validationErrors.length > 0) {
-        setError(validationErrors.join('. '));
-        return;
-      }
-
-      const enrollmentData = {
-        level: formData.level,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        maxStudents: parseInt(formData.maxStudents),
-        minAttendancePercentage: parseFloat(formData.minAttendancePercentage),
-        minAverageScore: parseFloat(formData.minAverageScore),
-        teacher: formData.teacher,
-      };
-
-      log('Creando cohorte', { level: formData.level });
-
-      await apiService.createEnrollment(enrollmentData);
-
-      logSecurityEvent('enrollment_created', {
-        level: formData.level,
-        timestamp: new Date().toISOString()
-      });
-
-      setShowForm(false);
-      resetForm();
-      fetchEnrollments();
-    } catch (err) {
-      handleError('CREATE_ENROLLMENT', 'handleSubmit');
-      logError('Error creando cohorte:', err);
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('. '));
+      return;
     }
-  };
 
+    const enrollmentData = {
+      level: formData.level,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      maxStudents: parseInt(formData.maxStudents),
+      minAttendancePercentage: parseFloat(formData.minAttendancePercentage),
+      minAverageScore: parseFloat(formData.minAverageScore),
+      teacher: formData.teacher,
+    };
+
+    log('Creando cohorte', { level: formData.level });
+
+    await apiService.createEnrollment(enrollmentData);
+
+    logSecurityEvent('enrollment_created', {
+      level: formData.level,
+      timestamp: new Date().toISOString()
+    });
+
+    // ✅ Mostrar alert inmediatamente
+    alert("✅ Cohorte creada exitosamente");
+    
+    setShowForm(false);
+    resetForm();
+    
+    // ✅ Luego actualizar datos en segundo plano
+    await fetchEnrollments();
+    
+  } catch (err) {
+    handleError('CREATE_ENROLLMENT', 'handleSubmit');
+    logError('Error creando cohorte:', err);
+    alert("❌ Error al crear la cohorte: " + err.message);
+  }
+};
+
+  // ✅ IMPORTANTE: El formulario de edición envía nombres ORIGINALES al backend
   const handleEditSubmit = async (e) => {
     e.preventDefault();
 
@@ -802,7 +826,7 @@ const EnrollmentsPage = () => {
         updateData.minAverageScore = parseFloat(editFormData.minAverageScore);
       }
       if (editFormData.teacher?.id && typeof editFormData.teacher.id === 'number') {
-        updateData.teacher = editFormData.teacher;
+        updateData.teacher = editFormData.teacher; // Contiene nombre ORIGINAL
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -936,7 +960,7 @@ const EnrollmentsPage = () => {
                   <input
                     type="text"
                     placeholder="Busca un maestro por nombre..."
-                    value={teacherSearchTerm}
+                    value={teacherSearchTerm} // ✅ Mostrar nombre TRANSFORMADO
                     onChange={(e) => handleTeacherSearch(e.target.value)}
                     onFocus={() => teacherSearchTerm && setShowTeacherDropdown(true)}
                     className="teacher-search-input"
@@ -964,7 +988,7 @@ const EnrollmentsPage = () => {
                           onClick={() => handleSelectTeacher(teacher)}
                           className="teacher-option"
                         >
-                          <div className="teacher-name">{escapeHtml(teacher.name)}</div>
+                          <div className="teacher-name">{getDisplayName(teacher.name)}</div> {/* ✅ Mostrar transformado */}
                         </button>
                       ))}
                     </div>
@@ -972,7 +996,7 @@ const EnrollmentsPage = () => {
 
                   {formData.teacher && (
                     <div className="teacher-selected">
-                      <p className="teacher-selected-name">✅ {formData.teacher.name}</p>
+                      <p className="teacher-selected-name">✅ {getDisplayName(formData.teacher.name)}</p> {/* ✅ Mostrar transformado */}
                     </div>
                   )}
                 </div>
@@ -1102,7 +1126,7 @@ const EnrollmentsPage = () => {
                   <p><strong>Fin:</strong> {new Date(enrollment.endDate).toLocaleDateString('es-CO')}</p>
                   <p><strong>Estudiantes:</strong> {enrollment.maxStudents} máx</p>
                   {enrollment.teacher?.name && (
-                    <p><strong>👨‍🏫 Maestro:</strong> {escapeHtml(enrollment.teacher.name)}</p>
+                    <p><strong>👨‍🏫 Maestro:</strong> {getDisplayName(enrollment.teacher.name)}</p>
                   )}
                 </div>
               </div>
@@ -1170,7 +1194,7 @@ const EnrollmentsPage = () => {
                     {selectedEnrollment.teacher?.name && (
                       <div>
                         <p className="detail-label">👨‍🏫 Maestro</p>
-                        <p className="detail-value">{escapeHtml(selectedEnrollment.teacher.name)}</p>
+                        <p className="detail-value">{getDisplayName(selectedEnrollment.teacher.name)}</p>
                       </div>
                     )}
                     <div>
@@ -1405,7 +1429,7 @@ const EnrollmentsPage = () => {
                     <input
                       type="text"
                       placeholder="Busca un maestro por nombre..."
-                      value={editTeacherSearchTerm}
+                      value={editTeacherSearchTerm} // ✅ Mostrar nombre TRANSFORMADO
                       onChange={(e) => handleEditTeacherSearch(e.target.value)}
                       onFocus={() => editTeacherSearchTerm && setEditShowTeacherDropdown(true)}
                       className="teacher-search-input"
@@ -1432,7 +1456,7 @@ const EnrollmentsPage = () => {
                             onClick={() => handleEditSelectTeacher(teacher)}
                             className="teacher-option"
                           >
-                            <div className="teacher-name">{escapeHtml(teacher.name)}</div>
+                            <div className="teacher-name">{getDisplayName(teacher.name)}</div> {/* ✅ Mostrar transformado */}
                           </button>
                         ))}
                       </div>
@@ -1440,7 +1464,7 @@ const EnrollmentsPage = () => {
 
                     {editFormData.teacher && (
                       <div className="teacher-selected">
-                        <p className="teacher-selected-name">✅ {editFormData.teacher.name}</p>
+                        <p className="teacher-selected-name">✅ {getDisplayName(editFormData.teacher.name)}</p> {/* ✅ Mostrar transformado */}
                       </div>
                     )}
                   </div>

@@ -832,4 +832,43 @@
   .activity-page__table {
     font-size: 0.875rem;
   }
+  /* Estilo para indicador de filtros aplicados */
+.activity-page__filters-applied {
+  margin-top: 5px;
+  padding: 5px 10px;
+  background-color: rgba(0, 123, 255, 0.1);
+  border-radius: 4px;
+  color: #007bff;
+  font-size: 0.9em;
+}
+
+/* Estilo para botón deshabilitado con tooltip */
+.activity-page__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.activity-page__btn:disabled:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.8em;
+  white-space: nowrap;
+  z-index: 1000;
+}
+
+/* Ajustes en el grid de controles */
+.activity-page__controls-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
 }

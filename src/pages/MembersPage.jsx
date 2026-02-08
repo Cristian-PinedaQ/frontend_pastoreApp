@@ -4,6 +4,7 @@
 // ✅ Generar PDF del resultado filtrado
 // ✅ Diseño responsive mantenido
 // ✅ ACTUALIZADO: Click en nombre para ver detalle, acciones en modal
+// ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
 
 import React, { useState, useEffect, useRef, memo, useCallback } from "react";
 import apiService from "../apiService";
@@ -11,7 +12,11 @@ import { useAuth } from "../context/AuthContext";
 import { MemberDetailModal } from "../components/MemberDetailModal";
 import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal";
 import { generateMembersPDF } from "../services/generateMembersPDF";
+import nameHelper from "../services/nameHelper"; // ✅ Importar el helper
 import "../css/Memberspageresponsive.css";
+
+// Extraer funciones del helper
+const { getDisplayName, transformArrayForDisplay } = nameHelper;
 
 // ========== COMPONENTES REUTILIZABLES MEMOIZADOS ==========
 
@@ -109,7 +114,7 @@ const FilterPanel = memo(
               <option value="">Todos</option>
               {leaders.map((leader) => (
                 <option key={leader.id} value={leader.id}>
-                  {leader.name}
+                  {getDisplayName(leader.name)} {/* ✅ Usar helper aquí */}
                 </option>
               ))}
             </select>
@@ -276,13 +281,16 @@ export const MembersPage = () => {
     setFilteredLeaders(filtered.slice(0, 5));
   };
 
+  // ✅ ACTUALIZADO: Usar getDisplayName para mostrar, pero guardar nombre original
   const handleSelectLeader = (leader) => {
     setSelectedLeader(leader);
     setFormData((prev) => ({
       ...prev,
-      leader: { id: leader.id, name: leader.name },
+      leader: { id: leader.id, name: leader.name }, // Guardar nombre ORIGINAL para backend
     }));
-    setLeaderSearchTerm(leader.name);
+    
+    // Mostrar nombre transformado en el input
+    setLeaderSearchTerm(getDisplayName(leader.name));
     setShowLeaderDropdown(false);
     setFilteredLeaders([]);
   };
@@ -297,44 +305,59 @@ export const MembersPage = () => {
     setFilteredLeaders([]);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setFormError(null);
-    try {
-      const memberData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        documentType: formData.documentType,
-        document: formData.document,
-        gender: formData.gender,
-        maritalStatus: formData.maritalStatus,
-        city: formData.city,
-        profession: formData.profession,
-        birthdate: formData.birthdate,
-        employmentStatus: formData.employmentStatus,
-        leader: selectedLeader ? { id: selectedLeader.id } : null,
-        district: formData.district,
-      };
+  // ✅ IMPORTANTE: El formulario envía nombres ORIGINALES al backend
+  // ========== FORM SUBMIT HANDLER (Versión mejorada) ==========
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setFormError(null);
+  
+  try {
+    const memberData = {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      address: formData.address,
+      documentType: formData.documentType,
+      document: formData.document,
+      gender: formData.gender,
+      maritalStatus: formData.maritalStatus,
+      city: formData.city,
+      profession: formData.profession,
+      birthdate: formData.birthdate,
+      employmentStatus: formData.employmentStatus,
+      leader: formData.leader,
+      district: formData.district,
+    };
 
-      if (editingId) {
-        await apiService.updateMember(editingId, memberData);
-        alert("✅ Miembro actualizado");
-      } else {
-        await apiService.createMember(memberData);
-        alert("✅ Miembro creado");
-      }
-      resetForm();
-      fetchAllMembers();
-    } catch (err) {
-      setFormError(err.message);
+    if (editingId) {
+      await apiService.updateMember(editingId, memberData);
+      
+      // Mostrar alert inmediatamente
+      alert("✅ Miembro actualizado");
+      
+      // Luego actualizar datos
+      await fetchAllMembers();
+    } else {
+      await apiService.createMember(memberData);
+      
+      // Mostrar alert inmediatamente
+      alert("✅ Miembro creado exitosamente");
+      
+      // Luego actualizar datos
+      await fetchAllMembers();
     }
-  };
+    
+    resetForm();
+    
+  } catch (err) {
+    setFormError(err.message);
+    alert("❌ Error: " + err.message);
+  }
+};
 
   const handleEdit = (member) => {
     setFormData({
-      name: member.name || "",
+      name: member.name || "", // Nombre ORIGINAL
       email: member.email || "",
       phone: member.phone || "",
       address: member.address || "",
@@ -346,13 +369,14 @@ export const MembersPage = () => {
       profession: member.profession || "",
       birthdate: member.birthdate || "",
       employmentStatus: member.employmentStatus || "",
-      leader: member.leader || null,
+      leader: member.leader || null, // Nombre ORIGINAL del líder
       district: member.district || "",
     });
 
     if (member.leader) {
       setSelectedLeader(member.leader);
-      setLeaderSearchTerm(member.leader.name || "");
+      // Mostrar nombre transformado en el input
+      setLeaderSearchTerm(getDisplayName(member.leader.name));
     }
 
     setEditingId(member.id);
@@ -451,7 +475,7 @@ export const MembersPage = () => {
   // ========== LÓGICA DE FILTRADO ==========
   const applyFilters = (membersArray) => {
     return membersArray.filter((member) => {
-      // Filtro por búsqueda de texto (nombre/email)
+      // Filtro por búsqueda de texto (nombre/email) - usando nombres ORIGINALES
       const matchesSearch =
         !searchTerm.trim() ||
         member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -489,6 +513,18 @@ export const MembersPage = () => {
 
   const canEdit = hasAnyRole(["ROLE_PASTORES", "ROLE_GANANDO"]);
 
+  // ========== OBTENER LÍDERES ÚNICOS ==========
+  const uniqueLeaders = Array.from(
+    new Map(
+      allMembers.filter((m) => m.leader).map((m) => [m.leader.id, m.leader]),
+    ).values(),
+  );
+
+  const genderOptions = [
+    { value: "MASCULINO", label: "Masculino" },
+    { value: "FEMENINO", label: "Femenino" },
+  ];
+
   // ========== EXPORTAR PDF ==========
   const handleExportPDF = () => {
     if (displayMembers.length === 0) {
@@ -502,29 +538,20 @@ export const MembersPage = () => {
       if (filters.gender) filterSummary.push(`Género: ${filters.gender}`);
       if (filters.district) filterSummary.push(`Distrito: ${filters.district}`);
       if (filters.leader) {
-        const leaderName = allMembers.find(
+        const leader = allMembers.find(
           (m) => m.id === Number(filters.leader),
-        )?.name;
-        filterSummary.push(`Líder: ${leaderName}`);
+        );
+        filterSummary.push(`Líder: ${getDisplayName(leader?.name)}`); // ✅ Usar helper
       }
 
-      generateMembersPDF(displayMembers, filterSummary);
+      // Crear copia de los miembros con nombres transformados para el PDF
+      const membersForPDF = transformArrayForDisplay(displayMembers, ['name', 'leader.name']);
+      
+      generateMembersPDF(membersForPDF, filterSummary);
     } catch (err) {
       alert("❌ Error al generar PDF: " + err.message);
     }
   };
-
-  // ========== OBTENER LÍDERES ÚNICOS ==========
-  const uniqueLeaders = Array.from(
-    new Map(
-      allMembers.filter((m) => m.leader).map((m) => [m.leader.id, m.leader]),
-    ).values(),
-  );
-
-  const genderOptions = [
-    { value: "MASCULINO", label: "Masculino" },
-    { value: "FEMENINO", label: "Femenino" },
-  ];
 
   return (
     <div className="members-page">
@@ -570,12 +597,13 @@ export const MembersPage = () => {
             )}
 
             <form onSubmit={handleSubmit} className="members-page__form">
+              {/* ✅ El formulario trabaja con nombres ORIGINALES */}
               <FormInput
                 label="Nombre Completo *"
                 type="text"
                 name="name"
                 placeholder="Nombre"
-                value={formData.name}
+                value={formData.name} // Nombre ORIGINAL
                 onChange={handleInputChange}
                 required
                 gridColumn="1 / -1"
@@ -608,7 +636,7 @@ export const MembersPage = () => {
                     type="text"
                     className="members-page__form-input"
                     placeholder="Buscar líder..."
-                    value={leaderSearchTerm}
+                    value={leaderSearchTerm} // Nombre TRANSFORMADO para mostrar
                     onChange={(e) => handleLeaderSearch(e.target.value)}
                     onFocus={() =>
                       leaderSearchTerm && setShowLeaderDropdown(true)
@@ -636,7 +664,7 @@ export const MembersPage = () => {
                           onClick={() => handleSelectLeader(leader)}
                         >
                           <div className="members-page__leader-option-name">
-                            {leader.name}
+                            {getDisplayName(leader.name)} {/* ✅ Mostrar nombre transformado */}
                           </div>
                           <div className="members-page__leader-option-email">
                             {leader.email}
@@ -649,7 +677,7 @@ export const MembersPage = () => {
 
                 {selectedLeader && (
                   <div className="members-page__leader-selected">
-                    <p>✅ {selectedLeader.name}</p>
+                    <p>✅ {getDisplayName(selectedLeader.name)}</p> {/* ✅ Mostrar nombre transformado */}
                   </div>
                 )}
               </div>
@@ -831,9 +859,15 @@ export const MembersPage = () => {
               </thead>
               <tbody>
                 {displayMembers.map((member) => (
-                  <tr key={member.id} onClick={() => handleViewDetails(member)} style={{ cursor: "pointer" }}>
+                  <tr 
+                    key={member.id} 
+                    onClick={() => handleViewDetails(member)} 
+                    style={{ cursor: "pointer" }}
+                  >
                     <td>
-                      <strong className="members-page__member-name-clickable">{member.name}</strong>
+                      <strong className="members-page__member-name-clickable">
+                        {getDisplayName(member.name)} {/* ✅ Usar helper aquí */}
+                      </strong>
                     </td>
                     <td>{member.phone || "-"}</td>
                     <td>
@@ -850,7 +884,7 @@ export const MembersPage = () => {
                     <td>
                       {member.leader ? (
                         <span className="members-page__leader-badge">
-                          {member.leader.name}
+                          {getDisplayName(member.leader.name)} {/* ✅ Usar helper aquí */}
                         </span>
                       ) : (
                         <span className="members-page__no-leader">—</span>
@@ -884,6 +918,7 @@ export const MembersPage = () => {
             onDelete={handleDelete}
             onViewEnrollment={handleViewEnrollment}
             canEdit={canEdit}
+            getDisplayName={getDisplayName} // ✅ Pasar la función al modal
           />
         )}
       </div>

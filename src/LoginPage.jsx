@@ -254,7 +254,7 @@ const LoginPage = () => {
                   title="Mostrar/Ocultar contraseña"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 >
-                  {showPassword ? '👁️' : '🙈'}
+                  {showPassword ? '👀' : '🙈'}
                 </button>
               </div>
             </div>

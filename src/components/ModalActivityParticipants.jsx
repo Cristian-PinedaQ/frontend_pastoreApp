@@ -1,47 +1,128 @@
-// ============================================
-// ModalActivityParticipants.jsx
-// Modal para ver y gestionar participantes de una actividad
-// ============================================
+// ModalActivityParticipants.jsx - CON FUNCIÓN DE GENERAR PDF (VERSIÓN OPTIMIZADA)
+// ✅ INTEGRADO: nameHelper para transformación de nombres
+// ✅ CORREGIDO: useCallback y useEffect sin warnings
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "../css/ModalActivityParticipants.css";
+import ParticipantDetailModal from "./ParticipantDetailModal";
+import apiService from "../apiService";
+import { generateGeneralParticipantsPDF } from "../services/participantsGeneralPdfGenerator";
+import { transformForDisplay, transformArrayForDisplay } from "../services/nameHelper";
 
 const ModalActivityParticipants = ({
   isOpen,
   onClose,
   activity,
-  participants,
-  onEnrollParticipant,
+  onAddPayment,
 }) => {
   const [filterText, setFilterText] = useState("");
-  const [selectedMemberId, setSelectedMemberId] = useState("");
-  const [initialPayment, setInitialPayment] = useState("");
-  const [enrolling, setEnrolling] = useState(false);
-  const [enrollError, setEnrollError] = useState("");
-  const [enrollSuccess, setEnrollSuccess] = useState("");
+  const [selectedParticipant, setSelectedParticipant] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [contributions, setContributions] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [leaderFilter, setLeaderFilter] = useState("");
+  const [districtFilter, setDistrictFilter] = useState("");
+  const [leaders, setLeaders] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
 
-  // Filtrar participantes
-  const filteredParticipants = participants.filter((participant) => {
-    if (!filterText) return true;
+  // ✅ DEFINIR loadParticipants CON useCallback ANTES del useEffect
+  const loadParticipants = useCallback(async () => {
+    if (!activity?.id) return;
 
-    const searchTerm = filterText.toLowerCase();
-    return (
-      (participant.memberName &&
-        participant.memberName.toLowerCase().includes(searchTerm)) ||
-      (participant.memberEmail &&
-        participant.memberEmail.toLowerCase().includes(searchTerm)) ||
-      (participant.enrollmentStatus &&
-        participant.enrollmentStatus.toLowerCase().includes(searchTerm))
-    );
-  });
+    setLoading(true);
+    try {
+      const url = `/activity-contribution/activity/${activity.id}/with-leader-info`;
+      const response = await apiService.request(url, { method: "GET" });
+      
+      // ✅ USANDO nameHelper: Transformar nombres de participantes para mostrar
+      const transformedParticipants = transformArrayForDisplay(response, ['memberName', 'leaderName']);
+      
+      setParticipants(transformedParticipants);
 
-  // Estadísticas de participantes
+      const uniqueLeaders = [
+        ...new Set(
+          transformedParticipants
+            .filter((p) => p.leaderName && p.leaderName !== "Sin líder")
+            .map((p) => p.leaderName)
+            .sort((a, b) => a.localeCompare(b)),
+        ),
+      ];
+      setLeaders(uniqueLeaders);
+
+      const uniqueDistricts = [
+        ...new Set(
+          transformedParticipants
+            .filter((p) => p.districtDescription)
+            .map((p) => p.districtDescription)
+            .sort((a, b) => a.localeCompare(b)),
+        ),
+      ];
+      setDistricts(uniqueDistricts);
+    } catch (error) {
+      console.error("❌ Error cargando participantes:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [activity?.id]);
+
+  // ✅ useEffect CON DEPENDENCIAS CORRECTAS
+  useEffect(() => {
+    if (isOpen && activity?.id) {
+      loadParticipants();
+    } else {
+      setParticipants([]);
+      setLeaders([]);
+      setDistricts([]);
+      setShowFilters(false);
+    }
+  }, [isOpen, activity?.id, loadParticipants]);
+
+  const handleGeneratePDF = () => {
+    try {
+      const pdfData = {
+        activity: {
+          id: activity.id,
+          name: activity.activityName,
+          price: activity.price,
+          endDate: activity.endDate,
+          quantity: activity.quantity,
+          isActive: activity.isActive,
+        },
+        participants: filteredParticipants,
+        filters: {
+          searchText: filterText,
+          leaderFilter,
+          districtFilter,
+        },
+        statistics: {
+          total: stats.total,
+          fullyPaid: stats.fullyPaid,
+          partiallyPaid: stats.partiallyPaid,
+          pending: stats.pending,
+          totalPaid: stats.totalPaid,
+          totalPending: stats.totalPending,
+          percentagePaid: stats.total > 0
+            ? ((stats.totalPaid / (stats.totalPaid + stats.totalPending)) * 100).toFixed(1)
+            : 0,
+        },
+      };
+
+      const filename = `participantes-general-${activity.activityName.toLowerCase().replace(/\s+/g, "-")}`;
+      generateGeneralParticipantsPDF(pdfData, filename);
+    } catch (error) {
+      console.error("❌ Error generando PDF general:", error);
+      alert("Error al generar el PDF. Por favor, intente nuevamente.");
+    }
+  };
+
   const stats = {
     total: participants.length,
     fullyPaid: participants.filter((p) => p.isFullyPaid).length,
     partiallyPaid: participants.filter((p) => p.totalPaid > 0 && !p.isFullyPaid)
       .length,
-    pending: participants.filter((p) => p.totalPaid === 0).length,
+    pending: participants.filter((p) => (p.totalPaid || 0) === 0).length,
     totalPaid: participants.reduce((sum, p) => sum + (p.totalPaid || 0), 0),
     totalPending: participants.reduce(
       (sum, p) => sum + (p.pendingBalance || 0),
@@ -49,340 +130,409 @@ const ModalActivityParticipants = ({
     ),
   };
 
-  const handleEnroll = async () => {
-    if (!selectedMemberId) {
-      setEnrollError("Debes seleccionar un miembro");
-      return;
-    }
+  const filteredParticipants = participants.filter((participant) => {
+    const searchTerm = filterText.toLowerCase();
+    const matchesSearch =
+      !filterText ||
+      (participant.memberName &&
+        participant.memberName.toLowerCase().includes(searchTerm)) ||
+      (participant.memberEmail &&
+        participant.memberEmail.toLowerCase().includes(searchTerm)) ||
+      (participant.document &&
+        participant.document.toLowerCase().includes(searchTerm)) ||
+      (participant.leaderName &&
+        participant.leaderName.toLowerCase().includes(searchTerm));
 
-    if (initialPayment && parseFloat(initialPayment) < 0) {
-      setEnrollError("El pago inicial no puede ser negativo");
-      return;
-    }
+    const matchesLeader =
+      !leaderFilter ||
+      (participant.leaderName && participant.leaderName === leaderFilter);
 
-    // Verificar si el miembro ya está inscrito
-    const alreadyEnrolled = participants.find(
-      (p) => p.memberId === parseInt(selectedMemberId),
-    );
-    if (alreadyEnrolled) {
-      setEnrollError("Este miembro ya está inscrito en la actividad");
-      return;
-    }
+    const matchesDistrict =
+      !districtFilter ||
+      (participant.districtDescription &&
+        participant.districtDescription === districtFilter);
 
-    setEnrolling(true);
-    setEnrollError("");
-    setEnrollSuccess("");
+    return matchesSearch && matchesLeader && matchesDistrict;
+  });
 
+  const clearAllFilters = () => {
+    setFilterText("");
+    setLeaderFilter("");
+    setDistrictFilter("");
+  };
+
+  const handleParticipantClick = async (participant) => {
     try {
-      const success = await onEnrollParticipant(
-        activity.id,
-        selectedMemberId,
-        initialPayment ? parseFloat(initialPayment) : 0,
+      const contributionId = participant.contributionId || participant.id;
+      const contribution = await apiService.request(
+        `/activity-payment/contribution/${contributionId}`,
+        { method: "GET" },
       );
-
-      if (success) {
-        setEnrollSuccess("✅ Participante inscrito exitosamente");
-        // Resetear formulario
-        setSelectedMemberId("");
-        setInitialPayment("");
-        // Limpiar mensaje después de 3 segundos
-        setTimeout(() => setEnrollSuccess(""), 3000);
-      }
+      
+      // ✅ USANDO nameHelper: Transformar nombres en la contribución
+      const transformedContribution = transformForDisplay(contribution, ['memberName']);
+      
+      setContributions([transformedContribution]);
+      setSelectedParticipant(participant);
+      setShowDetailModal(true);
     } catch (error) {
-      setEnrollError(error.message || "Error al inscribir participante");
-    } finally {
-      setEnrolling(false);
+      console.error("Error cargando contribuciones:", error);
+      setContributions([participant]);
+      setSelectedParticipant(participant);
+      setShowDetailModal(true);
     }
+  };
+
+  const handleCloseDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedParticipant(null);
+    setContributions([]);
+  };
+
+  const handleAddPaymentSuccess = async () => {
+    await loadParticipants();
   };
 
   if (!isOpen || !activity) return null;
 
+  const activeFiltersCount = (filterText ? 1 : 0) + 
+                            (leaderFilter ? 1 : 0) + 
+                            (districtFilter ? 1 : 0);
+
   return (
-    <div className="modal-participants-overlay">
-      <div className="modal-participants">
-        <div className="modal-participants__header">
-          <div className="modal-participants__header-content">
-            <h2>👥 Participantes - {activity.activityName}</h2>
-            <div className="participants-count">
-              {stats.total} participante{stats.total !== 1 ? "s" : ""}
-            </div>
-          </div>
-          <button className="modal-participants__close" onClick={onClose}>
-            ×
-          </button>
-        </div>
-
-        <div className="modal-participants__content">
-          {/* ESTADÍSTICAS */}
-          <div className="participants-stats">
-            <div className="stat-card total">
-              <div className="stat-icon">👥</div>
-              <div className="stat-content">
-                <div className="stat-value">{stats.total}</div>
-                <div className="stat-label">Total</div>
-              </div>
-            </div>
-
-            <div className="stat-card paid">
-              <div className="stat-icon">✅</div>
-              <div className="stat-content">
-                <div className="stat-value">{stats.fullyPaid}</div>
-                <div className="stat-label">Pagado</div>
-              </div>
-            </div>
-
-            <div className="stat-card partial">
-              <div className="stat-icon">🟡</div>
-              <div className="stat-content">
-                <div className="stat-value">{stats.partiallyPaid}</div>
-                <div className="stat-label">Parcial</div>
-              </div>
-            </div>
-
-            <div className="stat-card pending">
-              <div className="stat-icon">⏳</div>
-              <div className="stat-content">
-                <div className="stat-value">{stats.pending}</div>
-                <div className="stat-label">Pendiente</div>
-              </div>
-            </div>
-
-            <div className="stat-card money">
-              <div className="stat-icon">💰</div>
-              <div className="stat-content">
-                <div className="stat-value">
-                  ${stats.totalPaid.toLocaleString("es-CO")}
-                </div>
-                <div className="stat-label">Pagado Total</div>
-              </div>
-            </div>
-
-            <div className="stat-card debt">
-              <div className="stat-icon">📝</div>
-              <div className="stat-content">
-                <div className="stat-value">
-                  ${stats.totalPending.toLocaleString("es-CO")}
-                </div>
-                <div className="stat-label">Pendiente Total</div>
-              </div>
-            </div>
-          </div>
-
-          {/* INSCRIBIR NUEVO PARTICIPANTE */}
-          <div className="enroll-section">
-            <h3>➕ Inscribir Nuevo Participante</h3>
-
-            {enrollSuccess && (
-              <div className="enroll-success">{enrollSuccess}</div>
-            )}
-
-            {enrollError && <div className="enroll-error">{enrollError}</div>}
-
-            <div className="enroll-form">
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Miembro *</label>
-                  <input
-                    type="text"
-                    placeholder="ID del miembro..."
-                    value={selectedMemberId}
-                    onChange={(e) =>
-                      setSelectedMemberId(e.target.value.replace(/\D/g, ""))
-                    }
-                    disabled={enrolling}
-                  />
-                  <div className="form-hint">
-                    Ingresa el ID numérico del miembro
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Pago Inicial (opcional)</label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    value={initialPayment}
-                    onChange={(e) => setInitialPayment(e.target.value)}
-                    disabled={enrolling}
-                    min="0"
-                    max={activity.price}
-                    className="payment-input" /* ← Agrega clase específica si necesitas */
-                  />
-                  <div className="form-hint">
-                    Máximo: ${activity.price?.toLocaleString("es-CO") || "0"}
-                  </div>
+    <>
+      <div className="modal-participants-overlay">
+        <div className="modal-participants">
+          {/* HEADER COMPACTO */}
+          <div className="modal-participants__header compact">
+            <div className="modal-participants__header-main">
+              <div className="modal-participants__title-section">
+                <h2 className="modal-participants__title">
+                  👥 {activity.activityName}
+                </h2>
+                <div className="modal-participants__stats">
+                  <span className="participants-count">
+                    {stats.total} participante{stats.total !== 1 ? "s" : ""}
+                  </span>
+                  <span className="participants-amount">
+                    ${stats.totalPaid.toLocaleString("es-CO")} recaudado
+                  </span>
                 </div>
               </div>
-
-              <button
-                className="enroll-btn"
-                onClick={handleEnroll}
-                disabled={!selectedMemberId || enrolling}
-              >
-                {enrolling ? (
-                  <>
-                    <span className="spinner"></span>
-                    Inscribiendo...
-                  </>
-                ) : (
-                  "✅ Inscribir Participante"
+              
+              <div className="modal-participants__header-actions">
+                <button 
+                  className={`btn-toggle-filters ${activeFiltersCount > 0 ? 'has-filters' : ''}`}
+                  onClick={() => setShowFilters(!showFilters)}
+                  title={showFilters ? "Ocultar filtros" : "Mostrar filtros"}
+                >
+                  🔍 Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+                </button>
+                
+                {filteredParticipants.length > 0 && (
+                  <button
+                    className="btn-pdf-export"
+                    onClick={handleGeneratePDF}
+                    title="Exportar a PDF"
+                  >
+                    📄 PDF
+                  </button>
                 )}
+                
+                <button className="modal-participants__close" onClick={onClose}>
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Barra de búsqueda principal siempre visible */}
+            <div className="search-bar-main">
+              <input
+                type="text"
+                placeholder="Buscar participantes..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="search-input-main"
+              />
+              <button
+                className="btn-refresh-main"
+                onClick={loadParticipants}
+                disabled={loading}
+                title="Actualizar"
+              >
+                {loading ? "🔄" : "↻"}
               </button>
             </div>
           </div>
 
-          {/* BÚSQUEDA */}
-          <div className="search-section">
-            <div className="search-container">
-              <input
-                type="text"
-                placeholder="🔍 Buscar participante por nombre, email o estado..."
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                className="search-input"
-              />
-              {filterText && (
-                <button
-                  className="clear-search"
-                  onClick={() => setFilterText("")}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-            <div className="search-info">
-              Mostrando {filteredParticipants.length} de {participants.length}{" "}
-              participantes
-              {filterText && ` para "${filterText}"`}
-            </div>
-          </div>
+          <div className="modal-participants__content">
+            {/* SECCIÓN DE FILTROS (colapsable) */}
+            {showFilters && (
+              <div className="filters-section-collapsible">
+                <div className="filters-header">
+                  <h4>Filtros avanzados</h4>
+                  <button 
+                    className="btn-close-filters"
+                    onClick={() => setShowFilters(false)}
+                    title="Cerrar filtros"
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                <div className="filters-grid">
+                  <div className="filter-group">
+                    <label className="filter-label">👤 Líder:</label>
+                    <select
+                      value={leaderFilter}
+                      onChange={(e) => setLeaderFilter(e.target.value)}
+                      className="filter-select"
+                    >
+                      <option value="">Todos los líderes</option>
+                      {leaders.map((leader, index) => (
+                        <option key={index} value={leader}>
+                          {/* ✅ Líderes ya transformados */}
+                          {leader}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-          {/* LISTA DE PARTICIPANTES */}
-          <div className="participants-list">
-            {filteredParticipants.length === 0 ? (
-              <div className="empty-participants">
-                {participants.length === 0 ? (
-                  <>
-                    <div className="empty-icon">👥</div>
-                    <h4>No hay participantes inscritos</h4>
-                    <p>
-                      Comienza inscribiendo participantes usando el formulario
-                      arriba
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="empty-icon">🔍</div>
-                    <h4>No se encontraron participantes</h4>
-                    <p>Intenta con otros términos de búsqueda</p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="participants-table-container">
-                <table className="participants-table">
-                  <thead>
-                    <tr>
-                      <th>Miembro</th>
-                      <th>Estado</th>
-                      <th>Pagado</th>
-                      <th>Pendiente</th>
-                      <th>Cumplimiento</th>
-                      <th>Fecha Inscripción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredParticipants.map((participant) => (
-                      <tr
-                        key={participant.id}
-                        className={`participant-${participant.isFullyPaid ? "paid" : "pending"}`}
+                  <div className="filter-group">
+                    <label className="filter-label">🏘️ Distrito:</label>
+                    <select
+                      value={districtFilter}
+                      onChange={(e) => setDistrictFilter(e.target.value)}
+                      className="filter-select"
+                    >
+                      <option value="">Todos los distritos</option>
+                      {districts.map((district, index) => (
+                        <option key={index} value={district}>
+                          {district}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="filter-actions">
+                    {(filterText || leaderFilter || districtFilter) && (
+                      <button
+                        className="btn-clear-all"
+                        onClick={clearAllFilters}
+                        title="Limpiar todos los filtros"
                       >
-                        <td>
-                          <div className="participant-info">
-                            <div className="participant-avatar">
-                              {participant.memberName?.charAt(0) || "?"}
-                            </div>
-                            <div className="participant-details">
-                              <div className="participant-name">
-                                {participant.memberName || "Sin nombre"}
-                              </div>
-                              <div className="participant-id">
-                                ID: {participant.memberId}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div
-                            className={`status-badge ${participant.enrollmentStatus?.toLowerCase() || "pending"}`}
-                          >
-                            {participant.enrollmentStatus === "COMPLETED"
-                              ? "✅ Pagado"
-                              : participant.enrollmentStatus === "ACTIVE"
-                                ? "🟡 Parcial"
-                                : "⏳ Pendiente"}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="amount paid">
-                            $
-                            {(participant.totalPaid || 0).toLocaleString(
-                              "es-CO",
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="amount pending">
-                            $
-                            {(participant.pendingBalance || 0).toLocaleString(
-                              "es-CO",
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <div className="compliance">
-                            <div className="compliance-bar">
-                              <div
-                                className="compliance-fill"
-                                style={{
-                                  width: `${Math.min(100, participant.compliancePercentage || 0)}%`,
-                                }}
-                              ></div>
-                            </div>
-                            <span className="compliance-text">
-                              {Math.round(
-                                participant.compliancePercentage || 0,
-                              )}
-                              %
-                            </span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="registration-date">
-                            {participant.registrationDate
-                              ? new Date(
-                                  participant.registrationDate,
-                                ).toLocaleDateString("es-CO")
-                              : "-"}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        🧹 Limpiar filtros
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="filters-info">
+                  {filterText && `Buscando: "${filterText}"`}
+                  {leaderFilter && ` • Líder: ${leaderFilter}`}
+                  {districtFilter && ` • Distrito: ${districtFilter}`}
+                  <span className="results-count">
+                    Mostrando {filteredParticipants.length} de {participants.length}
+                  </span>
+                </div>
               </div>
             )}
+
+            {/* ESTADÍSTICAS COMPACTAS */}
+            <div className="quick-stats-compact">
+              <div className="stat-item">
+                <span className="stat-icon">✅</span>
+                <span className="stat-value">{stats.fullyPaid}</span>
+                <span className="stat-label">Pagado</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-icon">🟡</span>
+                <span className="stat-value">{stats.partiallyPaid}</span>
+                <span className="stat-label">Parcial</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-icon">⏳</span>
+                <span className="stat-value">{stats.pending}</span>
+                <span className="stat-label">Pendiente</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-icon">💰</span>
+                <span className="stat-value">
+                  ${stats.totalPending.toLocaleString("es-CO")}
+                </span>
+                <span className="stat-label">Por cobrar</span>
+              </div>
+            </div>
+
+            {/* LISTA DE PARTICIPANTES */}
+            <div className="participants-list">
+              {loading ? (
+                <div className="loading-participants">
+                  <div className="loading-spinner"></div>
+                  <p>Cargando participantes...</p>
+                </div>
+              ) : filteredParticipants.length === 0 ? (
+                <div className="empty-participants">
+                  {participants.length === 0 ? (
+                    <>
+                      <div className="empty-icon">👥</div>
+                      <h4>No hay participantes inscritos</h4>
+                      <p>Los participantes se inscriben desde otra sección</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="empty-icon">🔍</div>
+                      <h4>No se encontraron participantes</h4>
+                      <p>Intenta con otros términos o ajusta los filtros</p>
+                      <button
+                        className="btn-clear-filters"
+                        onClick={clearAllFilters}
+                      >
+                        🧹 Limpiar filtros
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="participants-table-container">
+                  <table className="participants-table">
+                    <thead>
+                      <tr>
+                        <th>Miembro</th>
+                        <th>Líder</th>
+                        <th>Distrito</th>
+                        <th>Estado</th>
+                        <th>Pagado</th>
+                        <th>Pendiente</th>
+                        <th>Cumpl.</th>
+                        <th>Inscrito</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredParticipants.map((participant) => (
+                        <tr
+                          key={participant.id}
+                          className={`participant-row ${participant.isFullyPaid ? "paid" : "pending"}`}
+                          onClick={() => handleParticipantClick(participant)}
+                        >
+                          <td>
+                            <div className="participant-info">
+                              <div className="participant-avatar">
+                                {participant.memberName?.charAt(0) || "?"}
+                              </div>
+                              <div className="participant-details">
+                                <div className="participant-name">
+                                  {/* ✅ Nombre ya transformado */}
+                                  {participant.memberName || "Sin nombre"}
+                                </div>
+                                <div className="participant-document">
+                                  {participant.documentType}:{" "}
+                                  {participant.document}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="participant-leader">
+                              {/* ✅ Nombre del líder ya transformado */}
+                              {participant.leaderName || "Sin líder"}
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              className={`district-badge ${participant.districtDescription ? "has-district" : "no-district"}`}
+                            >
+                              {participant.districtDescription ||
+                                "Sin distrito"}
+                            </div>
+                          </td>
+                          <td>
+                            <div
+                              className={`status-badge ${participant.enrollmentStatus?.toLowerCase() || "pending"}`}
+                            >
+                              {participant.enrollmentStatus === "COMPLETED"
+                                ? "✅"
+                                : participant.enrollmentStatus === "ACTIVE"
+                                  ? "🟡"
+                                  : "⏳"}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="amount paid">
+                              $
+                              {(participant.totalPaid || 0).toLocaleString(
+                                "es-CO",
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="amount pending">
+                              $
+                              {(participant.pendingBalance || 0).toLocaleString(
+                                "es-CO",
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="compliance">
+                              <div className="compliance-bar">
+                                <div
+                                  className="compliance-fill"
+                                  style={{
+                                    width: `${Math.min(100, participant.compliancePercentage || 0)}%`,
+                                  }}
+                                ></div>
+                              </div>
+                              <span className="compliance-text">
+                                {Math.round(
+                                  participant.compliancePercentage || 0,
+                                )}
+                                %
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="registration-date">
+                              {participant.registrationDate
+                                ? new Date(
+                                    participant.registrationDate,
+                                  ).toLocaleDateString("es-CO")
+                                : "-"}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="modal-participants__footer">
+            <div className="footer-summary">
+              <span className="footer-total">{filteredParticipants.length} participantes</span>
+              <span className="footer-amount">Total recaudado: ${stats.totalPaid.toLocaleString("es-CO")}</span>
+            </div>
+            <button className="btn btn-close" onClick={onClose}>
+              Cerrar
+            </button>
           </div>
         </div>
-
-        {/* ACCIONES */}
-        <div className="modal-participants__actions">
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cerrar
-          </button>
-        </div>
       </div>
-    </div>
+
+      {/* Modal de detalle */}
+      {showDetailModal && selectedParticipant && (
+        <ParticipantDetailModal
+          isOpen={showDetailModal}
+          onClose={handleCloseDetailModal}
+          participant={selectedParticipant}
+          activity={activity}
+          contribution={contributions[0]}
+          onAddPaymentSuccess={handleAddPaymentSuccess}
+        />
+      )}
+    </>
   );
 };
 

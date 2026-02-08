@@ -2,9 +2,14 @@
 // Modal para inscribir estudiantes a cohortes
 // Legible automáticamente en modo oscuro
 // ✅ ARREGLADO: loadAvailableCohorts envuelto en useCallback
+// ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
 
 import React, { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
+import nameHelper from '../services/nameHelper'; // ✅ Importar el helper
+
+// Extraer función del helper
+const { getDisplayName } = nameHelper;
 
 const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
   // ========== DARK MODE ==========
@@ -123,7 +128,17 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     try {
       console.log('📚 Cargando cohortes disponibles para nivel:', selectedLevel);
       const data = await apiService.getAvailableCohortsByLevel(selectedLevel);
-      setAvailableCohorts(data || []);
+      
+      // ✅ Transformar nombres de maestros para visualización
+      const transformedCohorts = (data || []).map(cohort => ({
+        ...cohort,
+        maestro: cohort.maestro ? {
+          ...cohort.maestro,
+          displayName: getDisplayName(cohort.maestro.name) // ✅ Nombre transformado para mostrar
+        } : null
+      }));
+      
+      setAvailableCohorts(transformedCohorts);
       console.log('✅ Cohortes cargadas:', data?.length || 0);
     } catch (err) {
       console.error('❌ Error cargando cohortes:', err);
@@ -169,30 +184,36 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
   // ========== INSCRIBIR ESTUDIANTE ==========
   const handleEnroll = async () => {
-    if (!selectedMember || !selectedCohort) {
-      setError('Falta seleccionar información');
-      return;
-    }
+  if (!selectedMember || !selectedCohort) {
+    setError('Falta seleccionar información');
+    return;
+  }
 
-    setLoading(true);
-    setError('');
+  setLoading(true);
+  setError('');
 
-    try {
-      console.log('📝 Inscribiendo estudiante...');
-      await apiService.createStudentEnrollment(selectedMember.id, selectedCohort.cohortId);
+  try {
+    console.log('📝 Inscribiendo estudiante...');
+    
+    // Crear la inscripción
+    await apiService.createStudentEnrollment(selectedMember.id, selectedCohort.cohortId);
 
-      console.log('✅ Estudiante inscrito exitosamente');
-      alert('Estudiante inscrito exitosamente en la cohorte');
-
-      handleReset();
-      onEnrollmentSuccess();
-    } catch (err) {
-      console.error('❌ Error inscribiendo estudiante:', err);
-      setError('Error al inscribir: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('✅ Estudiante inscrito exitosamente');
+    
+    // ✅ Mostrar alert inmediatamente
+    alert('Estudiante inscrito exitosamente en la cohorte');
+    
+    // ✅ Luego ejecutar otras operaciones
+    handleReset();
+    onEnrollmentSuccess();
+    
+  } catch (err) {
+    console.error('❌ Error inscribiendo estudiante:', err);
+    setError('Error al inscribir: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ========== RESETEAR MODAL ==========
   const handleReset = () => {
@@ -207,7 +228,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
   // Filtrar miembros por búsqueda
   const filteredMembers = members.filter(member =>
-    member.name?.toLowerCase().includes(searchMember.toLowerCase())
+    member.name?.toLowerCase().includes(searchMember.toLowerCase()) ||
+    getDisplayName(member.name)?.toLowerCase().includes(searchMember.toLowerCase())
   );
 
   if (!isOpen) return null;
@@ -318,7 +340,10 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                             onChange={() => setSelectedMember(member)}
                           />
                           <span className="option-text">
-                            <strong style={{ color: themeColors.text }}>{member.name}</strong>
+                            {/* ✅ Mostrar nombre transformado */}
+                            <strong style={{ color: themeColors.text }}>
+                              {getDisplayName(member.name)}
+                            </strong>
                             <small style={{ color: themeColors.textSecondary }}>{member.email}</small>
                           </span>
                         </div>
@@ -335,7 +360,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                         color: isDarkMode ? '#86efac' : '#065f46',
                       }}
                     >
-                      <p>✅ Estudiante seleccionado: <strong>{selectedMember.name}</strong></p>
+                      {/* ✅ Mostrar nombre transformado */}
+                      <p>✅ Estudiante seleccionado: <strong>{getDisplayName(selectedMember.name)}</strong></p>
                     </div>
                   )}
                 </div>
@@ -352,7 +378,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                       color: themeColors.infoText,
                     }}
                   >
-                    Estudiante: <strong>{selectedMember?.name}</strong>
+                    {/* ✅ Mostrar nombre transformado */}
+                    Estudiante: <strong>{getDisplayName(selectedMember?.name)}</strong>
                   </p>
 
                   <div className="options-grid">
@@ -402,7 +429,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                       color: themeColors.infoText,
                     }}
                   >
-                    Estudiante: <strong>{selectedMember?.name}</strong><br />
+                    {/* ✅ Mostrar nombre transformado */}
+                    Estudiante: <strong>{getDisplayName(selectedMember?.name)}</strong><br />
                     Nivel: <strong>{LEVELS.find(l => l.value === selectedLevel)?.label}</strong>
                   </p>
 
@@ -430,7 +458,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                           <div className="cohort-info">
                             <strong style={{ color: themeColors.text }}>{cohort.cohortName}</strong>
                             <p style={{ color: themeColors.textSecondary }}>
-                              Maestro: {cohort.maestro?.name || 'No asignado'} |
+                              {/* ✅ Mostrar nombre transformado del maestro */}
+                              Maestro: {cohort.maestro?.displayName || getDisplayName(cohort.maestro?.name) || 'No asignado'} |
                               Estudiantes: {cohort.currentStudents}/{cohort.maxStudents} |
                               Espacios: {cohort.availableSpots}
                             </p>
@@ -463,6 +492,9 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                       }}
                     >
                       <p>✅ Cohorte seleccionada: <strong>{selectedCohort.cohortName}</strong></p>
+                      {selectedCohort.maestro && (
+                        <p>Maestro: <strong>{selectedCohort.maestro.displayName || getDisplayName(selectedCohort.maestro.name)}</strong></p>
+                      )}
                     </div>
                   )}
                 </div>

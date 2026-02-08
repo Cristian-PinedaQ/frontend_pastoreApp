@@ -113,7 +113,6 @@ const ActivityPage = () => {
   // Filtros
   const [searchText, setSearchText] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
-  const [selectedTimeframe, setSelectedTimeframe] = useState("ALL");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
@@ -127,6 +126,20 @@ const ActivityPage = () => {
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [activityBalance, setActivityBalance] = useState(null);
   const [activityParticipants, setActivityParticipants] = useState([]);
+
+  // Estado para verificar si hay filtros aplicados
+  const [filtersApplied, setFiltersApplied] = useState(false);
+
+  // ========== VERIFICAR FILTROS APLICADOS ==========
+  useEffect(() => {
+    const hasFilters = 
+      searchText.trim() !== "" ||
+      selectedStatus !== "ALL" ||
+      startDate !== "" ||
+      endDate !== "";
+    
+    setFiltersApplied(hasFilters);
+  }, [searchText, selectedStatus, startDate, endDate]);
 
   // ========== CARGAR ACTIVIDADES ==========
   const loadActivities = useCallback(async () => {
@@ -230,7 +243,8 @@ const ActivityPage = () => {
     try {
       log("Cargando participantes", { activityId });
 
-      const participants = await apiService.request(`/activity-contribution/activity/${activityId}`);
+      // ✅ CORREGIDO: Usar el endpoint correcto con información de líder y distrito
+      const participants = await apiService.request(`/activity-contribution/activity/${activityId}/with-leader-info`);
       setActivityParticipants(participants || []);
 
       log("Participantes cargados", { count: participants?.length || 0 });
@@ -254,10 +268,10 @@ const ActivityPage = () => {
       // 🔧 Limpiar error antes de recargar
       setError("");
       setSelectedStatus("ALL");
-      setSelectedTimeframe("ALL");
       setSearchText("");
       setStartDate("");
       setEndDate("");
+      setFiltersApplied(false);
 
       await loadActivities();
 
@@ -304,23 +318,6 @@ const ActivityPage = () => {
         });
       }
 
-      // Filtrar por período de tiempo
-      if (selectedTimeframe !== "ALL") {
-        const today = new Date();
-        filtered = filtered.filter((activity) => {
-          const endDate = new Date(activity.endDate);
-          if (isNaN(endDate.getTime())) return false;
-
-          const daysDifference = (endDate - today) / (1000 * 60 * 60 * 24);
-          
-          if (selectedTimeframe === "THIS_WEEK") return daysDifference <= 7 && daysDifference >= 0;
-          if (selectedTimeframe === "THIS_MONTH") return daysDifference <= 30 && daysDifference >= 0;
-          if (selectedTimeframe === "NEXT_MONTH") return daysDifference <= 60 && daysDifference > 30;
-          if (selectedTimeframe === "PAST") return daysDifference < 0;
-          return true;
-        });
-      }
-
       // Filtrar por fechas personalizadas
       if (startDate && !endDate) {
         const targetDate = startDate;
@@ -359,7 +356,7 @@ const ActivityPage = () => {
       logError("Error aplicando filtros:", error);
       setFilteredActivities(allActivities);
     }
-  }, [allActivities, selectedStatus, selectedTimeframe, searchText, startDate, endDate]);
+  }, [allActivities, selectedStatus, searchText, startDate, endDate]);
 
   // ========== CARGA INICIAL ==========
   useEffect(() => {
@@ -524,98 +521,206 @@ const ActivityPage = () => {
     });
   }, [loadActivityBalance]);
 
-  // ========== EXPORTAR PDF ==========
-  const handleExportPDF = useCallback(async () => {
-    try {
-      log("Generando PDF de actividades");
+// ========== EXPORTAR PDF ==========
+const handleExportPDF = useCallback(async () => {
+  try {
+    setError(""); // Limpiar errores previos
+    log("Generando PDF de actividades");
 
-      let title = "Reporte de Actividades";
-      let subtitle = "";
+    // Mostrar loading
+    setLoading(true);
 
-      if (selectedStatus !== "ALL") {
-        const statusLabels = {
-          "ACTIVE": "Activas",
-          "INACTIVE": "Inactivas",
-          "ENDING_SOON": "Por finalizar",
-          "FINISHED": "Finalizadas",
-        };
-        subtitle = `Estado: ${statusLabels[selectedStatus] || selectedStatus}`;
-      }
+    let title = "Reporte de Actividades";
+    let subtitle = "";
 
-      if (startDate && endDate) {
-        subtitle += (subtitle ? " • " : "") + `Período: ${startDate} al ${endDate}`;
-      }
+    // Crear subtítulo con filtros aplicados
+    const filterLabels = [];
 
-      const data = {
-        title,
-        subtitle,
-        date: new Date().toLocaleDateString("es-CO"),
-        activities: filteredActivities,
-        statistics: {
-          totalActivities: filteredActivities.length,
-          totalActive: filteredActivities.filter(a => a.isActive).length,
-          totalParticipants: filteredActivities.reduce((sum, a) => sum + (a.quantity || 0), 0),
-          totalValue: filteredActivities.reduce((sum, a) => sum + (a.price || 0) * (a.quantity || 0), 0),
-        },
+    if (selectedStatus !== "ALL") {
+      const statusLabels = {
+        "ACTIVE": "Activas",
+        "INACTIVE": "Inactivas",
+        "ENDING_SOON": "Por finalizar",
+        "FINISHED": "Finalizadas",
       };
+      filterLabels.push(`Estado: ${statusLabels[selectedStatus] || selectedStatus}`);
+    }
 
-      generateActivityPDF(data, "activity-report");
+    if (searchText.trim()) {
+      filterLabels.push(`Búsqueda: "${searchText}"`);
+    }
 
+    if (startDate && endDate) {
+      filterLabels.push(`Período: ${startDate} al ${endDate}`);
+    } else if (startDate) {
+      filterLabels.push(`Fecha: ${startDate}`);
+    }
+
+    subtitle = filterLabels.join(" • ");
+
+    const data = {
+      title,
+      subtitle: subtitle || "Todos los registros",
+      date: new Date().toLocaleDateString("es-CO"),
+      activities: filteredActivities,
+      statistics: {
+        totalActivities: filteredActivities.length,
+        totalActive: filteredActivities.filter(a => a.isActive).length,
+        totalParticipants: filteredActivities.reduce((sum, a) => sum + (a.quantity || 0), 0),
+        totalValue: filteredActivities.reduce((sum, a) => sum + (a.price || 0) * (a.quantity || 0), 0),
+      },
+    };
+
+    // 🔧 Generar PDF
+    const success = await generateActivityPDF(data, "reporte-actividades");
+
+    if (success) {
       log("PDF generado exitosamente");
-
+      
       logUserAction("export_activity_pdf", {
         activityCount: filteredActivities.length,
+        filtersApplied: filtersApplied,
         timestamp: new Date().toISOString(),
       });
-    } catch (err) {
-      logError("Error generando PDF:", err);
-      setError("Error al generar PDF");
+      
+      // Mostrar mensaje de éxito
+      alert(`✅ PDF generado exitosamente\n📄 Se descargó el archivo: reporte-actividades-${new Date().toISOString().split('T')[0]}.pdf`);
+    } else {
+      throw new Error("No se pudo generar el PDF");
     }
-  }, [filteredActivities, selectedStatus, startDate, endDate]);
+  } catch (err) {
+    logError("Error generando PDF:", err);
+    setError("Error al generar PDF. Por favor, intente nuevamente.");
+  } finally {
+    setLoading(false);
+  }
+}, [filteredActivities, selectedStatus, searchText, startDate, endDate, filtersApplied]);
 
   // ========== INSCRIBIR PARTICIPANTE ==========
-  const handleEnrollParticipant = useCallback(async (activityId, memberId, initialPayment) => {
+ // ========== INSCRIBIR PARTICIPANTE ==========
+// ========== INSCRIBIR PARTICIPANTE ==========
+// ========== INSCRIBIR PARTICIPANTE ==========
+const handleEnrollParticipant = useCallback(async (activityId, memberId, initialPayment) => {
+  try {
+    log("Inscribiendo participante", { activityId, memberId, initialPayment });
+
+    const currentUser = apiService.getCurrentUser();
+    const recordedBy = currentUser?.username || "Sistema";
+
+    // CORRECCIÓN: Verificar si realmente hay pago inicial
+    const hasInitialPayment = initialPayment && parseFloat(initialPayment) > 0;
+
+    // PRIMERO: Verificar si el miembro ya está inscrito en esta actividad
+    log("Verificando si el miembro ya está inscrito...");
+    
+    let alreadyEnrolled = false;
     try {
-      log("Inscribiendo participante", { activityId, memberId });
-
-      const enrollmentData = {
-        memberId,
-        activityId,
-        initialPaymentAmount: initialPayment || 0,
-        recordedBy: apiService.getCurrentUser()?.username || "Sistema",
-        incomeMethod: "CASH",
-      };
-
-      await apiService.request("/activity-contribution/create-with-initial-payment", {
-        method: "POST",
-        body: JSON.stringify(enrollmentData),
-      });
-
-      log("Participante inscrito exitosamente");
-
-      logUserAction("enroll_participant", {
-        activityId,
-        memberId,
-        timestamp: new Date().toISOString(),
-      });
-
-      alert("Participante inscrito exitosamente");
+      // Cargar los participantes actuales de la actividad
+      const currentParticipants = await apiService.request(`/activity-contribution/activity/${activityId}/with-leader-info`);
       
-      // Recargar datos si estamos viendo participantes o detalles
-      if (showParticipantsModal) {
-        await loadActivityParticipants(activityId);
+      if (Array.isArray(currentParticipants)) {
+        alreadyEnrolled = currentParticipants.some(
+          participant => {
+            // Verificar por memberId directo
+            if (participant.memberId === memberId) return true;
+            
+            // Verificar por objeto member anidado
+            if (participant.member && participant.member.id === memberId) return true;
+            
+            // Verificar por miembro como objeto en member
+            if (participant.member && participant.member.memberId === memberId) return true;
+            
+            return false;
+          }
+        );
+        
+        if (alreadyEnrolled) {
+          const errorMsg = "❌ Este miembro ya está inscrito en esta actividad";
+          setError(errorMsg);
+          log("Miembro ya inscrito", { activityId, memberId });
+          return false; // 🔴 IMPORTANTE: Retornar false para detener la ejecución
+        }
       }
-      if (showDetailsModal || showFinanceModal) {
-        await loadActivityBalance(activityId);
-      }
-      
-      return true;
-    } catch (err) {
-      logError("Error inscribiendo participante:", err);
-      setError("Error al inscribir participante");
+    } catch (checkError) {
+      log("No se pudo verificar inscripción previa, continuando...", checkError);
+      // Continuamos aunque falle la verificación, el backend lo validará
+    }
+
+    // 🔴 CORRECCIÓN: Si ya está inscrito, NO continuar
+    if (alreadyEnrolled) {
       return false;
     }
-  }, [showParticipantsModal, showDetailsModal, showFinanceModal, loadActivityParticipants, loadActivityBalance]);
+
+    let response;
+    let endpoint;
+    let enrollmentData;
+
+    if (hasInitialPayment) {
+      // CASO 1: Con pago inicial
+      endpoint = "/activity-contribution/create-with-initial-payment";
+      enrollmentData = {
+        memberId,
+        activityId,
+        incomeMethod: "CASH", // Valor por defecto
+        recordedBy,
+        initialPaymentAmount: parseFloat(initialPayment),
+      };
+    } else {
+      // CASO 2: Sin pago inicial - usar endpoint diferente
+      endpoint = "/activity-contribution/save";
+      enrollmentData = {
+        memberId,
+        activityId,
+        recordedBy,
+        // NO enviar initialPaymentAmount ni incomeMethod
+      };
+    }
+
+    log(`Enviando a ${endpoint}`, enrollmentData);
+
+    response = await apiService.request(endpoint, {
+      method: "POST",
+      body: JSON.stringify(enrollmentData),
+    });
+
+    log("Participante inscrito exitosamente", response);
+
+    logUserAction("enroll_participant", {
+      activityId,
+      memberId,
+      hasInitialPayment,
+      timestamp: new Date().toISOString(),
+    });
+
+    alert(`✅ Participante inscrito ${hasInitialPayment ? `con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}` : "sin pago inicial"}`);
+    
+    // Recargar datos si estamos viendo participantes o detalles
+    if (showParticipantsModal) {
+      await loadActivityParticipants(activityId);
+    }
+    if (showDetailsModal || showFinanceModal) {
+      await loadActivityBalance(activityId);
+    }
+    
+    return true;
+  } catch (err) {
+    logError("Error inscribiendo participante:", err);
+    
+    // Mensaje de error más específico
+    let errorMessage = "Error al inscribir participante";
+    if (err.response?.data?.error) {
+      errorMessage = err.response.data.error;
+    } else if (err.message) {
+      errorMessage = err.message;
+    } else if (err.fields) {
+      const fieldErrors = Object.values(err.fields).join(', ');
+      errorMessage = `Error de validación: ${fieldErrors}`;
+    }
+    
+    setError(errorMessage);
+    return false;
+  }
+}, [showParticipantsModal, showDetailsModal, showFinanceModal, loadActivityParticipants, loadActivityBalance]);
 
   // ========== RENDER ==========
   return (
@@ -657,22 +762,7 @@ const ActivityPage = () => {
               </select>
             </div>
 
-            {/* Filtro por tiempo */}
-            <div className="activity-page__filter-item">
-              <label>⏰ Período</label>
-              <select
-                value={selectedTimeframe}
-                onChange={(e) => setSelectedTimeframe(e.target.value)}
-              >
-                <option value="ALL">Todo el tiempo</option>
-                <option value="THIS_WEEK">Esta semana</option>
-                <option value="THIS_MONTH">Este mes</option>
-                <option value="NEXT_MONTH">Próximo mes</option>
-                <option value="PAST">Pasadas</option>
-              </select>
-            </div>
-
-            {/* Filtro por fechas */}
+            {/* Filtro por fechas - DESDE */}
             <div className="activity-page__filter-item">
               <label>📅 Desde</label>
               <input
@@ -682,12 +772,14 @@ const ActivityPage = () => {
               />
             </div>
 
+            {/* Filtro por fechas - HASTA */}
             <div className="activity-page__filter-item">
               <label>📅 Hasta</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
+                min={startDate}
               />
             </div>
           </div>
@@ -708,8 +800,8 @@ const ActivityPage = () => {
             <button
               className="activity-page__btn activity-page__btn--secondary"
               onClick={handleExportPDF}
-              disabled={filteredActivities.length === 0}
-              title="Exportar reporte en PDF"
+              disabled={!filtersApplied || filteredActivities.length === 0}
+              title={!filtersApplied ? "Aplica al menos un filtro para exportar" : "Exportar reporte en PDF"}
             >
               📄 Exportar PDF
             </button>
@@ -734,11 +826,15 @@ const ActivityPage = () => {
               selectedStatus === "INACTIVE" ? "🔴 Inactivas" : 
               selectedStatus === "ENDING_SOON" ? "🟠 Por finalizar" : 
               "⚫ Finalizadas"}`}
-            {selectedTimeframe !== "ALL" && ` · ${selectedTimeframe === "THIS_WEEK" ? "Esta semana" : 
-              selectedTimeframe === "THIS_MONTH" ? "Este mes" : 
-              selectedTimeframe === "NEXT_MONTH" ? "Próximo mes" : "Pasadas"}`}
+            {searchText.trim() && ` · 🔍 "${searchText}"`}
             {startDate && endDate && ` · 📅 ${startDate} al ${endDate}`}
+            {startDate && !endDate && ` · 📅 ${startDate}`}
           </p>
+          {filtersApplied && (
+            <div className="activity-page__filters-applied">
+              <small>✅ Filtros aplicados: El botón Exportar PDF está habilitado</small>
+            </div>
+          )}
         </div>
 
         {/* MENSAJES DE ERROR */}
@@ -965,6 +1061,38 @@ const ActivityPage = () => {
         /* Evitar que la columna de acciones active el clic de la fila */
         .activity-page__col-actions {
           pointer-events: auto;
+        }
+        
+        /* Estilo para indicador de filtros aplicados */
+        .activity-page__filters-applied {
+          margin-top: 5px;
+          padding: 5px 10px;
+          background-color: rgba(0, 123, 255, 0.1);
+          border-radius: 4px;
+          color: #007bff;
+          font-size: 0.9em;
+        }
+        
+        /* Estilo para botón deshabilitado con tooltip */
+        .activity-page__btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          position: relative;
+        }
+        
+        .activity-page__btn:disabled:hover::after {
+          content: attr(title);
+          position: absolute;
+          bottom: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #333;
+          color: white;
+          padding: 5px 10px;
+          border-radius: 4px;
+          font-size: 0.8em;
+          white-space: nowrap;
+          z-index: 1000;
         }
       `}</style>
     </div>

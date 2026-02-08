@@ -1,5 +1,6 @@
 // ============================================
 // StudentsPage.jsx - SEGURIDAD MEJORADA
+// ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
 // ============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -8,7 +9,11 @@ import ModalEnrollStudent from '../components/Modalenrollstudent';
 import ModalStatistics from '../components/ModalStatistics';
 import { generatePDF } from '../services/Pdfgenerator';
 import { logSecurityEvent, logUserAction } from '../utils/securityLogger';
+import nameHelper from '../services/nameHelper'; // ✅ Importar el helper
 import '../css/Studentspage.css';
+
+// Extraer función del helper
+const { getDisplayName } = nameHelper;
 
 // 🔐 Debug condicional
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -23,7 +28,7 @@ const logError = (message, error) => {
   console.error(`[StudentsPage] ${message}`, error);
 };
 
-// ✅ Sanitización de HTML
+// ✅ Sanitización de HTML (manteniendo nombres originales para seguridad)
 const escapeHtml = (text) => {
   if (!text || typeof text !== 'string') return '';
   const map = {
@@ -204,7 +209,8 @@ const StudentsPage = () => {
         return {
           id: enrollment.id,
           memberId: enrollment.memberId,
-          studentName: escapeHtml(enrollment.memberName || 'Sin nombre'),
+          // ✅ Usar getDisplayName para mostrar nombres transformados
+          studentName: getDisplayName(escapeHtml(enrollment.memberName || 'Sin nombre')),
           level: escapeHtml(enrollment.cohortName || 'Sin cohorte'),
           levelEnrollment: levelValue,
           cohortName: escapeHtml(enrollment.cohortName || ''),
@@ -349,7 +355,10 @@ const StudentsPage = () => {
       if (searchText.trim()) {
         const search = searchText.toLowerCase();
         filtered = filtered.filter(student =>
-          student.studentName.toLowerCase().includes(search)
+          // Buscar por nombre transformado y nombre original
+          student.studentName.toLowerCase().includes(search) ||
+          // También buscar por nombre original si es necesario
+          (student.originalName && student.originalName.toLowerCase().includes(search))
         );
       }
 
@@ -795,6 +804,7 @@ const StudentsPage = () => {
                     <td className="students-page__col-name">
                       <div className="students-page__student-info">
                         <span className="students-page__avatar">👤</span>
+                        {/* ✅ Mostrar nombre transformado */}
                         <span className="students-page__student-name">{student.studentName}</span>
                       </div>
                     </td>

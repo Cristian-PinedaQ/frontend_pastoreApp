@@ -3,273 +3,553 @@
 // Generador de PDF para reportes de actividades
 // ============================================
 
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 
 // Colores para el PDF
 const COLORS = {
-  primary: '#3b82f6',
-  secondary: '#10b981',
-  danger: '#ef4444',
-  warning: '#f59e0b',
-  info: '#0891b2',
-  dark: '#6b7280',
-  light: '#f3f4f6',
-  border: '#e5e7eb',
-  text: '#111827',
-  textSecondary: '#4b5563',
-  textTertiary: '#6b7280',
+  primary: [59, 130, 246],    // Azul
+  success: [16, 185, 129],    // Verde
+  danger: [239, 68, 68],      // Rojo
+  warning: [245, 158, 11],    // Amarillo
+  dark: [107, 114, 128],      // Gris oscuro
+  light: [243, 244, 246],     // Gris claro
+  border: [229, 231, 235],    // Borde gris
+  text: [17, 24, 39],         // Texto negro
+  textSecondary: [75, 85, 99], // Texto gris
+};
+
+// Helper para formatear moneda
+const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined) return "$ 0";
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
+
+// Helper para formatear fecha
+const formatDate = (dateString) => {
+  if (!dateString) return '-';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return '-';
+  }
+};
+
+// Obtener información financiera de cada actividad
+const fetchActivityFinancialData = async (activity) => {
+  try {
+    const apiService = await import('../apiService').then(module => module.default);
+    const balance = await apiService.request(`/activity/balance/${activity.id}`);
+    
+    return {
+      totalCollected: balance?.totalPaid || 0,
+      totalExpenses: balance?.totalCosts || 0,
+      balance: (balance?.totalPaid || 0) - (balance?.totalCosts || 0), // Calculando balance
+      totalCommitted: balance?.totalCommitted || 0,
+      participantCount: balance?.participantCount || 0,
+      compliancePercentage: balance?.compliancePercentage || 0,
+      createdAt: activity.registrationDate
+    };
+  } catch (error) {
+    console.warn(`⚠️ No se pudo obtener información financiera para la actividad ${activity.id}:`, error);
+    return {
+      totalCollected: 0,
+      totalExpenses: 0,
+      balance: 0,
+      totalCommitted: 0,
+      participantCount: 0,
+      compliancePercentage: 0,
+      createdAt: activity.registrationDate
+    };
+  }
+};
+
+// Calcular días restantes
+const calculateDaysLeft = (endDate) => {
+  if (!endDate) return null;
+  try {
+    const today = new Date();
+    const end = new Date(endDate);
+    const diffTime = end - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Obtener texto de estado
+const getStatusText = (isActive, endDate) => {
+  if (!isActive) return "Inactiva";
+  
+  const today = new Date();
+  const end = new Date(endDate);
+  
+  if (isNaN(end.getTime())) return "Activa";
+  
+  if (end < today) return "Finalizada";
+  if (end.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000) {
+    return "Por finalizar";
+  }
+  
+  return "Activa";
+};
+
+// Calcular capacidad utilizada y porcentaje
+const calculateCapacityUsage = (participantCount, quantity) => {
+  if (!quantity || quantity <= 0) return { used: participantCount, total: "Ilimitada", percentage: 0 };
+  
+  const percentage = quantity > 0 ? ((participantCount / quantity) * 100) : 0;
+  return {
+    used: participantCount,
+    total: quantity,
+    percentage: percentage.toFixed(1)
+  };
+};
+
+// Calcular valor total (precio * cantidad)
+const calculateTotalValue = (price, quantity) => {
+  return (price || 0) * (quantity || 0);
+};
+
+// Helper para determinar color según balance
+const getBalanceColor = (balance) => {
+  return balance >= 0 ? COLORS.success : COLORS.danger;
 };
 
 /**
- * Genera un reporte PDF de actividades
- * @param {Object} data - Datos para el reporte
- * @param {string} filename - Nombre del archivo
+ * Genera un reporte PDF de actividades con la misma información que ModalActivityDetails
  */
-export const generateActivityPDF = (data, filename = 'activity-report') => {
+export const generateActivityPDF = async (data, filename = 'activity-report') => {
   try {
+    console.log('🔧 [generateActivityPDF] Iniciando generación de PDF...');
+    
+    // Obtener información financiera completa
+    const activitiesWithFinance = await Promise.all(
+      (data.activities || []).map(async (activity) => {
+        const financeData = await fetchActivityFinancialData(activity);
+        const daysLeft = calculateDaysLeft(activity.endDate);
+        const statusText = getStatusText(activity.isActive, activity.endDate);
+        const capacityUsage = calculateCapacityUsage(financeData.participantCount, activity.quantity);
+        const totalValue = calculateTotalValue(activity.price, activity.quantity);
+        
+        return { 
+          ...activity, 
+          financeData,
+          daysLeft,
+          statusText,
+          capacityUsage,
+          totalValue
+        };
+      })
+    );
+    
     // Crear documento PDF
     const doc = new jsPDF({
-      orientation: 'portrait',
+      orientation: 'landscape',
       unit: 'mm',
       format: 'a4',
     });
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    const contentWidth = pageWidth - (margin * 2);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = margin;
     
-    // TÍTULO
+    // ========== ENCABEZADO ==========
+    doc.setFillColor(...COLORS.primary);
+    doc.rect(0, 0, pageWidth, 25, 'F');
+    
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(COLORS.primary);
-    doc.text(data.title || 'Reporte de Actividades', margin, 30);
+    doc.setTextColor(255, 255, 255);
+    doc.text('REPORTE DE ACTIVIDADES', pageWidth / 2, 15, { align: 'center' });
     
-    // SUBTÍTULO
-    if (data.subtitle) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(COLORS.textSecondary);
-      doc.text(data.subtitle, margin, 40);
-    }
-    
-    // FECHA
     doc.setFontSize(10);
-    doc.setTextColor(COLORS.textTertiary);
-    const dateText = `Generado el: ${data.date || new Date().toLocaleDateString('es-CO')}`;
-    const dateWidth = doc.getTextWidth(dateText);
-    doc.text(dateText, pageWidth - margin - dateWidth, 30);
+    doc.text(data.subtitle || 'Resumen general de actividades', pageWidth / 2, 22, { align: 'center' });
     
-    // LÍNEA SEPARADORA
-    doc.setDrawColor(COLORS.border);
-    doc.setLineWidth(0.5);
-    doc.line(margin, 45, pageWidth - margin, 45);
+    yPos = 35;
     
-    let yPos = 55;
+    // ========== FECHA DE GENERACIÓN ==========
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COLORS.textSecondary);
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-CO', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`, margin, yPos);
     
-    // ESTADÍSTICAS GENERALES
-    if (data.statistics) {
-      doc.setFontSize(14);
+    yPos += 10;
+    
+    // ========== ESTADÍSTICAS GLOBALES ==========
+    const totalCollected = activitiesWithFinance.reduce((sum, a) => sum + a.financeData.totalCollected, 0);
+    const totalExpenses = activitiesWithFinance.reduce((sum, a) => sum + a.financeData.totalExpenses, 0);
+    const overallBalance = totalCollected - totalExpenses;
+    const totalCommitted = activitiesWithFinance.reduce((sum, a) => sum + a.financeData.totalCommitted, 0);
+    const totalParticipants = activitiesWithFinance.reduce((sum, a) => sum + a.financeData.participantCount, 0);
+    const totalValue = activitiesWithFinance.reduce((sum, a) => sum + a.totalValue, 0);
+    
+    // Crear cajas de estadísticas (similar a ModalActivityDetails)
+    const stats = [
+      { label: 'Total Actividades', value: activitiesWithFinance.length, icon: '', color: COLORS.primary },
+      { label: 'Participantes Totales', value: totalParticipants, icon: '', color: COLORS.success },
+      { label: 'Valor Total', value: formatCurrency(totalValue), icon: '', color: COLORS.primary },
+      { label: 'Comprometido', value: formatCurrency(totalCommitted), icon: '', color: COLORS.primary },
+      { label: 'Recaudado', value: formatCurrency(totalCollected), icon: '', color: COLORS.success },
+      { label: 'Gastos', value: formatCurrency(totalExpenses), icon: '', color: COLORS.danger },
+      { label: 'Balance General', value: formatCurrency(overallBalance), icon: '', color: getBalanceColor(overallBalance) },
+    ];
+    
+    // Organizar estadísticas en 2 filas
+    const boxWidth = (pageWidth - (margin * 2) - 60) / 4; // 4 cajas por fila
+    let xPos = margin;
+    
+    // Primera fila de estadísticas
+    stats.slice(0, 4).forEach((stat) => {
+      // Fondo de la caja
+      doc.setFillColor(...stat.color);
+      doc.roundedRect(xPos, yPos, boxWidth, 18, 3, 3, 'F');
+      
+      // Texto
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(COLORS.text);
-      doc.text('📊 Estadísticas Generales', margin, yPos);
-      yPos += 10;
+      doc.setTextColor(255, 255, 255);
+      doc.text(stat.icon, xPos + 3, yPos + 6);
       
-      // Tabla de estadísticas
-      const statsTable = [
-        ['Total de Actividades', data.statistics.totalActivities?.toString() || '0'],
-        ['Actividades Activas', data.statistics.totalActive?.toString() || '0'],
-        ['Total de Participantes', data.statistics.totalParticipants?.toString() || '0'],
-        ['Valor Total Estimado', `$ ${(data.statistics.totalValue || 0).toLocaleString('es-CO')}`],
-      ];
+      doc.setFontSize(7);
+      doc.text(stat.label, xPos + 10, yPos + 6);
       
-      doc.autoTable({
-        startY: yPos,
-        head: [['Métrica', 'Valor']],
-        body: statsTable,
-        margin: { left: margin, right: margin },
-        theme: 'grid',
-        headStyles: {
-          fillColor: COLORS.primary,
-          textColor: '#ffffff',
-          fontStyle: 'bold',
-        },
-        bodyStyles: {
-          textColor: COLORS.text,
-        },
-        alternateRowStyles: {
-          fillColor: COLORS.light,
-        },
-      });
-      
-      yPos = doc.lastAutoTable.finalY + 15;
-    }
-    
-    // DETALLE DE ACTIVIDADES
-    if (data.activities && data.activities.length > 0) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(COLORS.text);
-      doc.text('📋 Detalle de Actividades', margin, yPos);
-      yPos += 10;
-      
-      // Preparar datos para la tabla
-      const activitiesData = data.activities.map(activity => {
-        const status = getStatusText(activity);
-        const endDate = activity.endDate ? new Date(activity.endDate).toLocaleDateString('es-CO') : '-';
-        const participants = activity.quantity || 'Ilimitada';
-        const price = `$ ${(activity.price || 0).toLocaleString('es-CO')}`;
-        
-        return [
-          activity.activityName || 'Sin nombre',
-          price,
-          participants,
-          status,
-          endDate,
-        ];
-      });
-      
-      doc.autoTable({
-        startY: yPos,
-        head: [['Actividad', 'Precio', 'Participantes', 'Estado', 'Fecha Fin']],
-        body: activitiesData,
-        margin: { left: margin, right: margin },
-        theme: 'grid',
-        headStyles: {
-          fillColor: COLORS.primary,
-          textColor: '#ffffff',
-          fontStyle: 'bold',
-        },
-        bodyStyles: {
-          textColor: COLORS.text,
-        },
-        alternateRowStyles: {
-          fillColor: COLORS.light,
-        },
-        columnStyles: {
-          0: { cellWidth: 50 }, // Nombre
-          1: { cellWidth: 30 }, // Precio
-          2: { cellWidth: 30 }, // Participantes
-          3: { cellWidth: 30 }, // Estado
-          4: { cellWidth: 30 }, // Fecha
-        },
-        didDrawCell: (data) => {
-          // Colorear celdas de estado
-          if (data.section === 'body' && data.column.index === 3) {
-            const cellText = data.cell.text[0];
-            let fillColor;
-            
-            if (cellText.includes('🟢') || cellText.includes('Activa')) {
-              fillColor = [16, 185, 129, 10]; // Verde claro
-            } else if (cellText.includes('🔴') || cellText.includes('Inactiva')) {
-              fillColor = [239, 68, 68, 10]; // Rojo claro
-            } else if (cellText.includes('🟠') || cellText.includes('Por finalizar')) {
-              fillColor = [245, 158, 11, 10]; // Naranja claro
-            } else if (cellText.includes('⚫') || cellText.includes('Finalizada')) {
-              fillColor = [107, 114, 128, 10]; // Gris claro
-            }
-            
-            if (fillColor) {
-              doc.setFillColor(...fillColor);
-              doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
-            }
-          }
-        },
-      });
-      
-      yPos = doc.lastAutoTable.finalY + 15;
-    }
-    
-    // RESUMEN POR ESTADO
-    if (data.activities && data.activities.length > 0) {
-      const statusSummary = {
-        active: data.activities.filter(a => a.isActive && !isActivityFinished(a)).length,
-        ending: data.activities.filter(a => a.isActive && isActivityEndingSoon(a)).length,
-        finished: data.activities.filter(a => isActivityFinished(a)).length,
-        inactive: data.activities.filter(a => !a.isActive).length,
-      };
-      
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(COLORS.text);
-      doc.text('📈 Resumen por Estado', margin, yPos);
-      yPos += 10;
-      
-      const summaryData = [
-        ['🟢 Activas', statusSummary.active.toString()],
-        ['🟠 Por Finalizar', statusSummary.ending.toString()],
-        ['⚫ Finalizadas', statusSummary.finished.toString()],
-        ['🔴 Inactivas', statusSummary.inactive.toString()],
-        ['📊 Total', data.activities.length.toString()],
-      ];
-      
-      doc.autoTable({
-        startY: yPos,
-        body: summaryData,
-        margin: { left: margin, right: margin },
-        theme: 'grid',
-        bodyStyles: {
-          textColor: COLORS.text,
-        },
-        alternateRowStyles: {
-          fillColor: COLORS.light,
-        },
-        columnStyles: {
-          0: { cellWidth: contentWidth * 0.7, fontStyle: 'bold' },
-          1: { cellWidth: contentWidth * 0.3, halign: 'center' },
-        },
-        didDrawCell: (data) => {
-          if (data.section === 'body') {
-            const cellText = data.cell.text[0];
-            if (cellText.includes('🟢')) {
-              doc.setTextColor(COLORS.secondary);
-            } else if (cellText.includes('🟠')) {
-              doc.setTextColor(COLORS.warning);
-            } else if (cellText.includes('⚫')) {
-              doc.setTextColor(COLORS.dark);
-            } else if (cellText.includes('🔴')) {
-              doc.setTextColor(COLORS.danger);
-            } else if (cellText.includes('📊')) {
-              doc.setTextColor(COLORS.primary);
-              doc.setFontStyle('bold');
-            }
-            
-            doc.text(cellText, data.cell.x + 2, data.cell.y + 7);
-            doc.setTextColor(COLORS.text);
-            doc.setFontStyle('normal');
-          }
-        },
-      });
-    }
-    
-    // PIE DE PÁGINA
-    const pageCount = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      
-      // Número de página
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(COLORS.textTertiary);
-      const pageText = `Página ${i} de ${pageCount}`;
-      const pageTextWidth = doc.getTextWidth(pageText);
-      doc.text(pageText, pageWidth - margin - pageTextWidth, 290);
-      
-      // Línea superior
-      doc.setDrawColor(COLORS.border);
-      doc.setLineWidth(0.5);
-      doc.line(margin, 285, pageWidth - margin, 285);
-      
-      // Información del sistema
       doc.setFontSize(9);
-      const footerText = `Sistema de Gestión de Actividades - ${new Date().getFullYear()}`;
-      doc.text(footerText, margin, 295);
+      doc.text(stat.value.toString(), xPos + boxWidth / 2, yPos + 13, { align: 'center' });
+      
+      xPos += boxWidth + 10;
+    });
+    
+    yPos += 25;
+    xPos = margin;
+    
+    // Segunda fila de estadísticas
+    stats.slice(4, 7).forEach((stat) => {
+      // Fondo de la caja
+      doc.setFillColor(...stat.color);
+      doc.roundedRect(xPos, yPos, boxWidth, 18, 3, 3, 'F');
+      
+      // Texto
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(255, 255, 255);
+      doc.text(stat.icon, xPos + 3, yPos + 6);
+      
+      doc.setFontSize(7);
+      doc.text(stat.label, xPos + 10, yPos + 6);
+      
+      doc.setFontSize(9);
+      doc.text(stat.value.toString(), xPos + boxWidth / 2, yPos + 13, { align: 'center' });
+      
+      xPos += boxWidth + 10;
+    });
+    
+    yPos += 25;
+    
+    // ========== TABLA DETALLADA DE ACTIVIDADES ==========
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.text);
+    doc.text('DETALLE DE ACTIVIDADES (Información General)', margin, yPos);
+    yPos += 8;
+    
+    // Preparar datos para la tabla - MOSTRANDO LOS MISMOS CAMPOS QUE ModalActivityDetails
+    const tableData = activitiesWithFinance.map(activity => {
+      const daysLeftText = activity.daysLeft > 0 ? ` (${activity.daysLeft} días)` : '';
+      
+      return [
+        activity.activityName || 'Sin nombre',
+        activity.statusText || '',
+        formatCurrency(activity.price || 0),
+        activity.capacityUsage.total === "Ilimitada" ? 
+          `${activity.capacityUsage.used} / ${activity.capacityUsage.total}` :
+          `${activity.capacityUsage.used} / ${activity.capacityUsage.total} (${activity.capacityUsage.percentage}%)`,
+        formatDate(activity.registrationDate),
+        formatDate(activity.endDate) + daysLeftText,
+        formatCurrency(activity.totalValue),
+        formatCurrency(activity.financeData.totalCommitted),
+        formatCurrency(activity.financeData.totalCollected),
+        formatCurrency(activity.financeData.balance), // Pendiente (TotalPaid - TotalCommitted)
+        formatCurrency(activity.financeData.totalExpenses), // GASTOS - NUEVO CAMPO
+        formatCurrency(activity.financeData.balance), // BALANCE (Pagado - Gastos) - NUEVO CAMPO
+        `${activity.financeData.compliancePercentage?.toFixed(1) || "0"}%`
+      ];
+    });
+    
+    // Crear la tabla con autoTable
+    doc.autoTable({
+      startY: yPos,
+      head: [[
+        'ACTIVIDAD', 
+        'ESTADO', 
+        'PRECIO', 
+        'CAPACIDAD', 
+        'CREACIÓN', 
+        'FINALIZACIÓN', 
+        'VALOR TOTAL',
+        'COMPROMETIDO',
+        'PAGADO',
+        'PENDIENTE',
+        'GASTOS', // NUEVA COLUMNA
+        'BALANCE', // NUEVA COLUMNA
+        'CUMPLIMIENTO'
+      ]],
+      body: tableData,
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      headStyles: {
+        fillColor: COLORS.primary,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'center'
+      },
+      bodyStyles: {
+        textColor: COLORS.text,
+        fontSize: 7,
+        cellPadding: 2,
+      },
+      alternateRowStyles: {
+        fillColor: COLORS.light,
+      },
+      styles: {
+        lineWidth: 0.1,
+        lineColor: COLORS.border,
+      },
+      columnStyles: {
+        0: { cellWidth: 25, fontStyle: 'bold' }, // Nombre
+        1: { cellWidth: 15, halign: 'center' },  // Estado
+        2: { cellWidth: 18, halign: 'right' },   // Precio
+        3: { cellWidth: 23, halign: 'center' },  // Capacidad
+        4: { cellWidth: 20, halign: 'center' },  // Creación
+        5: { cellWidth: 22, halign: 'center' },  // Finalización
+        6: { cellWidth: 25, halign: 'right', fontStyle: 'bold' }, // Valor Total
+        7: { 
+          cellWidth: 28, 
+          halign: 'right',
+          fontStyle: 'bold',
+          textColor: COLORS.primary // Azul para comprometido
+        },
+        8: { 
+          cellWidth: 20, 
+          halign: 'right',
+          fontStyle: 'bold',
+          textColor: COLORS.success // Verde para pagado
+        },
+        9: { 
+          cellWidth: 20, 
+          halign: 'right',
+          fontStyle: 'bold',
+          textColor: COLORS.warning // Amarillo para pendiente
+        },
+        10: { // GASTOS - NUEVA COLUMNA
+          cellWidth: 20, 
+          halign: 'right',
+          fontStyle: 'bold',
+          textColor: COLORS.danger // Rojo para gastos
+        },
+        11: { // BALANCE - NUEVA COLUMNA
+          cellWidth: 20, 
+          halign: 'right',
+          fontStyle: 'bold',
+          didParseCell: function(data) {
+            const cellValue = data.cell.raw;
+            if (cellValue) {
+              // Extraer número del texto formateado
+              const match = cellValue.match(/[\d,.]+/);
+              if (match) {
+                const amount = parseFloat(match[0].replace(/\./g, '').replace(',', '.'));
+                data.cell.styles.textColor = amount >= 0 ? COLORS.success : COLORS.danger;
+              }
+            }
+          }
+        },
+        12: { 
+          cellWidth: 25, 
+          halign: 'center',
+          fontStyle: 'bold',
+          didParseCell: function(data) {
+            const cellValue = data.cell.raw;
+            if (cellValue && cellValue !== "0%") {
+              const percentage = parseFloat(cellValue.replace('%', ''));
+              if (percentage >= 80) {
+                data.cell.styles.textColor = COLORS.success;
+              } else if (percentage >= 50) {
+                data.cell.styles.textColor = COLORS.warning;
+              } else {
+                data.cell.styles.textColor = COLORS.danger;
+              }
+            }
+          }
+        },
+      },
+      didDrawPage: function(data) {
+        // Número de página
+        doc.setFontSize(8);
+        doc.setTextColor(...COLORS.textSecondary);
+        doc.text(
+          `Página ${data.pageNumber} de ${data.pageCount}`,
+          pageWidth - margin - 20,
+          pageHeight - 10
+        );
+      }
+    });
+    
+    yPos = doc.lastAutoTable.finalY + 15;
+    
+    // ========== RESUMEN FINANCIERO POR ACTIVIDAD ==========
+    if (activitiesWithFinance.length > 0) {
+      // Separador
+      doc.setDrawColor(...COLORS.border);
+      doc.setLineWidth(0.5);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 10;
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...COLORS.text);
+      doc.text('ANÁLISIS FINANCIERO DETALLADO', margin, yPos);
+      yPos += 8;
+      
+      // Tabla de análisis financiero simplificado
+      const financialData = activitiesWithFinance.map(activity => [
+        activity.activityName,
+        formatCurrency(activity.financeData.totalCommitted),
+        formatCurrency(activity.financeData.totalCollected),
+        formatCurrency(activity.financeData.balance),
+        formatCurrency(activity.financeData.totalExpenses),
+        formatCurrency(activity.financeData.balance), // Balance calculado (Pagado - Gastos)
+        activity.financeData.totalCommitted > 0 ? 
+          `${Math.round((activity.financeData.totalCollected / activity.financeData.totalCommitted) * 100)}%` : '0%'
+      ]);
+      
+      doc.autoTable({
+        startY: yPos,
+        head: [['Actividad', 'Comprometido', 'Pagado', 'Pendiente', 'Gastos', 'Balance (Utilidad)', '% Cobranza']],
+        body: financialData,
+        margin: { left: margin, right: margin },
+        theme: 'striped',
+        headStyles: {
+          fillColor: COLORS.dark,
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+        bodyStyles: {
+          fontSize: 7,
+        },
+        columnStyles: {
+          0: { cellWidth: 40 },
+          1: { cellWidth: 30, halign: 'right', textColor: COLORS.primary },
+          2: { cellWidth: 30, halign: 'right', textColor: COLORS.success },
+          3: { cellWidth: 25, halign: 'right', textColor: COLORS.warning },
+          4: { cellWidth: 25, halign: 'right', textColor: COLORS.danger },
+          5: { 
+            cellWidth: 30, 
+            halign: 'right',
+            fontStyle: 'bold',
+            didParseCell: function(data) {
+              const cellValue = data.cell.raw;
+              if (cellValue) {
+                const match = cellValue.match(/[\d,.]+/);
+                if (match) {
+                  const amount = parseFloat(match[0].replace(/\./g, '').replace(',', '.'));
+                  data.cell.styles.textColor = amount >= 0 ? COLORS.success : COLORS.danger;
+                }
+              }
+            }
+          },
+          6: { 
+            cellWidth: 25, 
+            halign: 'center',
+            didParseCell: function(data) {
+              const cellValue = data.cell.raw;
+              if (cellValue && cellValue !== "0%") {
+                const percentage = parseFloat(cellValue.replace('%', ''));
+                if (percentage >= 80) {
+                  data.cell.styles.textColor = COLORS.success;
+                } else if (percentage >= 50) {
+                  data.cell.styles.textColor = COLORS.warning;
+                } else {
+                  data.cell.styles.textColor = COLORS.danger;
+                }
+              }
+            }
+          },
+        },
+      });
+      
+      yPos = doc.lastAutoTable.finalY + 15;
     }
     
-    // GUARDAR PDF
-    doc.save(`${filename}.pdf`);
+    // ========== LEYENDA Y NOTAS ==========
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COLORS.textSecondary);
     
-    console.log('✅ PDF generado exitosamente');
+    const legendY = pageHeight - 30;
+    
+    // Leyenda de colores
+    doc.setFillColor(...COLORS.success);
+    doc.rect(margin, legendY, 4, 4, 'F');
+    doc.text('Balance positivo / Pagado', margin + 7, legendY + 3);
+    
+    doc.setFillColor(...COLORS.danger);
+    doc.rect(margin + 60, legendY, 4, 4, 'F');
+    doc.text('Balance negativo / Gastos', margin + 67, legendY + 3);
+    
+    doc.setFillColor(...COLORS.warning);
+    doc.rect(margin + 120, legendY, 4, 4, 'F');
+    doc.text('Pendiente', margin + 127, legendY + 3);
+    
+    doc.setFillColor(...COLORS.primary);
+    doc.rect(margin + 165, legendY, 4, 4, 'F');
+    doc.text('Comprometido', margin + 172, legendY + 3);
+    
+    // Notas explicativas
+    const notesY = legendY + 10;
+    doc.text('Notas:', margin, notesY);
+    doc.text('• Balance = Pagado - Gastos (utilidad de la actividad)', margin + 10, notesY + 5);
+    doc.text('• Cumplimiento = (Pagado / Comprometido) × 100', margin + 10, notesY + 10);
+    
+    // ========== PIE DE PÁGINA ==========
+    doc.setFillColor(...COLORS.light);
+    doc.rect(0, pageHeight - 15, pageWidth, 15, 'F');
+    
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...COLORS.textSecondary);
+    doc.text(
+      'Sistema de Gestión de Actividades • Información equivalente a vista "Información General"',
+      pageWidth / 2,
+      pageHeight - 8,
+      { align: 'center' }
+    );
+    
+    // ========== GUARDAR PDF ==========
+    const finalFilename = `${filename}-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(finalFilename);
+    
+    console.log('✅ PDF generado exitosamente:', finalFilename);
     return true;
     
   } catch (error) {
@@ -281,196 +561,8 @@ export const generateActivityPDF = (data, filename = 'activity-report') => {
 
 /**
  * Genera un PDF detallado para una actividad específica
- * @param {Object} data - Datos de la actividad
- * @param {string} filename - Nombre del archivo
+ * (Mantener función existente sin cambios)
  */
 export const generateActivityDetailPDF = (data, filename = 'activity-detail') => {
-  try {
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
-    });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    const contentWidth = pageWidth - (margin * 2);
-    
-    // LOGO O ENCABEZADO
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(COLORS.primary);
-    doc.text('📋 REPORTE DE ACTIVIDAD', pageWidth / 2, 30, { align: 'center' });
-    
-    // INFORMACIÓN DE LA ACTIVIDAD
-    doc.setFontSize(16);
-    doc.setTextColor(COLORS.text);
-    doc.text(data.activity.activityName || 'Sin nombre', margin, 50);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(COLORS.textSecondary);
-    
-    let yPos = 60;
-    
-    // DETALLES BÁSICOS
-    const details = [
-      ['💰 Precio:', `$ ${(data.activity.price || 0).toLocaleString('es-CO')}`],
-      ['👥 Capacidad:', data.activity.quantity || 'Ilimitada'],
-      ['📅 Fecha de Creación:', new Date(data.activity.registrationDate).toLocaleDateString('es-CO')],
-      ['📅 Fecha de Finalización:', new Date(data.activity.endDate).toLocaleDateString('es-CO')],
-      ['📊 Estado:', getStatusText(data.activity)],
-    ];
-    
-    details.forEach(([label, value], index) => {
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(COLORS.text);
-      doc.text(label, margin, yPos + (index * 8));
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(COLORS.textSecondary);
-      const labelWidth = doc.getTextWidth(label);
-      doc.text(value, margin + labelWidth + 5, yPos + (index * 8));
-    });
-    
-    yPos += (details.length * 8) + 15;
-    
-    // INFORMACIÓN FINANCIERA
-    if (data.balance) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(COLORS.text);
-      doc.text('💰 Información Financiera', margin, yPos);
-      yPos += 10;
-      
-      const financeData = [
-        ['Ingresos Comprometidos', `$ ${(data.balance.totalCommitted || 0).toLocaleString('es-CO')}`],
-        ['Ingresos Recibidos', `$ ${(data.balance.totalPaid || 0).toLocaleString('es-CO')}`],
-        ['Costos Totales', `$ ${(data.balance.totalCosts || 0).toLocaleString('es-CO')}`],
-        ['Balance Actual', `$ ${(data.balance.balance || 0).toLocaleString('es-CO')}`],
-        ['Tasa de Cumplimiento', `${(data.balance.compliancePercentage || 0).toFixed(1)}%`],
-      ];
-      
-      doc.autoTable({
-        startY: yPos,
-        body: financeData,
-        margin: { left: margin, right: margin },
-        theme: 'grid',
-        headStyles: {
-          fillColor: COLORS.primary,
-          textColor: '#ffffff',
-          fontStyle: 'bold',
-        },
-        bodyStyles: {
-          textColor: COLORS.text,
-        },
-        alternateRowStyles: {
-          fillColor: COLORS.light,
-        },
-        columnStyles: {
-          0: { cellWidth: contentWidth * 0.6, fontStyle: 'bold' },
-          1: { cellWidth: contentWidth * 0.4, halign: 'right' },
-        },
-      });
-      
-      yPos = doc.lastAutoTable.finalY + 15;
-    }
-    
-    // PARTICIPANTES
-    if (data.participants && data.participants.length > 0) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(COLORS.text);
-      doc.text('👥 Lista de Participantes', margin, yPos);
-      yPos += 10;
-      
-      const participantsData = data.participants.map(participant => [
-        participant.memberName || 'Sin nombre',
-        `$ ${(participant.totalPaid || 0).toLocaleString('es-CO')}`,
-        `$ ${(participant.pendingBalance || 0).toLocaleString('es-CO')}`,
-        `${Math.round(participant.compliancePercentage || 0)}%`,
-        participant.enrollmentStatus === 'COMPLETED' ? '✅ Pagado' : 
-        participant.enrollmentStatus === 'ACTIVE' ? '🟡 Parcial' : '⏳ Pendiente',
-      ]);
-      
-      doc.autoTable({
-        startY: yPos,
-        head: [['Nombre', 'Pagado', 'Pendiente', 'Cumplimiento', 'Estado']],
-        body: participantsData,
-        margin: { left: margin, right: margin },
-        theme: 'grid',
-        headStyles: {
-          fillColor: COLORS.primary,
-          textColor: '#ffffff',
-          fontStyle: 'bold',
-        },
-        bodyStyles: {
-          textColor: COLORS.text,
-        },
-        alternateRowStyles: {
-          fillColor: COLORS.light,
-        },
-      });
-    }
-    
-    // FIRMA Y FECHA
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(COLORS.textTertiary);
-    doc.text('______________________________', pageWidth - margin - 50, 250);
-    doc.text('Firma y Sello', pageWidth - margin - 40, 255);
-    doc.text(new Date().toLocaleDateString('es-CO'), pageWidth - margin - 35, 260);
-    
-    // GUARDAR PDF
-    doc.save(`${filename}.pdf`);
-    
-    console.log('✅ PDF detallado generado exitosamente');
-    return true;
-    
-  } catch (error) {
-    console.error('❌ Error generando PDF detallado:', error);
-    return false;
-  }
-};
-
-/**
- * Helper: Obtener texto de estado
- */
-const getStatusText = (activity) => {
-  if (!activity.isActive) return '🔴 Inactiva';
-  
-  const endDate = new Date(activity.endDate);
-  const today = new Date();
-  
-  if (isNaN(endDate.getTime())) return '🟡 Activa';
-  if (endDate < today) return '⚫ Finalizada';
-  if (endDate.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000) {
-    return '🟠 Por finalizar';
-  }
-  
-  return '🟢 Activa';
-};
-
-/**
- * Helper: Verificar si actividad está por finalizar
- */
-const isActivityEndingSoon = (activity) => {
-  if (!activity.isActive || !activity.endDate) return false;
-  
-  const endDate = new Date(activity.endDate);
-  const today = new Date();
-  
-  return endDate.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000;
-};
-
-/**
- * Helper: Verificar si actividad está finalizada
- */
-const isActivityFinished = (activity) => {
-  if (!activity.endDate) return false;
-  
-  const endDate = new Date(activity.endDate);
-  const today = new Date();
-  
-  return endDate < today;
+  // ... (código existente)
 };

@@ -18,7 +18,7 @@
   background: var(--activity-bg-primary);
   border-radius: var(--activity-radius-xl);
   width: 100%;
-  max-width: 800px;
+  max-width: 1000px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--activity-shadow-xl);
@@ -110,6 +110,42 @@
 .modal-activity-details__close:hover {
   background: var(--activity-bg-tertiary);
   color: var(--activity-text-primary);
+}
+
+/* PESTAÑAS */
+.modal-activity-details__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--activity-border-color);
+  background: var(--activity-bg-secondary);
+  padding: 0 var(--activity-spacing-lg);
+}
+
+.tab {
+  padding: var(--activity-spacing-md) var(--activity-spacing-lg);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--activity-text-tertiary);
+  cursor: pointer;
+  transition: all var(--activity-transition-base);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.tab:hover {
+  color: var(--activity-text-primary);
+  background: var(--activity-bg-tertiary);
+}
+
+.tab.active {
+  color: var(--activity-primary);
+  border-bottom-color: var(--activity-primary);
+  background: var(--activity-bg-primary);
+  font-weight: 600;
 }
 
 /* CONTENT */
@@ -343,7 +379,7 @@
   color: var(--activity-text-tertiary);
   font-size: 0.9rem;
 }
-/*
+
 .input-with-prefix {
   position: relative;
   display: flex;
@@ -360,7 +396,7 @@
 .input-with-prefix input {
   padding-left: calc(var(--activity-spacing-md) * 2.5);
 }
-*/
+
 .enroll-btn {
   width: 100%;
   padding: var(--activity-spacing-md);
@@ -386,6 +422,238 @@
 .enroll-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* SECCIÓN DE COSTOS */
+.costs-section {
+  background: var(--activity-bg-secondary);
+  padding: var(--activity-spacing-lg);
+  border-radius: var(--activity-radius-lg);
+  border: 1px solid var(--activity-border-color);
+}
+
+.costs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--activity-spacing-lg);
+  flex-wrap: wrap;
+  gap: var(--activity-spacing-md);
+}
+
+.total-costs {
+  background: var(--activity-bg-primary);
+  padding: var(--activity-spacing-md) var(--activity-spacing-lg);
+  border-radius: var(--activity-radius-md);
+  border: 1px solid var(--activity-border-color);
+  display: flex;
+  align-items: center;
+  gap: var(--activity-spacing-md);
+}
+
+.total-label {
+  font-size: 0.9rem;
+  color: var(--activity-text-tertiary);
+  font-weight: 500;
+}
+
+.total-value {
+  font-size: 1.25rem;
+  color: var(--activity-danger);
+  font-weight: 700;
+}
+
+.cost-form {
+  background: var(--activity-bg-primary);
+  padding: var(--activity-spacing-lg);
+  border-radius: var(--activity-radius-lg);
+  border: 1px solid var(--activity-border-color);
+  margin-bottom: var(--activity-spacing-xl);
+}
+
+.cost-form h4 {
+  margin: 0 0 var(--activity-spacing-lg) 0;
+  font-size: 1.1rem;
+  color: var(--activity-text-primary);
+  font-weight: 600;
+}
+
+.cost-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: #065f46;
+  padding: var(--activity-spacing-md);
+  border-radius: var(--activity-radius-md);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  margin-bottom: var(--activity-spacing-lg);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.cost-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #991b1b;
+  padding: var(--activity-spacing-md);
+  border-radius: var(--activity-radius-md);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  margin-bottom: var(--activity-spacing-lg);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--activity-spacing-md);
+  margin-bottom: var(--activity-spacing-lg);
+}
+
+.save-cost-btn {
+  width: 100%;
+  padding: var(--activity-spacing-md);
+  background: linear-gradient(135deg, var(--activity-danger) 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: var(--activity-radius-lg);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--activity-transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.save-cost-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  transform: translateY(-2px);
+}
+
+.save-cost-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* LISTA DE COSTOS */
+.costs-list {
+  background: var(--activity-bg-primary);
+  padding: var(--activity-spacing-lg);
+  border-radius: var(--activity-radius-lg);
+  border: 1px solid var(--activity-border-color);
+}
+
+.costs-list h4 {
+  margin: 0 0 var(--activity-spacing-lg) 0;
+  font-size: 1.1rem;
+  color: var(--activity-text-primary);
+  font-weight: 600;
+}
+
+.loading-costs {
+  padding: var(--activity-spacing-lg);
+  text-align: center;
+  color: var(--activity-text-tertiary);
+  font-size: 0.9rem;
+}
+
+.no-costs {
+  padding: var(--activity-spacing-lg);
+  text-align: center;
+  color: var(--activity-text-tertiary);
+  font-size: 1rem;
+  background: var(--activity-bg-tertiary);
+  border-radius: var(--activity-radius-md);
+}
+
+.costs-table-container {
+  overflow-x: auto;
+}
+
+.costs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.costs-table th {
+  background: var(--activity-bg-tertiary);
+  color: var(--activity-text-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: var(--activity-spacing-md);
+  border-bottom: 2px solid var(--activity-border-color);
+  white-space: nowrap;
+}
+
+.costs-table td {
+  padding: var(--activity-spacing-md);
+  border-bottom: 1px solid var(--activity-border-color);
+  vertical-align: middle;
+}
+
+.costs-table tr:hover {
+  background: var(--activity-bg-tertiary);
+}
+
+.cost-price {
+  color: var(--activity-danger);
+  font-weight: 600;
+}
+
+.method-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.method-badge.efectivo {
+  background: rgba(34, 197, 94, 0.1);
+  color: #166534;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.method-badge.transferencia {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1e40af;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.method-badge.tarjeta {
+  background: rgba(168, 85, 247, 0.1);
+  color: #6b21a8;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.method-badge.cheque {
+  background: rgba(245, 158, 11, 0.1);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.method-badge.otro {
+  background: rgba(107, 114, 128, 0.1);
+  color: #4b5563;
+  border: 1px solid rgba(107, 114, 128, 0.2);
+}
+
+.delete-cost-btn {
+  background: none;
+  border: none;
+  color: var(--activity-danger);
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all var(--activity-transition-base);
+}
+
+.delete-cost-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
 }
 
 /* ACCIONES */
@@ -420,6 +688,21 @@
   color: var(--activity-text-primary);
 }
 
+/* SPINNER */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .modal-activity-details {
@@ -443,12 +726,26 @@
     white-space: normal;
   }
 
+  .modal-activity-details__tabs {
+    flex-wrap: wrap;
+    padding: 0 var(--activity-spacing-sm);
+  }
+
+  .tab {
+    flex: 1;
+    min-width: 120px;
+    text-align: center;
+    padding: var(--activity-spacing-sm) var(--activity-spacing-md);
+    font-size: 0.85rem;
+  }
+
   .modal-activity-details__content {
     padding: var(--activity-spacing-md);
   }
 
   .details-grid,
-  .finance-grid {
+  .finance-grid,
+  .form-grid {
     grid-template-columns: 1fr;
   }
 
@@ -456,8 +753,23 @@
     font-size: 1.1rem;
   }
 
-  .enroll-section {
-    padding: var(--activity-spacing-md);
+  .costs-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .total-costs {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .costs-table {
+    font-size: 0.8rem;
+  }
+
+  .costs-table th,
+  .costs-table td {
+    padding: var(--activity-spacing-sm);
   }
 }
 
@@ -472,6 +784,12 @@
 
   .modal-activity-details__header h2 {
     font-size: 1.1rem;
+  }
+
+  .tab {
+    min-width: 100px;
+    font-size: 0.8rem;
+    padding: 8px 12px;
   }
 
   .detail-item,
@@ -494,4 +812,5 @@
     width: 100%;
     min-width: auto;
   }
+
 }

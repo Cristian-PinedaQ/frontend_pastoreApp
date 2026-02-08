@@ -22,6 +22,9 @@ const UsersPage = () => {
   // ========== DARK MODE ==========
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // ========== ESTADO PARA MOSTRAR/OCULTAR CONTRASEÑA ==========
+  const [showPassword, setShowPassword] = useState(false);
+
   useEffect(() => {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const savedMode = localStorage.getItem('darkMode');
@@ -89,6 +92,11 @@ const UsersPage = () => {
     password: "",
     role: "PROFESORES",
   });
+
+  // Función para alternar visibilidad de contraseña
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   // ✅ SEGURIDAD: Validación de contraseña fuerte
   const validatePassword = (password) => {
@@ -254,6 +262,7 @@ const UsersPage = () => {
       });
       setEditingId(null);
       setShowForm(false);
+      setShowPassword(false); // Resetear visibilidad de contraseña
       await loadUsers();
     } catch (err) {
       if (err.code === "CONFLICT") {
@@ -287,6 +296,7 @@ const UsersPage = () => {
 
       setEditingId(userId);
       setShowForm(true);
+      setShowPassword(false); // Ocultar contraseña por defecto al editar
       setSuccess("Cargado para editar");
     } catch (err) {
       handleError("SERVER_ERROR", "handleEdit");
@@ -340,6 +350,7 @@ const UsersPage = () => {
     });
     setEditingId(null);
     setShowForm(false);
+    setShowPassword(false); // Ocultar contraseña al cancelar
     setError("");
     setSuccess("");
   };
@@ -423,6 +434,7 @@ const UsersPage = () => {
                 password: "",
                 role: "PROFESORES",
               });
+              setShowPassword(false); // Ocultar contraseña al abrir formulario
             }}
             disabled={loading}
             onMouseEnter={(e) => {
@@ -566,43 +578,120 @@ const UsersPage = () => {
                 </small>
               </div>
 
-              {/* Contraseña */}
+              {/* Contraseña con botón para mostrar/ocultar */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '600',
-                  color: theme.text,
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   marginBottom: '0.5rem',
                 }}>
-                  Contraseña * {editingId && "(opcional)"}
-                </label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  placeholder={
-                    editingId
-                      ? "Dejar en blanco si no deseas cambiar"
-                      : "Contraseña segura"
-                  }
-                  required={!editingId}
-                  disabled={loading}
-                  minLength="12"
-                  maxLength="100"
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem 1rem',
-                    border: `1px solid ${theme.border}`,
-                    borderRadius: '0.5rem',
-                    backgroundColor: theme.input,
-                    color: theme.text,
+                  <label style={{
+                    display: 'block',
                     fontSize: '0.875rem',
-                    boxSizing: 'border-box',
-                  }}
-                />
+                    fontWeight: '600',
+                    color: theme.text,
+                  }}>
+                    Contraseña * {editingId && "(opcional)"}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={togglePasswordVisibility}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: theme.textSecondary,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '0.25rem',
+                      opacity: loading ? 0.6 : 1,
+                    }}
+                    disabled={loading}
+                    onMouseEnter={(e) => {
+                      if (!loading) e.target.style.backgroundColor = theme.bgSecondary;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = 'transparent';
+                    }}
+                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                  >
+                    {showPassword ? (
+                      <>
+                        👀 Ocultar
+                      </>
+                    ) : (
+                      <>
+                        🙈 Mostrar
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    placeholder={
+                      editingId
+                        ? "Dejar en blanco si no deseas cambiar"
+                        : "Contraseña segura"
+                    }
+                    required={!editingId}
+                    disabled={loading}
+                    minLength="12"
+                    maxLength="100"
+                    style={{
+                      width: '100%',
+                      padding: '0.5rem 3rem 0.5rem 1rem',
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: '0.5rem',
+                      backgroundColor: theme.input,
+                      color: theme.text,
+                      fontSize: '0.875rem',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={togglePasswordVisibility}
+                    style={{
+                      position: 'absolute',
+                      right: '0.5rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: theme.textSecondary,
+                      cursor: 'pointer',
+                      padding: '0.25rem',
+                      borderRadius: '0.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: loading ? 0.6 : 1,
+                    }}
+                    disabled={loading}
+                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    onMouseEnter={(e) => {
+                      if (!loading) e.target.style.color = theme.text;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.color = theme.textSecondary;
+                    }}
+                  >
+                    {showPassword ? (
+                      <span style={{ fontSize: '1.25rem' }}>👀</span>
+                    ) : (
+                      <span style={{ fontSize: '1.25rem' }}>🙈</span>
+                    )}
+                  </button>
+                </div>
                 <small style={{ color: theme.textSecondary, display: 'block', marginTop: '0.25rem' }}>
                   Mínimo 12 caracteres: mayúscula, minúscula, número, carácter especial
                 </small>
