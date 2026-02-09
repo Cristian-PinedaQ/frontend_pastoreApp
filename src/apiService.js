@@ -4,7 +4,7 @@
 // ✅ Mensajes de error genéricos
 // ✅ Export con nombre (ESLint compliance)
 //Produccion
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL;
 //desarrollo
 //const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 

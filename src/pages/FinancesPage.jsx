@@ -386,10 +386,10 @@ const FinancesPage = () => {
       if (
         startDate ||
         endDate ||
-        selectedMethod ||
-        selectedVerification ||
-        selectedConcept ||
-        !searchText.trim()
+        selectedMethod !== "ALL" ||
+        selectedVerification !== "ALL" ||
+        selectedConcept !== "ALL" ||
+        searchText.trim()
       ) {
         setShowReportModal(true);
 
@@ -428,7 +428,16 @@ const FinancesPage = () => {
       logError("Error generando PDF:", err);
       setError("Error al generar PDF");
     }
-  }, [startDate, endDate, selectedConcept, filteredFinances, calculateStatistics, searchText, selectedMethod, selectedVerification]);
+  }, [
+    startDate,
+    endDate,
+    selectedConcept,
+    selectedMethod,
+    selectedVerification,
+    searchText,
+    filteredFinances,
+    calculateStatistics,
+  ]);
 
   // ========== CONFIRM REPORT ==========
   const handleConfirmReport = useCallback(
@@ -436,8 +445,42 @@ const FinancesPage = () => {
       try {
         log("Generando reporte", { type: reportType });
 
+        // Calcular estadísticas detalladas como en el modal
+        const stats = {
+          totalRecords: filteredFinances.length,
+          totalAmount: filteredFinances.reduce(
+            (sum, f) => sum + (f.amount || 0),
+            0,
+          ),
+          verifiedCount: filteredFinances.filter((f) => f.isVerified).length,
+          unverifiedCount: filteredFinances.filter((f) => !f.isVerified)
+            .length,
+          byConcept: {},
+          finances: filteredFinances,
+        };
+
+        // Calcular desglose por concepto
+        filteredFinances.forEach((finance) => {
+          const concept = finance.concept || "OTRO";
+          if (!stats.byConcept[concept]) {
+            stats.byConcept[concept] = {
+              count: 0,
+              total: 0,
+              verified: 0,
+              pending: 0,
+            };
+          }
+          stats.byConcept[concept].count++;
+          stats.byConcept[concept].total += finance.amount || 0;
+          if (finance.isVerified) {
+            stats.byConcept[concept].verified++;
+          } else {
+            stats.byConcept[concept].pending++;
+          }
+        });
+
         let reportDateRange = "";
-        let reportDateForPDF = startDate;
+        let reportDateForPDF = "";
 
         if (startDate && endDate) {
           try {
@@ -454,6 +497,7 @@ const FinancesPage = () => {
           try {
             const startDateObj = getDateWithoutTimezone(startDate);
             reportDateRange = startDateObj.toLocaleDateString("es-CO");
+            reportDateForPDF = startDate;
           } catch (e) {
             logError("Error formateando fecha:", e);
           }
@@ -465,6 +509,11 @@ const FinancesPage = () => {
           } catch (e) {
             logError("Error formateando fecha:", e);
           }
+        } else {
+          // Si no hay fechas, usar la fecha actual
+          const today = new Date();
+          reportDateRange = today.toLocaleDateString("es-CO");
+          reportDateForPDF = getDateStringWithoutTimezone(today);
         }
 
         const data = {
@@ -474,22 +523,26 @@ const FinancesPage = () => {
           dateRange: reportDateRange,
           finances: filteredFinances,
           reportType,
-          statistics: {
-            totalRecords: filteredFinances.length,
-            totalAmount: filteredFinances.reduce(
-              (sum, f) => sum + (f.amount || 0),
-              0,
-            ),
-            verifiedCount: filteredFinances.filter((f) => f.isVerified).length,
-            unverifiedCount: filteredFinances.filter((f) => !f.isVerified)
-              .length,
-            byConcept: {},
+          statistics: stats,
+          // Añadir configuración para el PDF
+          config: {
+            includeCharts: false,
+            title: reportDateRange
+              ? `Reporte de Ingresos - ${reportDateRange}`
+              : "Reporte de Ingresos Financieros",
+            showVerificationSummary: true,
+            showConceptBreakdown: true,
+            showMemberList: reportType === "members",
           },
         };
 
         generateDailyFinancePDF(data, "reporte-ingresos");
 
-        log("PDF generado correctamente");
+        log("PDF generado correctamente", {
+          reportType,
+          recordCount: filteredFinances.length,
+          stats: stats,
+        });
 
         logUserAction("generate_report_pdf", {
           startDate,
@@ -500,7 +553,7 @@ const FinancesPage = () => {
         });
 
         setShowReportModal(false);
-        alert("Reporte generado exitosamente");
+        alert("✅ Reporte generado exitosamente");
       } catch (err) {
         logError("Error generando PDF:", err);
         setError("Error al generar reporte");
@@ -521,8 +574,8 @@ const FinancesPage = () => {
         }
 
         // Preparar datos para backend (mantener nombres originales)
-        const backendData = prepareForBackend(financeData, ['memberName']);
-        
+        const backendData = prepareForBackend(financeData, ["memberName"]);
+
         await apiService.createFinance(backendData);
 
         log("Ingreso creado exitosamente");
@@ -566,8 +619,8 @@ const FinancesPage = () => {
         log("Actualizando ingreso", { financeId: editingFinance.id });
 
         // Preparar datos para backend (mantener nombres originales)
-        const backendData = prepareForBackend(financeData, ['memberName']);
-        
+        const backendData = prepareForBackend(financeData, ["memberName"]);
+
         await apiService.updateFinance(editingFinance.id, backendData);
 
         log("Ingreso actualizado exitosamente");
@@ -691,6 +744,36 @@ const FinancesPage = () => {
     return isVerified ? "✅ Verificado" : "⏳ Pendiente";
   };
 
+  // ========== FORMAT DATE RANGE FOR MODAL ==========
+  const getFormattedDateRange = () => {
+    if (startDate && endDate) {
+      try {
+        const startDateObj = getDateWithoutTimezone(startDate);
+        const endDateObj = getDateWithoutTimezone(endDate);
+        const startFormatted = startDateObj.toLocaleDateString("es-CO");
+        const endFormatted = endDateObj.toLocaleDateString("es-CO");
+        return `${startFormatted} - ${endFormatted}`;
+      } catch (e) {
+        return `${startDate} - ${endDate}`;
+      }
+    } else if (startDate) {
+      try {
+        const startDateObj = getDateWithoutTimezone(startDate);
+        return startDateObj.toLocaleDateString("es-CO");
+      } catch (e) {
+        return startDate;
+      }
+    } else if (endDate) {
+      try {
+        const endDateObj = getDateWithoutTimezone(endDate);
+        return endDateObj.toLocaleDateString("es-CO");
+      } catch (e) {
+        return endDate;
+      }
+    }
+    return null;
+  };
+
   return (
     <div className="finances-page">
       <div className="finances-page-container">
@@ -799,21 +882,24 @@ const FinancesPage = () => {
               className="finances-page__btn finances-page__btn--export"
               onClick={handleExportPDF}
               disabled={
-                !startDate &&
-                !endDate &&
-                selectedMethod &&
-                selectedVerification &&
-                selectedConcept === "ALL" &&
-                !searchText.trim()
-              } // ✅ DESHABILITADO sin filtros
+                filteredFinances.length === 0 ||
+                (!startDate &&
+                  !endDate &&
+                  selectedMethod === "ALL" &&
+                  selectedVerification === "ALL" &&
+                  selectedConcept === "ALL" &&
+                  !searchText.trim())
+              }
               title={
-                !startDate &&
-                !endDate &&
-                selectedMethod &&
-                selectedVerification &&
-                selectedConcept === "ALL" &&
-                !searchText.trim()
-                  ? "Debes seleccionar fechas, método o buscar un miembro"
+                filteredFinances.length === 0
+                  ? "No hay datos para exportar"
+                  : !startDate &&
+                    !endDate &&
+                    selectedMethod === "ALL" &&
+                    selectedVerification === "ALL" &&
+                    selectedConcept === "ALL" &&
+                    !searchText.trim()
+                  ? "Debes aplicar filtros para generar un reporte específico"
                   : "Generar reporte en PDF"
               }
             >
@@ -840,13 +926,23 @@ const FinancesPage = () => {
             {selectedMethod !== "ALL" &&
               ` · Método: ${getMethodLabel(selectedMethod)}`}
             {selectedVerification !== "ALL" &&
-              ` · Estado: ${selectedVerification === "VERIFIED" ? "Verificados" : "Pendientes"}`}
+              ` · Estado: ${
+                selectedVerification === "VERIFIED"
+                  ? "Verificados"
+                  : "Pendientes"
+              }`}
             {startDate &&
               !endDate &&
-              ` · 📅 ${getDateWithoutTimezone(startDate).toLocaleDateString("es-CO")}`}
+              ` · 📅 ${getDateWithoutTimezone(startDate).toLocaleDateString(
+                "es-CO",
+              )}`}
             {startDate &&
               endDate &&
-              ` · 📅 ${getDateWithoutTimezone(startDate).toLocaleDateString("es-CO")} - ${getDateWithoutTimezone(endDate).toLocaleDateString("es-CO")}`}
+              ` · 📅 ${getDateWithoutTimezone(startDate).toLocaleDateString(
+                "es-CO",
+              )} - ${getDateWithoutTimezone(endDate).toLocaleDateString(
+                "es-CO",
+              )}`}
           </p>
         </div>
 
@@ -1004,7 +1100,7 @@ const FinancesPage = () => {
         onConfirm={handleConfirmReport}
         selectedDate={startDate || endDate}
         financesData={filteredFinances}
-        dateRange={startDate && endDate ? `${startDate} - ${endDate}` : null}
+        dateRange={getFormattedDateRange()}
       />
 
       <style>{`
