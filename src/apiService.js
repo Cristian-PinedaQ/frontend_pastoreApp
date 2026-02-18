@@ -3,10 +3,11 @@
 // ✅ Validación de entrada
 // ✅ Mensajes de error genéricos
 // ✅ Export con nombre (ESLint compliance)
+
 //Produccion
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 //desarrollo
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -46,10 +47,13 @@ const validateString = (value, fieldName, minLength = 1, maxLength = 255) => {
   }
 };
 
-const validateNumber = (value, fieldName, min = 0) => {
+const validateNumber = (value, fieldName, min = 0, max = null) => {
   const num = parseFloat(value);
   if (isNaN(num) || num < min) {
     throw new Error(`${fieldName} inválido`);
+  }
+  if (max !== null && num > max) {
+    throw new Error(`${fieldName} excede el máximo permitido`);
   }
   return num;
 };
@@ -66,6 +70,7 @@ class ApiService {
       return null;
     }
   }
+
   // ✅ Obtener headers con autenticación DINÁMICAMENTE
   getHeaders() {
     const token = sessionStorage.getItem('token');
@@ -530,7 +535,7 @@ class ApiService {
       
       if (updateData.status) params.push(`status=${encodeURIComponent(updateData.status)}`);
       if (updateData.finalAttendancePercentage !== undefined) {
-        validateNumber(updateData.finalAttendancePercentage, 'finalAttendancePercentage', 0);
+        validateNumber(updateData.finalAttendancePercentage, 'finalAttendancePercentage', 0, 100);
         params.push(`finalAttendancePercentage=${updateData.finalAttendancePercentage}`);
       }
       if (updateData.passed !== undefined) params.push(`passed=${updateData.passed}`);
@@ -819,7 +824,7 @@ class ApiService {
     }
   }
 
-async createFinance(financeData) {
+  async createFinance(financeData) {
     try {
       if (!financeData || typeof financeData !== 'object') {
         throw new Error('Datos de finanza inválidos');
@@ -836,7 +841,7 @@ async createFinance(financeData) {
       const body = {
         memberId: validateNumber(financeData.memberId, 'memberId'),
         memberName: financeData.memberName,
-        amount: validateNumber(financeData.amount, 'amount'),
+        amount: validateNumber(financeData.amount, 'amount', 0),
         incomeConcept: financeData.incomeConcept,
         incomeMethod: financeData.incomeMethod,
         description: financeData.description || '',
@@ -878,7 +883,7 @@ async createFinance(financeData) {
       const body = {
         memberId: validateNumber(financeData.memberId, 'memberId'),
         memberName: financeData.memberName,
-        amount: validateNumber(financeData.amount, 'amount'),
+        amount: validateNumber(financeData.amount, 'amount', 0),
         incomeConcept: financeData.incomeConcept,
         incomeMethod: financeData.incomeMethod,
         description: financeData.description || '',
@@ -901,6 +906,7 @@ async createFinance(financeData) {
       throw error;
     }
   }
+
   async deleteFinance(id) {
     try {
       validateId(id, 'financeId');
@@ -1014,6 +1020,1189 @@ async createFinance(financeData) {
       });
     } catch (error) {
       logError('❌ [verifyFinance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 👥 LÍDERES ==========
+
+  /**
+   * Obtener todos los líderes
+   * GET /api/v1/leaders
+   */
+  async getLeaders() {
+    try {
+      log('📋 [getLeaders] Obteniendo todos los líderes');
+      const response = await this.request('/leaders');
+      log('✅ [getLeaders] Éxito -', response?.length || 0, 'líderes');
+      return response;
+    } catch (error) {
+      logError('❌ [getLeaders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener líderes activos
+   * GET /api/v1/leaders/active
+   */
+  async getActiveLeaders() {
+    try {
+      log('✅ [getActiveLeaders] Obteniendo líderes activos');
+      const response = await this.request('/leaders/active');
+      return response;
+    } catch (error) {
+      logError('❌ [getActiveLeaders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener líderes suspendidos
+   * GET /api/v1/leaders/suspended
+   */
+  async getSuspendedLeaders() {
+    try {
+      log('⏸️ [getSuspendedLeaders] Obteniendo líderes suspendidos');
+      const response = await this.request('/leaders/suspended');
+      return response;
+    } catch (error) {
+      logError('❌ [getSuspendedLeaders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener líderes inactivos
+   * GET /api/v1/leaders/inactive
+   */
+  async getInactiveLeaders() {
+    try {
+      log('⏹️ [getInactiveLeaders] Obteniendo líderes inactivos');
+      const response = await this.request('/leaders/inactive');
+      return response;
+    } catch (error) {
+      logError('❌ [getInactiveLeaders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener líder por ID
+   * GET /api/v1/leaders/{id}
+   */
+  async getLeaderById(id) {
+    try {
+      validateId(id, 'leaderId');
+      log('🔍 [getLeaderById] Buscando líder ID:', id);
+      const response = await this.request(`/leaders/${id}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getLeaderById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener líder por ID de miembro
+   * GET /api/v1/leaders/member/{memberId}
+   */
+  async getLeaderByMemberId(memberId) {
+    try {
+      validateId(memberId, 'memberId');
+      log('🔍 [getLeaderByMemberId] Buscando líder del miembro ID:', memberId);
+      const response = await this.request(`/leaders/member/${memberId}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getLeaderByMemberId] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+ * Obtener líderes por tipo
+ * GET /api/v1/leaders/type/{leaderType}
+ */
+async getLeadersByType(leaderType) {
+  try {
+    validateString(leaderType, 'leaderType', 1, 50);
+    
+    // ✅ ACTUALIZADO: Validar tipo
+    if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+      throw new Error('Tipo de líder inválido');
+    }
+    
+    log('🔍 [getLeadersByType] Buscando líderes tipo:', leaderType);
+    const response = await this.request(`/leaders/type/${leaderType}`);
+    return response;
+  } catch (error) {
+    logError('❌ [getLeadersByType] Error:', error.message);
+    throw error;
+  }
+}
+
+  /**
+ * Promover miembro a líder
+ * POST /api/v1/leaders/promote
+ */
+async promoteToLeader(memberId, leaderType, cellGroupCode = null, notes = null) {
+  try {
+    validateId(memberId, 'memberId');
+    validateString(leaderType, 'leaderType', 1, 50);
+    
+    // ✅ ACTUALIZADO: Incluir LEADER_144
+    if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+      throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
+    }
+
+    const params = new URLSearchParams();
+    params.append('memberId', memberId);
+    params.append('leaderType', leaderType);
+    if (cellGroupCode) params.append('cellGroupCode', cellGroupCode.trim());
+    if (notes) params.append('notes', notes.trim());
+
+    log('🌟 [promoteToLeader] Promoviendo miembro:', { memberId, leaderType });
+
+    const response = await this.request(`/leaders/promote?${params.toString()}`, {
+      method: 'POST',
+    });
+
+    log('✅ [promoteToLeader] Éxito - Líder ID:', response?.leaderId);
+    return response;
+  } catch (error) {
+    logError('❌ [promoteToLeader] Error:', error.message);
+    throw error;
+  }
+}
+
+ /**
+ * Verificar elegibilidad de un miembro para ser líder
+ * GET /api/v1/leaders/eligibility/{memberId}
+ */
+async checkEligibility(memberId, leaderType) {
+  try {
+    validateId(memberId, 'memberId');
+    validateString(leaderType, 'leaderType', 1, 50);
+
+    // ✅ ACTUALIZADO: Incluir LEADER_144
+    if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+      throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
+    }
+
+    log('🔍 [checkEligibility] Verificando miembro:', { memberId, leaderType });
+
+    const response = await this.request(`/leaders/eligibility/${memberId}?leaderType=${leaderType}`);
+
+    log('📊 [checkEligibility] Resultado:', {
+      isEligible: response?.isEligible,
+      passed: response?.passedRequirements?.length || 0,
+      failed: response?.failedRequirements?.length || 0
+    });
+
+    return response;
+  } catch (error) {
+    logError('❌ [checkEligibility] Error:', error.message);
+    throw error;
+  }
+}
+
+  /**
+   * Verificar todos los líderes activos automáticamente
+   * POST /api/v1/leaders/verify-all
+   */
+  async verifyAllLeaders() {
+    try {
+      log('🔄 [verifyAllLeaders] Verificando todos los líderes activos');
+
+      const response = await this.request('/leaders/verify-all', {
+        method: 'POST',
+      });
+
+      log('✅ [verifyAllLeaders] Éxito -', {
+        total: response?.totalVerified,
+        suspendidos: response?.suspended,
+        válidos: response?.stillValid
+      });
+
+      return response;
+    } catch (error) {
+      logError('❌ [verifyAllLeaders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Verificar un líder específico
+   * POST /api/v1/leaders/{id}/verify
+   */
+  async verifyLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🔍 [verifyLeader] Verificando líder ID:', leaderId);
+
+      const response = await this.request(`/leaders/${leaderId}/verify`, {
+        method: 'POST',
+      });
+
+      if (response?.wasSuspended) {
+        log('⚠️ [verifyLeader] Líder suspendido automáticamente');
+      } else {
+        log('✅ [verifyLeader] Líder verificado, cumple requisitos');
+      }
+
+      return response;
+    } catch (error) {
+      logError('❌ [verifyLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Intentar reactivar líderes suspendidos
+   * POST /api/v1/leaders/reactivate-suspended
+   */
+  async reactivateSuspendedLeaders() {
+    try {
+      log('▶️ [reactivateSuspendedLeaders] Intentando reactivar suspendidos');
+
+      const response = await this.request('/leaders/reactivate-suspended', {
+        method: 'POST',
+      });
+
+      log('✅ [reactivateSuspendedLeaders] Éxito -', {
+        revisados: response?.totalChecked,
+        reactivados: response?.reactivated,
+        aúnSuspendidos: response?.stillSuspended
+      });
+
+      return response;
+    } catch (error) {
+      logError('❌ [reactivateSuspendedLeaders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Suspender un líder manualmente
+   * PUT /api/v1/leaders/{id}/suspend
+   */
+  async suspendLeader(leaderId, reason) {
+    try {
+      validateId(leaderId, 'leaderId');
+      validateString(reason, 'reason', 3, 500);
+
+      log('⏸️ [suspendLeader] Suspendiendo líder ID:', leaderId);
+
+      const params = new URLSearchParams();
+      params.append('reason', reason.trim());
+
+      const response = await this.request(`/leaders/${leaderId}/suspend?${params.toString()}`, {
+        method: 'PUT',
+      });
+
+      log('✅ [suspendLeader] Líder suspendido');
+      return response;
+    } catch (error) {
+      logError('❌ [suspendLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Reactivar un líder suspendido
+   * PUT /api/v1/leaders/{id}/unsuspend
+   */
+  async unsuspendLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('▶️ [unsuspendLeader] Reactivando líder suspendido ID:', leaderId);
+
+      const response = await this.request(`/leaders/${leaderId}/unsuspend`, {
+        method: 'PUT',
+      });
+
+      log('✅ [unsuspendLeader] Líder reactivado');
+      return response;
+    } catch (error) {
+      logError('❌ [unsuspendLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Desactivar un líder manualmente
+   * PUT /api/v1/leaders/{id}/deactivate
+   */
+  async deactivateLeader(leaderId, reason) {
+    try {
+      validateId(leaderId, 'leaderId');
+      validateString(reason, 'reason', 3, 500);
+
+      log('⏹️ [deactivateLeader] Desactivando líder ID:', leaderId);
+
+      const params = new URLSearchParams();
+      params.append('reason', reason.trim());
+
+      const response = await this.request(`/leaders/${leaderId}/deactivate?${params.toString()}`, {
+        method: 'PUT',
+      });
+
+      log('✅ [deactivateLeader] Líder desactivado');
+      return response;
+    } catch (error) {
+      logError('❌ [deactivateLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Reactivar un líder inactivo
+   * PUT /api/v1/leaders/{id}/reactivate
+   */
+  async reactivateLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('▶️ [reactivateLeader] Reactivando líder inactivo ID:', leaderId);
+
+      const response = await this.request(`/leaders/${leaderId}/reactivate`, {
+        method: 'PUT',
+      });
+
+      log('✅ [reactivateLeader] Líder reactivado');
+      return response;
+    } catch (error) {
+      logError('❌ [reactivateLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar información de un líder
+   * PUT /api/v1/leaders/{id}
+   */
+  async updateLeader(leaderId, leaderType = null, cellGroupCode = null, notes = null) {
+    try {
+      validateId(leaderId, 'leaderId');
+
+      const params = new URLSearchParams();
+      if (leaderType) {
+        validateString(leaderType, 'leaderType', 1, 50);
+        params.append('leaderType', leaderType);
+      }
+      if (cellGroupCode) params.append('cellGroupCode', cellGroupCode.trim());
+      if (notes) params.append('notes', notes.trim());
+
+      log('📝 [updateLeader] Actualizando líder ID:', leaderId);
+
+      const response = await this.request(`/leaders/${leaderId}?${params.toString()}`, {
+        method: 'PUT',
+      });
+
+      log('✅ [updateLeader] Líder actualizado');
+      return response;
+    } catch (error) {
+      logError('❌ [updateLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas de liderazgo
+   * GET /api/v1/leaders/statistics
+   */
+  async getLeaderStatistics() {
+    try {
+      log('📊 [getLeaderStatistics] Obteniendo estadísticas');
+
+      const response = await this.request('/leaders/statistics');
+
+      log('✅ [getLeaderStatistics] Éxito -', {
+        total: response?.totalLeaders,
+        activos: response?.activeLeaders,
+        suspendidos: response?.suspendedLeaders,
+        inactivos: response?.inactiveLeaders
+      });
+
+      return response;
+    } catch (error) {
+      logError('❌ [getLeaderStatistics] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar miembros que NO son líderes (para promoción)
+   * GET /api/v1/members/search?term=
+   */
+  async searchMembers(term) {
+    try {
+      if (!term || term.trim().length < 2) {
+        return [];
+      }
+
+      validateString(term, 'searchTerm', 2, 100);
+      
+      log('🔍 [searchMembers] Buscando:', term);
+
+      // Primero obtener todos los miembros
+      const allMembers = await this.getAllMembers();
+      
+      // Obtener todos los líderes para filtrar
+      const leaders = await this.getLeaders();
+      const leaderMemberIds = new Set(leaders.map(l => l.memberId));
+
+      // Filtrar miembros que coincidan con el término de búsqueda
+      const searchTerm = term.toLowerCase().trim();
+      const results = allMembers
+        .filter(member => {
+          // Filtrar por término de búsqueda
+          const matches = 
+            (member.name?.toLowerCase().includes(searchTerm)) ||
+            (member.document?.toLowerCase().includes(searchTerm)) ||
+            (member.email?.toLowerCase().includes(searchTerm)) ||
+            (member.phone?.includes(searchTerm));
+          
+          return matches && !leaderMemberIds.has(member.id);
+        })
+        .map(member => ({
+          ...member,
+          isLeader: false // Explícitamente indicar que no es líder
+        }))
+        .slice(0, 20); // Limitar a 20 resultados
+
+      log('✅ [searchMembers] Encontrados:', results.length);
+      return results;
+    } catch (error) {
+      logError('❌ [searchMembers] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 🏠 CÉLULAS (VERSIÓN MEJORADA CON JERARQUÍA) ==========
+
+  /**
+   * Crear nueva célula con estructura jerárquica
+   * POST /api/v1/cells
+   * @param {Object} cellData - Datos completos de la célula
+   */
+  async createCell(cellData) {
+    try {
+      // Validaciones
+      if (!cellData || typeof cellData !== 'object') {
+        throw new Error('Datos de célula inválidos');
+      }
+
+      validateString(cellData.name, 'name', 3, 200);
+      validateId(cellData.mainLeaderId, 'mainLeaderId');
+      validateId(cellData.groupLeaderId, 'groupLeaderId');
+      validateId(cellData.hostId, 'hostId');
+      validateId(cellData.timoteoId, 'timoteoId');
+      
+      // branchLeaderId es opcional, pero si viene debe ser válido
+      if (cellData.branchLeaderId !== null && cellData.branchLeaderId !== undefined && cellData.branchLeaderId !== '') {
+        validateId(cellData.branchLeaderId, 'branchLeaderId');
+      }
+
+      if (cellData.maxCapacity !== null && cellData.maxCapacity !== undefined) {
+        validateNumber(cellData.maxCapacity, 'maxCapacity', 1, 1000);
+      }
+
+      // Construir objeto con los datos validados
+      const payload = {
+        name: cellData.name.trim(),
+        mainLeaderId: Number(cellData.mainLeaderId),
+        groupLeaderId: Number(cellData.groupLeaderId),
+        hostId: Number(cellData.hostId),
+        timoteoId: Number(cellData.timoteoId),
+        meetingDay: cellData.meetingDay || null,
+        meetingTime: cellData.meetingTime || null,
+        meetingAddress: cellData.meetingAddress?.trim() || null,
+        maxCapacity: cellData.maxCapacity ? Number(cellData.maxCapacity) : null,
+        district: cellData.district?.trim() || null,
+        notes: cellData.notes?.trim() || null
+      };
+
+      // Agregar branchLeaderId solo si está presente y no es vacío
+      if (cellData.branchLeaderId && cellData.branchLeaderId !== '' && cellData.branchLeaderId !== 'null') {
+        payload.branchLeaderId = Number(cellData.branchLeaderId);
+      }
+
+      log('🏠 [createCell] Creando célula con jerarquía:', {
+        name: payload.name,
+        mainLeaderId: payload.mainLeaderId,
+        branchLeaderId: payload.branchLeaderId || 'sin líder de rama',
+        groupLeaderId: payload.groupLeaderId
+      });
+
+      const response = await this.request('/cells', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      log('✅ [createCell] Éxito - Célula creada:', {
+        id: response?.cellId || response?.id,
+        name: response?.cellName || response?.name,
+        hierarchyType: response?.hierarchyType
+      });
+
+      return response;
+    } catch (error) {
+      logError('❌ [createCell] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener todas las células
+   * GET /api/v1/cells
+   */
+  async getCells(ordered = true) {
+    try {
+      log('📋 [getCells] Obteniendo todas las células (ordered:', ordered, ')');
+      const response = await this.request(`/cells?ordered=${ordered}`);
+      log('✅ [getCells] Éxito -', response?.length || 0, 'células');
+      return response;
+    } catch (error) {
+      logError('❌ [getCells] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener célula por ID
+   * GET /api/v1/cells/{id}
+   */
+  async getCellById(id) {
+    try {
+      validateId(id, 'cellId');
+      log('🔍 [getCellById] Buscando célula ID:', id);
+      const response = await this.request(`/cells/${id}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCellById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener miembros de una célula
+   * GET /api/v1/cells/{cellId}/members
+   *
+   * El backend responde:
+   *   { cellId, members: [...], memberCount, timestamp }
+   *
+   * Este método extrae y devuelve el array `members` directamente,
+   * así el componente recibe un Array limpio y no tiene que hacer
+   * response?.members (lo que causaba el count: 0).
+   */
+  async getCellMembers(cellId) {
+    try {
+      validateId(cellId, 'cellId');
+      log('👥 [getCellMembers] Obteniendo miembros de célula ID:', cellId);
+
+      const response = await this.request(`/cells/${cellId}/members`);
+
+      // El backend envuelve la lista en { members: [...] }
+      const members = response?.members ?? [];
+
+      log('✅ [getCellMembers] Miembros recibidos:', members.length);
+      return members;          // ← siempre devuelve un Array, nunca undefined
+    } catch (error) {
+      logError('❌ [getCellMembers] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células por estado
+   * GET /api/v1/cells/status/{status}
+   */
+  async getCellsByStatus(status, ordered = false) {
+    try {
+      validateString(status, 'status', 1, 50);
+      log('🔍 [getCellsByStatus] Buscando células con estado:', status, 'ordered:', ordered);
+      const response = await this.request(`/cells/status/${status}?ordered=${ordered}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsByStatus] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células de un líder específico
+   * GET /api/v1/cells/leader/{leaderId}
+   */
+  async getCellsByLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🔍 [getCellsByLeader] Buscando células del líder ID:', leaderId);
+      const response = await this.request(`/cells/leader/${leaderId}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsByLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células por distrito
+   * GET /api/v1/cells/district/{district}
+   */
+  async getCellsByDistrict(district, status = null) {
+    try {
+      validateString(district, 'district', 1, 50);
+      let url = `/cells/district/${district}`;
+      if (status) {
+        url += `?status=${status}`;
+      }
+      log('🔍 [getCellsByDistrict] Buscando células del distrito:', district);
+      const response = await this.request(url);
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsByDistrict] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células disponibles (con cupo)
+   * GET /api/v1/cells/available
+   */
+  async getAvailableCells(district = null) {
+    try {
+      let url = '/cells/available';
+      if (district) {
+        url += `?district=${district}`;
+      }
+      log('🔍 [getAvailableCells] Obteniendo células disponibles');
+      const response = await this.request(url);
+      return response;
+    } catch (error) {
+      logError('❌ [getAvailableCells] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células con liderazgo incompleto
+   * GET /api/v1/cells/incomplete-leadership
+   */
+  async getCellsWithIncompleteLeadership() {
+    try {
+      log('⚠️ [getCellsWithIncompleteLeadership] Obteniendo células con liderazgo incompleto');
+      const response = await this.request('/cells/incomplete-leadership');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsWithIncompleteLeadership] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células con liderazgo completo
+   * GET /api/v1/cells/complete-leadership
+   */
+  async getCellsWithCompleteLeadership() {
+    try {
+      log('✅ [getCellsWithCompleteLeadership] Obteniendo células con liderazgo completo');
+      const response = await this.request('/cells/complete-leadership');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsWithCompleteLeadership] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células activas con todos los líderes (carga optimizada)
+   * GET /api/v1/cells/active-with-leaders
+   */
+  async getActiveCellsWithAllLeaders() {
+    try {
+      log('🚀 [getActiveCellsWithAllLeaders] Obteniendo células activas con líderes');
+      const response = await this.request('/cells/active-with-leaders');
+      return response;
+    } catch (error) {
+      logError('❌ [getActiveCellsWithAllLeaders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células llenas (sin cupo)
+   * GET /api/v1/cells/full
+   */
+  async getFullCells() {
+    try {
+      log('🔍 [getFullCells] Obteniendo células llenas');
+      const response = await this.request('/cells/full');
+      return response;
+    } catch (error) {
+      logError('❌ [getFullCells] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar células por nombre
+   * GET /api/v1/cells/search?name=
+   */
+  async searchCellsByName(name) {
+    try {
+      validateString(name, 'name', 2, 200);
+      log('🔍 [searchCellsByName] Buscando células con nombre:', name);
+      const response = await this.request(`/cells/search?name=${encodeURIComponent(name)}`);
+      return response;
+    } catch (error) {
+      logError('❌ [searchCellsByName] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células de un líder de red (LEADER_12)
+   * GET /api/v1/cells/main-leader/{leaderId}
+   */
+  async getCellsByMainLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🔍 [getCellsByMainLeader] Buscando células del líder de red ID:', leaderId);
+      const response = await this.request(`/cells/main-leader/${leaderId}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsByMainLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células directas de un líder de red (sin líder de rama)
+   * GET /api/v1/cells/main-leader/{leaderId}/direct
+   */
+  async getDirectCellsByMainLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🔍 [getDirectCellsByMainLeader] Buscando células directas del líder ID:', leaderId);
+      const response = await this.request(`/cells/main-leader/${leaderId}/direct`);
+      return response;
+    } catch (error) {
+      logError('❌ [getDirectCellsByMainLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células jerárquicas de un líder de red (con líder de rama)
+   * GET /api/v1/cells/main-leader/{leaderId}/hierarchical
+   */
+  async getHierarchicalCellsByMainLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🔍 [getHierarchicalCellsByMainLeader] Buscando células jerárquicas del líder ID:', leaderId);
+      const response = await this.request(`/cells/main-leader/${leaderId}/hierarchical`);
+      return response;
+    } catch (error) {
+      logError('❌ [getHierarchicalCellsByMainLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener red completa de un líder de red
+   * GET /api/v1/cells/main-leader/{leaderId}/network
+   */
+  async getNetworkByMainLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🕸️ [getNetworkByMainLeader] Obteniendo red completa del líder:', leaderId);
+      const response = await this.request(`/cells/main-leader/${leaderId}/network`);
+      log('✅ [getNetworkByMainLeader] Red obtenida:', {
+        totalCélulas: response?.cells?.length || 0,
+        líderesRama: response?.branchLeadersCount || 0
+      });
+      return response;
+    } catch (error) {
+      logError('❌ [getNetworkByMainLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas de un líder de red
+   * GET /api/v1/cells/main-leader/{leaderId}/statistics
+   */
+  async getMainLeaderStatistics(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('📊 [getMainLeaderStatistics] Obteniendo estadísticas del líder ID:', leaderId);
+      const response = await this.request(`/cells/main-leader/${leaderId}/statistics`);
+      return response;
+    } catch (error) {
+      logError('❌ [getMainLeaderStatistics] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células de un líder de rama
+   * GET /api/v1/cells/branch-leader/{leaderId}
+   */
+  async getCellsByBranchLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🔀 [getCellsByBranchLeader] Obteniendo células del líder de rama:', leaderId);
+      const response = await this.request(`/cells/branch-leader/${leaderId}`);
+      log('✅ [getCellsByBranchLeader] Éxito -', response?.cells?.length || 0, 'células');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsByBranchLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células por día de reunión
+   * GET /api/v1/cells/meeting-day/{day}
+   */
+  async getCellsByMeetingDay(day) {
+    try {
+      validateString(day, 'day', 1, 20);
+      log('🔍 [getCellsByMeetingDay] Buscando células que se reúnen el día:', day);
+      const response = await this.request(`/cells/meeting-day/${day}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCellsByMeetingDay] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener células en proceso de multiplicación
+   * GET /api/v1/cells/multiplying
+   */
+  async getMultiplyingCells() {
+    try {
+      log('🌱 [getMultiplyingCells] Obteniendo células en multiplicación');
+      const response = await this.request('/cells/multiplying');
+      return response;
+    } catch (error) {
+      logError('❌ [getMultiplyingCells] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener top de células con más multiplicaciones
+   * GET /api/v1/cells/top-multiplying?limit=
+   */
+  async getTopMultiplyingCells(limit = 10) {
+    try {
+      validateNumber(limit, 'limit', 1, 100);
+      log('🏆 [getTopMultiplyingCells] Obteniendo top', limit, 'células con más multiplicaciones');
+      const response = await this.request(`/cells/top-multiplying?limit=${limit}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getTopMultiplyingCells] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener jerarquía completa de una célula
+   * GET /api/v1/cells/hierarchy/{cellId}
+   */
+  async getCellHierarchy(cellId) {
+    try {
+      validateId(cellId, 'cellId');
+      log('🏛️ [getCellHierarchy] Obteniendo jerarquía de célula:', cellId);
+      const response = await this.request(`/cells/hierarchy/${cellId}`);
+      if (response) {
+        log('✅ [getCellHierarchy] Jerarquía:', {
+          célula: response.cell?.name,
+          líderRed: response.mainLeader?.name,
+          líderRama: response.branchLeader?.name || 'N/A',
+          líderGrupo: response.groupLeader?.name,
+          anfitrión: response.host?.name,
+          timoteo: response.timoteo?.name
+        });
+      }
+      return response;
+    } catch (error) {
+      logError('❌ [getCellHierarchy] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar célula existente con soporte jerárquico
+   * PUT /api/v1/cells/{id}
+   * @param {number} id - ID de la célula a actualizar
+   * @param {Object} cellData - Datos a actualizar (todos opcionales)
+   */
+  async updateCell(id, cellData) {
+    try {
+      validateId(id, 'cellId');
+      
+      if (!cellData || typeof cellData !== 'object') {
+        throw new Error('Datos de célula inválidos');
+      }
+
+      // Validar campos si están presentes
+      if (cellData.name) validateString(cellData.name, 'name', 3, 200);
+      if (cellData.mainLeaderId) validateId(cellData.mainLeaderId, 'mainLeaderId');
+      if (cellData.branchLeaderId) validateId(cellData.branchLeaderId, 'branchLeaderId');
+      if (cellData.groupLeaderId) validateId(cellData.groupLeaderId, 'groupLeaderId');
+      if (cellData.hostId) validateId(cellData.hostId, 'hostId');
+      if (cellData.timoteoId) validateId(cellData.timoteoId, 'timoteoId');
+      if (cellData.maxCapacity) validateNumber(cellData.maxCapacity, 'maxCapacity', 1, 1000);
+
+      // Construir payload limpiando undefined/null
+      const payload = {};
+      
+      const fields = [
+        'name', 'mainLeaderId', 'branchLeaderId', 'groupLeaderId',
+        'hostId', 'timoteoId', 'meetingDay', 'meetingTime',
+        'meetingAddress', 'maxCapacity', 'district', 'notes'
+      ];
+
+      fields.forEach(field => {
+        if (cellData[field] !== undefined && cellData[field] !== null && cellData[field] !== '') {
+          if (typeof cellData[field] === 'string') {
+            payload[field] = cellData[field].trim();
+          } else if (field.includes('Id') || field === 'maxCapacity') {
+            payload[field] = Number(cellData[field]);
+          } else {
+            payload[field] = cellData[field];
+          }
+        }
+      });
+
+      log('📝 [updateCell] Actualizando célula ID:', id, 'con datos:', payload);
+
+      const response = await this.request(`/cells/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+
+      log('✅ [updateCell] Célula actualizada');
+      return response;
+    } catch (error) {
+      logError('❌ [updateCell] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Cambiar estado de célula
+   * PUT /api/v1/cells/{id}/status
+   * @param {number} id - ID de la célula
+   * @param {string} newStatus - Nuevo estado (ACTIVE, INACTIVE, SUSPENDED, etc.)
+   */
+  async changeCellStatus(id, newStatus) {
+    try {
+      validateId(id, 'cellId');
+      validateString(newStatus, 'newStatus', 1, 50);
+
+      log('🔄 [changeCellStatus] Cambiando estado de célula', { id, newStatus });
+
+      const payload = {
+        newStatus: newStatus
+      };
+
+      const response = await this.request(`/cells/${id}/status`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+
+      log('✅ [changeCellStatus] Estado cambiado');
+      return response;
+    } catch (error) {
+      logError('❌ [changeCellStatus] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar célula (soft delete)
+   * DELETE /api/v1/cells/{id}
+   */
+  async deleteCell(id) {
+    try {
+      validateId(id, 'cellId');
+      log('🗑️ [deleteCell] Eliminando célula ID:', id);
+
+      const response = await this.request(`/cells/${id}`, {
+        method: 'DELETE',
+      });
+
+      log('✅ [deleteCell] Célula marcada como inactiva');
+      return response;
+    } catch (error) {
+      logError('❌ [deleteCell] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Agregar miembro a célula
+   * POST /api/v1/cells/{cellId}/members
+   * @param {number} cellId - ID de la célula
+   * @param {number} memberId - ID del miembro a agregar
+   */
+  async addMemberToCell(cellId, memberId) {
+    try {
+      validateId(cellId, 'cellId');
+      validateId(memberId, 'memberId');
+
+      log('➕ [addMemberToCell] Agregando miembro', { cellId, memberId });
+
+      const payload = {
+        memberId: memberId
+      };
+
+      const response = await this.request(`/cells/${cellId}/members`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      log('✅ [addMemberToCell] Miembro agregado');
+      return response;
+    } catch (error) {
+      logError('❌ [addMemberToCell] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Remover miembro de célula
+   * DELETE /api/v1/cells/{cellId}/members/{memberId}
+   */
+  async removeMemberFromCell(cellId, memberId) {
+    try {
+      validateId(cellId, 'cellId');
+      validateId(memberId, 'memberId');
+
+      log('➖ [removeMemberFromCell] Removiendo miembro', { cellId, memberId });
+
+      const response = await this.request(`/cells/${cellId}/members/${memberId}`, {
+        method: 'DELETE',
+      });
+
+      log('✅ [removeMemberFromCell] Miembro removido');
+      return response;
+    } catch (error) {
+      logError('❌ [removeMemberFromCell] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Iniciar multiplicación de célula
+   * POST /api/v1/cells/{id}/start-multiplication
+   */
+  async startMultiplication(cellId) {
+    try {
+      validateId(cellId, 'cellId');
+      log('🌱 [startMultiplication] Iniciando multiplicación célula ID:', cellId);
+
+      const response = await this.request(`/cells/${cellId}/start-multiplication`, {
+        method: 'POST',
+      });
+
+      log('✅ [startMultiplication] Multiplicación iniciada');
+      return response;
+    } catch (error) {
+      logError('❌ [startMultiplication] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Completar multiplicación de célula
+   * POST /api/v1/cells/{id}/complete-multiplication
+   */
+  async completeMultiplication(cellId) {
+    try {
+      validateId(cellId, 'cellId');
+      log('✅ [completeMultiplication] Completando multiplicación célula ID:', cellId);
+
+      const response = await this.request(`/cells/${cellId}/complete-multiplication`, {
+        method: 'POST',
+      });
+
+      log('✅ [completeMultiplication] Multiplicación completada');
+      return response;
+    } catch (error) {
+      logError('❌ [completeMultiplication] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Verificar estado de célula
+   * POST /api/v1/cells/{id}/verify
+   */
+  async verifyCell(cellId) {
+    try {
+      validateId(cellId, 'cellId');
+      log('🔍 [verifyCell] Verificando célula ID:', cellId);
+
+      const response = await this.request(`/cells/${cellId}/verify`, {
+        method: 'POST',
+      });
+
+      log('✅ [verifyCell] Célula verificada');
+      return response;
+    } catch (error) {
+      logError('❌ [verifyCell] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Verificar todas las células
+   * POST /api/v1/cells/verify-all
+   */
+  async verifyAllCells() {
+    try {
+      log('🔄 [verifyAllCells] Verificando todas las células');
+
+      const response = await this.request('/cells/verify-all', {
+        method: 'POST',
+      });
+
+      log('✅ [verifyAllCells] Éxito -', {
+        total: response?.totalVerified,
+        cambiaron: response?.statusChanged
+      });
+
+      return response;
+    } catch (error) {
+      logError('❌ [verifyAllCells] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas de células
+   * GET /api/v1/cells/statistics
+   */
+  async getCellStatistics() {
+    try {
+      log('📊 [getCellStatistics] Obteniendo estadísticas de células');
+
+      const response = await this.request('/cells/statistics');
+
+      log('✅ [getCellStatistics] Éxito -', {
+        total: response?.totalCells,
+        activas: response?.activeCells,
+        incompletas: response?.incompleteCells
+      });
+
+      return response;
+    } catch (error) {
+      logError('❌ [getCellStatistics] Error:', error.message);
       throw error;
     }
   }

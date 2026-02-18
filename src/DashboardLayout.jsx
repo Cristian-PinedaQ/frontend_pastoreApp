@@ -91,13 +91,13 @@ export const DashboardLayout = () => {
     },
     {
       label: 'LIDERAZGO',
-      path: '/dashboard/lessons',
+      path: '/dashboard/leadership',
       icon: '🦺',
       visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
     },
     {
       label: 'CBI',
-      path: '/dashboard/attendance',
+      path: '/dashboard/cellgroups',
       icon: '🏘️',
       visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
     },

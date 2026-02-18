@@ -22,6 +22,8 @@ import UsersPage from './pages/UsersPage';
 import FinancesPage from './pages/FinancesPage';
 import { LessonsPage, AttendancePage } from './pages/index';
 import ActivityPage from './pages/ActivityPage';
+import LeadersPage from './pages/LeadersPage';
+import CellGroupsPage from './pages/CellGroupsPage';
 
 function App() {
   return (
@@ -111,6 +113,28 @@ function App() {
                     'ROLE_AREAS',
                     'ROLE_PROFESORES',
                   ]}
+                />
+              }
+            />
+
+            {/* Liderazgo */}
+            <Route
+              path="leadership"
+              element={
+                <ProtectedRoute
+                  element={<LeadersPage />}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
+                />
+              }
+            />
+
+            {/* celulas */}
+            <Route
+              path="cellgroups"
+              element={
+                <ProtectedRoute
+                  element={<CellGroupsPage />}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
                 />
               }
             />

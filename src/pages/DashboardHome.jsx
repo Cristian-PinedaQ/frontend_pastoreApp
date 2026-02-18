@@ -11,9 +11,10 @@ export const DashboardHome = () => {
     totalMembersFemale: 0,
     totalMembersMale: 0,
     totalEnrollments: 0,
-    totalLessons: 0,
-    totalAttendance: 0,
+    totalLessons: 0,      // Células activas
+    totalAttendance: 0,    // Líderes activos
   });
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -60,32 +61,213 @@ export const DashboardHome = () => {
       try {
         setLoading(true);
         setError(null);
+        
+        const debug = {
+          leaders: null,
+          cells: null,
+          error: null
+        };
 
+        // ===== 1. MIEMBROS =====
         const membersRes = await apiService.getAllMembers();
-        const activeMembersCount = membersRes?.filter(m => m.isActive === true).length || 0;
-        const genderMembersCount = membersRes?.filter(m => m.gender === "FEMENINO" && m.isActive).length || 0;
-        const genderMaleMembersCount = membersRes?.filter(m => m.gender === "MASCULINO" && m.isActive).length || 0;
+        const activeMembers = membersRes?.filter(m => m.isActive === true) || [];
+        const activeMembersCount = activeMembers.length;
+        const genderMembersCount = activeMembers.filter(m => m.gender === "FEMENINO").length || 0;
+        const genderMaleMembersCount = activeMembers.filter(m => m.gender === "MASCULINO").length || 0;
 
+        // ===== 2. INSCRIPCIONES ACTIVAS =====
         const enrollmentsRes = await apiService.getEnrollments();
         const activeEnrollmentsCount = enrollmentsRes?.filter(e => 
           e.status === 'PENDING' || e.status === 'ACTIVE'
         ).length || 0;
 
+        // ===== 3. LÍDERES ACTIVOS =====
+        let activeLeadersCount = 0;
+        let leadersData = null;
+        
+        try {
+          // Intentar con getActiveLeaders primero (método específico)
+          leadersData = await apiService.getActiveLeaders();
+          console.log('🔍 getActiveLeaders response:', leadersData);
+          
+          if (Array.isArray(leadersData)) {
+            activeLeadersCount = leadersData.length;
+            console.log(`✅ Líderes activos (getActiveLeaders): ${activeLeadersCount}`);
+          } else if (leadersData && typeof leadersData === 'object') {
+            // Si es un objeto, intentar encontrar el array
+            if (leadersData.data && Array.isArray(leadersData.data)) {
+              activeLeadersCount = leadersData.data.length;
+            } else if (leadersData.leaders && Array.isArray(leadersData.leaders)) {
+              activeLeadersCount = leadersData.leaders.length;
+            } else if (leadersData.content && Array.isArray(leadersData.content)) {
+              activeLeadersCount = leadersData.content.length;
+            } else {
+              // Intentar contar propiedades
+              activeLeadersCount = Object.keys(leadersData).length;
+            }
+            console.log(`✅ Líderes activos (objeto): ${activeLeadersCount}`);
+          }
+          
+          debug.leaders = {
+            method: 'getActiveLeaders',
+            data: leadersData,
+            count: activeLeadersCount
+          };
+          
+        } catch (leaderError) {
+          console.warn('⚠️ Error con getActiveLeaders:', leaderError);
+          
+          // Fallback: obtener todos los líderes y filtrar
+          try {
+            const allLeaders = await apiService.getLeaders();
+            console.log('🔍 getLeaders response:', allLeaders);
+            
+            if (Array.isArray(allLeaders)) {
+              // Intentar diferentes formas de filtrar activos
+              activeLeadersCount = allLeaders.filter(l => {
+                // Probar diferentes campos posibles
+                return (
+                  l.status === 'ACTIVE' || 
+                  l.status === 'active' || 
+                  l.isActive === true || 
+                  l.active === true ||
+                  l.estado === 'ACTIVE' ||
+                  l.estado === 'activo'
+                );
+              }).length;
+              
+              console.log(`✅ Líderes activos después de filtrar: ${activeLeadersCount}`);
+              
+              // Si no hay filtrados, usar todos
+              if (activeLeadersCount === 0 && allLeaders.length > 0) {
+                console.warn('⚠️ No se pudo filtrar por estado, usando todos los líderes');
+                activeLeadersCount = allLeaders.length;
+              }
+            }
+            
+            debug.leaders = {
+              method: 'getLeaders (fallback)',
+              data: allLeaders,
+              count: activeLeadersCount
+            };
+            
+          } catch (altError) {
+            console.error('❌ Error también en fallback:', altError);
+            debug.error = { leaders: altError.message };
+          }
+        }
+
+        // ===== 4. CÉLULAS ACTIVAS =====
+        let activeCellsCount = 0;
+        let cellsData = null;
+        
+        try {
+          // Intentar con getCells primero
+          cellsData = await apiService.getCells();
+          console.log('🔍 getCells response:', cellsData);
+          
+          if (Array.isArray(cellsData)) {
+            // Mostrar estructura de la primera célula para depuración
+            if (cellsData.length > 0) {
+              console.log('📋 Estructura de célula ejemplo:', cellsData[0]);
+            }
+            
+            // Filtrar células activas
+            activeCellsCount = cellsData.filter(cell => {
+              // Probar diferentes campos de estado
+              const isActive = (
+                cell.status === 'ACTIVE' || 
+                cell.status === 'active' || 
+                cell.isActive === true || 
+                cell.active === true ||
+                cell.estado === 'ACTIVE' ||
+                cell.estado === 'activo' ||
+                cell.cellStatus === 'ACTIVE' ||
+                cell.cellStatus === 'active'
+              );
+              
+              if (isActive) {
+                console.log('✅ Célula activa encontrada:', cell.name || cell.id);
+              }
+              
+              return isActive;
+            }).length;
+            
+            console.log(`✅ Células activas después de filtrar: ${activeCellsCount}`);
+            
+            // Si no hay células activas pero hay células, mostrar advertencia
+            if (activeCellsCount === 0 && cellsData.length > 0) {
+              console.warn('⚠️ Hay células pero ninguna marcada como activa. Estados encontrados:', 
+                cellsData.map(c => c.status || c.estado || 'sin estado'));
+            }
+          }
+          
+          debug.cells = {
+            method: 'getCells',
+            total: cellsData?.length || 0,
+            active: activeCellsCount,
+            sample: cellsData?.[0]
+          };
+          
+        } catch (cellsError) {
+          console.warn('⚠️ Error con getCells:', cellsError);
+          
+          // Fallback: intentar con getCellsByStatus
+          try {
+            cellsData = await apiService.getCellsByStatus('ACTIVE');
+            console.log('🔍 getCellsByStatus response:', cellsData);
+            
+            if (Array.isArray(cellsData)) {
+              activeCellsCount = cellsData.length;
+            } else if (cellsData && typeof cellsData === 'object') {
+              if (cellsData.data && Array.isArray(cellsData.data)) {
+                activeCellsCount = cellsData.data.length;
+              } else if (cellsData.cells && Array.isArray(cellsData.cells)) {
+                activeCellsCount = cellsData.cells.length;
+              }
+            }
+            
+            debug.cells = {
+              method: 'getCellsByStatus',
+              data: cellsData,
+              count: activeCellsCount
+            };
+            
+          } catch (altError) {
+            console.error('❌ Error también en fallback:', altError);
+            debug.error = { ...debug.error, cells: altError.message };
+          }
+        }
+
+        // Actualizar estadísticas
         setStats({
           totalMembers: activeMembersCount,
           totalMembersFemale: genderMembersCount,
           totalMembersMale: genderMaleMembersCount,
           totalEnrollments: activeEnrollmentsCount,
-          totalLessons: 0,
-          totalAttendance: 0,
+          totalLessons: activeCellsCount,      // Células activas
+          totalAttendance: activeLeadersCount,  // Líderes activos
         });
+
+        // Resumen en consola
+        console.log('📊 ESTADÍSTICAS FINALES:', {
+          miembrosActivos: activeMembersCount,
+          rocios: genderMembersCount,
+          radicales: genderMaleMembersCount,
+          procesosActivos: activeEnrollmentsCount,
+          celulasActivas: activeCellsCount,
+          lideresActivos: activeLeadersCount
+        });
+
       } catch (err) {
         setError("No se pudieron cargar las estadísticas");
-        console.error("Error al cargar estadísticas:", err);
+        console.error("❌ Error al cargar estadísticas:", err);
       } finally {
         setLoading(false);
       }
     };
+
+    
 
     fetchStats();
   }, []);
