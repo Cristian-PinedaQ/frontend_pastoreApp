@@ -728,9 +728,10 @@ const UsersPage = () => {
                   >
                     <option value="PASTORES">🙏 Pastores</option>
                     <option value="PROFESORES">👨‍🏫 Profesores</option>
-                    <option value="AREAS">📋 Áreas</option>
+                    <option value="AREAS">🧩 Áreas</option>
                     <option value="GANANDO">🎯 Ganando</option>
                     <option value="ECONOMICO">🏦 Economico</option>
+                    <option value="LIDER">🦺 Líder</option> 
                   </select>
                 </div>
               )}

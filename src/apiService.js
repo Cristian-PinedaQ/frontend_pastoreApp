@@ -1478,6 +1478,27 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
+   /**
+   * Eliminar un líder permanentemente
+   * DELETE /api/v1/leaders/{id}
+   */
+  async deleteLeader(leaderId) {
+    try {
+      validateId(leaderId, 'leaderId');
+      log('🗑️ [deleteLeader] Eliminando líder ID:', leaderId);
+
+      const response = await this.request(`/leaders/${leaderId}`, {
+        method: 'DELETE',
+      });
+
+      log('✅ [deleteLeader] Líder eliminado permanentemente');
+      return response;
+    } catch (error) {
+      logError('❌ [deleteLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
   // ========== 🏠 CÉLULAS (VERSIÓN MEJORADA CON JERARQUÍA) ==========
 
   /**
@@ -2293,7 +2314,7 @@ async checkEligibility(memberId, leaderType) {
 
           const levelOrder = [
             'PREENCUENTRO', 'ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS',
-            'EDIRD_1', 'EDIRD_2', 'EDIRD_3', 'SANIDAD_INTEGRAL_RAICES', 'EDIRD_4',
+            'ESENCIA_1', 'ESENCIA_2', 'ESENCIA_3', 'SANIDAD_INTEGRAL_RAICES', 'ESENCIA_4',
             'ADIESTRAMIENTO', 'GRADUACION'
           ];
 
@@ -2336,15 +2357,285 @@ async checkEligibility(memberId, leaderType) {
       'ENCUENTRO': 'Encuentro',
       'POST_ENCUENTRO': 'Post-encuentro',
       'BAUTIZOS': 'Bautizos',
-      'EDIRD_1': 'EDIRD 1',
-      'EDIRD_2': 'EDIRD 2',
-      'EDIRD_3': 'EDIRD 3',
+      'ESENCIA_1': 'ESENCIA 1',
+      'ESENCIA_2': 'ESENCIA 2',
+      'ESENCIA_3': 'ESENCIA 3',
       'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces',
-      'EDIRD_4': 'EDIRD 4',
+      'ESENCIA_4': 'ESENCIA 4',
       'ADIESTRAMIENTO': 'Adiestramiento',
       'GRADUACION': 'Graduación',
     };
     return levelMap[levelEnrollment] || levelEnrollment;
+  }
+  // ========== 📋 ASISTENCIAS DE CÉLULAS (Cell Group Attendance) ==========
+// Agregar estos métodos al ApiService en apiService.js
+
+  // ── Configuración ──────────────────────────────────────────────────
+  /**
+   * Obtener configuración de asistencias
+   * GET /api/v1/attendance/config
+   */
+  async getAttendanceConfig() {
+    try {
+      log('📋 [getAttendanceConfig] Obteniendo configuración');
+      const response = await this.request('/attendance/config');
+      log('✅ [getAttendanceConfig] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getAttendanceConfig] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Generación automática ─────────────────────────────────────────
+  /**
+   * Generar asistencias para una célula en una fecha
+   * POST /api/v1/attendance/generate/cell/{cellId}?date={date}
+   */
+  async generateCellAttendances(cellId, date) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      log('📋 [generateCellAttendances] Generando para célula:', cellId, 'fecha:', date);
+
+      const response = await this.request(`/attendance/generate/cell/${cellId}?date=${date}`, {
+        method: 'POST',
+      });
+
+      log('✅ [generateCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [generateCellAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Generar asistencias para mis células (como líder principal)
+   * POST /api/v1/attendance/generate/my-cells?date={date}
+   */
+  async generateMyCellsAttendances(date) {
+    try {
+      validateString(date, 'date', 10, 10);
+      log('📋 [generateMyCellsAttendances] Generando para mis células, fecha:', date);
+
+      const response = await this.request(`/attendance/generate/my-cells?date=${date}`, {
+        method: 'POST',
+      });
+
+      log('✅ [generateMyCellsAttendances] Éxito -', response?.totalCells || 0, 'células');
+      return response;
+    } catch (error) {
+      logError('❌ [generateMyCellsAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Ejecutar generación manual del mes actual (solo PASTORES)
+   * POST /api/v1/attendance/generate/current-month
+   */
+  async generateCurrentMonthAttendances() {
+    try {
+      log('🔄 [generateCurrentMonthAttendances] Ejecutando generación manual');
+      const response = await this.request('/attendance/generate/current-month', {
+        method: 'POST',
+      });
+      log('✅ [generateCurrentMonthAttendances] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [generateCurrentMonthAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Consultas ─────────────────────────────────────────────────────
+  /**
+   * Obtener asistencias del mes actual (filtradas por usuario)
+   * GET /api/v1/attendance/current-month
+   */
+  async getCellAttendancesCurrentMonth() {
+    try {
+      log('📅 [getCellAttendancesCurrentMonth] Consultando mes actual');
+      const response = await this.request('/attendance/current-month');
+      log('✅ [getCellAttendancesCurrentMonth] Éxito -', response?.totalCells || 0, 'células');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendancesCurrentMonth] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener asistencias de un mes específico
+   * GET /api/v1/attendance/month/{year}/{month}
+   */
+  async getCellAttendancesByMonth(year, month) {
+    try {
+      validateNumber(year, 'year', 2020);
+      validateNumber(month, 'month', 1, 12);
+      log('📅 [getCellAttendancesByMonth] Consultando:', year, '/', month);
+      const response = await this.request(`/attendance/month/${year}/${month}`);
+      log('✅ [getCellAttendancesByMonth] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendancesByMonth] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener asistencias de una célula en una fecha
+   * GET /api/v1/attendance/cell/{cellId}/date/{date}
+   */
+  async getCellAttendancesByDate(cellId, date) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      log('🔍 [getCellAttendancesByDate] Célula:', cellId, 'Fecha:', date);
+      const response = await this.request(`/attendance/cell/${cellId}/date/${date}`);
+      log('✅ [getCellAttendancesByDate] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendancesByDate] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Registro y actualización ──────────────────────────────────────
+  /**
+   * Registrar asistencia individual
+   * POST /api/v1/attendance/cell/{cellId}/date/{date}
+   */
+  async recordCellAttendance(cellId, date, attendanceData) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      if (!attendanceData || typeof attendanceData !== 'object') {
+        throw new Error('Datos de asistencia inválidos');
+      }
+      log('📝 [recordCellAttendance] Registrando:', { cellId, date, memberId: attendanceData.memberId });
+
+      const response = await this.request(`/attendance/cell/${cellId}/date/${date}`, {
+        method: 'POST',
+        body: JSON.stringify(attendanceData),
+      });
+
+      log('✅ [recordCellAttendance] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [recordCellAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Registrar asistencias masivas
+   * POST /api/v1/attendance/cell/{cellId}/bulk
+   */
+  async recordBulkCellAttendances(cellId, bulkData) {
+    try {
+      validateId(cellId, 'cellId');
+      if (!bulkData || typeof bulkData !== 'object') {
+        throw new Error('Datos de asistencias inválidos');
+      }
+      log('📦 [recordBulkCellAttendances] Registrando masivo:', {
+        cellId,
+        date: bulkData.attendanceDate,
+        count: bulkData.attendances?.length || 0,
+      });
+
+      const response = await this.request(`/attendance/cell/${cellId}/bulk`, {
+        method: 'POST',
+        body: JSON.stringify(bulkData),
+      });
+
+      log('✅ [recordBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [recordBulkCellAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar asistencias masivas
+   * PUT /api/v1/attendance/cell/{cellId}/date/{date}
+   */
+  async updateBulkCellAttendances(cellId, date, attendances) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      if (!Array.isArray(attendances)) {
+        throw new Error('Datos de asistencias inválidos');
+      }
+      log('📦 [updateBulkCellAttendances] Actualizando:', { cellId, date, count: attendances.length });
+
+      const response = await this.request(`/attendance/cell/${cellId}/date/${date}`, {
+        method: 'PUT',
+        body: JSON.stringify(attendances),
+      });
+
+      log('✅ [updateBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [updateBulkCellAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Resumen y estadísticas ────────────────────────────────────────
+  /**
+   * Obtener resumen de asistencia
+   * GET /api/v1/attendance/summary/cell/{cellId}/date/{date}
+   */
+  async getCellAttendanceSummary(cellId, date) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      log('📊 [getCellAttendanceSummary] Resumen:', { cellId, date });
+      const response = await this.request(`/attendance/summary/cell/${cellId}/date/${date}`);
+      log('✅ [getCellAttendanceSummary] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendanceSummary] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas mensuales
+   * GET /api/v1/attendance/statistics/cell/{cellId}/month/{year}/{month}
+   */
+  async getCellAttendanceMonthlyStats(cellId, year, month) {
+    try {
+      validateId(cellId, 'cellId');
+      validateNumber(year, 'year', 2020);
+      validateNumber(month, 'month', 1, 12);
+      log('📊 [getCellAttendanceMonthlyStats] Stats:', { cellId, year, month });
+      const response = await this.request(`/attendance/statistics/cell/${cellId}/month/${year}/${month}`);
+      log('✅ [getCellAttendanceMonthlyStats] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendanceMonthlyStats] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener estadísticas globales (solo PASTORES)
+   * GET /api/v1/attendance/statistics/global
+   */
+  async getCellAttendanceGlobalStats() {
+    try {
+      log('📊 [getCellAttendanceGlobalStats] Obteniendo estadísticas globales');
+      const response = await this.request('/attendance/statistics/global');
+      log('✅ [getCellAttendanceGlobalStats] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendanceGlobalStats] Error:', error.message);
+      throw error;
+    }
   }
 }
 

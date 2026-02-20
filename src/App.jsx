@@ -20,10 +20,10 @@ import EnrollmentsPage from './pages/EnrollmentsPage';
 import StudentsPage from './pages/StudentsPage';
 import UsersPage from './pages/UsersPage';
 import FinancesPage from './pages/FinancesPage';
-import { LessonsPage, AttendancePage } from './pages/index';
 import ActivityPage from './pages/ActivityPage';
 import LeadersPage from './pages/LeadersPage';
 import CellGroupsPage from './pages/CellGroupsPage';
+import CellAttendancePage from './pages/CellAttendancePage.jsx';
 
 function App() {
   return (
@@ -90,33 +90,6 @@ function App() {
                 />
               }
             />
-
-            {/* Lecciones */}
-            <Route
-              path="lessons"
-              element={
-                <ProtectedRoute
-                  element={<LessonsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
-                />
-              }
-            />
-
-            {/* Asistencias */}
-            <Route
-              path="attendance"
-              element={
-                <ProtectedRoute
-                  element={<AttendancePage />}
-                  requiredRoles={[
-                    'ROLE_PASTORES',
-                    'ROLE_AREAS',
-                    'ROLE_PROFESORES',
-                  ]}
-                />
-              }
-            />
-
             {/* Liderazgo */}
             <Route
               path="leadership"
@@ -135,6 +108,16 @@ function App() {
                 <ProtectedRoute
                   element={<CellGroupsPage />}
                   requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
+                />
+              }
+            />
+
+            <Route
+              path="cellgroups-atendance"
+              element={
+                <ProtectedRoute
+                  element={<CellAttendancePage />}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_GANANDO', 'ROLE_LIDER']}
                 />
               }
             />

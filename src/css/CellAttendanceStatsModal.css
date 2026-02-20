@@ -1,0 +1,644 @@
+/* ============================================
+   CellAttendanceStatsModal.css — v5 Profesional
+   Colors handled via inline styles (T theme object)
+   CSS = layout, spacing, animations, transitions only
+   Supports: Monthly + Annual views + Dynamic periods
+   ============================================ */
+
+/* ── Reset ── */
+.cas-overlay *,
+.cas-overlay *::before,
+.cas-overlay *::after,
+.cas-modal *,
+.cas-modal *::before,
+.cas-modal *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── OVERLAY ── */
+.cas-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1000;
+  animation: cas-fadeIn 0.2s ease-out;
+}
+
+/* ── MODAL ── */
+.cas-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 1001;
+  animation: cas-slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cas-modal__container {
+  width: 100%;
+  max-width: 560px;
+  max-height: 92vh;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 8px 16px rgba(0, 0, 0, 0.08),
+    0 24px 56px rgba(0, 0, 0, 0.16);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+}
+
+/* ── HANDLE (Mobile) ── */
+.cas-modal__handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 99px;
+  margin: 10px auto 0;
+}
+
+/* ── HEADER ── */
+.cas-modal__header {
+  position: sticky;
+  top: 0;
+  padding: 1rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid;
+  z-index: 2;
+}
+
+.cas-modal__header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cas-modal__title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: -0.2px;
+}
+
+.cas-modal__subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cas-modal__subtitle {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* ── Annual badge ── */
+.cas-annual-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* ── ACTIONS ── */
+.cas-modal__actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cas-btn-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.cas-btn-icon:hover { opacity: 0.7; }
+.cas-btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.cas-btn-close {
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.6;
+}
+.cas-btn-close:hover { opacity: 1; }
+
+.cas-spin {
+  display: inline-block;
+  animation: cas-rotate 0.8s linear infinite;
+}
+
+/* ── CONTENT ── */
+.cas-modal__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.25rem 1.5rem;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+.cas-modal__content::-webkit-scrollbar { width: 5px; }
+.cas-modal__content::-webkit-scrollbar-track { background: transparent; }
+.cas-modal__content::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 99px;
+}
+
+/* ── FILTERS ── */
+.cas-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 0.75rem;
+}
+
+.cas-filter-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cas-filter-group label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cas-select {
+  padding: 0.55rem 2rem 0.55rem 0.75rem;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}
+
+.cas-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.cas-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── PERIODS INFO ── */
+.cas-periods-info {
+  font-size: 0.72rem;
+  font-weight: 500;
+  margin-bottom: 0.85rem;
+  padding: 0 2px;
+  line-height: 1.4;
+}
+
+/* ── LOADING ── */
+.cas-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 3rem 1rem;
+  font-size: 0.9rem;
+}
+
+.cas-loading__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid;
+  border-radius: 50%;
+  animation: cas-rotate 0.7s linear infinite;
+}
+
+/* ── ERROR ── */
+.cas-error {
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 3px solid #ef4444;
+  animation: cas-feedIn 0.2s ease;
+}
+
+/* ── EMPTY STATE ── */
+.cas-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.cas-empty p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── KPI GRID ── */
+.cas-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.cas-kpi-card {
+  padding: 0.85rem 0.6rem;
+  border-radius: 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transition: transform 0.15s;
+}
+
+.cas-kpi-card:hover { transform: translateY(-1px); }
+
+.cas-kpi-card__icon {
+  font-size: 1.3rem;
+  line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  margin-bottom: 2px;
+}
+
+.cas-kpi-card__value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.cas-kpi-card__label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ── PROGRESS SECTION ── */
+.cas-progress-section {
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid;
+}
+
+.cas-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.cas-progress-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cas-progress-pct {
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.cas-progress-bar {
+  width: 100%;
+  height: 10px;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.cas-progress-bar__fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cas-progress-detail {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+.cas-progress-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── HIGHLIGHTS (Best / Worst) ── */
+.cas-highlights {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.cas-highlight-card {
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid;
+}
+
+.cas-highlight-card__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.cas-highlight-card__icon { font-size: 1rem; }
+
+.cas-highlight-card__title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cas-highlight-card__date {
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.cas-highlight-card__stat {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.cas-highlight-card__pct {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: 4px;
+  opacity: 0.7;
+}
+
+.cas-highlight-card__meta {
+  font-size: 0.7rem;
+  margin-top: 4px;
+}
+
+/* ── DETAIL TABLE ── */
+.cas-detail-section {
+  margin-bottom: 0.5rem;
+}
+
+.cas-detail-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin: 0 0 0.75rem;
+}
+
+.cas-detail-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+  border: 1px solid;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cas-detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.cas-detail-table thead th {
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid;
+}
+
+.cas-detail-table thead th:first-child {
+  text-align: left;
+  padding-left: 0.85rem;
+}
+
+.cas-detail-table tbody td {
+  padding: 0.55rem 0.5rem;
+  text-align: center;
+  border-bottom: 1px solid;
+  vertical-align: middle;
+}
+
+.cas-detail-table tbody tr:last-child td { border-bottom: none; }
+
+.cas-detail-table__date {
+  text-align: left !important;
+  padding-left: 0.85rem !important;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Annual row: clickable ── */
+.cas-annual-row { transition: opacity 0.12s; }
+.cas-annual-row:hover { opacity: 0.75; }
+.cas-annual-row:active { opacity: 0.6; }
+
+/* ── Annual hint text ── */
+.cas-annual-hint {
+  font-size: 0.72rem;
+  text-align: center;
+  margin-top: 10px;
+  font-style: italic;
+}
+
+/* ── Mini progress bar (annual table) ── */
+.cas-mini-bar {
+  width: 100%;
+  min-width: 40px;
+  height: 6px;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.cas-mini-bar__fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* ── BADGES & PILLS ── */
+.cas-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cas-pct-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── FOOTER ── */
+.cas-modal__footer {
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.cas-btn-secondary {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.cas-btn-secondary:hover { opacity: 0.8; }
+
+/* ── Mobile: floating back-to-annual button ── */
+.cas-mobile-annual-btn-wrap {
+  padding: 10px 1.25rem;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+}
+
+.cas-mobile-annual-btn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: opacity 0.15s;
+}
+
+.cas-mobile-annual-btn:hover { opacity: 0.8; }
+
+/* ── ANIMATIONS ── */
+@keyframes cas-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cas-slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes cas-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cas-feedIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════ */
+
+@media (min-width: 769px) {
+  .cas-modal { align-items: center; }
+
+  .cas-modal__container {
+    border-radius: 20px;
+    max-height: 85vh;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.04),
+      0 20px 60px rgba(0, 0, 0, 0.2);
+  }
+}
+
+@media (max-width: 380px) {
+  .cas-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .cas-highlights { grid-template-columns: 1fr; }
+  .cas-modal__content { padding: 0.85rem; }
+  .cas-modal__header { padding: 0.85rem; }
+  .cas-modal__title { font-size: 0.95rem; }
+  .cas-filters { flex-direction: column; gap: 8px; }
+  .cas-mini-bar { min-width: 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cas-overlay,
+  .cas-modal,
+  .cas-error { animation: none !important; }
+
+  .cas-progress-bar__fill,
+  .cas-mini-bar__fill { transition: none !important; }
+
+  .cas-kpi-card,
+  .cas-btn-icon,
+  .cas-btn-secondary,
+  .cas-annual-row,
+  .cas-mobile-annual-btn { transition: none !important; }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .cas-modal__content {
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  }
+}

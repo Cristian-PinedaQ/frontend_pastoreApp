@@ -1,324 +1,257 @@
 // ============================================
-// ModalLeaderStatistics.jsx - Estadísticas de liderazgo
+// ModalLeaderStatistics.jsx - Estadísticas de Liderazgo
+// Basado en datos de GET /api/v1/leaders/statistics
 // ============================================
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import '../css/ModalLeaderStatistics.css';
 
 const ModalLeaderStatistics = ({ isOpen, onClose, data, isDarkMode }) => {
-  const chartRefs = useRef({});
+  // Cerrar con Escape y bloquear scroll
+  useEffect(() => {
+    if (!isOpen) return;
 
-  // ========== THEME COLORS ==========
-  const theme = {
-    bg: isDarkMode ? '#1e293b' : '#ffffff',
-    bgSecondary: isDarkMode ? '#0f172a' : '#f9fafb',
-    text: isDarkMode ? '#f3f4f6' : '#1f2937',
-    textSecondary: isDarkMode ? '#9ca3af' : '#6b7280',
-    border: isDarkMode ? '#334155' : '#e5e7eb',
-    cardBg: isDarkMode ? '#0f172a' : '#f9fafb',
-  };
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
 
-  // ========== FORMAT NUMBERS ==========
-  const formatNumber = (num) => {
-    return new Intl.NumberFormat('es-CO').format(num || 0);
-  };
+    document.addEventListener('keydown', handleEsc);
+    document.body.style.overflow = 'hidden';
 
-  // ========== CALCULATE PERCENTAGE ==========
-  const calculatePercentage = (value, total) => {
-    if (!total || total === 0) return 0;
-    return ((value / total) * 100).toFixed(1);
-  };
+    return () => {
+      document.removeEventListener('keydown', handleEsc);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, onClose]);
 
-  // ========== RENDER STATS CARDS ==========
-  const renderStatsCards = () => {
-    if (!data) return null;
-
-    const cards = [
-      {
-        title: 'Total Líderes',
-        value: formatNumber(data.totalLeaders || 0),
-        icon: '👥',
-        color: '#3b82f6',
-        bgColor: isDarkMode ? '#3b82f620' : '#dbeafe',
-      },
-      {
-        title: 'Activos',
-        value: formatNumber(data.activeLeaders || 0),
-        icon: '✅',
-        color: '#10b981',
-        bgColor: isDarkMode ? '#10b98120' : '#d1fae5',
-        percentage: calculatePercentage(data.activeLeaders, data.totalLeaders),
-      },
-      {
-        title: 'Suspendidos',
-        value: formatNumber(data.suspendedLeaders || 0),
-        icon: '⏸️',
-        color: '#f59e0b',
-        bgColor: isDarkMode ? '#f59e0b20' : '#fed7aa',
-        percentage: calculatePercentage(data.suspendedLeaders, data.totalLeaders),
-      },
-      {
-        title: 'Inactivos',
-        value: formatNumber(data.inactiveLeaders || 0),
-        icon: '⏹️',
-        color: '#6b7280',
-        bgColor: isDarkMode ? '#6b728020' : '#e5e7eb',
-        percentage: calculatePercentage(data.inactiveLeaders, data.totalLeaders),
-      },
-    ];
-
-    return (
-      <div className="modal-stats__cards">
-        {cards.map((card, index) => (
-          <div
-            key={index}
-            className="modal-stats__card"
-            style={{
-              backgroundColor: card.bgColor,
-              borderColor: theme.border,
-            }}
-          >
-            <div className="modal-stats__card-icon">{card.icon}</div>
-            <div className="modal-stats__card-content">
-              <div className="modal-stats__card-title">{card.title}</div>
-              <div className="modal-stats__card-value" style={{ color: card.color }}>
-                {card.value}
-              </div>
-              {card.percentage && (
-                <div className="modal-stats__card-percentage">
-                  {card.percentage}% del total
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  // ========== RENDER STATS BY TYPE ==========
-  const renderStatsByType = () => {
-    if (!data || !data.byType) return null;
-
-    const types = [
-      { key: 'SERVANT', label: 'Servidores', icon: '🛠️', color: '#3b82f6' },
-      { key: 'LEADER_12', label: 'Líderes 12', icon: '👥', color: '#10b981' },
-    ];
-
-    return (
-      <div className="modal-stats__section">
-        <h3>📊 Distribución por Tipo</h3>
-        <div className="modal-stats__type-grid">
-          {types.map(type => {
-            const typeData = data.byType[type.key] || { count: 0, displayName: type.label, requiredLevel: '' };
-            
-            return (
-              <div
-                key={type.key}
-                className="modal-stats__type-card"
-                style={{
-                  backgroundColor: theme.cardBg,
-                  borderColor: theme.border,
-                  borderLeftColor: type.color,
-                }}
-              >
-                <div className="modal-stats__type-header">
-                  <span className="modal-stats__type-icon">{type.icon}</span>
-                  <span className="modal-stats__type-name">{typeData.displayName}</span>
-                </div>
-                <div className="modal-stats__type-count" style={{ color: type.color }}>
-                  {formatNumber(typeData.count)}
-                </div>
-                <div className="modal-stats__type-level">
-                  Nivel: {typeData.requiredLevel}
-                </div>
-                <div className="modal-stats__type-percentage">
-                  {calculatePercentage(typeData.count, data.activeLeaders)}% de activos
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  // ========== RENDER PROMOTIONS ==========
-  const renderPromotions = () => {
-    if (!data) return null;
-
-    return (
-      <div className="modal-stats__section">
-        <h3>📈 Promociones Recientes</h3>
-        <div 
-          className="modal-stats__promo-card"
-          style={{
-            backgroundColor: theme.cardBg,
-            borderColor: theme.border,
-          }}
-        >
-          <div className="modal-stats__promo-icon">📅</div>
-          <div className="modal-stats__promo-content">
-            <div className="modal-stats__promo-value">
-              {formatNumber(data.promotionsLastMonth || 0)}
-            </div>
-            <div className="modal-stats__promo-label">
-              Nuevos líderes en el último mes
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ========== RENDER FILTER INFO ==========
-  const renderFilterInfo = () => {
-    if (!data || !data.hasFilters) return null;
-
-    return (
-      <div 
-        className="modal-stats__filter-info"
-        style={{
-          backgroundColor: theme.bgSecondary,
-          borderColor: theme.border,
-        }}
-      >
-        <h4>🔍 Vista filtrada</h4>
-        <p>
-          Mostrando estadísticas de <strong>{data.currentViewCount}</strong> líderes 
-          (de <strong>{data.totalCount}</strong> totales)
-        </p>
-        {data.filtersInfo && Object.entries(data.filtersInfo).length > 0 && (
-          <div className="modal-stats__filter-tags">
-            {Object.entries(data.filtersInfo).map(([key, value]) => (
-              <span 
-                key={key}
-                className="modal-stats__filter-tag"
-                style={{
-                  backgroundColor: isDarkMode ? '#3b82f620' : '#dbeafe',
-                  color: isDarkMode ? '#93c5fd' : '#1e40af',
-                }}
-              >
-                {key === 'status' && '📌 '}
-                {key === 'type' && '🛠️ '}
-                {key === 'search' && '🔍 '}
-                {value}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ========== RENDER QUICK ACTIONS ==========
-  const renderQuickActions = () => {
-    return (
-      <div className="modal-stats__section">
-        <h3>⚡ Acciones rápidas</h3>
-        <div className="modal-stats__actions-grid">
-          <button
-            className="modal-stats__action-btn"
-            onClick={() => {
-              onClose();
-              // Aquí puedes navegar a la vista de activos
-            }}
-            style={{
-              backgroundColor: isDarkMode ? '#10b98120' : '#d1fae5',
-              color: isDarkMode ? '#34d399' : '#047857',
-            }}
-          >
-            ✅ Ver Activos
-          </button>
-          <button
-            className="modal-stats__action-btn"
-            onClick={() => {
-              onClose();
-              // Aquí puedes navegar a la vista de suspendidos
-            }}
-            style={{
-              backgroundColor: isDarkMode ? '#f59e0b20' : '#fed7aa',
-              color: isDarkMode ? '#fbbf24' : '#b45309',
-            }}
-          >
-            ⏸️ Ver Suspendidos
-          </button>
-          <button
-            className="modal-stats__action-btn"
-            onClick={() => {
-              onClose();
-              // Aquí puedes navegar a la vista de inactivos
-            }}
-            style={{
-              backgroundColor: isDarkMode ? '#6b728020' : '#e5e7eb',
-              color: isDarkMode ? '#9ca3af' : '#4b5563',
-            }}
-          >
-            ⏹️ Ver Inactivos
-          </button>
-          <button
-            className="modal-stats__action-btn"
-            onClick={() => {
-              // Aquí puedes implementar exportación rápida
-              window.print();
-            }}
-            style={{
-              backgroundColor: isDarkMode ? '#8b5cf620' : '#ede9fe',
-              color: isDarkMode ? '#a78bfa' : '#6d28d9',
-            }}
-          >
-            📄 Exportar PDF
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // ========== RENDER ==========
   if (!isOpen || !data) return null;
 
+  const handleOverlayClick = (e) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
+  // ===== Datos del backend =====
+  const total = data.totalLeaders || 0;
+  const active = data.activeLeaders || 0;
+  const suspended = data.suspendedLeaders || 0;
+  const inactive = data.inactiveLeaders || 0;
+  const promotionsLastMonth = data.promotionsLastMonth || 0;
+  const byType = data.byType || {};
+
+  // Porcentajes (evitar NaN)
+  const pctActive = total > 0 ? Math.round((active / total) * 100) : 0;
+  const pctSuspended = total > 0 ? Math.round((suspended / total) * 100) : 0;
+  const pctInactive = total > 0 ? Math.round((inactive / total) * 100) : 0;
+
+  // Info de tipos con iconos y colores
+  const typeConfig = {
+    SERVANT: { icon: '🌱', color: '#3b82f6', label: 'Servidores' },
+    LEADER_144: { icon: '🌿', color: '#8b5cf6', label: 'Líderes 144' },
+    LEADER_12: { icon: '🌳', color: '#10b981', label: 'Líderes 12' },
+  };
+
+  // Filtros activos (del contexto que agrega LeadersPage)
+  const hasFilters = data.hasFilters || false;
+  const filtersInfo = data.filtersInfo || {};
+
   return (
-    <div className="modal-stats__overlay" onClick={onClose}>
-      <div 
-        className="modal-stats__container" 
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: theme.bg,
-          color: theme.text,
-          borderColor: theme.border,
-        }}
-      >
-        {/* HEADER */}
-        <div className="modal-stats__header">
-          <h2>📊 Estadísticas de Liderazgo</h2>
-          <button 
-            className="modal-stats__close" 
+    <div className="leader-stats-overlay" onClick={handleOverlayClick}>
+      <div className={`leader-stats-modal ${isDarkMode ? 'leader-stats-modal--dark' : ''}`}>
+
+        {/* ========== HEADER ========== */}
+        <div className="leader-stats__header">
+          <div className="leader-stats__header-content">
+            <h2 className="leader-stats__title">📊 Estadísticas de Liderazgo</h2>
+            {hasFilters && (
+              <span className="leader-stats__filter-tag">
+                🔍 Con filtros
+              </span>
+            )}
+          </div>
+          <button
+            className="leader-stats__close-btn"
             onClick={onClose}
-            style={{ color: theme.text }}
+            aria-label="Cerrar"
           >
             ✕
           </button>
         </div>
 
-        {/* CONTENT */}
-        <div className="modal-stats__content">
-          {renderFilterInfo()}
-          {renderStatsCards()}
-          {renderStatsByType()}
-          {renderPromotions()}
-          {renderQuickActions()}
+        {/* ========== BODY ========== */}
+        <div className="leader-stats__body">
 
-          {/* FOOTER INFO */}
-          <div 
-            className="modal-stats__footer"
-            style={{
-              borderTopColor: theme.border,
-              color: theme.textSecondary,
-            }}
-          >
-            <span>📅 Actualizado: {new Date().toLocaleString('es-CO')}</span>
-            <span>🔄 Los datos se actualizan automáticamente</span>
+          {/* === Tarjetas resumen === */}
+          <div className="leader-stats__summary-cards">
+            <div className="leader-stats__card leader-stats__card--total">
+              <span className="leader-stats__card-icon">👥</span>
+              <div className="leader-stats__card-data">
+                <span className="leader-stats__card-number">{total}</span>
+                <span className="leader-stats__card-label">Total Líderes</span>
+              </div>
+            </div>
+
+            <div className="leader-stats__card leader-stats__card--active">
+              <span className="leader-stats__card-icon">✅</span>
+              <div className="leader-stats__card-data">
+                <span className="leader-stats__card-number">{active}</span>
+                <span className="leader-stats__card-label">Activos</span>
+              </div>
+            </div>
+
+            <div className="leader-stats__card leader-stats__card--suspended">
+              <span className="leader-stats__card-icon">⏸️</span>
+              <div className="leader-stats__card-data">
+                <span className="leader-stats__card-number">{suspended}</span>
+                <span className="leader-stats__card-label">Suspendidos</span>
+              </div>
+            </div>
+
+            <div className="leader-stats__card leader-stats__card--inactive">
+              <span className="leader-stats__card-icon">⏹️</span>
+              <div className="leader-stats__card-data">
+                <span className="leader-stats__card-number">{inactive}</span>
+                <span className="leader-stats__card-label">Inactivos</span>
+              </div>
+            </div>
           </div>
+
+          {/* === Barras de distribución por estado === */}
+          <div className="leader-stats__section">
+            <h3 className="leader-stats__section-title">📌 Distribución por Estado</h3>
+
+            {total === 0 ? (
+              <p className="leader-stats__empty-text">No hay líderes registrados</p>
+            ) : (
+              <>
+                {/* Barra visual compuesta */}
+                <div className="leader-stats__stacked-bar">
+                  {pctActive > 0 && (
+                    <div
+                      className="leader-stats__stacked-segment"
+                      style={{ width: `${pctActive}%`, backgroundColor: '#10b981' }}
+                      title={`Activos: ${pctActive}%`}
+                    />
+                  )}
+                  {pctSuspended > 0 && (
+                    <div
+                      className="leader-stats__stacked-segment"
+                      style={{ width: `${pctSuspended}%`, backgroundColor: '#f59e0b' }}
+                      title={`Suspendidos: ${pctSuspended}%`}
+                    />
+                  )}
+                  {pctInactive > 0 && (
+                    <div
+                      className="leader-stats__stacked-segment"
+                      style={{ width: `${pctInactive}%`, backgroundColor: '#6b7280' }}
+                      title={`Inactivos: ${pctInactive}%`}
+                    />
+                  )}
+                </div>
+
+                {/* Leyenda */}
+                <div className="leader-stats__legend">
+                  <div className="leader-stats__legend-item">
+                    <span className="leader-stats__legend-dot" style={{ backgroundColor: '#10b981' }} />
+                    <span>Activos {pctActive}%</span>
+                  </div>
+                  <div className="leader-stats__legend-item">
+                    <span className="leader-stats__legend-dot" style={{ backgroundColor: '#f59e0b' }} />
+                    <span>Suspendidos {pctSuspended}%</span>
+                  </div>
+                  <div className="leader-stats__legend-item">
+                    <span className="leader-stats__legend-dot" style={{ backgroundColor: '#6b7280' }} />
+                    <span>Inactivos {pctInactive}%</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* === Desglose por tipo de líder === */}
+          <div className="leader-stats__section">
+            <h3 className="leader-stats__section-title">🏷️ Líderes Activos por Tipo</h3>
+
+            <div className="leader-stats__type-list">
+              {Object.entries(byType).map(([typeKey, typeData]) => {
+                const config = typeConfig[typeKey] || { icon: '👤', color: '#6b7280', label: typeKey };
+                const count = typeData?.count || 0;
+                const displayName = typeData?.displayName || config.label;
+                const requiredLevel = typeData?.requiredLevel || '';
+                const barWidth = active > 0 ? Math.round((count / active) * 100) : 0;
+
+                return (
+                  <div key={typeKey} className="leader-stats__type-item">
+                    <div className="leader-stats__type-header">
+                      <div className="leader-stats__type-info">
+                        <span className="leader-stats__type-icon">{config.icon}</span>
+                        <div className="leader-stats__type-text">
+                          <span className="leader-stats__type-name">{displayName}</span>
+                          {requiredLevel && (
+                            <span className="leader-stats__type-req">Requisito: {requiredLevel}</span>
+                          )}
+                        </div>
+                      </div>
+                      <span
+                        className="leader-stats__type-count"
+                        style={{ color: config.color }}
+                      >
+                        {count}
+                      </span>
+                    </div>
+                    <div className="leader-stats__type-bar-bg">
+                      <div
+                        className="leader-stats__type-bar-fill"
+                        style={{
+                          width: `${barWidth}%`,
+                          backgroundColor: config.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* === Promociones recientes === */}
+          <div className="leader-stats__section leader-stats__section--highlight">
+            <div className="leader-stats__promo-card">
+              <span className="leader-stats__promo-icon">🌟</span>
+              <div className="leader-stats__promo-info">
+                <span className="leader-stats__promo-number">{promotionsLastMonth}</span>
+                <span className="leader-stats__promo-label">Promociones en el último mes</span>
+              </div>
+            </div>
+          </div>
+
+          {/* === Info de filtros (si aplica) === */}
+          {hasFilters && (
+            <div className="leader-stats__section leader-stats__section--filter-info">
+              <h3 className="leader-stats__section-title">🔍 Filtros Aplicados en Vista</h3>
+              <div className="leader-stats__filter-details">
+                {filtersInfo.status && (
+                  <span className="leader-stats__filter-chip">Estado: {filtersInfo.status}</span>
+                )}
+                {filtersInfo.type && (
+                  <span className="leader-stats__filter-chip">Tipo: {filtersInfo.type}</span>
+                )}
+                {filtersInfo.search && (
+                  <span className="leader-stats__filter-chip">Búsqueda: "{filtersInfo.search}"</span>
+                )}
+                <p className="leader-stats__filter-note">
+                  Vista filtrada: {data.currentViewCount || 0} de {data.totalCount || 0} líderes.
+                  Las estadísticas muestran datos globales del sistema.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ========== FOOTER ========== */}
+        <div className="leader-stats__footer">
+          <button className="leader-stats__close-footer-btn" onClick={onClose}>
+            Cerrar
+          </button>
         </div>
       </div>
     </div>

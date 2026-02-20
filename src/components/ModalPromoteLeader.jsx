@@ -24,8 +24,8 @@ const LEADER_TYPES = [
   { 
     value: 'SERVANT', 
     label: '🛠️ Servidor', 
-    description: 'Nivel mínimo: EDIRD 2 o superior',
-    requiredLevel: 'EDIRD_2',
+    description: 'Nivel mínimo: ESENCIA 2 o superior',
+    requiredLevel: 'ESENCIA_2',
     color: '#3b82f6',
     requiredLevelOrder: 6
   },
@@ -52,11 +52,11 @@ const LEVEL_ORDER = {
   'ENCUENTRO': 2,
   'POST_ENCUENTRO': 3,
   'BAUTIZOS': 4,
-  'EDIRD_1': 5,
-  'EDIRD_2': 6,
-  'EDIRD_3': 7,
+  'ESENCIA_1': 5,
+  'ESENCIA_2': 6,
+  'ESENCIA_3': 7,
   'SANIDAD_INTEGRAL_RAICES': 8,
-  'EDIRD_4': 9,
+  'ESENCIA_4': 9,
   'ADIESTRAMIENTO': 10,
   'GRADUACION': 11
 };
@@ -66,11 +66,11 @@ const LEVEL_DISPLAY_NAMES = {
   'ENCUENTRO': 'Encuentro',
   'POST_ENCUENTRO': 'Post-encuentro',
   'BAUTIZOS': 'Bautizos',
-  'EDIRD_1': 'EDIRD 1',
-  'EDIRD_2': 'EDIRD 2',
-  'EDIRD_3': 'EDIRD 3',
+  'ESENCIA_1': 'ESENCIA 1',
+  'ESENCIA_2': 'ESENCIA 2',
+  'ESENCIA_3': 'ESENCIA 3',
   'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces',
-  'EDIRD_4': 'EDIRD 4',
+  'ESENCIA_4': 'ESENCIA 4',
   'ADIESTRAMIENTO': 'Adiestramiento',
   'GRADUACION': 'Graduación'
 };

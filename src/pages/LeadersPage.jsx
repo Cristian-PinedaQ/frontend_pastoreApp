@@ -1,15 +1,16 @@
 // ============================================
-// LeadersPage.jsx - Gestión de Líderes (SERVANT y LEADER_12)
-// Basado en la arquitectura de StudentsPage
+// LeadersPage.jsx - Gestión de Líderes (SERVANT, LEADER_144 y LEADER_12)
+// Versión limpia: click en fila abre ModalLeaderDetail
 // ============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
-import { generatePDF } from '../services/Pdfgenerator';
+import { generateLeadersPDF } from '../services/leadersPdfGenerator';
 import { logSecurityEvent, logUserAction } from '../utils/securityLogger';
 import nameHelper from '../services/nameHelper';
 import ModalPromoteLeader from '../components/ModalPromoteLeader';
 import ModalLeaderStatistics from '../components/ModalLeaderStatistics';
+import ModalLeaderDetail from '../components/ModalLeaderDetail';
 import '../css/LeadersPage.css';
 
 // Extraer función del helper para transformar nombres
@@ -50,8 +51,9 @@ const validateSearchText = (text) => {
 
 // ========== CONSTANTES ==========
 const LEADER_TYPE_MAP = {
-  SERVANT: { label: 'Servidor', color: '#3b82f6', icon: '🛠️' },
-  LEADER_12: { label: 'Líder 12', color: '#10b981', icon: '👥' },
+  SERVANT: { label: 'Servidor', color: '#3b82f6', icon: '🌱' },
+  LEADER_144: { label: 'Líder 144', color: '#8b5cf6', icon: '🌿' },
+  LEADER_12: { label: 'Líder 12', color: '#10b981', icon: '🌳' },
 };
 
 const LEADER_STATUS_MAP = {
@@ -77,6 +79,8 @@ const LeadersPage = () => {
   const [showPromoteModal, setShowPromoteModal] = useState(false);
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
   const [showVerifyAllModal, setShowVerifyAllModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedLeader, setSelectedLeader] = useState(null);
   const [verificationResult, setVerificationResult] = useState(null);
   const [statisticsData, setStatisticsData] = useState(null);
 
@@ -84,7 +88,6 @@ const LeadersPage = () => {
   const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
   const [activeFiltersInfo, setActiveFiltersInfo] = useState({});
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [expandedLeaderId, setExpandedLeaderId] = useState(null);
 
   // ========== DARK MODE DETECTION ==========
   useEffect(() => {
@@ -162,27 +165,30 @@ const LeadersPage = () => {
 
       const processedLeaders = leaders.map(leader => ({
         ...leader,
-        // Transformar nombre para mostrar
         memberName: getDisplayName(escapeHtml(leader.memberName || 'Sin nombre')),
-        // Añadir campos útiles para UI
         leaderTypeIcon: LEADER_TYPE_MAP[leader.leaderType]?.icon || '👤',
         leaderTypeLabel: LEADER_TYPE_MAP[leader.leaderType]?.label || leader.leaderType,
         statusIcon: LEADER_STATUS_MAP[leader.status]?.icon || '•',
         statusLabel: LEADER_STATUS_MAP[leader.status]?.label || leader.status,
-        // Formatear fechas
-        promotionDateFormatted: leader.promotionDate 
-          ? new Date(leader.promotionDate).toLocaleDateString('es-CO') 
+        promotionDateFormatted: leader.promotionDate
+          ? new Date(leader.promotionDate).toLocaleDateString('es-CO')
           : '-',
-        suspensionDateFormatted: leader.suspensionDate 
-          ? new Date(leader.suspensionDate).toLocaleDateString('es-CO') 
+        suspensionDateFormatted: leader.suspensionDate
+          ? new Date(leader.suspensionDate).toLocaleDateString('es-CO')
           : null,
-        lastVerificationFormatted: leader.lastVerificationDate 
-          ? new Date(leader.lastVerificationDate).toLocaleDateString('es-CO') 
+        lastVerificationFormatted: leader.lastVerificationDate
+          ? new Date(leader.lastVerificationDate).toLocaleDateString('es-CO')
           : 'Nunca',
       }));
 
       log('Líderes procesados', { count: processedLeaders.length });
       setAllLeaders(processedLeaders);
+
+      // Si hay un líder seleccionado, actualizar su data
+      if (selectedLeader) {
+        const updated = processedLeaders.find(l => l.id === selectedLeader.id);
+        if (updated) setSelectedLeader(updated);
+      }
 
       logUserAction('load_leaders', {
         leaderCount: processedLeaders.length,
@@ -200,24 +206,21 @@ const LeadersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedLeader]);
 
   // ========== APPLY FILTERS ==========
   const applyFilters = useCallback(() => {
     try {
       let filtered = [...allLeaders];
 
-      // Filtrar por ESTADO
       if (selectedStatus !== 'ALL') {
         filtered = filtered.filter(leader => leader.status === selectedStatus);
       }
 
-      // Filtrar por TIPO
       if (selectedType !== 'ALL') {
         filtered = filtered.filter(leader => leader.leaderType === selectedType);
       }
 
-      // Filtrar por búsqueda (nombre, documento, email, grupo)
       if (searchText.trim()) {
         const search = searchText.toLowerCase().trim();
         filtered = filtered.filter(leader =>
@@ -228,15 +231,13 @@ const LeadersPage = () => {
         );
       }
 
-      // Ordenar: primero activos, luego suspendidos, luego inactivos
       filtered.sort((a, b) => {
         const statusOrder = { ACTIVE: 1, SUSPENDED: 2, INACTIVE: 3 };
         const orderA = statusOrder[a.status] || 99;
         const orderB = statusOrder[b.status] || 99;
-        
+
         if (orderA !== orderB) return orderA - orderB;
-        
-        // Si mismo status, ordenar por fecha de promoción (más reciente primero)
+
         return new Date(b.promotionDate || 0) - new Date(a.promotionDate || 0);
       });
 
@@ -251,7 +252,8 @@ const LeadersPage = () => {
   // ========== INIT LOAD ==========
   useEffect(() => {
     loadLeaders();
-  }, [loadLeaders]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ========== APPLY FILTERS ON CHANGE ==========
   useEffect(() => {
@@ -280,6 +282,17 @@ const LeadersPage = () => {
     }
   }, [selectedStatus, selectedType, searchText]);
 
+  // ========== OPEN LEADER DETAIL ==========
+  const handleRowClick = useCallback((leader) => {
+    setSelectedLeader(leader);
+    setShowDetailModal(true);
+
+    logUserAction('open_leader_detail', {
+      leaderId: leader.id,
+      timestamp: new Date().toISOString()
+    });
+  }, []);
+
   // ========== VERIFY ALL LEADERS ==========
   const handleVerifyAll = useCallback(async () => {
     try {
@@ -293,7 +306,6 @@ const LeadersPage = () => {
       setVerificationResult(result);
       setShowVerifyAllModal(true);
 
-      // Recargar datos para reflejar cambios
       await loadLeaders();
 
       logUserAction('verify_all_leaders', {
@@ -332,7 +344,6 @@ const LeadersPage = () => {
         timestamp: new Date().toISOString()
       });
 
-      // Auto-ocultar mensaje después de 5 segundos
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (err) {
@@ -352,7 +363,6 @@ const LeadersPage = () => {
       const stats = await apiService.getLeaderStatistics();
       log('Estadísticas recibidas', stats);
 
-      // Añadir información de filtros actuales
       const dataWithContext = {
         ...stats,
         hasFilters: hasFiltersApplied,
@@ -376,12 +386,12 @@ const LeadersPage = () => {
     }
   }, [hasFiltersApplied, activeFiltersInfo, filteredLeaders.length, allLeaders.length]);
 
-  // ========== SUSPEND LEADER ==========
+  // ========== ACCIONES INDIVIDUALES (usadas por ModalLeaderDetail) ==========
   const handleSuspendLeader = useCallback(async (leaderId, memberName) => {
     try {
       const reason = window.prompt(`Ingrese el motivo para suspender a ${memberName}:`, 'Incumplimiento de requisitos');
-      
-      if (reason === null) return; // Cancelar
+
+      if (reason === null) return;
       if (!reason.trim()) {
         alert('Debe ingresar un motivo para la suspensión');
         return;
@@ -392,9 +402,8 @@ const LeadersPage = () => {
 
       await apiService.suspendLeader(leaderId, reason.trim());
       setSuccessMessage(`✅ Líder ${memberName} suspendido exitosamente`);
-      
-      await loadLeaders();
 
+      await loadLeaders();
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (err) {
@@ -405,7 +414,6 @@ const LeadersPage = () => {
     }
   }, [loadLeaders]);
 
-  // ========== UNSUSPEND LEADER ==========
   const handleUnsuspendLeader = useCallback(async (leaderId, memberName) => {
     try {
       if (!window.confirm(`¿Está seguro de reactivar a ${memberName}? Se verificará que cumpla los requisitos.`)) {
@@ -417,9 +425,8 @@ const LeadersPage = () => {
 
       await apiService.unsuspendLeader(leaderId);
       setSuccessMessage(`✅ Líder ${memberName} reactivado exitosamente`);
-      
-      await loadLeaders();
 
+      await loadLeaders();
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (err) {
@@ -430,11 +437,10 @@ const LeadersPage = () => {
     }
   }, [loadLeaders]);
 
-  // ========== DEACTIVATE LEADER ==========
   const handleDeactivateLeader = useCallback(async (leaderId, memberName) => {
     try {
       const reason = window.prompt(`Ingrese el motivo para desactivar a ${memberName} (permanente):`, 'Renuncia / Traslado');
-      
+
       if (reason === null) return;
       if (!reason.trim()) {
         alert('Debe ingresar un motivo para la desactivación');
@@ -450,9 +456,8 @@ const LeadersPage = () => {
 
       await apiService.deactivateLeader(leaderId, reason.trim());
       setSuccessMessage(`✅ Líder ${memberName} desactivado exitosamente`);
-      
-      await loadLeaders();
 
+      await loadLeaders();
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (err) {
@@ -463,7 +468,6 @@ const LeadersPage = () => {
     }
   }, [loadLeaders]);
 
-  // ========== REACTIVATE LEADER ==========
   const handleReactivateLeader = useCallback(async (leaderId, memberName) => {
     try {
       if (!window.confirm(`¿Reactivar a ${memberName}? Se verificará que cumpla los requisitos actuales.`)) {
@@ -475,9 +479,8 @@ const LeadersPage = () => {
 
       await apiService.reactivateLeader(leaderId);
       setSuccessMessage(`✅ Líder ${memberName} reactivado exitosamente`);
-      
-      await loadLeaders();
 
+      await loadLeaders();
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (err) {
@@ -488,22 +491,20 @@ const LeadersPage = () => {
     }
   }, [loadLeaders]);
 
-  // ========== VERIFY LEADER ==========
   const handleVerifyLeader = useCallback(async (leaderId, memberName) => {
     try {
       setLoading(true);
       log('Verificando líder específico', { leaderId });
 
       const result = await apiService.verifyLeader(leaderId);
-      
+
       if (result.wasSuspended) {
         setSuccessMessage(`⚠️ ${memberName} fue suspendido automáticamente por no cumplir requisitos`);
       } else {
         setSuccessMessage(`✅ ${memberName} verificado, cumple todos los requisitos`);
       }
-      
-      await loadLeaders();
 
+      await loadLeaders();
       setTimeout(() => setSuccessMessage(''), 5000);
 
     } catch (err) {
@@ -514,6 +515,53 @@ const LeadersPage = () => {
     }
   }, [loadLeaders]);
 
+  // ========== EDITAR LÍDER ==========
+  // Usa la firma existente en apiService:
+  //   updateLeader(leaderId, leaderType, cellGroupCode, notes)
+  const handleEditLeader = useCallback(async (leaderId, fields) => {
+    log('Editando líder', { leaderId, fields });
+
+    await apiService.updateLeader(
+      leaderId,
+      fields.leaderType    || null,
+      fields.cellGroupCode !== undefined ? fields.cellGroupCode : null,
+      fields.notes         !== undefined ? fields.notes         : null,
+    );
+
+    setSuccessMessage('✅ Líder actualizado exitosamente');
+    await loadLeaders();
+    setTimeout(() => setSuccessMessage(''), 5000);
+
+    logUserAction('edit_leader', {
+      leaderId,
+      fields,
+      timestamp: new Date().toISOString(),
+    });
+  }, [loadLeaders]);
+
+  // ========== ELIMINAR LÍDER ==========
+  const handleDeleteLeader = useCallback(async (leaderId, memberName) => {
+    log('Eliminando líder', { leaderId, memberName });
+
+    // Lanzar la llamada — si falla, el error burbujea al modal para mostrarlo
+    await apiService.deleteLeader(leaderId);
+
+    setSuccessMessage(`✅ Líder ${memberName} eliminado exitosamente`);
+
+    // Cerrar modal y limpiar selección antes de recargar
+    setShowDetailModal(false);
+    setSelectedLeader(null);
+
+    await loadLeaders();
+    setTimeout(() => setSuccessMessage(''), 5000);
+
+    logUserAction('delete_leader', {
+      leaderId,
+      memberName,
+      timestamp: new Date().toISOString()
+    });
+  }, [loadLeaders]);
+
   // ========== EXPORT PDF ==========
   const handleExportPDF = useCallback(() => {
     try {
@@ -521,17 +569,16 @@ const LeadersPage = () => {
 
       const dataForPDF = hasFiltersApplied ? filteredLeaders : allLeaders;
 
-      // Agrupar por estado para el PDF
       const active = dataForPDF.filter(l => l.status === 'ACTIVE');
       const suspended = dataForPDF.filter(l => l.status === 'SUSPENDED');
       const inactive = dataForPDF.filter(l => l.status === 'INACTIVE');
 
       const data = {
-        title: hasFiltersApplied ? 'Líderes (Filtrados)' : 'Reporte General de Líderes',
+        leaders: dataForPDF,
+        title: hasFiltersApplied ? 'Reporte de Líderes (Filtrados)' : 'Reporte General de Líderes',
         type: selectedType !== 'ALL' ? LEADER_TYPE_MAP[selectedType]?.label : 'Todos los Tipos',
         status: selectedStatus !== 'ALL' ? LEADER_STATUS_MAP[selectedStatus]?.label : 'Todos los Estados',
         date: new Date().toLocaleDateString('es-CO'),
-        leaders: dataForPDF,
         activeCount: active.length,
         suspendedCount: suspended.length,
         inactiveCount: inactive.length,
@@ -540,11 +587,12 @@ const LeadersPage = () => {
         filtersInfo: activeFiltersInfo,
         byType: {
           SERVANT: dataForPDF.filter(l => l.leaderType === 'SERVANT').length,
+          LEADER_144: dataForPDF.filter(l => l.leaderType === 'LEADER_144').length,
           LEADER_12: dataForPDF.filter(l => l.leaderType === 'LEADER_12').length,
         }
       };
 
-      generatePDF(data, 'leaders-report');
+      generateLeadersPDF(data);
 
       logUserAction('export_leaders_pdf', {
         hasFilters: hasFiltersApplied,
@@ -558,21 +606,16 @@ const LeadersPage = () => {
     }
   }, [hasFiltersApplied, filteredLeaders, allLeaders, selectedType, selectedStatus, activeFiltersInfo]);
 
-  // ========== TOGGLE EXPAND ==========
-  const toggleExpand = (leaderId) => {
-    setExpandedLeaderId(expandedLeaderId === leaderId ? null : leaderId);
-  };
-
-  // ========== RENDER STATUS BADGE ==========
+  // ========== RENDER HELPERS ==========
   const renderStatusBadge = (status) => {
     const statusInfo = LEADER_STATUS_MAP[status] || { label: status, icon: '•', color: '#6b7280' };
-    
+
     return (
-      <span 
+      <span
         className="leaders-page__status-badge"
-        style={{ 
+        style={{
           backgroundColor: isDarkMode ? `${statusInfo.color}20` : `${statusInfo.color}10`,
-          color: isDarkMode ? statusInfo.color : statusInfo.color,
+          color: statusInfo.color,
           borderColor: isDarkMode ? `${statusInfo.color}40` : `${statusInfo.color}30`,
         }}
       >
@@ -581,143 +624,20 @@ const LeadersPage = () => {
     );
   };
 
-  // ========== RENDER TYPE BADGE ==========
   const renderTypeBadge = (type) => {
     const typeInfo = LEADER_TYPE_MAP[type] || { label: type, icon: '👤', color: '#3b82f6' };
-    
+
     return (
-      <span 
+      <span
         className="leaders-page__type-badge"
-        style={{ 
+        style={{
           backgroundColor: isDarkMode ? `${typeInfo.color}20` : `${typeInfo.color}10`,
-          color: isDarkMode ? typeInfo.color : typeInfo.color,
+          color: typeInfo.color,
           borderColor: isDarkMode ? `${typeInfo.color}40` : `${typeInfo.color}30`,
         }}
       >
         {typeInfo.icon} {typeInfo.label}
       </span>
-    );
-  };
-
-  // ========== RENDER ACTION BUTTONS ==========
-  const renderActionButtons = (leader) => {
-    return (
-      <div className="leaders-page__action-buttons">
-        {/* Botón Verificar */}
-        <button
-          className="leaders-page__action-btn leaders-page__action-btn--verify"
-          onClick={() => handleVerifyLeader(leader.id, leader.memberName)}
-          title="Verificar si cumple requisitos"
-          disabled={loading}
-        >
-          🔍
-        </button>
-
-        {/* Botones según estado */}
-        {leader.status === 'ACTIVE' && (
-          <>
-            <button
-              className="leaders-page__action-btn leaders-page__action-btn--suspend"
-              onClick={() => handleSuspendLeader(leader.id, leader.memberName)}
-              title="Suspender líder (automático)"
-              disabled={loading}
-            >
-              ⏸️
-            </button>
-            <button
-              className="leaders-page__action-btn leaders-page__action-btn--deactivate"
-              onClick={() => handleDeactivateLeader(leader.id, leader.memberName)}
-              title="Desactivar permanentemente"
-              disabled={loading}
-            >
-              ⏹️
-            </button>
-          </>
-        )}
-
-        {leader.status === 'SUSPENDED' && (
-          <button
-            className="leaders-page__action-btn leaders-page__action-btn--unsuspend"
-            onClick={() => handleUnsuspendLeader(leader.id, leader.memberName)}
-            title="Reactivar (verifica requisitos)"
-            disabled={loading}
-          >
-            ▶️
-          </button>
-        )}
-
-        {leader.status === 'INACTIVE' && (
-          <button
-            className="leaders-page__action-btn leaders-page__action-btn--reactivate"
-            onClick={() => handleReactivateLeader(leader.id, leader.memberName)}
-            title="Reactivar (verifica requisitos)"
-            disabled={loading}
-          >
-            🔄
-          </button>
-        )}
-
-        {/* Botón Expandir */}
-        <button
-          className="leaders-page__action-btn leaders-page__action-btn--expand"
-          onClick={() => toggleExpand(leader.id)}
-          title="Ver detalles"
-        >
-          {expandedLeaderId === leader.id ? '▲' : '▼'}
-        </button>
-      </div>
-    );
-  };
-
-  // ========== RENDER EXPANDED DETAILS ==========
-  const renderExpandedDetails = (leader) => {
-    if (expandedLeaderId !== leader.id) return null;
-
-    return (
-      <tr className="leaders-page__expanded-row">
-        <td colSpan="8">
-          <div className="leaders-page__details-grid">
-            <div className="leaders-page__details-item">
-              <strong>📧 Email:</strong> {leader.memberEmail || 'No registrado'}
-            </div>
-            <div className="leaders-page__details-item">
-              <strong>📞 Teléfono:</strong> {leader.memberPhone || 'No registrado'}
-            </div>
-            <div className="leaders-page__details-item">
-              <strong>🆔 Documento:</strong> {leader.memberDocument || 'No registrado'}
-            </div>
-            <div className="leaders-page__details-item">
-              <strong>📅 Promoción:</strong> {leader.promotionDateFormatted}
-            </div>
-            <div className="leaders-page__details-item">
-              <strong>🔄 Última verificación:</strong> {leader.lastVerificationFormatted}
-            </div>
-            <div className="leaders-page__details-item">
-              <strong>🏷️ Código de célula:</strong> {leader.cellGroupCode || 'No asignado'}
-            </div>
-            
-            {leader.suspensionReason && (
-              <div className="leaders-page__details-item leaders-page__details-item--full">
-                <strong>⏸️ Razón de suspensión:</strong> {leader.suspensionReason}
-                {leader.suspensionDateFormatted && ` (${leader.suspensionDateFormatted})`}
-              </div>
-            )}
-            
-            {leader.deactivationReason && (
-              <div className="leaders-page__details-item leaders-page__details-item--full">
-                <strong>⏹️ Razón de desactivación:</strong> {leader.deactivationReason}
-                {leader.deactivationDate && ` (${new Date(leader.deactivationDate).toLocaleDateString('es-CO')})`}
-              </div>
-            )}
-
-            {leader.notes && (
-              <div className="leaders-page__details-item leaders-page__details-item--full">
-                <strong>📝 Notas:</strong> {leader.notes}
-              </div>
-            )}
-          </div>
-        </td>
-      </tr>
     );
   };
 
@@ -727,7 +647,7 @@ const LeadersPage = () => {
         {/* HEADER */}
         <div className="leaders-page__header">
           <h1>👥 Gestión de Líderes</h1>
-          <p>Promueve, verifica y administra líderes (Servidores y Líderes 12)</p>
+          <p>Promueve, verifica y administra líderes (Servidores, Líderes 144 y Líderes 12)</p>
         </div>
 
         {/* CONTROLES */}
@@ -771,7 +691,7 @@ const LeadersPage = () => {
 
             {/* Filtro por Tipo */}
             <div className="leaders-page__filter-item">
-              <label>🛠️ Tipo</label>
+              <label>✨ Tipo</label>
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
@@ -782,8 +702,9 @@ const LeadersPage = () => {
                 }}
               >
                 <option value="ALL">Todos los Tipos</option>
-                <option value="SERVANT">🛠️ Servidores ({allLeaders.filter(l => l.leaderType === 'SERVANT').length})</option>
-                <option value="LEADER_12">👥 Líderes 12 ({allLeaders.filter(l => l.leaderType === 'LEADER_12').length})</option>
+                <option value="SERVANT">🌱 Servidores ({allLeaders.filter(l => l.leaderType === 'SERVANT').length})</option>
+                <option value="LEADER_144">🌿 Líderes 144 ({allLeaders.filter(l => l.leaderType === 'LEADER_144').length})</option>
+                <option value="LEADER_12">🌳 Líderes 12 ({allLeaders.filter(l => l.leaderType === 'LEADER_12').length})</option>
               </select>
             </div>
           </div>
@@ -906,78 +827,70 @@ const LeadersPage = () => {
                   <th className="leaders-page__col-group">Célula</th>
                   <th className="leaders-page__col-date">Promoción</th>
                   <th className="leaders-page__col-verified">Verificado</th>
-                  <th className="leaders-page__col-actions">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLeaders.map(leader => (
-                  <React.Fragment key={leader.id}>
-                    <tr 
-                      className={`leaders-page__row leaders-page__row--${leader.status.toLowerCase()}`}
-                      style={{
-                        backgroundColor: isDarkMode ? '#1a2332' : '#fff',
-                        borderColor: theme.border,
-                      }}
-                    >
-                      {/* Columna Miembro */}
-                      <td className="leaders-page__col-member">
-                        <div className="leaders-page__member-info">
-                          <span className="leaders-page__avatar">👤</span>
-                          <div className="leaders-page__member-details">
-                            <span className="leaders-page__member-name">{leader.memberName}</span>
-                            <span className="leaders-page__member-meta">
-                              {leader.memberDocument || 'Sin documento'}
-                            </span>
-                          </div>
+                  <tr
+                    key={leader.id}
+                    className={`leaders-page__row leaders-page__row--${leader.status.toLowerCase()} leaders-page__row--clickable`}
+                    style={{
+                      backgroundColor: isDarkMode ? '#1a2332' : '#fff',
+                      borderColor: theme.border,
+                    }}
+                    onClick={() => handleRowClick(leader)}
+                    title="Click para ver detalles"
+                  >
+                    {/* Miembro */}
+                    <td className="leaders-page__col-member">
+                      <div className="leaders-page__member-info">
+                        <span className="leaders-page__avatar">👤</span>
+                        <div className="leaders-page__member-details">
+                          <span className="leaders-page__member-name">{leader.memberName}</span>
+                          <span className="leaders-page__member-meta">
+                            {leader.memberDocument || 'Sin documento'}
+                          </span>
                         </div>
-                      </td>
+                      </div>
+                    </td>
 
-                      {/* Tipo */}
-                      <td className="leaders-page__col-type">
-                        {renderTypeBadge(leader.leaderType)}
-                      </td>
+                    {/* Tipo */}
+                    <td className="leaders-page__col-type">
+                      {renderTypeBadge(leader.leaderType)}
+                    </td>
 
-                      {/* Estado */}
-                      <td className="leaders-page__col-status">
-                        {renderStatusBadge(leader.status)}
-                      </td>
+                    {/* Estado */}
+                    <td className="leaders-page__col-status">
+                      {renderStatusBadge(leader.status)}
+                    </td>
 
-                      {/* Célula */}
-                      <td className="leaders-page__col-group">
-                        {leader.cellGroupCode || '-'}
-                      </td>
+                    {/* Célula */}
+                    <td className="leaders-page__col-group">
+                      {leader.cellGroupCode || '-'}
+                    </td>
 
-                      {/* Fecha Promoción */}
-                      <td className="leaders-page__col-date">
-                        {leader.promotionDateFormatted}
-                      </td>
+                    {/* Fecha Promoción */}
+                    <td className="leaders-page__col-date">
+                      {leader.promotionDateFormatted}
+                    </td>
 
-                      {/* Última Verificación */}
-                      <td className="leaders-page__col-verified">
-                        <span 
-                          className="leaders-page__verified-badge"
-                          style={{
-                            backgroundColor: leader.lastVerificationDate 
-                              ? (isDarkMode ? '#10b98120' : '#d1fae5') 
-                              : (isDarkMode ? '#6b728020' : '#f3f4f6'),
-                            color: leader.lastVerificationDate ? '#10b981' : '#6b7280',
-                          }}
-                        >
-                          {leader.lastVerificationDate 
-                            ? `✅ ${leader.lastVerificationFormatted}` 
-                            : '⏳ Nunca'}
-                        </span>
-                      </td>
-
-                      {/* Acciones */}
-                      <td className="leaders-page__col-actions">
-                        {renderActionButtons(leader)}
-                      </td>
-                    </tr>
-
-                    {/* Fila expandida con detalles */}
-                    {renderExpandedDetails(leader)}
-                  </React.Fragment>
+                    {/* Última Verificación */}
+                    <td className="leaders-page__col-verified">
+                      <span
+                        className="leaders-page__verified-badge"
+                        style={{
+                          backgroundColor: leader.lastVerificationDate
+                            ? (isDarkMode ? '#10b98120' : '#d1fae5')
+                            : (isDarkMode ? '#6b728020' : '#f3f4f6'),
+                          color: leader.lastVerificationDate ? '#10b981' : '#6b7280',
+                        }}
+                      >
+                        {leader.lastVerificationDate
+                          ? `✅ ${leader.lastVerificationFormatted}`
+                          : '⏳ Nunca'}
+                      </span>
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -985,7 +898,28 @@ const LeadersPage = () => {
         )}
       </div>
 
-      {/* MODALES */}
+      {/* ========== MODALES ========== */}
+
+      {/* Modal Detalle de Líder */}
+      <ModalLeaderDetail
+        isOpen={showDetailModal}
+        onClose={() => {
+          setShowDetailModal(false);
+          setSelectedLeader(null);
+        }}
+        leader={selectedLeader}
+        isDarkMode={isDarkMode}
+        loading={loading}
+        onVerify={handleVerifyLeader}
+        onSuspend={handleSuspendLeader}
+        onUnsuspend={handleUnsuspendLeader}
+        onDeactivate={handleDeactivateLeader}
+        onReactivate={handleReactivateLeader}
+        onEdit={handleEditLeader}
+        onDelete={handleDeleteLeader}
+      />
+
+      {/* Modal Promover */}
       <ModalPromoteLeader
         isOpen={showPromoteModal}
         onClose={() => setShowPromoteModal(false)}
@@ -995,6 +929,7 @@ const LeadersPage = () => {
         }}
       />
 
+      {/* Modal Estadísticas */}
       <ModalLeaderStatistics
         isOpen={showStatisticsModal}
         onClose={() => setShowStatisticsModal(false)}
@@ -1032,7 +967,7 @@ const LeadersPage = () => {
               )}
             </div>
             <div className="leaders-page__modal-footer">
-              <button 
+              <button
                 className="leaders-page__btn leaders-page__btn--primary"
                 onClick={() => setShowVerifyAllModal(false)}
               >

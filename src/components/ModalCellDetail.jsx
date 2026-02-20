@@ -1,7 +1,7 @@
 // ============================================
 // ModalCellDetail.jsx
-// Vista completa de una célula: Info | Miembros | Agregar Miembro
-// Acciones (Verificar, Estado, Multiplicación, PDF) en el header
+// Vista completa de una célula: Info | Miembros | Agregar Miembro | Editar
+// Acciones (Verificar, Estado, Multiplicación, PDF, Eliminar) en el header
 // ============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -35,7 +35,37 @@ const TABS = [
   { id: 'info',    label: '📋 Información' },
   { id: 'members', label: '👥 Miembros' },
   { id: 'add',     label: '➕ Agregar Miembro' },
+  { id: 'edit',    label: '✏️ Editar' },
 ];
+
+const DAYS_OF_WEEK = [
+  'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
+];
+
+const DISTRICTS = [
+  'NORTE', 'SUR', 'ESTE', 'OESTE', 'CENTRO',
+  'NORESTE', 'NOROESTE', 'SURESTE', 'SUROESTE',
+];
+
+// ── Convierte cualquier formato de hora al formato HH:mm que requiere <input type="time"> ──
+const toInputTime = (timeStr) => {
+  if (!timeStr) return '';
+  // Ya está en formato HH:mm
+  if (/^\d{2}:\d{2}$/.test(timeStr)) return timeStr;
+  // Formato con segundos HH:mm:ss
+  if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) return timeStr.slice(0, 5);
+  // Formato 12h: "7:00 PM" / "07:00 AM"
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match) {
+    let h = parseInt(match[1], 10);
+    const m = match[2];
+    const period = match[3].toUpperCase();
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return `${String(h).padStart(2, '0')}:${m}`;
+  }
+  return timeStr;
+};
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -59,6 +89,23 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
   const [selectedMember, setSelectedMember]   = useState(null);
   const [addResult, setAddResult]             = useState(null);
   const [addError, setAddError]               = useState('');
+
+  // Edit sub-state
+  const [editForm, setEditForm]       = useState({});
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError]     = useState('');
+  const [editSuccess, setEditSuccess] = useState('');
+
+  // Delete sub-state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText]  = useState('');
+  const [deleting, setDeleting]                    = useState(false);
+
+  // Leader search for edit
+  const [leaderSearchField, setLeaderSearchField] = useState(null);
+  const [leaderSearchTerm, setLeaderSearchTerm]   = useState('');
+  const [leaderResults, setLeaderResults]         = useState([]);
+  const [searchingLeaders, setSearchingLeaders]   = useState(false);
 
   // Dark mode
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -115,6 +162,39 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     }
   }, [activeTab]);
 
+  // ── Initialize edit form when switching to edit tab ──────────────────────────
+  // Se usan ?? en lugar de || para respetar valores como 0 o false.
+  // toInputTime() normaliza el formato de hora al requerido por <input type="time">.
+  useEffect(() => {
+    if (activeTab === 'edit' && cell) {
+      setEditForm({
+        name:           cell.name           ?? '',
+        meetingDay:     cell.meetingDay     ?? '',
+        // Prioriza meetingTime (formato raw); toInputTime convierte "7:00 PM" → "19:00"
+        meetingTime:    toInputTime(cell.meetingTime ?? cell.meetingTimeFormatted ?? ''),
+        meetingAddress: cell.meetingAddress ?? '',
+        maxCapacity:    cell.maxCapacity    ?? 12,
+        district:       cell.district       ?? '',
+        notes:          cell.notes          ?? '',
+        // IDs de líderes
+        mainLeaderId:   cell.mainLeaderId   ?? null,
+        groupLeaderId:  cell.groupLeaderId  ?? null,
+        hostId:         cell.hostId         ?? null,
+        timoteoId:      cell.timoteoId      ?? null,
+        // Nombres para mostrar en el formulario
+        mainLeaderName:  cell.mainLeaderName  ?? '',
+        groupLeaderName: cell.groupLeaderName ?? '',
+        hostName:        cell.hostName        ?? '',
+        timoteoName:     cell.timoteoName     ?? '',
+      });
+      setEditError('');
+      setEditSuccess('');
+      setLeaderSearchField(null);
+      setLeaderSearchTerm('');
+      setLeaderResults([]);
+    }
+  }, [activeTab, cell]);
+
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const showSuccess = (msg) => {
     setSuccessMsg(msg);
@@ -122,22 +202,22 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
   };
 
   const loadMembers = useCallback(async () => {
-  if (!cell?.id) return;
-  setLoadingMembers(true);
-  try {
-    const raw = await apiService.getCellMembers(cell.id);  // ← getCellMembers, NO getCellById
-    const list = Array.isArray(raw) ? raw : [];
-    setMembers(list.map(m => ({
-      ...m,
-      displayName: getDisplayName(escapeHtml(m.name || 'Sin nombre')),
-    })));
-    log('Miembros cargados', { count: list.length });
-  } catch (err) {
-    logError('Error cargando miembros:', err);
-  } finally {
-    setLoadingMembers(false);
-  }
-}, [cell?.id]);
+    if (!cell?.id) return;
+    setLoadingMembers(true);
+    try {
+      const raw = await apiService.getCellMembers(cell.id);
+      const list = Array.isArray(raw) ? raw : [];
+      setMembers(list.map(m => ({
+        ...m,
+        displayName: getDisplayName(escapeHtml(m.name || 'Sin nombre')),
+      })));
+      log('Miembros cargados', { count: list.length });
+    } catch (err) {
+      logError('Error cargando miembros:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, [cell?.id]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
   const handleVerify = async () => {
@@ -215,34 +295,142 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     }
   };
 
+  // ── Delete cell ──────────────────────────────────────────────────────────────
+  const handleDeleteCell = async () => {
+    if (deleteConfirmText !== cell.name) return;
+    setDeleting(true); setError('');
+    try {
+      await apiService.deleteCell(cell.id);
+      logUserAction('delete_cell', { cellId: cell.id, cellName: cell.name });
+      setShowDeleteConfirm(false);
+      if (onCellChanged) onCellChanged();
+      onClose();
+    } catch (err) {
+      setError(`Error al eliminar célula: ${err.message}`);
+      setDeleting(false);
+    }
+  };
+
+  // ── Edit cell ────────────────────────────────────────────────────────────────
+  const handleEditField = (field, value) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSearchLeaders = async () => {
+    if (leaderSearchTerm.trim().length < 2) return;
+    setSearchingLeaders(true);
+    try {
+      const allLeaders = await apiService.getAllLeaders();
+      const q = leaderSearchTerm.toLowerCase().trim();
+      const results = allLeaders
+        .filter(l =>
+          l.name?.toLowerCase().includes(q) ||
+          l.document?.toLowerCase().includes(q)
+        )
+        .slice(0, 10);
+      setLeaderResults(results);
+    } catch (err) {
+      logError('Error buscando líderes:', err);
+      setLeaderResults([]);
+    } finally {
+      setSearchingLeaders(false);
+    }
+  };
+
+  const handleSelectLeader = (leader) => {
+    if (!leaderSearchField) return;
+    const idField = leaderSearchField;
+    const nameField = leaderSearchField.replace('Id', 'Name');
+    setEditForm(prev => ({
+      ...prev,
+      [idField]: leader.id,
+      [nameField]: leader.name || `Líder #${leader.id}`,
+    }));
+    setLeaderSearchField(null);
+    setLeaderSearchTerm('');
+    setLeaderResults([]);
+  };
+
+  const handleSaveEdit = async () => {
+    setEditLoading(true); setEditError(''); setEditSuccess('');
+    try {
+      if (!editForm.name?.trim()) { setEditError('El nombre es obligatorio'); setEditLoading(false); return; }
+
+      const payload = {
+        name:           editForm.name.trim(),
+        mainLeaderId:   editForm.mainLeaderId,
+        groupLeaderId:  editForm.groupLeaderId,
+        hostId:         editForm.hostId,
+        timoteoId:      editForm.timoteoId,
+        meetingDay:     editForm.meetingDay || null,
+        meetingTime:    editForm.meetingTime || null,
+        meetingAddress: editForm.meetingAddress || null,
+        maxCapacity:    editForm.maxCapacity ? parseInt(editForm.maxCapacity, 10) : null,
+        district:       editForm.district || null,
+        notes:          editForm.notes || null,
+      };
+
+      await apiService.updateCell(cell.id, payload);
+      setEditSuccess('✅ Célula actualizada exitosamente');
+      logUserAction('edit_cell', { cellId: cell.id });
+
+      setCell(prev => ({
+        ...prev,
+        name:             payload.name,
+        meetingDay:       payload.meetingDay,
+        meetingTime:      payload.meetingTime,
+        meetingTimeFormatted: payload.meetingTime,
+        meetingAddress:   payload.meetingAddress,
+        maxCapacity:      payload.maxCapacity,
+        district:         payload.district,
+        notes:            payload.notes,
+        mainLeaderId:     payload.mainLeaderId,
+        groupLeaderId:    payload.groupLeaderId,
+        hostId:           payload.hostId,
+        timoteoId:        payload.timoteoId,
+        mainLeaderName:   editForm.mainLeaderName,
+        groupLeaderName:  editForm.groupLeaderName,
+        hostName:         editForm.hostName,
+        timoteoName:      editForm.timoteoName,
+      }));
+
+      if (onCellChanged) onCellChanged();
+      onClose();
+    } catch (err) {
+      setEditError(err.message || 'Error al actualizar la célula');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   // ── Add member flow ──────────────────────────────────────────────────────────
   const handleSearch = async () => {
-  if (searchTerm.trim().length < 2) { setAddError('Ingresa al menos 2 caracteres'); return; }
-  setSearching(true); setAddError(''); setSearchResults([]);
-  try {
-    const [allMembers, currentMembers] = await Promise.all([
-      apiService.getAllMembers(),
-      apiService.getCellMembers(cell.id),  // ← getCellMembers, NO getCellById
-    ]);
-    const currentIds = new Set((Array.isArray(currentMembers) ? currentMembers : []).map(m => m.id));
-    const q = searchTerm.toLowerCase().trim();
-    const results = allMembers
-      .filter(m => !currentIds.has(m.id) && (
-        m.name?.toLowerCase().includes(q) ||
-        m.document?.toLowerCase().includes(q) ||
-        m.email?.toLowerCase().includes(q)
-      ))
-      .map(m => ({ ...m, displayName: getDisplayName(escapeHtml(m.name || 'Sin nombre')) }))
-      .slice(0, 20);
-    setSearchResults(results);
-    if (results.length === 0) setAddError('No se encontraron miembros disponibles');
-  } catch (err) {
-    setAddError('Error al buscar miembros');
-    logSecurityEvent('member_search_error', { errorType: 'api_error' });
-  } finally {
-    setSearching(false);
-  }
-};
+    if (searchTerm.trim().length < 2) { setAddError('Ingresa al menos 2 caracteres'); return; }
+    setSearching(true); setAddError(''); setSearchResults([]);
+    try {
+      const [allMembers, currentMembers] = await Promise.all([
+        apiService.getAllMembers(),
+        apiService.getCellMembers(cell.id),
+      ]);
+      const currentIds = new Set((Array.isArray(currentMembers) ? currentMembers : []).map(m => m.id));
+      const q = searchTerm.toLowerCase().trim();
+      const results = allMembers
+        .filter(m => !currentIds.has(m.id) && (
+          m.name?.toLowerCase().includes(q) ||
+          m.document?.toLowerCase().includes(q) ||
+          m.email?.toLowerCase().includes(q)
+        ))
+        .map(m => ({ ...m, displayName: getDisplayName(escapeHtml(m.name || 'Sin nombre')) }))
+        .slice(0, 20);
+      setSearchResults(results);
+      if (results.length === 0) setAddError('No se encontraron miembros disponibles');
+    } catch (err) {
+      setAddError('Error al buscar miembros');
+      logSecurityEvent('member_search_error', { errorType: 'api_error' });
+    } finally {
+      setSearching(false);
+    }
+  };
 
   const handleConfirmAdd = async () => {
     setLoading(true); setAddError('');
@@ -583,6 +771,285 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     );
   };
 
+  // ── Edit tab ──────────────────────────────────────────────────────────────────
+  const renderEdit = () => {
+    const leaderField = (label, idKey, nameKey) => (
+      <div className="mcd-edit-field">
+        <label className="mcd-edit-label" style={{ color: T.textSub }}>{label}</label>
+        <div className="mcd-edit-leader-row">
+          <div
+            className="mcd-edit-leader-current"
+            style={{ backgroundColor: T.bgSecondary, borderColor: T.border, color: T.text }}
+          >
+            <span className="mcd-edit-leader-avatar">👤</span>
+            <span className="mcd-edit-leader-name">
+              {editForm[nameKey] || '— Sin asignar —'}
+            </span>
+          </div>
+          <button
+            className="mcd-btn mcd-btn--sm mcd-btn--secondary"
+            style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgSecondary }}
+            onClick={() => {
+              setLeaderSearchField(idKey);
+              setLeaderSearchTerm('');
+              setLeaderResults([]);
+            }}
+            type="button"
+          >
+            🔄 Cambiar
+          </button>
+        </div>
+
+        {/* Inline leader search */}
+        {leaderSearchField === idKey && (
+          <div className="mcd-leader-search-inline" style={{ borderColor: T.border, backgroundColor: T.bg }}>
+            <div className="mcd-search-row">
+              <input
+                type="text"
+                placeholder="Buscar líder por nombre o documento…"
+                value={leaderSearchTerm}
+                onChange={e => setLeaderSearchTerm(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSearchLeaders()}
+                className="mcd-input"
+                style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+                autoFocus
+              />
+              <button
+                className="mcd-btn mcd-btn--primary mcd-btn--sm"
+                onClick={handleSearchLeaders}
+                disabled={searchingLeaders || leaderSearchTerm.trim().length < 2}
+                type="button"
+              >
+                {searchingLeaders ? '…' : '🔍'}
+              </button>
+              <button
+                className="mcd-btn mcd-btn--sm mcd-btn--secondary"
+                style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgSecondary }}
+                onClick={() => { setLeaderSearchField(null); setLeaderResults([]); }}
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+            {leaderResults.length > 0 && (
+              <div className="mcd-leader-results">
+                {leaderResults.map(l => (
+                  <button
+                    key={l.id}
+                    className="mcd-leader-result-item"
+                    style={{ backgroundColor: T.bgSecondary, borderColor: T.border, color: T.text }}
+                    onClick={() => handleSelectLeader(l)}
+                    type="button"
+                  >
+                    <span>👤</span>
+                    <div className="mcd-leader-result-info">
+                      <span style={{ fontWeight: 600, fontSize: '13px' }}>{l.name || `Líder #${l.id}`}</span>
+                      {l.document && <span style={{ color: T.textSub, fontSize: '11px' }}>🆔 {l.document}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+
+    return (
+      <div className="mcd-edit-form">
+        {editError && (
+          <div className="mcd-inline-error" style={{ backgroundColor: T.errorBg, color: T.errorText }}>
+            ❌ {editError}
+          </div>
+        )}
+        {editSuccess && (
+          <div className="mcd-feedback mcd-feedback--success" style={{ backgroundColor: T.successBg, color: T.successText, borderRadius: '10px' }}>
+            {editSuccess}
+          </div>
+        )}
+
+        {/* Información básica */}
+        <div className="mcd-card" style={{ backgroundColor: T.cardBg, borderColor: T.border }}>
+          <h4 className="mcd-card-title" style={{ color: '#1e40af' }}>📝 Información General</h4>
+
+          <div className="mcd-edit-field">
+            <label className="mcd-edit-label" style={{ color: T.textSub }}>Nombre de la célula *</label>
+            <input
+              type="text"
+              value={editForm.name || ''}
+              onChange={e => handleEditField('name', e.target.value)}
+              className="mcd-input"
+              style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+              placeholder="Nombre de la célula"
+            />
+          </div>
+
+          <div className="mcd-edit-row-2">
+            <div className="mcd-edit-field">
+              <label className="mcd-edit-label" style={{ color: T.textSub }}>Día de reunión</label>
+              <select
+                value={editForm.meetingDay || ''}
+                onChange={e => handleEditField('meetingDay', e.target.value)}
+                className="mcd-input mcd-select"
+                style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+              >
+                <option value="">— Seleccionar —</option>
+                {DAYS_OF_WEEK.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div className="mcd-edit-field">
+              <label className="mcd-edit-label" style={{ color: T.textSub }}>Hora de reunión</label>
+              <input
+                type="time"
+                value={editForm.meetingTime || ''}
+                onChange={e => handleEditField('meetingTime', e.target.value)}
+                className="mcd-input"
+                style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+              />
+            </div>
+          </div>
+
+          <div className="mcd-edit-field">
+            <label className="mcd-edit-label" style={{ color: T.textSub }}>Dirección</label>
+            <input
+              type="text"
+              value={editForm.meetingAddress || ''}
+              onChange={e => handleEditField('meetingAddress', e.target.value)}
+              className="mcd-input"
+              style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+              placeholder="Dirección de reunión"
+            />
+          </div>
+
+          <div className="mcd-edit-row-2">
+            <div className="mcd-edit-field">
+              <label className="mcd-edit-label" style={{ color: T.textSub }}>Capacidad máxima</label>
+              <input
+                type="number"
+                min="1"
+                max="50"
+                value={editForm.maxCapacity || ''}
+                onChange={e => handleEditField('maxCapacity', e.target.value)}
+                className="mcd-input"
+                style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+              />
+            </div>
+            <div className="mcd-edit-field">
+              <label className="mcd-edit-label" style={{ color: T.textSub }}>Distrito</label>
+              <select
+                value={editForm.district || ''}
+                onChange={e => handleEditField('district', e.target.value)}
+                className="mcd-input mcd-select"
+                style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+              >
+                <option value="">— Seleccionar —</option>
+                {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="mcd-edit-field">
+            <label className="mcd-edit-label" style={{ color: T.textSub }}>Notas</label>
+            <textarea
+              value={editForm.notes || ''}
+              onChange={e => handleEditField('notes', e.target.value)}
+              className="mcd-input mcd-textarea"
+              style={{ backgroundColor: T.bgSecondary, color: T.text, borderColor: T.border }}
+              placeholder="Notas adicionales…"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        {/* Líderes */}
+        <div className="mcd-card" style={{ backgroundColor: T.cardBg, borderColor: T.border }}>
+          <h4 className="mcd-card-title" style={{ color: '#1e40af' }}>👥 Equipo de Liderazgo</h4>
+          {leaderField('Líder Principal',  'mainLeaderId',  'mainLeaderName')}
+          {leaderField('Líder de Grupo',   'groupLeaderId', 'groupLeaderName')}
+          {leaderField('Anfitrión/a',      'hostId',        'hostName')}
+          {leaderField('Timoteo',          'timoteoId',     'timoteoName')}
+        </div>
+
+        {/* Botones */}
+        <div className="mcd-edit-actions">
+          <button
+            className="mcd-btn mcd-btn--secondary"
+            onClick={() => setActiveTab('info')}
+            disabled={editLoading}
+            style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgSecondary }}
+          >
+            ← Cancelar
+          </button>
+          <button
+            className="mcd-btn mcd-btn--primary"
+            onClick={handleSaveEdit}
+            disabled={editLoading}
+          >
+            {editLoading ? '⏳ Guardando…' : '💾 Guardar Cambios'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Delete confirmation overlay ───────────────────────────────────────────────
+  const renderDeleteConfirm = () => {
+    if (!showDeleteConfirm) return null;
+
+    return (
+      <div className="mcd-delete-overlay" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}>
+        <div
+          className="mcd-delete-modal"
+          style={{ backgroundColor: T.bg, borderColor: T.border }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="mcd-delete-icon">🗑️</div>
+          <h3 className="mcd-delete-title" style={{ color: T.text }}>¿Eliminar esta célula?</h3>
+          <p className="mcd-delete-desc" style={{ color: T.textSub }}>
+            Esta acción marcará la célula <strong style={{ color: T.errorText }}>{cell.name}</strong> como inactiva.
+            Los miembros serán desvinculados.
+          </p>
+
+          <div className="mcd-delete-confirm-box" style={{ backgroundColor: T.errorBg, borderColor: '#ef4444' }}>
+            <p style={{ color: T.errorText, fontSize: '12px', fontWeight: 600, margin: '0 0 8px' }}>
+              Para confirmar, escribe el nombre de la célula:
+            </p>
+            <div className="mcd-delete-expected" style={{ color: T.errorText }}>
+              {cell.name}
+            </div>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              className="mcd-input"
+              style={{ backgroundColor: T.bg, color: T.text, borderColor: deleteConfirmText === cell.name ? '#10b981' : T.border }}
+              placeholder="Escribe el nombre aquí…"
+              autoFocus
+            />
+          </div>
+
+          <div className="mcd-delete-actions">
+            <button
+              className="mcd-btn mcd-btn--secondary"
+              onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(''); }}
+              disabled={deleting}
+              style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgSecondary }}
+            >
+              Cancelar
+            </button>
+            <button
+              className="mcd-btn mcd-btn--danger"
+              onClick={handleDeleteCell}
+              disabled={deleting || deleteConfirmText !== cell.name}
+            >
+              {deleting ? '⏳ Eliminando…' : '🗑️ Eliminar Célula'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ── Main render ───────────────────────────────────────────────────────────────
   return (
     <div className="mcd-overlay" onClick={onClose}>
@@ -684,6 +1151,16 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
               📄 PDF
             </button>
 
+            {/* ── BOTÓN ELIMINAR ── */}
+            <button
+              className="mcd-action-btn mcd-action-btn--delete"
+              onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); }}
+              disabled={loading || deleting}
+              title="Eliminar célula"
+            >
+              🗑️ Eliminar
+            </button>
+
             <button
               className="mcd-close-btn"
               onClick={onClose}
@@ -736,7 +1213,11 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
           {activeTab === 'info'    && renderInfo()}
           {activeTab === 'members' && renderMembers()}
           {activeTab === 'add'     && renderAddMember()}
+          {activeTab === 'edit'    && renderEdit()}
         </div>
+
+        {/* ── DELETE CONFIRMATION OVERLAY ── */}
+        {renderDeleteConfirm()}
       </div>
     </div>
   );

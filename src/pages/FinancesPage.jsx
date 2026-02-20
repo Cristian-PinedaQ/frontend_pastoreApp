@@ -13,7 +13,7 @@ import {
   generateDailyFinancePDF,
 } from "../services/financepdfgenerator";
 import { logSecurityEvent, logUserAction } from "../utils/securityLogger";
-import { transformForDisplay, prepareForBackend } from "../services/nameHelper"; // Importar nameHelper
+import { transformForDisplay, prepareForBackend } from "../services/nameHelper";
 import "../css/FinancesPage.css";
 
 // 🔐 Debug condicional
@@ -128,26 +128,54 @@ const FinancesPage = () => {
   const [statisticsData, setStatisticsData] = useState(null);
   const [editingFinance, setEditingFinance] = useState(null);
 
-  // ========== LOAD FINANCES ==========
+  // ========== LOAD FINANCES - VERSIÓN CORREGIDA (CARGA TODOS) ==========
   const loadFinances = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      log("Cargando ingresos financieros");
+      log("Cargando todos los ingresos financieros");
 
-      const response = await apiService.getFinances(0, 100);
-      const finances = response?.content || [];
+      // Obtener el total de elementos de la primera página
+      const firstPageResponse = await apiService.getFinances(0, 100);
+      const totalElements = firstPageResponse?.totalElements || 0;
+      const totalPages = firstPageResponse?.totalPages || 1;
 
-      log("Finanzas cargadas", { count: finances.length });
+      log("Paginación info", { totalElements, totalPages });
 
-      if (!finances || finances.length === 0) {
+      let allFinancesData = [];
+      
+      // Si solo hay una página o ninguna, usar los datos de la primera página
+      if (totalPages <= 1) {
+        allFinancesData = firstPageResponse?.content || [];
+      } else {
+        // Cargar todas las páginas
+        const pagePromises = [];
+        
+        // Empezar desde la página 1 (ya tenemos la página 0)
+        for (let page = 1; page < totalPages; page++) {
+          pagePromises.push(apiService.getFinances(page, 100));
+        }
+        
+        // Ejecutar todas las solicitudes en paralelo
+        const responses = await Promise.all(pagePromises);
+        
+        // Combinar todas las páginas
+        allFinancesData = [
+          ...(firstPageResponse?.content || []),
+          ...responses.flatMap(r => r?.content || [])
+        ];
+      }
+
+      log("Total finanzas cargadas", { count: allFinancesData.length });
+
+      if (!allFinancesData || allFinancesData.length === 0) {
         log("No hay registros financieros");
         setAllFinances([]);
         return;
       }
 
-      const processedFinances = finances.map((finance) => ({
+      const processedFinances = allFinancesData.map((finance) => ({
         id: finance.id,
         memberId: finance.memberId,
         memberName: escapeHtml(finance.memberName || "Sin nombre"),

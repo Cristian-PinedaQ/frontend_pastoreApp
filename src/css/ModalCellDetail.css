@@ -1,5 +1,6 @@
 /* ============================================
    ModalCellDetail.css — Refined & 100% Responsive
+   Now includes: Edit tab + Delete confirmation
    ============================================ */
 
 /* ── Reset base ── */
@@ -48,6 +49,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  position: relative;
 }
 
 @keyframes mcdSlideIn {
@@ -157,6 +159,12 @@
 .mcd-action-btn--complete { background: #d1fae5; color: #065f46; }
 .mcd-action-btn--status   { background: #fef3c7; color: #92400e; }
 .mcd-action-btn--pdf      { background: #f3f4f6; color: #374151; }
+.mcd-action-btn--delete   { background: #fee2e2; color: #dc2626; }
+.mcd-action-btn--delete:hover:not(:disabled) {
+  background: #fecaca;
+  filter: none;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
 
 .mcd-close-btn {
   background: none;
@@ -533,6 +541,21 @@
   border-color: #ef4444;
 }
 
+.mcd-btn--danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+}
+.mcd-btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+  filter: none;
+  box-shadow: 0 2px 10px rgba(220, 38, 38, 0.3);
+}
+.mcd-btn--danger:disabled {
+  background: #9ca3af;
+  color: #d1d5db;
+}
+
 /* ── Add member ── */
 .mcd-add-step {
   display: flex;
@@ -563,6 +586,22 @@
 .mcd-input:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.mcd-select {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.mcd-textarea {
+  resize: vertical;
+  min-height: 60px;
+  line-height: 1.5;
 }
 
 .mcd-inline-error {
@@ -707,6 +746,196 @@
 
 
 /* ═══════════════════════════════════════════════════
+   EDIT TAB
+   ═══════════════════════════════════════════════════ */
+
+.mcd-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mcd-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.mcd-edit-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mcd-edit-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.mcd-edit-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Leader edit field */
+.mcd-edit-leader-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcd-edit-leader-current {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.mcd-edit-leader-avatar {
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.mcd-edit-leader-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Leader inline search */
+.mcd-leader-search-inline {
+  border: 1px solid;
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 6px;
+  animation: mcdFeedIn 0.2s ease;
+}
+
+.mcd-leader-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.mcd-leader-result-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid;
+  border-radius: 10px;
+  cursor: pointer;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+  transition: all 0.15s;
+}
+.mcd-leader-result-item:hover {
+  border-color: #3b82f6;
+  transform: translateX(2px);
+}
+
+.mcd-leader-result-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════
+   DELETE CONFIRMATION OVERLAY
+   ═══════════════════════════════════════════════════ */
+
+.mcd-delete-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border-radius: 20px;
+  animation: mcdOverlayIn 0.2s ease;
+}
+
+.mcd-delete-modal {
+  width: 100%;
+  max-width: 440px;
+  border: 1px solid;
+  border-radius: 18px;
+  padding: 28px 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  animation: mcdSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mcd-delete-icon {
+  font-size: 44px;
+  text-align: center;
+  line-height: 1;
+}
+
+.mcd-delete-title {
+  font-size: 18px;
+  font-weight: 800;
+  text-align: center;
+  margin: 0;
+}
+
+.mcd-delete-desc {
+  font-size: 13px;
+  text-align: center;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.mcd-delete-confirm-box {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid;
+}
+
+.mcd-delete-expected {
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  padding: 6px 0 10px;
+  letter-spacing: 0.3px;
+  user-select: none;
+}
+
+.mcd-delete-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+
+/* ═══════════════════════════════════════════════════
    RESPONSIVE BREAKPOINTS
    ═══════════════════════════════════════════════════ */
 
@@ -797,6 +1026,43 @@
   .mcd-confirm-actions .mcd-btn {
     width: 100%;
     justify-content: center;
+    text-align: center;
+  }
+
+  /* Edit tab responsive */
+  .mcd-edit-row-2 {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .mcd-edit-actions {
+    flex-direction: column-reverse;
+  }
+  .mcd-edit-actions .mcd-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .mcd-edit-leader-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Delete modal responsive */
+  .mcd-delete-overlay {
+    padding: 16px;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .mcd-delete-modal {
+    padding: 24px 20px;
+  }
+
+  .mcd-delete-actions {
+    flex-direction: column-reverse;
+  }
+  .mcd-delete-actions .mcd-btn {
+    width: 100%;
     text-align: center;
   }
 }
@@ -1003,6 +1269,25 @@
     padding: 10px 16px;
     font-size: 13px;
   }
+
+  /* Delete overlay on small phones */
+  .mcd-delete-overlay {
+    border-radius: 0;
+    padding: 12px;
+  }
+
+  .mcd-delete-modal {
+    border-radius: 14px;
+    padding: 20px 16px;
+  }
+
+  .mcd-delete-icon {
+    font-size: 36px;
+  }
+
+  .mcd-delete-title {
+    font-size: 16px;
+  }
 }
 
 /* ── Status dropdown responsive fix ── */
@@ -1046,7 +1331,10 @@
   .mcd-container,
   .mcd-status-dropdown,
   .mcd-feedback,
-  .mcd-inline-error {
+  .mcd-inline-error,
+  .mcd-delete-overlay,
+  .mcd-delete-modal,
+  .mcd-leader-search-inline {
     animation: none !important;
   }
   .mcd-action-btn,
@@ -1054,7 +1342,8 @@
   .mcd-result-item,
   .mcd-close-btn,
   .mcd-tr,
-  .mcd-card {
+  .mcd-card,
+  .mcd-leader-result-item {
     transition: none !important;
   }
 }
