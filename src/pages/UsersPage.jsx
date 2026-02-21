@@ -157,7 +157,8 @@ const UsersPage = () => {
     }
   }, [handleError]);
 
-  // ✅ SEGURIDAD: Solo PASTORES pueden acceder
+  // ✅ SEGURIDAD: Solo 
+  //  pueden acceder
   useEffect(() => {
     if (!hasRole("PASTORES")) {
       setError(ERROR_MESSAGES.UNAUTHORIZED);

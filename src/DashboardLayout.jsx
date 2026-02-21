@@ -105,7 +105,7 @@ export const DashboardLayout = () => {
       label: 'Asistencias',
       path: '/dashboard/cellgroups-atendance',
       icon: '✅',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
+      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_LIDER']),
     },
     {
       label: 'Finanzas',
