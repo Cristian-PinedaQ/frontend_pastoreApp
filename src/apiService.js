@@ -1590,6 +1590,22 @@ async checkEligibility(memberId, leaderType) {
   }
 
   /**
+ * Obtener células accesibles para el usuario logueado
+ * GET /api/v1/attendance-cell-group/my-cells
+ */
+async getAccessibleCells() {
+  try {
+    log('📋 [getAccessibleCells] Obteniendo células accesibles para el usuario logueado');
+    const response = await this.request(`/attendance-cell-group/my-cells`);
+    log('✅ [getAccessibleCells] Éxito -', response?.length || 0, 'células');
+    return response;
+  } catch (error) {
+    logError('❌ [getAccessibleCells] Error:', error.message);
+    throw error;
+  }
+}
+
+  /**
    * Obtener célula por ID
    * GET /api/v1/cells/{id}
    */
@@ -2367,22 +2383,221 @@ async checkEligibility(memberId, leaderType) {
     };
     return levelMap[levelEnrollment] || levelEnrollment;
   }
-  // ========== 📋 ASISTENCIAS DE CÉLULAS (Cell Group Attendance) ==========
-// Agregar estos métodos al ApiService en apiService.js
+// ========== 📋 ASISTENCIAS DE CÉLULAS (Cell Group Attendance) ==========
+  // Base path del controller: /api/v1/attendance-cell-group
 
   // ── Configuración ──────────────────────────────────────────────────
-  /**
-   * Obtener configuración de asistencias
-   * GET /api/v1/attendance/config
-   */
   async getAttendanceConfig() {
     try {
       log('📋 [getAttendanceConfig] Obteniendo configuración');
-      const response = await this.request('/attendance/config');
+      const response = await this.request('/attendance-cell-group/config');
       log('✅ [getAttendanceConfig] Éxito');
       return response;
     } catch (error) {
       logError('❌ [getAttendanceConfig] Error:', error.message);
+      throw error;
+    }
+  }
+/*
+  // ── Generación automática ─────────────────────────────────────────
+  *async generateCellAttendances(cellId, date) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      log('📋 [generateCellAttendances] Generando para célula:', cellId, 'fecha:', date);
+
+      const response = await this.request(`/attendance-cell-group/generate/cell/${cellId}?date=${date}`, {
+        method: 'POST',
+      });
+
+      log('✅ [generateCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [generateCellAttendances] Error:', error.message);
+      throw error;
+    }
+  }*/
+
+  async generateMyCellsAttendances(date) {
+    try {
+      validateString(date, 'date', 10, 10);
+      log('📋 [generateMyCellsAttendances] Generando para mis células, fecha:', date);
+
+      const response = await this.request(`/attendance-cell-group/generate/my-cells?date=${date}`, {
+        method: 'POST',
+      });
+
+      log('✅ [generateMyCellsAttendances] Éxito -', response?.totalCells || 0, 'células');
+      return response;
+    } catch (error) {
+      logError('❌ [generateMyCellsAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async generateCurrentMonthAttendances() {
+    try {
+      log('🔄 [generateCurrentMonthAttendances] Ejecutando generación manual');
+      const response = await this.request('/attendance-cell-group/generate/current-month', {
+        method: 'POST',
+      });
+      log('✅ [generateCurrentMonthAttendances] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [generateCurrentMonthAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Consultas ─────────────────────────────────────────────────────
+  async getCellAttendancesCurrentMonth() {
+    try {
+      log('📅 [getCellAttendancesCurrentMonth] Consultando mes actual');
+      const response = await this.request('/attendance-cell-group/current-month');
+      log('✅ [getCellAttendancesCurrentMonth] Éxito -', response?.totalCells || 0, 'células');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendancesCurrentMonth] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getCellAttendancesByMonth(year, month) {
+    try {
+      validateNumber(year, 'year', 2020);
+      validateNumber(month, 'month', 1, 12);
+      log('📅 [getCellAttendancesByMonth] Consultando:', year, '/', month);
+      const response = await this.request(`/attendance-cell-group/month/${year}/${month}`);
+      log('✅ [getCellAttendancesByMonth] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendancesByMonth] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getCellAttendancesByDate(cellId, date) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      log('🔍 [getCellAttendancesByDate] Célula:', cellId, 'Fecha:', date);
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`);
+      log('✅ [getCellAttendancesByDate] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendancesByDate] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Registro y actualización ──────────────────────────────────────
+  async recordCellAttendance(cellId, date, attendanceData) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      if (!attendanceData || typeof attendanceData !== 'object') {
+        throw new Error('Datos de asistencia inválidos');
+      }
+      log('📝 [recordCellAttendance] Registrando:', { cellId, date, memberId: attendanceData.memberId });
+
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
+        method: 'POST',
+        body: JSON.stringify(attendanceData),
+      });
+
+      log('✅ [recordCellAttendance] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [recordCellAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async recordBulkCellAttendances(cellId, bulkData) {
+    try {
+      validateId(cellId, 'cellId');
+      if (!bulkData || typeof bulkData !== 'object') {
+        throw new Error('Datos de asistencias inválidos');
+      }
+      log('📦 [recordBulkCellAttendances] Registrando masivo:', {
+        cellId,
+        date: bulkData.attendanceDate,
+        count: bulkData.attendances?.length || 0,
+      });
+
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/bulk`, {
+        method: 'POST',
+        body: JSON.stringify(bulkData),
+      });
+
+      log('✅ [recordBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [recordBulkCellAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async updateBulkCellAttendances(cellId, date, attendances) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      if (!Array.isArray(attendances)) {
+        throw new Error('Datos de asistencias inválidos');
+      }
+      log('📦 [updateBulkCellAttendances] Actualizando:', { cellId, date, count: attendances.length });
+
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
+        method: 'PUT',
+        body: JSON.stringify(attendances),
+      });
+
+      log('✅ [updateBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [updateBulkCellAttendances] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Resumen y estadísticas ────────────────────────────────────────
+  async getCellAttendanceSummary(cellId, date) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      log('📊 [getCellAttendanceSummary] Resumen:', { cellId, date });
+      const response = await this.request(`/attendance-cell-group/summary/cell/${cellId}/date/${date}`);
+      log('✅ [getCellAttendanceSummary] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendanceSummary] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getCellAttendanceMonthlyStats(cellId, year, month) {
+    try {
+      validateId(cellId, 'cellId');
+      validateNumber(year, 'year', 2020);
+      validateNumber(month, 'month', 1, 12);
+      log('📊 [getCellAttendanceMonthlyStats] Stats:', { cellId, year, month });
+      const response = await this.request(`/attendance-cell-group/statistics/cell/${cellId}/month/${year}/${month}`);
+      log('✅ [getCellAttendanceMonthlyStats] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendanceMonthlyStats] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getCellAttendanceGlobalStats() {
+    try {
+      log('📊 [getCellAttendanceGlobalStats] Obteniendo estadísticas globales');
+      const response = await this.request('/attendance-cell-group/statistics/global');
+      log('✅ [getCellAttendanceGlobalStats] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getCellAttendanceGlobalStats] Error:', error.message);
       throw error;
     }
   }
@@ -2398,7 +2613,7 @@ async checkEligibility(memberId, leaderType) {
       validateString(date, 'date', 10, 10);
       log('📋 [generateCellAttendances] Generando para célula:', cellId, 'fecha:', date);
 
-      const response = await this.request(`/attendance/generate/cell/${cellId}?date=${date}`, {
+      const response = await this.request(`/attendance-cell-group/generate/cell/${cellId}?date=${date}`, {
         method: 'POST',
       });
 
@@ -2408,8 +2623,7 @@ async checkEligibility(memberId, leaderType) {
       logError('❌ [generateCellAttendances] Error:', error.message);
       throw error;
     }
-  }
-
+  }/*
   /**
    * Generar asistencias para mis células (como líder principal)
    * POST /api/v1/attendance/generate/my-cells?date={date}
@@ -2419,7 +2633,7 @@ async checkEligibility(memberId, leaderType) {
       validateString(date, 'date', 10, 10);
       log('📋 [generateMyCellsAttendances] Generando para mis células, fecha:', date);
 
-      const response = await this.request(`/attendance/generate/my-cells?date=${date}`, {
+      const response = await this.request(`/attendance-cell-group/generate/my-cells?date=${date}`, {
         method: 'POST',
       });
 
@@ -2438,7 +2652,7 @@ async checkEligibility(memberId, leaderType) {
   async generateCurrentMonthAttendances() {
     try {
       log('🔄 [generateCurrentMonthAttendances] Ejecutando generación manual');
-      const response = await this.request('/attendance/generate/current-month', {
+      const response = await this.request('/attendance-cell-group/generate/current-month', {
         method: 'POST',
       });
       log('✅ [generateCurrentMonthAttendances] Éxito');
@@ -2457,7 +2671,7 @@ async checkEligibility(memberId, leaderType) {
   async getCellAttendancesCurrentMonth() {
     try {
       log('📅 [getCellAttendancesCurrentMonth] Consultando mes actual');
-      const response = await this.request('/attendance/current-month');
+      const response = await this.request('/attendance-cell-group/current-month');
       log('✅ [getCellAttendancesCurrentMonth] Éxito -', response?.totalCells || 0, 'células');
       return response;
     } catch (error) {
@@ -2475,7 +2689,7 @@ async checkEligibility(memberId, leaderType) {
       validateNumber(year, 'year', 2020);
       validateNumber(month, 'month', 1, 12);
       log('📅 [getCellAttendancesByMonth] Consultando:', year, '/', month);
-      const response = await this.request(`/attendance/month/${year}/${month}`);
+      const response = await this.request(`/attendance-cell-group/month/${year}/${month}`);
       log('✅ [getCellAttendancesByMonth] Éxito');
       return response;
     } catch (error) {
@@ -2493,7 +2707,7 @@ async checkEligibility(memberId, leaderType) {
       validateId(cellId, 'cellId');
       validateString(date, 'date', 10, 10);
       log('🔍 [getCellAttendancesByDate] Célula:', cellId, 'Fecha:', date);
-      const response = await this.request(`/attendance/cell/${cellId}/date/${date}`);
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`);
       log('✅ [getCellAttendancesByDate] Éxito -', response?.totalCount || 0, 'registros');
       return response;
     } catch (error) {
@@ -2516,7 +2730,7 @@ async checkEligibility(memberId, leaderType) {
       }
       log('📝 [recordCellAttendance] Registrando:', { cellId, date, memberId: attendanceData.memberId });
 
-      const response = await this.request(`/attendance/cell/${cellId}/date/${date}`, {
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
         method: 'POST',
         body: JSON.stringify(attendanceData),
       });
@@ -2545,7 +2759,7 @@ async checkEligibility(memberId, leaderType) {
         count: bulkData.attendances?.length || 0,
       });
 
-      const response = await this.request(`/attendance/cell/${cellId}/bulk`, {
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/bulk`, {
         method: 'POST',
         body: JSON.stringify(bulkData),
       });
@@ -2571,7 +2785,7 @@ async checkEligibility(memberId, leaderType) {
       }
       log('📦 [updateBulkCellAttendances] Actualizando:', { cellId, date, count: attendances.length });
 
-      const response = await this.request(`/attendance/cell/${cellId}/date/${date}`, {
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
         method: 'PUT',
         body: JSON.stringify(attendances),
       });
@@ -2594,7 +2808,7 @@ async checkEligibility(memberId, leaderType) {
       validateId(cellId, 'cellId');
       validateString(date, 'date', 10, 10);
       log('📊 [getCellAttendanceSummary] Resumen:', { cellId, date });
-      const response = await this.request(`/attendance/summary/cell/${cellId}/date/${date}`);
+      const response = await this.request(`/attendance-cell-group/summary/cell/${cellId}/date/${date}`);
       log('✅ [getCellAttendanceSummary] Éxito');
       return response;
     } catch (error) {
@@ -2613,7 +2827,7 @@ async checkEligibility(memberId, leaderType) {
       validateNumber(year, 'year', 2020);
       validateNumber(month, 'month', 1, 12);
       log('📊 [getCellAttendanceMonthlyStats] Stats:', { cellId, year, month });
-      const response = await this.request(`/attendance/statistics/cell/${cellId}/month/${year}/${month}`);
+      const response = await this.request(`/attendance-cell-group/statistics/cell/${cellId}/month/${year}/${month}`);
       log('✅ [getCellAttendanceMonthlyStats] Éxito');
       return response;
     } catch (error) {
@@ -2629,7 +2843,7 @@ async checkEligibility(memberId, leaderType) {
   async getCellAttendanceGlobalStats() {
     try {
       log('📊 [getCellAttendanceGlobalStats] Obteniendo estadísticas globales');
-      const response = await this.request('/attendance/statistics/global');
+      const response = await this.request('/attendance-cell-group/statistics/global');
       log('✅ [getCellAttendanceGlobalStats] Éxito');
       return response;
     } catch (error) {
