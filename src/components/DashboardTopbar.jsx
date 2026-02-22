@@ -5,6 +5,7 @@
 
 import React from 'react';
 import logoDora from '../assets/Pastoreapp_blanco.png';
+import logonegro from '../assets/Pastoreappnegro.png';
 import '../css/Dashboardtopbar.css';
 
 const DashboardTopbar = ({ user }) => {
@@ -14,7 +15,7 @@ const DashboardTopbar = ({ user }) => {
       <div className="dashboard-topbar__logo-wrapper">
         {/* Logo Dorado - Light Mode */}
         <img
-          src={logoDora}
+          src={logonegro}
           alt="Raiz de David Logo"
           className="dashboard-topbar__logo dashboard-topbar__logo--dorado"
         />

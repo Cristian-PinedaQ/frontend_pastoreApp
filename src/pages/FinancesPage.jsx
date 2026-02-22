@@ -1,6 +1,7 @@
 // ============================================
 // FinancesPage.jsx - SEGURIDAD MEJORADA
 // Gestión de finanzas con validaciones de seguridad
+// ✅ FIX CONCURRENCIA: Mutex en todas las operaciones con finally correcto
 // ============================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -128,46 +129,63 @@ const FinancesPage = () => {
   const [statisticsData, setStatisticsData] = useState(null);
   const [editingFinance, setEditingFinance] = useState(null);
 
-  // ========== LOAD FINANCES - VERSIÓN CORREGIDA (CARGA TODOS) ==========
+  // ✅ FIX CONCURRENCIA: Mutex para prevenir operaciones concurrentes
+  const operationInProgress = React.useRef(false);
+
+  // ========== LOAD FINANCES - CARGA SECUENCIAL PARA +500 REGISTROS ==========
+  // ✅ FIX CONCURRENCIA: Carga página por página de forma secuencial (NO paralela)
+  // Esto evita inconsistencias de datos que ocurren con Promise.all cuando
+  // otro usuario inserta registros entre las peticiones paralelas.
   const loadFinances = useCallback(async () => {
+    // ✅ FIX: Prevenir cargas concurrentes
+    if (operationInProgress.current) {
+      log("Carga ya en progreso, ignorando");
+      return;
+    }
+    operationInProgress.current = true;
     setLoading(true);
     setError("");
 
     try {
-      log("Cargando todos los ingresos financieros");
+      log("Cargando todos los ingresos financieros (secuencial)");
 
-      // Obtener el total de elementos de la primera página
-      const firstPageResponse = await apiService.getFinances(0, 100);
-      const totalElements = firstPageResponse?.totalElements || 0;
-      const totalPages = firstPageResponse?.totalPages || 1;
-
-      log("Paginación info", { totalElements, totalPages });
-
+      const PAGE_SIZE = 100;
       let allFinancesData = [];
-      
-      // Si solo hay una página o ninguna, usar los datos de la primera página
-      if (totalPages <= 1) {
-        allFinancesData = firstPageResponse?.content || [];
-      } else {
-        // Cargar todas las páginas
-        const pagePromises = [];
-        
-        // Empezar desde la página 1 (ya tenemos la página 0)
-        for (let page = 1; page < totalPages; page++) {
-          pagePromises.push(apiService.getFinances(page, 100));
+      let currentPage = 0;
+      let hasMore = true;
+
+      // ✅ Carga secuencial: una página a la vez, en orden
+      // Cada request espera a que la anterior termine antes de lanzar la siguiente
+      while (hasMore) {
+        log(`Cargando página ${currentPage}...`);
+
+        const response = await apiService.getFinances(currentPage, PAGE_SIZE);
+        const pageContent = response?.content || [];
+
+        // Acumular resultados
+        allFinancesData = [...allFinancesData, ...pageContent];
+
+        // Verificar si hay más páginas
+        hasMore = response?.hasNext === true;
+        currentPage++;
+
+        log(`Página ${currentPage - 1} cargada: ${pageContent.length} registros`, {
+          acumulado: allFinancesData.length,
+          totalElements: response?.totalElements,
+          hasMore,
+        });
+
+        // Seguridad: límite máximo de páginas para evitar loops infinitos
+        if (currentPage > 100) {
+          log("⚠️ Límite de páginas alcanzado (100), deteniendo carga");
+          break;
         }
-        
-        // Ejecutar todas las solicitudes en paralelo
-        const responses = await Promise.all(pagePromises);
-        
-        // Combinar todas las páginas
-        allFinancesData = [
-          ...(firstPageResponse?.content || []),
-          ...responses.flatMap(r => r?.content || [])
-        ];
       }
 
-      log("Total finanzas cargadas", { count: allFinancesData.length });
+      log("Total finanzas cargadas", {
+        count: allFinancesData.length,
+        pages: currentPage,
+      });
 
       if (!allFinancesData || allFinancesData.length === 0) {
         log("No hay registros financieros");
@@ -175,7 +193,23 @@ const FinancesPage = () => {
         return;
       }
 
-      const processedFinances = allFinancesData.map((finance) => ({
+      // ✅ Deduplicar por ID para garantizar consistencia
+      // En caso de que un registro aparezca en dos páginas por inserciones concurrentes
+      const uniqueMap = new Map();
+      allFinancesData.forEach((finance) => {
+        uniqueMap.set(finance.id, finance);
+      });
+      const uniqueFinances = Array.from(uniqueMap.values());
+
+      if (uniqueFinances.length !== allFinancesData.length) {
+        log("⚠️ Se eliminaron duplicados", {
+          original: allFinancesData.length,
+          deduplicado: uniqueFinances.length,
+          duplicados: allFinancesData.length - uniqueFinances.length,
+        });
+      }
+
+      const processedFinances = uniqueFinances.map((finance) => ({
         id: finance.id,
         memberId: finance.memberId,
         memberName: escapeHtml(finance.memberName || "Sin nombre"),
@@ -191,16 +225,17 @@ const FinancesPage = () => {
       }));
 
       log("Finanzas procesadas", { count: processedFinances.length });
-      
+
       // Aplicar transformaciones de nombres para mostrar en el frontend
-      const transformedFinances = processedFinances.map(finance => 
-        transformForDisplay(finance, ['memberName'])
+      const transformedFinances = processedFinances.map((finance) =>
+        transformForDisplay(finance, ["memberName"]),
       );
-      
+
       setAllFinances(transformedFinances);
 
       logUserAction("load_finances", {
         financeCount: transformedFinances.length,
+        pagesLoaded: currentPage,
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
@@ -213,6 +248,7 @@ const FinancesPage = () => {
       });
     } finally {
       setLoading(false);
+      operationInProgress.current = false;
     }
   }, []);
 
@@ -473,7 +509,6 @@ const FinancesPage = () => {
       try {
         log("Generando reporte", { type: reportType });
 
-        // Calcular estadísticas detalladas como en el modal
         const stats = {
           totalRecords: filteredFinances.length,
           totalAmount: filteredFinances.reduce(
@@ -481,13 +516,11 @@ const FinancesPage = () => {
             0,
           ),
           verifiedCount: filteredFinances.filter((f) => f.isVerified).length,
-          unverifiedCount: filteredFinances.filter((f) => !f.isVerified)
-            .length,
+          unverifiedCount: filteredFinances.filter((f) => !f.isVerified).length,
           byConcept: {},
           finances: filteredFinances,
         };
 
-        // Calcular desglose por concepto
         filteredFinances.forEach((finance) => {
           const concept = finance.concept || "OTRO";
           if (!stats.byConcept[concept]) {
@@ -538,7 +571,6 @@ const FinancesPage = () => {
             logError("Error formateando fecha:", e);
           }
         } else {
-          // Si no hay fechas, usar la fecha actual
           const today = new Date();
           reportDateRange = today.toLocaleDateString("es-CO");
           reportDateForPDF = getDateStringWithoutTimezone(today);
@@ -552,7 +584,6 @@ const FinancesPage = () => {
           finances: filteredFinances,
           reportType,
           statistics: stats,
-          // Añadir configuración para el PDF
           config: {
             includeCharts: false,
             title: reportDateRange
@@ -593,6 +624,13 @@ const FinancesPage = () => {
   // ========== ADD FINANCE ==========
   const handleAddFinance = useCallback(
     async (financeData) => {
+      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
+      if (operationInProgress.current) {
+        log("Operación ya en progreso, ignorando");
+        return;
+      }
+      operationInProgress.current = true;
+
       try {
         log("Creando nuevo ingreso");
 
@@ -601,10 +639,12 @@ const FinancesPage = () => {
           return;
         }
 
-        // Preparar datos para backend (mantener nombres originales)
         const backendData = prepareForBackend(financeData, ["memberName"]);
 
-        await apiService.createFinance(backendData);
+        // ✅ FIX CONCURRENCIA: Agregar idempotency key única
+        const idempotencyKey = `finance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        await apiService.createFinance(backendData, idempotencyKey);
 
         log("Ingreso creado exitosamente");
 
@@ -616,8 +656,20 @@ const FinancesPage = () => {
 
         alert("Ingreso registrado exitosamente");
         setShowAddModal(false);
-        loadFinances();
+        // ✅ FIX: Liberar mutex ANTES de recargar (loadFinances tiene su propio mutex)
+        operationInProgress.current = false;
+        await loadFinances();
       } catch (err) {
+        // ✅ FIX CONCURRENCIA: Manejar respuesta de duplicado del backend
+        if (err?.response?.status === 409) {
+          log("Registro duplicado detectado por el servidor");
+          alert("⚠️ Este registro ya fue procesado. Recargando datos...");
+          setShowAddModal(false);
+          operationInProgress.current = false;
+          await loadFinances();
+          return;
+        }
+
         logError("Error creando ingreso:", err);
         setError("Error al registrar ingreso");
 
@@ -625,6 +677,8 @@ const FinancesPage = () => {
           errorType: "api_error",
           timestamp: new Date().toISOString(),
         });
+      } finally {
+        operationInProgress.current = false;
       }
     },
     [loadFinances],
@@ -633,6 +687,13 @@ const FinancesPage = () => {
   // ========== EDIT FINANCE ==========
   const handleEditFinance = useCallback(
     async (financeData) => {
+      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
+      if (operationInProgress.current) {
+        log("Operación ya en progreso, ignorando");
+        return;
+      }
+      operationInProgress.current = true;
+
       try {
         if (!editingFinance || !editingFinance.id) {
           setError("ID de registro inválido");
@@ -661,10 +722,15 @@ const FinancesPage = () => {
         alert("Ingreso actualizado exitosamente");
         setShowAddModal(false);
         setEditingFinance(null);
-        loadFinances();
+        // ✅ FIX: Liberar mutex ANTES de recargar
+        operationInProgress.current = false;
+        await loadFinances();
       } catch (err) {
         logError("Error actualizando ingreso:", err);
         setError("Error al actualizar ingreso");
+      } finally {
+        // ✅ FIX CONCURRENCIA: SIEMPRE liberar el mutex
+        operationInProgress.current = false;
       }
     },
     [editingFinance, loadFinances],
@@ -673,6 +739,12 @@ const FinancesPage = () => {
   // ========== VERIFY FINANCE ==========
   const handleVerifyFinance = useCallback(
     async (financeId) => {
+      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
+      if (operationInProgress.current) {
+        log("Operación ya en progreso, ignorando");
+        return;
+      }
+
       try {
         if (!financeId || typeof financeId !== "number") {
           setError("ID de registro inválido");
@@ -682,6 +754,9 @@ const FinancesPage = () => {
         if (!window.confirm("¿Deseas verificar este registro?")) {
           return;
         }
+
+        // ✅ FIX: Activar mutex DESPUÉS del confirm() para que cancelar no bloquee
+        operationInProgress.current = true;
 
         log("Verificando ingreso", { financeId });
 
@@ -695,10 +770,15 @@ const FinancesPage = () => {
         });
 
         alert("Registro verificado exitosamente");
-        loadFinances();
+        // ✅ FIX: Liberar mutex ANTES de recargar
+        operationInProgress.current = false;
+        await loadFinances();
       } catch (err) {
         logError("Error verificando ingreso:", err);
         setError("Error al verificar ingreso");
+      } finally {
+        // ✅ FIX CONCURRENCIA: SIEMPRE liberar el mutex
+        operationInProgress.current = false;
       }
     },
     [loadFinances],
@@ -707,6 +787,12 @@ const FinancesPage = () => {
   // ========== DELETE FINANCE ==========
   const handleDeleteFinance = useCallback(
     async (financeId) => {
+      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
+      if (operationInProgress.current) {
+        log("Operación ya en progreso, ignorando");
+        return;
+      }
+
       try {
         if (!financeId || typeof financeId !== "number") {
           setError("ID de registro inválido");
@@ -714,10 +800,15 @@ const FinancesPage = () => {
         }
 
         if (
-          !window.confirm("¿Estás seguro de que deseas eliminar este registro?")
+          !window.confirm(
+            "¿Estás seguro de que deseas eliminar este registro?",
+          )
         ) {
           return;
         }
+
+        // ✅ FIX: Activar mutex DESPUÉS del confirm() para que cancelar no bloquee
+        operationInProgress.current = true;
 
         log("Eliminando ingreso", { financeId });
 
@@ -731,10 +822,15 @@ const FinancesPage = () => {
         });
 
         alert("Registro eliminado exitosamente");
-        loadFinances();
+        // ✅ FIX: Liberar mutex ANTES de recargar
+        operationInProgress.current = false;
+        await loadFinances();
       } catch (err) {
         logError("Error eliminando ingreso:", err);
         setError("Error al eliminar registro");
+      } finally {
+        // ✅ FIX CONCURRENCIA: SIEMPRE liberar el mutex
+        operationInProgress.current = false;
       }
     },
     [loadFinances],
@@ -922,13 +1018,13 @@ const FinancesPage = () => {
                 filteredFinances.length === 0
                   ? "No hay datos para exportar"
                   : !startDate &&
-                    !endDate &&
-                    selectedMethod === "ALL" &&
-                    selectedVerification === "ALL" &&
-                    selectedConcept === "ALL" &&
-                    !searchText.trim()
-                  ? "Debes aplicar filtros para generar un reporte específico"
-                  : "Generar reporte en PDF"
+                      !endDate &&
+                      selectedMethod === "ALL" &&
+                      selectedVerification === "ALL" &&
+                      selectedConcept === "ALL" &&
+                      !searchText.trim()
+                    ? "Debes aplicar filtros para generar un reporte específico"
+                    : "Generar reporte en PDF"
               }
             >
               📄 PDF
@@ -1048,9 +1144,9 @@ const FinancesPage = () => {
 
                     <td className="finances-page__col-date">
                       {finance.registrationDate
-                        ? new Date(finance.registrationDate).toLocaleDateString(
-                            "es-CO",
-                          )
+                        ? new Date(
+                            finance.registrationDate,
+                          ).toLocaleDateString("es-CO")
                         : "-"}
                     </td>
 

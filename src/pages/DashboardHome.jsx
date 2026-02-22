@@ -329,13 +329,13 @@ export const DashboardHome = () => {
             gradient="stat-card-radicales" 
           />
           <StatCard 
-            title="CBI" 
+            title="Altares de vida" 
             value={stats.totalLessons} 
             icon="🏘️" 
             gradient="stat-card-secondary" 
           />
           <StatCard 
-            title="LIDERAZGO" 
+            title="Servidores" 
             value={stats.totalAttendance} 
             icon="🦺" 
             gradient="stat-card-danger" 
@@ -349,7 +349,7 @@ export const DashboardHome = () => {
         </div>
 
         <div className="quick-access-section">
-          <h2>🚀 Accesos Rápidos</h2>
+          <h2 className="summary-text">🚀 Accesos Rápidos</h2>
 
           <div className="quick-access-grid">
             <a href="/dashboard/members" className="quick-access-card quick-access-primary">
@@ -358,24 +358,24 @@ export const DashboardHome = () => {
               <p className="qa-description">Gestiona todos los miembros</p>
             </a>
 
-            <a href="/dashboard/attendance" className="quick-access-card quick-access-export">
+            <a href="/dashboard/cellgroups-atendance" className="quick-access-card quick-access-export">
               <div className="qa-icon">✅</div>
               <p className="qa-title">Registrar Asistencia</p>
-              <p className="qa-description">Marca asistencia del día</p>
+              <p className="qa-description">Asistencia altares de vida</p>
             </a>
 
-            <a href="/dashboard/lessons" className="quick-access-card quick-access-secondary">
-              <div className="qa-icon">📖</div>
-              <p className="qa-title">Crear Lección</p>
-              <p className="qa-description">Nueva lección para el grupo</p>
+            <a href="/dashboard/activity" className="quick-access-card quick-access-secondary">
+              <div className="qa-icon">📅</div>
+              <p className="qa-title">Crear Actividades</p>
+              <p className="qa-description">Gestiona las Actividades</p>
             </a>
           </div>
         </div>
 
-        <div className="summary-section">
-          <h2>📝 Resumen General</h2>
+        <div className="quick-access-section">
+          <h2 className="summary-text">📝 Resumen General</h2>
           <p className="summary-text">
-            Sistema de gestión pastoral para coordinar actividades, miembros, asistencias y más.
+            PastoreApp es una plataforma integral de gestión pastoral que permite administrar miembros, asistencias, actividades y finanzas en una sola solución digital que facilita la administración de iglesias y ministerios.
           </p>
 
           <div className="role-info">

@@ -72,13 +72,13 @@ export const DashboardLayout = () => {
       visible: true,
     },
     {
-      label: 'Miembros',
+      label: 'Membresia',
       path: '/dashboard/members',
       icon: '👥',
       visible: true,
     },
     {
-      label: 'Formación',
+      label: 'Formaciones',
       path: '/dashboard/enrollments',
       icon: '🌾',
       visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_PROFESORES', 'ROLE_GANANDO']),
@@ -90,13 +90,13 @@ export const DashboardLayout = () => {
       visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS', 'ROLE_GANANDO']),
     },
     {
-      label: 'LIDERAZGO',
+      label: 'Servidores',
       path: '/dashboard/leadership',
       icon: '🦺',
       visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),
     },
     {
-      label: 'CBI',
+      label: 'Altares de vida',
       path: '/dashboard/cellgroups',
       icon: '🏘️',
       visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_AREAS']),

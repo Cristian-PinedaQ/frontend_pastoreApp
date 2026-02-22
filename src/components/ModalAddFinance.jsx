@@ -4,10 +4,11 @@
 // ✅ NUEVO: isVerified se marca automáticamente según el método de pago
 // ✅ NUEVO: FIRST_FRUITS (Primicias) agregado como concepto
 // ✅ INTEGRADO: nameHelper para transformación de nombres
+// ✅ FIX CONCURRENCIA: Protección contra doble submit con useRef
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import apiService from '../apiService';
-import { transformForDisplay } from '../services/nameHelper'; // Importar nameHelper
+import { transformForDisplay } from '../services/nameHelper';
 import '../css/ModalAddFinance.css';
 
 const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) => {
@@ -19,7 +20,7 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
     incomeMethod: 'CASH',
     reference: '',
     registrationDate: new Date().toISOString().split('T')[0],
-    isVerified: true,  // ✅ Por defecto true (CASH)
+    isVerified: true,
   });
 
   const [members, setMembers] = useState([]);
@@ -31,8 +32,11 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [recordedBy, setRecordedBy] = useState('');
 
+  // ✅ FIX CONCURRENCIA: Ref para prevenir doble submit
+  // useRef es más rápido que useState porque no causa re-render
+  const submitting = useRef(false);
+
   // ✅ CORREGIDO: Obtener SOLO el username
-  // ✅ VERSIÓN LIMPIA: Sin console.log
   const getRecordedBy = () => {
     // Intento 1: sessionStorage['username'] (directo)
     let user = sessionStorage.getItem('username');
@@ -100,38 +104,39 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
     return '';
   };
 
-  // Cargar miembros
+  // Cargar miembros y resetear estado al abrir
   useEffect(() => {
     if (isOpen) {
+      // ✅ FIX CONCURRENCIA: Resetear ref de submit al abrir modal
+      submitting.current = false;
+
       loadMembers();
-      
+
       // Obtener usuario
       const user = getRecordedBy();
       console.log('✅ [useEffect] recordedBy obtenido:', user, 'tipo:', typeof user);
       setRecordedBy(user);
-      
+
       // Si es edición, cargar datos
       if (isEditing && initialData) {
-        // ✅ NUEVO: Determinar isVerified según el método
         const method = initialData.method || 'CASH';
         const isVerifiedValue = method === 'CASH' ? true : (initialData.isVerified || false);
 
-        // ✅ USANDO nameHelper: Transformar nombre para mostrar
-        const displayName = initialData.memberName 
+        const displayName = initialData.memberName
           ? transformForDisplay({ memberName: initialData.memberName }, ['memberName']).memberName
           : '';
 
         setFormData({
           memberId: initialData.memberId || '',
-          memberName: displayName, // Usar nombre transformado
+          memberName: displayName,
           amount: initialData.amount || '',
           incomeConcept: initialData.concept || 'TITHE',
           incomeMethod: method,
           reference: initialData.reference || '',
-          registrationDate: initialData.registrationDate 
+          registrationDate: initialData.registrationDate
             ? new Date(initialData.registrationDate).toISOString().split('T')[0]
             : new Date().toISOString().split('T')[0],
-          isVerified: isVerifiedValue,  // ✅ Dinámico según método
+          isVerified: isVerifiedValue,
         });
       } else {
         setFormData({
@@ -142,7 +147,7 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
           incomeMethod: 'CASH',
           reference: '',
           registrationDate: new Date().toISOString().split('T')[0],
-          isVerified: true,  // ✅ Por defecto true (CASH)
+          isVerified: true,
         });
       }
       setSearchTerm('');
@@ -156,12 +161,11 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
     try {
       setLoadingMembers(true);
       const data = await apiService.getAllMembers();
-      
-      // ✅ USANDO nameHelper: Transformar nombres de miembros para mostrar
-      const transformedMembers = data 
+
+      const transformedMembers = data
         ? data.map(member => transformForDisplay(member, ['name']))
         : [];
-      
+
       setMembers(transformedMembers || []);
     } catch (error) {
       console.error('❌ Error cargando miembros:', error.message);
@@ -195,15 +199,14 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
 
   // Seleccionar miembro
   const selectMember = (member) => {
-    // ✅ USANDO nameHelper: El nombre ya está transformado al cargar los miembros
     setFormData(prev => ({
       ...prev,
       memberId: member.id,
-      memberName: member.name, // Nombre ya transformado
+      memberName: member.name,
     }));
     setSearchTerm(member.name);
     setShowMemberList(false);
-    
+
     if (errors.memberId) {
       setErrors(prev => ({
         ...prev,
@@ -212,26 +215,23 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
     }
   };
 
-  // ✅ NUEVO: Manejar cambios con lógica automática para isVerified
+  // Manejar cambios con lógica automática para isVerified
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
-    // ✅ NUEVO: Validación especial para el campo de monto
+
+    // Validación especial para el campo de monto
     if (name === 'amount') {
       console.log('📝 [handleInputChange] Campo monto recibió:', value);
-      
-      // Verificar si contiene puntos o comas
+
       if (value.includes('.') || value.includes(',')) {
         console.warn('⚠️ Intento de ingresar punto o coma en monto');
         setErrors(prev => ({
           ...prev,
           amount: '❌ No se permiten puntos ni comas. Solo números enteros positivos.',
         }));
-        // No actualizar el valor, mantener el anterior
         return;
       }
-      
-      // Verificar si contiene caracteres no permitidos
+
       if (!/^\d*$/.test(value)) {
         console.warn('⚠️ Intento de ingresar caracteres no permitidos');
         setErrors(prev => ({
@@ -240,46 +240,40 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
         }));
         return;
       }
-      
-      // Si todo está bien, actualizar el valor
+
       setFormData(prev => ({
         ...prev,
         [name]: value,
       }));
-      
-      // Limpiar error si existe
+
       if (errors.amount) {
         setErrors(prev => ({
           ...prev,
           amount: '',
         }));
       }
-    } 
-    // ✅ NUEVO: Si cambia el método de pago, actualizar isVerified automáticamente
+    }
+    // Si cambia el método de pago, actualizar isVerified automáticamente
     else if (name === 'incomeMethod') {
       console.log('📝 Método de pago cambió a:', value);
-      
+
       setFormData(prev => {
         const newFormData = {
           ...prev,
           [name]: value,
         };
-        
-        // Si es CASH, marcar como verificado automáticamente
+
         if (value === 'CASH') {
           console.log('✅ Método CASH detectado: isVerified = true');
           newFormData.isVerified = true;
-        } 
-        // Si es BANK_TRANSFER, desmarcar automáticamente
-        else if (value === 'BANK_TRANSFER') {
+        } else if (value === 'BANK_TRANSFER') {
           console.log('🏦 Método BANK_TRANSFER detectado: isVerified = false');
           newFormData.isVerified = false;
         }
-        
+
         return newFormData;
       });
     } else {
-      // Para otros campos, cambio normal
       setFormData(prev => ({
         ...prev,
         [name]: type === 'checkbox' ? checked : value,
@@ -302,7 +296,6 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
       newErrors.memberId = 'Debe seleccionar un miembro';
     }
 
-    // ✅ MEJORADO: Validación más específica para monto
     if (!formData.amount) {
       newErrors.amount = 'El monto es requerido';
     } else if (!/^\d+$/.test(formData.amount)) {
@@ -335,15 +328,25 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // ✅ FIX CONCURRENCIA: Prevenir doble submit con ref (instantáneo, sin re-render)
+    if (submitting.current) {
+      console.log('⚠️ [handleSubmit] Submit ya en progreso, ignorando clic duplicado');
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
+
+    // ✅ FIX CONCURRENCIA: Marcar como en progreso DESPUÉS de validar
+    // (si la validación falla, no queremos bloquear el botón)
+    submitting.current = true;
 
     try {
       setLoading(true);
 
       let finalRecordedBy = recordedBy;
-      
+
       // Si está vacío, intentar de nuevo
       if (!finalRecordedBy) {
         console.warn('⚠️ recordedBy vacío, intentando getRecordedBy()...');
@@ -354,7 +357,6 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
       if (!finalRecordedBy || finalRecordedBy.trim() === '') {
         console.error('❌ recordedBy sigue vacío');
         alert('Error: No se pudo obtener el usuario. Por favor recarga la página.');
-        setLoading(false);
         return;
       }
 
@@ -378,21 +380,12 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
       console.log('   registrationDate:', registrationDate);
       console.log('   isVerified:', formData.isVerified, '(automático según método)');
 
-      // ⚠️ IMPORTANTE: Cuando se envía al backend, el nombre NO debe transformarse
-      // El backend espera el nombre original de la base de datos
-      // Para obtener el nombre original del miembro seleccionado, necesitamos buscarlo
       let originalMemberName = formData.memberName;
-      
+
       try {
-        // Buscar el miembro original en la lista
         const selectedMember = members.find(m => m.id === parseInt(formData.memberId));
         if (selectedMember) {
-          // Aquí necesitaríamos una forma de obtener el nombre original
-          // Por ahora, mantenemos el nombre transformado pero esto debería ajustarse
-          // según cómo se obtengan los datos del backend
           console.log('ℹ️ Miembro seleccionado:', selectedMember);
-          // NOTA: En una implementación completa, deberíamos obtener el nombre original
-          // desde el backend o mantener una copia de los datos originales
         }
       } catch (error) {
         console.warn('No se pudo obtener el nombre original del miembro');
@@ -400,26 +393,30 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
 
       const dataToSend = {
         memberId: parseInt(formData.memberId),
-        memberName: originalMemberName, // Enviar nombre (el backend lo manejará)
+        memberName: originalMemberName,
         amount: parseFloat(formData.amount),
         incomeConcept: formData.incomeConcept,
         incomeMethod: formData.incomeMethod,
         reference: formData.reference || null,
         registrationDate: registrationDate,
-        isVerified: formData.isVerified,  // ✅ Ahora tiene valor automático
+        isVerified: formData.isVerified,
         recordedBy: finalRecordedBy,
       };
 
       console.log('📤 ENVIANDO:');
       console.log(JSON.stringify(dataToSend, null, 2));
 
-      onSave(dataToSend);
+      // ✅ FIX CONCURRENCIA: onSave es async en FinancesPage (handleAddFinance/handleEditFinance)
+      // Esperamos a que termine para no liberar el lock antes de tiempo
+      await onSave(dataToSend);
 
     } catch (error) {
       console.error('❌ Error:', error);
       alert('Error al guardar: ' + error.message);
     } finally {
       setLoading(false);
+      // ✅ FIX CONCURRENCIA: SIEMPRE liberar el lock del submit
+      submitting.current = false;
     }
   };
 
@@ -441,7 +438,7 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
               🆔 Miembro *
               <span className="help-text">(Buscar por nombre o documento)</span>
             </label>
-            
+
             <div className="member-search-container">
               <input
                 type="text"
@@ -463,7 +460,6 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
                       className="member-item"
                     >
                       <div className="member-name">
-                        {/* ✅ Nombres ya transformados para mostrar */}
                         {member.name}
                       </div>
                       <div className="member-document">
@@ -541,8 +537,7 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
               <option value="BANK_TRANSFER">🏦 Transferencia Bancaria</option>
             </select>
             {errors.incomeMethod && <span className="error-message">{errors.incomeMethod}</span>}
-            
-            {/* ✅ NUEVO: Mostrar estado automático de verificación */}
+
             <div className="verification-auto-status">
               {formData.incomeMethod === 'CASH' ? (
                 <span className="status-verified">✅ Se marcará automáticamente como verificado (Efectivo)</span>
@@ -607,7 +602,6 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
             {errors.registrationDate && <span className="error-message">{errors.registrationDate}</span>}
           </div>
 
-          {/* ✅ MODIFICADO: El checkbox ahora tiene comportamiento automático */}
           <div className="form-group-checkbox">
             <label className="checkbox-label">
               <input
@@ -615,7 +609,7 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
                 name="isVerified"
                 checked={formData.isVerified}
                 onChange={handleInputChange}
-                disabled={formData.incomeMethod === 'CASH'}  // ✅ Deshabilitado para CASH
+                disabled={formData.incomeMethod === 'CASH'}
                 title={formData.incomeMethod === 'CASH' ? 'Se marca automáticamente para Efectivo' : 'Marca para verificar esta transferencia'}
               />
               {formData.incomeMethod === 'CASH' ? (
@@ -631,6 +625,7 @@ const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) =>
               type="button"
               className="btn btn-cancel"
               onClick={onClose}
+              disabled={loading}
             >
               ❌ Cancelar
             </button>

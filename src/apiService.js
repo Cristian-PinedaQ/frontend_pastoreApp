@@ -89,77 +89,73 @@ class ApiService {
   }
 
   // ✅ Método genérico para requests CON SEGURIDAD MEJORADA
-  async request(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
-    const config = {
-      ...options,
-      headers: this.getHeaders(),
-    };
+ async request(endpoint, options = {}, extraHeaders = {}) {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const config = {
+    ...options,
+    headers: {
+      ...this.getHeaders(),
+      ...extraHeaders,  // ← permite inyectar headers adicionales por llamada
+    },
+  };
 
-    try {
-      log('📡 [request] Iniciando:', { method: config.method || 'GET', endpoint });
+  try {
+    log('📡 [request] Iniciando:', { method: config.method || 'GET', endpoint });
 
-      const response = await fetch(url, config);
+    const response = await fetch(url, config);
 
-      // ✅ Manejo de token expirado
-      if (response.status === 401) {
-        log('⚠️ [request] Token expirado (401)');
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('user');
-        
-        // Notificar al AuthContext sin hacer redirección forzada
-        window.dispatchEvent(new CustomEvent('authTokenExpired'));
-        
-        throw new Error('Sesión expirada');
-      }
-
-      if (!response.ok) {
-        let errorData = {};
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          errorData = { message: `Error ${response.status}` };
-        }
-
-        logError('❌ [request] Error del servidor:', JSON.stringify(errorData));
-
-        // ✅ Extraer errores de validación específicos
-        let errorMessage = '';
-
-        if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
-          // Errores de validación por campo
-          const fieldErrors = Object.entries(errorData.fieldErrors)
-            .map(([field, message]) => `${field}: ${message}`)
-            .join(' | ');
-          errorMessage = fieldErrors;
-        } else if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        } else if (errorData.message) {
-          errorMessage = typeof errorData.message === 'string'
-            ? errorData.message
-            : JSON.stringify(errorData.message);
-        } else if (errorData.error) {
-          errorMessage = typeof errorData.error === 'string'
-            ? errorData.error
-            : JSON.stringify(errorData.error);
-        } else {
-          // ✅ Mensaje genérico en producción
-          errorMessage = DEBUG ? JSON.stringify(errorData) : 'Error en la solicitud';
-        }
-
-        logError('❌ [request] Mensaje:', errorMessage);
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      log('✅ [request] Exitoso');
-      return data;
-
-    } catch (error) {
-      logError('🔴 [request] Error:', error.message);
-      throw error;
+    if (response.status === 401) {
+      log('⚠️ [request] Token expirado (401)');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('user');
+      window.dispatchEvent(new CustomEvent('authTokenExpired'));
+      throw new Error('Sesión expirada');
     }
+
+    if (!response.ok) {
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch (e) {
+        errorData = { message: `Error ${response.status}` };
+      }
+
+      logError('❌ [request] Error del servidor:', JSON.stringify(errorData));
+
+      let errorMessage = '';
+
+      if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
+        const fieldErrors = Object.entries(errorData.fieldErrors)
+          .map(([field, message]) => `${field}: ${message}`)
+          .join(' | ');
+        errorMessage = fieldErrors;
+      } else if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData.message) {
+        errorMessage = typeof errorData.message === 'string'
+          ? errorData.message
+          : JSON.stringify(errorData.message);
+      } else if (errorData.error) {
+        errorMessage = typeof errorData.error === 'string'
+          ? errorData.error
+          : JSON.stringify(errorData.error);
+      } else {
+        errorMessage = DEBUG ? JSON.stringify(errorData) : 'Error en la solicitud';
+      }
+
+      logError('❌ [request] Mensaje:', errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    log('✅ [request] Exitoso');
+    return data;
+
+  } catch (error) {
+    logError('🔴 [request] Error:', error.message);
+    throw error;
   }
+}
 
   // ========== 🔐 AUTENTICACIÓN ==========
   async login(username, password) {
@@ -824,46 +820,61 @@ class ApiService {
     }
   }
 
-  async createFinance(financeData) {
-    try {
-      if (!financeData || typeof financeData !== 'object') {
-        throw new Error('Datos de finanza inválidos');
-      }
+async createFinance(financeData) {
+  try {
+    if (!financeData || typeof financeData !== 'object') {
+      throw new Error('Datos de finanza inválidos');
+    }
 
-      // ✅ Auto-llenar recordedBy con username del usuario actual
-      let recordedBy = financeData.recordedBy;
-      if (!recordedBy) {
-        const currentUser = this.getCurrentUser();
-        recordedBy = currentUser?.username || 'Sistema';
-        log('📝 [createFinance] recordedBy auto-llenado con:', recordedBy);
-      }
+    // Auto-llenar recordedBy con username del usuario actual
+    let recordedBy = financeData.recordedBy;
+    if (!recordedBy) {
+      const currentUser = this.getCurrentUser();
+      recordedBy = currentUser?.username || 'Sistema';
+      log('📝 [createFinance] recordedBy auto-llenado con:', recordedBy);
+    }
 
-      const body = {
-        memberId: validateNumber(financeData.memberId, 'memberId'),
-        memberName: financeData.memberName,
-        amount: validateNumber(financeData.amount, 'amount', 0),
-        incomeConcept: financeData.incomeConcept,
-        incomeMethod: financeData.incomeMethod,
-        description: financeData.description || '',
-        recordedBy: recordedBy,
-        registrationDate: financeData.registrationDate,
-        isVerified: financeData.isVerified || false,
-      };
+    const body = {
+      memberId: validateNumber(financeData.memberId, 'memberId'),
+      memberName: financeData.memberName,
+      amount: validateNumber(financeData.amount, 'amount', 0),
+      incomeConcept: financeData.incomeConcept,
+      incomeMethod: financeData.incomeMethod,
+      description: financeData.description || '',
+      recordedBy: recordedBy,
+      registrationDate: financeData.registrationDate,
+      isVerified: financeData.isVerified || false,
+    };
 
-      log('📤 [createFinance] Creando finanza');
+    // ✅ NUEVO: Generar idempotency key única para este submit
+    // Formato: finance-{timestamp}-{random8chars}
+    // Esto garantiza que cada clic del botón "Registrar" tenga una key distinta.
+    // Si el mismo request llega dos veces al backend (doble clic, red inestable),
+    // el segundo recibe 409 CONFLICT sin crear un registro duplicado.
+    const idempotencyKey = `finance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    log('📤 [createFinance] Enviando con idempotencyKey:', idempotencyKey);
 
-      const response = await this.request('/finances', {
+    const response = await this.request(
+      '/finances',
+      {
         method: 'POST',
         body: JSON.stringify(body),
-      });
+      },
+      {
+        // ✅ CLAVE: Enviar el header que el Controller espera
+        'X-Idempotency-Key': idempotencyKey,
+      }
+    );
 
-      log('✅ [createFinance] Éxito - ID:', response?.id);
-      return response;
-    } catch (error) {
-      logError('❌ [createFinance] Error:', error.message);
-      throw error;
-    }
+    log('✅ [createFinance] Éxito - ID:', response?.id);
+    return response;
+
+  } catch (error) {
+    logError('❌ [createFinance] Error:', error.message);
+    throw error;
   }
+}
+
 
   async updateFinance(id, financeData) {
     try {
@@ -2383,7 +2394,8 @@ async getAccessibleCells() {
     };
     return levelMap[levelEnrollment] || levelEnrollment;
   }
-// ========== 📋 ASISTENCIAS DE CÉLULAS (Cell Group Attendance) ==========
+
+  // ========== 📋 ASISTENCIAS DE CÉLULAS (Cell Group Attendance) ==========
   // Base path del controller: /api/v1/attendance-cell-group
 
   // ── Configuración ──────────────────────────────────────────────────
@@ -2398,215 +2410,8 @@ async getAccessibleCells() {
       throw error;
     }
   }
-/*
-  // ── Generación automática ─────────────────────────────────────────
-  *async generateCellAttendances(cellId, date) {
-    try {
-      validateId(cellId, 'cellId');
-      validateString(date, 'date', 10, 10);
-      log('📋 [generateCellAttendances] Generando para célula:', cellId, 'fecha:', date);
-
-      const response = await this.request(`/attendance-cell-group/generate/cell/${cellId}?date=${date}`, {
-        method: 'POST',
-      });
-
-      log('✅ [generateCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
-      return response;
-    } catch (error) {
-      logError('❌ [generateCellAttendances] Error:', error.message);
-      throw error;
-    }
-  }*/
-
-  async generateMyCellsAttendances(date) {
-    try {
-      validateString(date, 'date', 10, 10);
-      log('📋 [generateMyCellsAttendances] Generando para mis células, fecha:', date);
-
-      const response = await this.request(`/attendance-cell-group/generate/my-cells?date=${date}`, {
-        method: 'POST',
-      });
-
-      log('✅ [generateMyCellsAttendances] Éxito -', response?.totalCells || 0, 'células');
-      return response;
-    } catch (error) {
-      logError('❌ [generateMyCellsAttendances] Error:', error.message);
-      throw error;
-    }
-  }
-
-  async generateCurrentMonthAttendances() {
-    try {
-      log('🔄 [generateCurrentMonthAttendances] Ejecutando generación manual');
-      const response = await this.request('/attendance-cell-group/generate/current-month', {
-        method: 'POST',
-      });
-      log('✅ [generateCurrentMonthAttendances] Éxito');
-      return response;
-    } catch (error) {
-      logError('❌ [generateCurrentMonthAttendances] Error:', error.message);
-      throw error;
-    }
-  }
-
-  // ── Consultas ─────────────────────────────────────────────────────
-  async getCellAttendancesCurrentMonth() {
-    try {
-      log('📅 [getCellAttendancesCurrentMonth] Consultando mes actual');
-      const response = await this.request('/attendance-cell-group/current-month');
-      log('✅ [getCellAttendancesCurrentMonth] Éxito -', response?.totalCells || 0, 'células');
-      return response;
-    } catch (error) {
-      logError('❌ [getCellAttendancesCurrentMonth] Error:', error.message);
-      throw error;
-    }
-  }
-
-  async getCellAttendancesByMonth(year, month) {
-    try {
-      validateNumber(year, 'year', 2020);
-      validateNumber(month, 'month', 1, 12);
-      log('📅 [getCellAttendancesByMonth] Consultando:', year, '/', month);
-      const response = await this.request(`/attendance-cell-group/month/${year}/${month}`);
-      log('✅ [getCellAttendancesByMonth] Éxito');
-      return response;
-    } catch (error) {
-      logError('❌ [getCellAttendancesByMonth] Error:', error.message);
-      throw error;
-    }
-  }
-
-  async getCellAttendancesByDate(cellId, date) {
-    try {
-      validateId(cellId, 'cellId');
-      validateString(date, 'date', 10, 10);
-      log('🔍 [getCellAttendancesByDate] Célula:', cellId, 'Fecha:', date);
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`);
-      log('✅ [getCellAttendancesByDate] Éxito -', response?.totalCount || 0, 'registros');
-      return response;
-    } catch (error) {
-      logError('❌ [getCellAttendancesByDate] Error:', error.message);
-      throw error;
-    }
-  }
-
-  // ── Registro y actualización ──────────────────────────────────────
-  async recordCellAttendance(cellId, date, attendanceData) {
-    try {
-      validateId(cellId, 'cellId');
-      validateString(date, 'date', 10, 10);
-      if (!attendanceData || typeof attendanceData !== 'object') {
-        throw new Error('Datos de asistencia inválidos');
-      }
-      log('📝 [recordCellAttendance] Registrando:', { cellId, date, memberId: attendanceData.memberId });
-
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
-        method: 'POST',
-        body: JSON.stringify(attendanceData),
-      });
-
-      log('✅ [recordCellAttendance] Éxito');
-      return response;
-    } catch (error) {
-      logError('❌ [recordCellAttendance] Error:', error.message);
-      throw error;
-    }
-  }
-
-  async recordBulkCellAttendances(cellId, bulkData) {
-    try {
-      validateId(cellId, 'cellId');
-      if (!bulkData || typeof bulkData !== 'object') {
-        throw new Error('Datos de asistencias inválidos');
-      }
-      log('📦 [recordBulkCellAttendances] Registrando masivo:', {
-        cellId,
-        date: bulkData.attendanceDate,
-        count: bulkData.attendances?.length || 0,
-      });
-
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/bulk`, {
-        method: 'POST',
-        body: JSON.stringify(bulkData),
-      });
-
-      log('✅ [recordBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
-      return response;
-    } catch (error) {
-      logError('❌ [recordBulkCellAttendances] Error:', error.message);
-      throw error;
-    }
-  }
-
-  async updateBulkCellAttendances(cellId, date, attendances) {
-    try {
-      validateId(cellId, 'cellId');
-      validateString(date, 'date', 10, 10);
-      if (!Array.isArray(attendances)) {
-        throw new Error('Datos de asistencias inválidos');
-      }
-      log('📦 [updateBulkCellAttendances] Actualizando:', { cellId, date, count: attendances.length });
-
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
-        method: 'PUT',
-        body: JSON.stringify(attendances),
-      });
-
-      log('✅ [updateBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
-      return response;
-    } catch (error) {
-      logError('❌ [updateBulkCellAttendances] Error:', error.message);
-      throw error;
-    }
-  }
-
-  // ── Resumen y estadísticas ────────────────────────────────────────
-  async getCellAttendanceSummary(cellId, date) {
-    try {
-      validateId(cellId, 'cellId');
-      validateString(date, 'date', 10, 10);
-      log('📊 [getCellAttendanceSummary] Resumen:', { cellId, date });
-      const response = await this.request(`/attendance-cell-group/summary/cell/${cellId}/date/${date}`);
-      log('✅ [getCellAttendanceSummary] Éxito');
-      return response;
-    } catch (error) {
-      logError('❌ [getCellAttendanceSummary] Error:', error.message);
-      throw error;
-    }
-  }
-
-  async getCellAttendanceMonthlyStats(cellId, year, month) {
-    try {
-      validateId(cellId, 'cellId');
-      validateNumber(year, 'year', 2020);
-      validateNumber(month, 'month', 1, 12);
-      log('📊 [getCellAttendanceMonthlyStats] Stats:', { cellId, year, month });
-      const response = await this.request(`/attendance-cell-group/statistics/cell/${cellId}/month/${year}/${month}`);
-      log('✅ [getCellAttendanceMonthlyStats] Éxito');
-      return response;
-    } catch (error) {
-      logError('❌ [getCellAttendanceMonthlyStats] Error:', error.message);
-      throw error;
-    }
-  }
-
-  async getCellAttendanceGlobalStats() {
-    try {
-      log('📊 [getCellAttendanceGlobalStats] Obteniendo estadísticas globales');
-      const response = await this.request('/attendance-cell-group/statistics/global');
-      log('✅ [getCellAttendanceGlobalStats] Éxito');
-      return response;
-    } catch (error) {
-      logError('❌ [getCellAttendanceGlobalStats] Error:', error.message);
-      throw error;
-    }
-  }
 
   // ── Generación automática ─────────────────────────────────────────
-  /**
-   * Generar asistencias para una célula en una fecha
-   * POST /api/v1/attendance/generate/cell/{cellId}?date={date}
-   */
   async generateCellAttendances(cellId, date) {
     try {
       validateId(cellId, 'cellId');
@@ -2623,11 +2428,8 @@ async getAccessibleCells() {
       logError('❌ [generateCellAttendances] Error:', error.message);
       throw error;
     }
-  }/*
-  /**
-   * Generar asistencias para mis células (como líder principal)
-   * POST /api/v1/attendance/generate/my-cells?date={date}
-   */
+  }
+
   async generateMyCellsAttendances(date) {
     try {
       validateString(date, 'date', 10, 10);
@@ -2645,10 +2447,6 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Ejecutar generación manual del mes actual (solo PASTORES)
-   * POST /api/v1/attendance/generate/current-month
-   */
   async generateCurrentMonthAttendances() {
     try {
       log('🔄 [generateCurrentMonthAttendances] Ejecutando generación manual');
@@ -2664,10 +2462,6 @@ async getAccessibleCells() {
   }
 
   // ── Consultas ─────────────────────────────────────────────────────
-  /**
-   * Obtener asistencias del mes actual (filtradas por usuario)
-   * GET /api/v1/attendance/current-month
-   */
   async getCellAttendancesCurrentMonth() {
     try {
       log('📅 [getCellAttendancesCurrentMonth] Consultando mes actual');
@@ -2680,10 +2474,6 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Obtener asistencias de un mes específico
-   * GET /api/v1/attendance/month/{year}/{month}
-   */
   async getCellAttendancesByMonth(year, month) {
     try {
       validateNumber(year, 'year', 2020);
@@ -2698,10 +2488,6 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Obtener asistencias de una célula en una fecha
-   * GET /api/v1/attendance/cell/{cellId}/date/{date}
-   */
   async getCellAttendancesByDate(cellId, date) {
     try {
       validateId(cellId, 'cellId');
@@ -2717,10 +2503,6 @@ async getAccessibleCells() {
   }
 
   // ── Registro y actualización ──────────────────────────────────────
-  /**
-   * Registrar asistencia individual
-   * POST /api/v1/attendance/cell/{cellId}/date/{date}
-   */
   async recordCellAttendance(cellId, date, attendanceData) {
     try {
       validateId(cellId, 'cellId');
@@ -2743,10 +2525,6 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Registrar asistencias masivas
-   * POST /api/v1/attendance/cell/{cellId}/bulk
-   */
   async recordBulkCellAttendances(cellId, bulkData) {
     try {
       validateId(cellId, 'cellId');
@@ -2772,10 +2550,6 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Actualizar asistencias masivas
-   * PUT /api/v1/attendance/cell/{cellId}/date/{date}
-   */
   async updateBulkCellAttendances(cellId, date, attendances) {
     try {
       validateId(cellId, 'cellId');
@@ -2799,10 +2573,6 @@ async getAccessibleCells() {
   }
 
   // ── Resumen y estadísticas ────────────────────────────────────────
-  /**
-   * Obtener resumen de asistencia
-   * GET /api/v1/attendance/summary/cell/{cellId}/date/{date}
-   */
   async getCellAttendanceSummary(cellId, date) {
     try {
       validateId(cellId, 'cellId');
@@ -2817,10 +2587,6 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Obtener estadísticas mensuales
-   * GET /api/v1/attendance/statistics/cell/{cellId}/month/{year}/{month}
-   */
   async getCellAttendanceMonthlyStats(cellId, year, month) {
     try {
       validateId(cellId, 'cellId');
@@ -2836,10 +2602,6 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Obtener estadísticas globales (solo PASTORES)
-   * GET /api/v1/attendance/statistics/global
-   */
   async getCellAttendanceGlobalStats() {
     try {
       log('📊 [getCellAttendanceGlobalStats] Obteniendo estadísticas globales');
