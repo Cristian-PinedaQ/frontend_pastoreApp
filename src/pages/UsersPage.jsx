@@ -8,7 +8,7 @@ import authService from "../services/authService";
 import { logError } from "../utils/securityLogger";
 import { throttle } from "lodash";
 
-// ✅ ARREGLADO: ERROR_MESSAGES fuera del componente (constante)
+// ✅ ERROR_MESSAGES constante
 const ERROR_MESSAGES = {
   UNAUTHORIZED: "No tienes permisos para acceder a esta página",
   VALIDATION_ERROR: "Datos inválidos. Por favor verifica los campos",
@@ -16,6 +16,30 @@ const ERROR_MESSAGES = {
   NETWORK_ERROR: "Error de conexión. Verifica tu internet",
   CONFLICT: "El usuario ya existe",
   NOT_FOUND: "El usuario no fue encontrado",
+};
+
+// ✅ ROLES ACTUALIZADOS según RoleName.java del backend
+const ROLE_OPTIONS = [
+  { value: 'PASTORES', label: '👨‍🌾 Pastores', icon: '🐑', color: '#4f46e5' },
+  { value: 'CONEXION', label: '🔗 Conexión', icon: '🤝', color: '#06b6d4' },
+  { value: 'CIMIENTO', label: '🏗️ Cimiento', icon: '🪨', color: '#854d0e' },
+  { value: 'ESENCIA', label: '✨ Esencia', icon: '💫', color: '#a21caf' },
+  { value: 'DESPLIEGUE', label: '🚀 Despliegue', icon: '📡', color: '#059669' },
+  { value: 'ECONOMICO', label: '💰 Económico', icon: '💵', color: '#b45309' },
+  { value: 'LIDER', label: '👑 Líder', icon: '⭐', color: '#b91c1c' },
+  { value: 'PROFESORES', label: '📚 Profesores', icon: '✏️', color: '#1e40af' }
+];
+
+// ✅ Mapa de colores para cada rol
+const ROLE_COLORS = {
+  PASTORES: '#4f46e5',
+  CONEXION: '#06b6d4',
+  CIMIENTO: '#854d0e',
+  ESENCIA: '#a21caf',
+  DESPLIEGUE: '#059669',
+  ECONOMICO: '#b45309',
+  LIDER: '#b91c1c',
+  PROFESORES: '#1e40af'
 };
 
 const UsersPage = () => {
@@ -90,7 +114,7 @@ const UsersPage = () => {
     username: "",
     email: "",
     password: "",
-    role: "PROFESORES",
+    role: "PROFESORES", // Valor por defecto
   });
 
   // Función para alternar visibilidad de contraseña
@@ -105,7 +129,6 @@ const UsersPage = () => {
     if (!/[A-Z]/.test(password)) errors.push("Debe contener mayúscula");
     if (!/[a-z]/.test(password)) errors.push("Debe contener minúscula");
     if (!/[0-9]/.test(password)) errors.push("Debe contener número");
-    // ✅ ARREGLADO: Regex sin escapes innecesarios
     if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
       errors.push("Debe contener carácter especial");
     }
@@ -113,7 +136,6 @@ const UsersPage = () => {
   };
 
   // ✅ SEGURIDAD: Logger seguro sin exponer detalles
-  // ✅ ARREGLADO: Envuelto en useCallback
   const handleError = useCallback((errorCode, context = "") => {
     logError({
       code: errorCode,
@@ -124,7 +146,7 @@ const UsersPage = () => {
     setError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.SERVER_ERROR);
   }, [user?.id]);
 
-  // ✅ ARREGLADO: Agregada handleError a dependencias
+  // ✅ Cargar usuarios
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -157,8 +179,7 @@ const UsersPage = () => {
     }
   }, [handleError]);
 
-  // ✅ SEGURIDAD: Solo 
-  //  pueden acceder
+  // ✅ SEGURIDAD: Solo PASTORES pueden acceder
   useEffect(() => {
     if (!hasRole("PASTORES")) {
       setError(ERROR_MESSAGES.UNAUTHORIZED);
@@ -250,7 +271,7 @@ const UsersPage = () => {
           formData.username,
           formData.email,
           formData.password,
-          formData.role
+          formData.role // Envía el rol exacto según RoleName.java
         );
         setSuccess("✅ Usuario registrado");
       }
@@ -263,7 +284,7 @@ const UsersPage = () => {
       });
       setEditingId(null);
       setShowForm(false);
-      setShowPassword(false); // Resetear visibilidad de contraseña
+      setShowPassword(false);
       await loadUsers();
     } catch (err) {
       if (err.code === "CONFLICT") {
@@ -297,7 +318,7 @@ const UsersPage = () => {
 
       setEditingId(userId);
       setShowForm(true);
-      setShowPassword(false); // Ocultar contraseña por defecto al editar
+      setShowPassword(false);
       setSuccess("Cargado para editar");
     } catch (err) {
       handleError("SERVER_ERROR", "handleEdit");
@@ -351,9 +372,31 @@ const UsersPage = () => {
     });
     setEditingId(null);
     setShowForm(false);
-    setShowPassword(false); // Ocultar contraseña al cancelar
+    setShowPassword(false);
     setError("");
     setSuccess("");
+  };
+
+  // ✅ Función para obtener el estilo de un rol
+  const getRoleStyle = (role) => {
+    const color = ROLE_COLORS[role] || theme.primary;
+    return {
+      backgroundColor: color,
+      color: 'white',
+      padding: '0.25rem 0.75rem',
+      borderRadius: '0.25rem',
+      fontSize: '0.75rem',
+      fontWeight: '600',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.25rem',
+    };
+  };
+
+  // ✅ Función para obtener el ícono de un rol
+  const getRoleIcon = (role) => {
+    const option = ROLE_OPTIONS.find(r => r.value === role);
+    return option?.icon || '🔘';
   };
 
   // ✅ SEGURIDAD: Verificar permisos
@@ -411,7 +454,7 @@ const UsersPage = () => {
               👥 Gestión de Usuarios
             </h1>
             <p style={{ color: theme.textSecondary, fontSize: '0.875rem', margin: '0.5rem 0 0 0' }}>
-              Administra usuarios y roles del sistema
+              Administra usuarios y roles del sistema ({ROLE_OPTIONS.length} roles disponibles)
             </p>
           </div>
           <button
@@ -435,17 +478,9 @@ const UsersPage = () => {
                 password: "",
                 role: "PROFESORES",
               });
-              setShowPassword(false); // Ocultar contraseña al abrir formulario
+              setShowPassword(false);
             }}
             disabled={loading}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.target.style.backgroundColor = showForm ? theme.bgSecondary : theme.primaryHover;
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = showForm ? 'transparent' : theme.primary;
-            }}
             title={showForm ? "Cancelar formulario" : "Crear nuevo usuario"}
           >
             {showForm ? "❌ Cancelar" : "➕ Nuevo Usuario"}
@@ -595,41 +630,6 @@ const UsersPage = () => {
                   }}>
                     Contraseña * {editingId && "(opcional)"}
                   </label>
-                  <button
-                    type="button"
-                    onClick={togglePasswordVisibility}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: theme.textSecondary,
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: '0.25rem',
-                      opacity: loading ? 0.6 : 1,
-                    }}
-                    disabled={loading}
-                    onMouseEnter={(e) => {
-                      if (!loading) e.target.style.backgroundColor = theme.bgSecondary;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = 'transparent';
-                    }}
-                    title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                  >
-                    {showPassword ? (
-                      <>
-                        👀 Ocultar
-                      </>
-                    ) : (
-                      <>
-                        🙈 Mostrar
-                      </>
-                    )}
-                  </button>
                 </div>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -679,18 +679,8 @@ const UsersPage = () => {
                     }}
                     disabled={loading}
                     title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    onMouseEnter={(e) => {
-                      if (!loading) e.target.style.color = theme.text;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.color = theme.textSecondary;
-                    }}
                   >
-                    {showPassword ? (
-                      <span style={{ fontSize: '1.25rem' }}>👀</span>
-                    ) : (
-                      <span style={{ fontSize: '1.25rem' }}>🙈</span>
-                    )}
+                    {showPassword ? "👀" : "🙈"}
                   </button>
                 </div>
                 <small style={{ color: theme.textSecondary, display: 'block', marginTop: '0.25rem' }}>
@@ -698,9 +688,9 @@ const UsersPage = () => {
                 </small>
               </div>
 
-              {/* Rol */}
+              {/* ✅ ROL - ACTUALIZADO según RoleName.java */}
               {!editingId && (
-                <div>
+                <div style={{ gridColumn: '1 / -1' }}>
                   <label style={{
                     display: 'block',
                     fontSize: '0.875rem',
@@ -725,15 +715,24 @@ const UsersPage = () => {
                       color: theme.text,
                       fontSize: '0.875rem',
                       boxSizing: 'border-box',
+                      borderColor: ROLE_COLORS[formData.role] || theme.border,
                     }}
                   >
-                    <option value="PASTORES">🙏 Pastores</option>
-                    <option value="PROFESORES">👨‍🏫 Profesores</option>
-                    <option value="AREAS">🧩 Áreas</option>
-                    <option value="GANANDO">🎯 Ganando</option>
-                    <option value="ECONOMICO">🏦 Economico</option>
-                    <option value="LIDER">🦺 Líder</option> 
+                    {ROLE_OPTIONS.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.icon} {role.label}
+                      </option>
+                    ))}
                   </select>
+                  {formData.role && (
+                    <small style={{ 
+                      color: ROLE_COLORS[formData.role] || theme.textSecondary,
+                      display: 'block', 
+                      marginTop: '0.25rem' 
+                    }}>
+                      {ROLE_OPTIONS.find(r => r.value === formData.role)?.icon} Rol seleccionado: {formData.role}
+                    </small>
+                  )}
                 </div>
               )}
 
@@ -757,12 +756,6 @@ const UsersPage = () => {
                     opacity: loading ? 0.6 : 1,
                   }}
                   disabled={loading}
-                  onMouseEnter={(e) => {
-                    if (!loading) e.target.style.backgroundColor = theme.primaryHover;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = theme.primary;
-                  }}
                 >
                   {loading ? "⏳ Guardando..." : "💾 Guardar"}
                 </button>
@@ -780,12 +773,6 @@ const UsersPage = () => {
                   }}
                   onClick={handleCancel}
                   disabled={loading}
-                  onMouseEnter={(e) => {
-                    if (!loading) e.target.style.backgroundColor = theme.bgSecondary;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
                 >
                   Cancelar
                 </button>
@@ -829,12 +816,6 @@ const UsersPage = () => {
                   cursor: 'pointer',
                   fontWeight: '600',
                   opacity: loading ? 0.6 : 1,
-                }}
-                onMouseEnter={(e) => {
-                  if (!loading) e.target.style.backgroundColor = theme.bgLight;
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = theme.bgSecondary;
                 }}
                 title="Recargar usuarios"
               >
@@ -939,16 +920,10 @@ const UsersPage = () => {
                               {usr.roles.map((role) => (
                                 <span
                                   key={role}
-                                  style={{
-                                    backgroundColor: theme.primary,
-                                    color: 'white',
-                                    padding: '0.25rem 0.75rem',
-                                    borderRadius: '0.25rem',
-                                    fontSize: '0.75rem',
-                                    fontWeight: '600',
-                                  }}
+                                  style={getRoleStyle(role)}
+                                  title={`Rol: ${role}`}
                                 >
-                                  {role}
+                                  {getRoleIcon(role)} {role}
                                 </span>
                               ))}
                             </div>
@@ -1054,8 +1029,6 @@ const UsersPage = () => {
                     cursor: 'pointer',
                     fontWeight: '600',
                   }}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = theme.primaryHover}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = theme.primary}
                 >
                   ➕ Crear el primer usuario
                 </button>
@@ -1096,9 +1069,23 @@ const UsersPage = () => {
               <strong style={{ color: theme.text }}>Rol actual:</strong> <span>{user?.roles?.join(", ") || "Sin rol"}</span>
             </li>
             <li style={{ color: theme.textSecondary }}>
+              <strong style={{ color: theme.text }}>Roles disponibles:</strong> <span>{ROLE_OPTIONS.length}</span>
+            </li>
+            <li style={{ color: theme.textSecondary }}>
               <strong style={{ color: theme.text }}>Seguridad:</strong> <span>✅ Validación backend</span>
             </li>
           </ul>
+          <div style={{ 
+            marginTop: '1rem',
+            padding: '0.5rem',
+            backgroundColor: theme.bg,
+            borderRadius: '0.25rem',
+            fontSize: '0.75rem',
+            color: theme.textSecondary,
+            border: `1px dashed ${theme.border}`
+          }}>
+            <strong>Roles en el sistema:</strong> {ROLE_OPTIONS.map(r => r.label).join(' • ')}
+          </div>
         </div>
       </div>
     </div>

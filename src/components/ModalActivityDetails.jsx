@@ -1,5 +1,5 @@
 // ============================================
-// ModalActivityDetails.jsx
+// ModalActivityDetails.jsx - CORREGIDO CON FILTRO POR NIVEL Y EXCLUSIONES
 // Modal para ver detalles de actividad y agregar participantes
 // ============================================
 
@@ -17,13 +17,18 @@ const ModalActivityDetails = ({
   // Estados para pestañas
   const [activeTab, setActiveTab] = useState("info");
 
+  // IDs de pastores a excluir - REEMPLAZAR CON LOS IDS CORRECTOS
+  const EXCLUDED_MEMBER_IDS = useRef([1, 2]); // ← Usar useRef para evitar dependencias en useCallback
+
   // Estados para membres
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
+  const [eligibleMembers, setEligibleMembers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [selectedMemberName, setSelectedMemberName] = useState("");
-  const [showPaymentSection, setShowPaymentSection] = useState(false); // 👈 NUEVO: Controla si mostrar sección de pago
+  const [selectedMemberLevel, setSelectedMemberLevel] = useState("");
+  const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [initialPayment, setInitialPayment] = useState("");
   const [incomeMethod, setIncomeMethod] = useState("CASH");
   const [enrolling, setEnrolling] = useState(false);
@@ -57,6 +62,52 @@ const ModalActivityDetails = ({
       return null;
     }
   };
+
+  // Función para determinar si un miembro es elegible según el nivel de la actividad
+  const isMemberEligible = useCallback((member) => {
+    // Excluir pastores específicos usando useRef
+    if (EXCLUDED_MEMBER_IDS.current.includes(member.id)) {
+      return false;
+    }
+
+    if (!activity?.requiredLevel) {
+      // Si no hay requiredLevel, todos son elegibles
+      return true;
+    }
+
+    // Para PREENCUENTRO, todos son elegibles
+    if (activity.requiredLevel === 'PREENCUENTRO') {
+      return true;
+    }
+
+    // Para otros niveles, el miembro debe tener el nivel anterior
+    const requiredLevel = activity.requiredLevel;
+    const memberLevel = member.currentLevel;
+
+    // Mapa de niveles anteriores
+    const previousLevelMap = {
+      'ENCUENTRO': 'PREENCUENTRO',
+      'POST_ENCUENTRO': 'ENCUENTRO',
+      'BAUTIZOS': 'POST_ENCUENTRO',
+      'ESENCIA_1': 'BAUTIZOS',
+      'ESENCIA_2': 'ESENCIA_1',
+      'ESENCIA_3': 'ESENCIA_2',
+      'SANIDAD_INTEGRAL_RAICES': 'ESENCIA_3',
+      'ESENCIA_4': 'SANIDAD_INTEGRAL_RAICES',
+      'ADIESTRAMIENTO': 'ESENCIA_4',
+      'GRADUACION': 'ADIESTRAMIENTO'
+    };
+
+    const requiredPreviousLevel = previousLevelMap[requiredLevel];
+    
+    // Si el miembro no tiene nivel actual, no es elegible (excepto PREENCUENTRO)
+    if (!memberLevel) {
+      return false;
+    }
+
+    // Comparar el nivel del miembro con el nivel requerido anterior
+    return memberLevel === requiredPreviousLevel;
+  }, [activity]); // EXCLUDED_MEMBER_IDS ya no es dependencia porque es useRef
 
   // Cargar lista de miembros
   const loadMembers = useCallback(async () => {
@@ -99,17 +150,36 @@ const ModalActivityDetails = ({
     }
   }, [isOpen, activity, loadMembers, activeTab, loadCosts]);
 
-  // Efecto para filtrar miembros según el término de búsqueda
+  // Efecto para calcular miembros elegibles cuando cambian los miembros o la actividad
+  useEffect(() => {
+    if (members.length > 0 && activity) {
+      const eligible = members.filter(member => isMemberEligible(member));
+      setEligibleMembers(eligible);
+      
+      // También resetear selección si el miembro seleccionado ya no es elegible
+      if (selectedMemberId) {
+        const selectedIsEligible = eligible.some(m => m.id === selectedMemberId);
+        if (!selectedIsEligible) {
+          setSelectedMemberId("");
+          setSelectedMemberName("");
+          setSelectedMemberLevel("");
+          setSearchTerm("");
+        }
+      }
+    }
+  }, [members, activity, isMemberEligible, selectedMemberId]);
+
+  // Efecto para filtrar miembros elegibles según el término de búsqueda
   useEffect(() => {
     if (searchTerm.trim() === "") {
-      setFilteredMembers(members);
+      setFilteredMembers(eligibleMembers);
     } else {
-      const filtered = members.filter((member) =>
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()),
+      const filtered = eligibleMembers.filter((member) =>
+        member.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredMembers(filtered);
     }
-  }, [searchTerm, members]);
+  }, [searchTerm, eligibleMembers]);
 
   // Efecto para cerrar dropdown al hacer clic fuera
   useEffect(() => {
@@ -131,11 +201,13 @@ const ModalActivityDetails = ({
     setShowDropdown(true);
     setSelectedMemberId("");
     setSelectedMemberName("");
+    setSelectedMemberLevel("");
   };
 
   const handleSelectMember = (member) => {
     setSelectedMemberId(member.id);
     setSelectedMemberName(member.name);
+    setSelectedMemberLevel(member.currentLevel || "Sin nivel");
     setSearchTerm(member.name);
     setShowDropdown(false);
   };
@@ -143,8 +215,9 @@ const ModalActivityDetails = ({
   const handleClearSelection = () => {
     setSelectedMemberId("");
     setSelectedMemberName("");
+    setSelectedMemberLevel("");
     setSearchTerm("");
-    setShowPaymentSection(false); // 👈 Ocultar sección de pago
+    setShowPaymentSection(false);
     setInitialPayment("");
     setIncomeMethod("CASH");
     setShowDropdown(true);
@@ -167,90 +240,87 @@ const ModalActivityDetails = ({
   };
 
   const handleEnroll = async () => {
-  if (!selectedMemberId) {
-    setEnrollError("Debes seleccionar un miembro");
-    return;
-  }
-
-  // Validaciones solo si hay pago inicial
-  if (showPaymentSection) {
-    if (!initialPayment || initialPayment.trim() === "") {
-      setEnrollError("Debes ingresar un monto para el pago inicial");
+    if (!selectedMemberId) {
+      setEnrollError("Debes seleccionar un miembro");
       return;
     }
 
-    const paymentAmount = parseFloat(initialPayment);
-    
-    if (paymentAmount <= 0) {
-      setEnrollError("El pago inicial debe ser mayor a cero");
-      return;
-    }
+    // Validaciones solo si hay pago inicial
+    if (showPaymentSection) {
+      if (!initialPayment || initialPayment.trim() === "") {
+        setEnrollError("Debes ingresar un monto para el pago inicial");
+        return;
+      }
 
-    if (paymentAmount > activity.price) {
-      setEnrollError(
-        `El pago inicial no puede exceder el precio de la actividad ($${activity.price?.toLocaleString("es-CO")})`,
-      );
-      return;
-    }
-
-    if (!incomeMethod) {
-      setEnrollError("Debes seleccionar un método de pago");
-      return;
-    }
-  }
-
-  setEnrolling(true);
-  setEnrollError("");
-  setEnrollSuccess("");
-
-  try {
-    const success = await onEnrollParticipant(
-      activity.id,
-      selectedMemberId,
-      showPaymentSection ? parseFloat(initialPayment) : 0,
-      incomeMethod
-    );
-
-    if (success) {
-      const successMessage = showPaymentSection 
-        ? `✅ Participante inscrito con pago inicial de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
-        : "✅ Participante inscrito exitosamente (pago pendiente)";
+      const paymentAmount = parseFloat(initialPayment);
       
-      setEnrollSuccess(successMessage);
+      if (paymentAmount <= 0) {
+        setEnrollError("El pago inicial debe ser mayor a cero");
+        return;
+      }
 
-      // Resetear formulario después de éxito
-      setSelectedMemberId("");
-      setSelectedMemberName("");
-      setSearchTerm("");
-      setShowPaymentSection(false);
-      setInitialPayment("");
-      setIncomeMethod("CASH");
+      if (paymentAmount > activity.price) {
+        setEnrollError(
+          `El pago inicial no puede exceder el precio de la actividad ($${activity.price?.toLocaleString("es-CO")})`,
+        );
+        return;
+      }
 
-      // Recargar miembros después de 1.5 segundos
-      setTimeout(() => {
-        loadMembers();
-        setEnrollSuccess("");
-      }, 1500);
-    } else {
-      // Si success es false, NO resetear el formulario
-      // El error ya fue mostrado por onEnrollParticipant
-      // Solo mantener el estado actual
+      if (!incomeMethod) {
+        setEnrollError("Debes seleccionar un método de pago");
+        return;
+      }
     }
-  } catch (error) {
-    console.error("❌ Error completo:", error);
-    
-    let errorMessage = "Error al inscribir participante";
-    if (error.response?.data?.error) {
-      errorMessage = error.response.data.error;
-    } else if (error.message) {
-      errorMessage = error.message;
+
+    setEnrolling(true);
+    setEnrollError("");
+    setEnrollSuccess("");
+
+    try {
+      const success = await onEnrollParticipant(
+        activity.id,
+        selectedMemberId,
+        showPaymentSection ? parseFloat(initialPayment) : 0,
+        incomeMethod
+      );
+
+      if (success) {
+        const successMessage = showPaymentSection 
+          ? `✅ Participante inscrito con pago inicial de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
+          : "✅ Participante inscrito exitosamente (pago pendiente)";
+        
+        setEnrollSuccess(successMessage);
+
+        // Resetear formulario después de éxito
+        setSelectedMemberId("");
+        setSelectedMemberName("");
+        setSelectedMemberLevel("");
+        setSearchTerm("");
+        setShowPaymentSection(false);
+        setInitialPayment("");
+        setIncomeMethod("CASH");
+
+        // Recargar miembros después de 1.5 segundos
+        setTimeout(() => {
+          loadMembers();
+          setEnrollSuccess("");
+        }, 1500);
+      }
+    } catch (error) {
+      console.error("❌ Error completo:", error);
+      
+      let errorMessage = "Error al inscribir participante";
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setEnrollError(errorMessage);
+    } finally {
+      setEnrolling(false);
     }
-    
-    setEnrollError(errorMessage);
-  } finally {
-    setEnrolling(false);
-  }
-};
+  };
 
   // Métodos para pestaña de costos
   const handleCostInputChange = (e) => {
@@ -363,9 +433,9 @@ const ModalActivityDetails = ({
       )
     : null;
 
-  // Calcular miembros disponibles usando balance.participantCount
+  // Calcular miembros disponibles
   const enrolledCount = balance?.participantCount || 0;
-  const availableMembersCount = Math.max(0, members.length - enrolledCount);
+  const eligibleCount = eligibleMembers.length;
   const hasCapacity = !activity.quantity || enrolledCount < activity.quantity;
 
   return (
@@ -542,20 +612,11 @@ const ModalActivityDetails = ({
                 <div className="info-message">
                   <strong>ℹ️ {members.length} miembros en el sistema</strong>
                   {enrolledCount > 0 && (
-                    <span>
-                      {" "}
-                      · {enrolledCount} ya inscritos en esta actividad
-                    </span>
+                    <span> · {enrolledCount} ya inscritos</span>
                   )}
-                  {availableMembersCount > 0 && (
-                    <span>
-                      {" "}
-                      · {availableMembersCount} disponibles para inscribir
-                    </span>
-                  )}
+                  <span> · {eligibleCount} elegibles para inscribir</span>
                   {!hasCapacity && activity.quantity && (
                     <span className="warning-text">
-                      {" "}
                       · ⚠️ Capacidad máxima alcanzada ({activity.quantity})
                     </span>
                   )}
@@ -568,7 +629,7 @@ const ModalActivityDetails = ({
 
               {enrollError && <div className="enroll-error">{enrollError}</div>}
 
-              {hasCapacity && availableMembersCount > 0 && (
+              {hasCapacity && eligibleCount > 0 && (
                 <div className="enroll-form">
                   <div className="form-group">
                     <label>Buscar Miembro *</label>
@@ -609,8 +670,7 @@ const ModalActivityDetails = ({
                           <div className="member-dropdown">
                             <div className="dropdown-header">
                               <span className="result-count">
-                                {filteredMembers.length} miembro(s)
-                                encontrado(s)
+                                {filteredMembers.length} miembro(s) elegible(s)
                               </span>
                             </div>
                             <div className="dropdown-list">
@@ -627,6 +687,9 @@ const ModalActivityDetails = ({
                                   <div className="member-name">
                                     {member.name}
                                   </div>
+                                  <div style={{ fontSize: '0.75em', color: '#666' }}>
+                                    {member.currentLevel || "Sin nivel"}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -638,7 +701,7 @@ const ModalActivityDetails = ({
                           filteredMembers.length === 0 && (
                             <div className="member-dropdown">
                               <div className="dropdown-empty">
-                                No se encontraron miembros con "{searchTerm}"
+                                No se encontraron miembros elegibles con "{searchTerm}"
                               </div>
                             </div>
                           )}
@@ -650,6 +713,9 @@ const ModalActivityDetails = ({
                         <div className="selected-member-badge">
                           <span className="selected-member-name">
                             ✅ Seleccionado: {selectedMemberName}
+                          </span>
+                          <span style={{ fontSize: '0.75em', color: '#666', marginLeft: '8px' }}>
+                            (Nivel actual: {selectedMemberLevel})
                           </span>
                         </div>
                       </div>
@@ -768,14 +834,11 @@ const ModalActivityDetails = ({
                 </div>
               )}
 
-              {hasCapacity &&
-                availableMembersCount === 0 &&
-                members.length > 0 && (
-                  <div className="info-message">
-                    ℹ️ Todos los miembros del sistema ya están inscritos en esta
-                    actividad.
-                  </div>
-                )}
+              {hasCapacity && eligibleCount === 0 && members.length > 0 && (
+                <div className="info-message">
+                  ℹ️ No hay miembros elegibles para esta actividad según el nivel requerido.
+                </div>
+              )}
             </div>
           )}
 

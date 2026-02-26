@@ -50,11 +50,8 @@ const DISTRICTS = [
 // ── Convierte cualquier formato de hora al formato HH:mm que requiere <input type="time"> ──
 const toInputTime = (timeStr) => {
   if (!timeStr) return '';
-  // Ya está en formato HH:mm
   if (/^\d{2}:\d{2}$/.test(timeStr)) return timeStr;
-  // Formato con segundos HH:mm:ss
   if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) return timeStr.slice(0, 5);
-  // Formato 12h: "7:00 PM" / "07:00 AM"
   const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (match) {
     let h = parseInt(match[1], 10);
@@ -101,6 +98,10 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
   const [deleteConfirmText, setDeleteConfirmText]  = useState('');
   const [deleting, setDeleting]                    = useState(false);
 
+  // Unlink leader sub-state
+  const [unlinkTarget, setUnlinkTarget] = useState(null); // { leaderId, leaderName, role }
+  const [unlinking, setUnlinking]       = useState(false);
+
   // Leader search for edit
   const [leaderSearchField, setLeaderSearchField] = useState(null);
   const [leaderSearchTerm, setLeaderSearchTerm]   = useState('');
@@ -132,6 +133,8 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     errorText:   isDarkMode ? '#fecaca'  : '#991b1b',
     successBg:   isDarkMode ? '#14532d30' : '#d1fae5',
     successText: isDarkMode ? '#a7f3d0'  : '#065f46',
+    warnBg:      isDarkMode ? '#78350f30' : '#fef3c7',
+    warnText:    isDarkMode ? '#fcd34d'  : '#92400e',
   };
 
   // ── Sync cell prop ──────────────────────────────────────────────────────────
@@ -163,25 +166,20 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
   }, [activeTab]);
 
   // ── Initialize edit form when switching to edit tab ──────────────────────────
-  // Se usan ?? en lugar de || para respetar valores como 0 o false.
-  // toInputTime() normaliza el formato de hora al requerido por <input type="time">.
   useEffect(() => {
     if (activeTab === 'edit' && cell) {
       setEditForm({
         name:           cell.name           ?? '',
         meetingDay:     cell.meetingDay     ?? '',
-        // Prioriza meetingTime (formato raw); toInputTime convierte "7:00 PM" → "19:00"
         meetingTime:    toInputTime(cell.meetingTime ?? cell.meetingTimeFormatted ?? ''),
         meetingAddress: cell.meetingAddress ?? '',
         maxCapacity:    cell.maxCapacity    ?? 12,
         district:       cell.district       ?? '',
         notes:          cell.notes          ?? '',
-        // IDs de líderes
         mainLeaderId:   cell.mainLeaderId   ?? null,
         groupLeaderId:  cell.groupLeaderId  ?? null,
         hostId:         cell.hostId         ?? null,
         timoteoId:      cell.timoteoId      ?? null,
-        // Nombres para mostrar en el formulario
         mainLeaderName:  cell.mainLeaderName  ?? '',
         groupLeaderName: cell.groupLeaderName ?? '',
         hostName:        cell.hostName        ?? '',
@@ -295,6 +293,55 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     }
   };
 
+  // ── Unlink leader ────────────────────────────────────────────────────────────
+  const handleConfirmUnlink = async () => {
+    if (!unlinkTarget) return;
+    setUnlinking(true); setError('');
+    try {
+      const result = await apiService.unlinkLeaderFromCell(cell.id, unlinkTarget.leaderId);
+
+      const roleToFields = {
+        mainLeader:   { idKey: 'mainLeaderId',  nameKey: 'mainLeaderName',  activeKey: 'mainLeaderIsActive' },
+        groupLeader:  { idKey: 'groupLeaderId', nameKey: 'groupLeaderName', activeKey: 'groupLeaderIsActive' },
+        host:         { idKey: 'hostId',        nameKey: 'hostName',        activeKey: 'hostIsActive' },
+        timoteo:      { idKey: 'timoteoId',     nameKey: 'timoteoName',     activeKey: 'timoteoIsActive' },
+      };
+      const fields = roleToFields[unlinkTarget.role];
+
+      // Actualizar cell state
+      setCell(prev => ({
+        ...prev,
+        status: result.newCellStatus ?? prev.status,
+        hasAllLeadersActive: false,
+        missingOrInactiveLeaders: result.missingOrInactiveLeaders ?? prev.missingOrInactiveLeaders,
+        ...(fields ? {
+          [fields.idKey]:     null,
+          [fields.nameKey]:   null,
+          [fields.activeKey]: null,
+        } : {}),
+      }));
+
+      // Limpiar también el editForm para que quede en sincronía
+      if (fields) {
+        setEditForm(prev => ({
+          ...prev,
+          [fields.idKey]:   null,
+          // nameKey en editForm usa el mismo key que en cell (ej: mainLeaderName)
+          [fields.nameKey]: '',
+        }));
+      }
+
+      showSuccess(`✂️ Líder "${unlinkTarget.leaderName}" desvinculado. Estado: ${result.newCellStatusDisplay ?? result.newCellStatus}`);
+      logUserAction('unlink_leader_from_cell', { cellId: cell.id, leaderId: unlinkTarget.leaderId, role: unlinkTarget.role });
+      if (onCellChanged) onCellChanged();
+    } catch (err) {
+      setEditError(`Error al desvincular líder: ${err.message}`);
+    } finally {
+      setUnlinking(false);
+      setUnlinkTarget(null);
+    }
+  };
+
   // ── Delete cell ──────────────────────────────────────────────────────────────
   const handleDeleteCell = async () => {
     if (deleteConfirmText !== cell.name) return;
@@ -320,15 +367,22 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     if (leaderSearchTerm.trim().length < 2) return;
     setSearchingLeaders(true);
     try {
-      const allLeaders = await apiService.getAllLeaders();
+      const servants = await apiService.getLeadersByType('SERVANT');
       const q = leaderSearchTerm.toLowerCase().trim();
-      const results = allLeaders
+      const results = (Array.isArray(servants) ? servants : [])
         .filter(l =>
           l.name?.toLowerCase().includes(q) ||
+          l.memberName?.toLowerCase().includes(q) ||
           l.document?.toLowerCase().includes(q)
         )
+        .map(l => ({
+          id: l.leaderId ?? l.id,
+          name: l.name ?? l.memberName ?? `Líder #${l.leaderId ?? l.id}`,
+          document: l.document ?? '',
+        }))
         .slice(0, 10);
       setLeaderResults(results);
+      if (results.length === 0) logError('Sin resultados para:', leaderSearchTerm);
     } catch (err) {
       logError('Error buscando líderes:', err);
       setLeaderResults([]);
@@ -456,20 +510,35 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
 
   // ── Info tab ─────────────────────────────────────────────────────────────────
   const renderInfo = () => {
-    const leaderItem = (label, name, isActive) => (
-      <div className="mcd-detail-row" style={{ borderBottomColor: T.border }}>
-        <span className="mcd-detail-label" style={{ color: T.textSub }}>{label}</span>
-        <div className="mcd-detail-value-row">
-          <span className="mcd-detail-value" style={{ color: T.text }}>{name || '—'}</span>
-          {isActive === false && (
-            <span className="mcd-badge mcd-badge--warn">⚠ Inactivo</span>
-          )}
-          {isActive === true && (
-            <span className="mcd-badge mcd-badge--ok">✓ Activo</span>
-          )}
+    const LEADER_ROLES = [
+      { role: 'mainLeader',  label: 'Líder Principal', idKey: 'mainLeaderId',  nameKey: 'mainLeaderName',  activeKey: 'mainLeaderIsActive'  },
+      { role: 'groupLeader', label: 'Líder de Grupo',  idKey: 'groupLeaderId', nameKey: 'groupLeaderName', activeKey: 'groupLeaderIsActive' },
+      { role: 'host',        label: 'Anfitrión/a',     idKey: 'hostId',        nameKey: 'hostName',        activeKey: 'hostIsActive'        },
+      { role: 'timoteo',     label: 'Timoteo',         idKey: 'timoteoId',     nameKey: 'timoteoName',     activeKey: 'timoteoIsActive'     },
+    ];
+
+    // Sin botón desvincular — solo info + badges de estado
+    const leaderItem = ({ role, label, idKey, nameKey, activeKey }) => {
+      const name     = cell[nameKey];
+      const isActive = cell[activeKey];
+
+      return (
+        <div key={role} className="mcd-detail-row mcd-detail-row--leader" style={{ borderBottomColor: T.border }}>
+          <span className="mcd-detail-label" style={{ color: T.textSub }}>{label}</span>
+          <div className="mcd-detail-value-row">
+            <span className="mcd-detail-value" style={{ color: T.text }}>{name || '—'}</span>
+            <div className="mcd-leader-row-actions">
+              {isActive === false && (
+                <span className="mcd-badge mcd-badge--warn">⚠ Inactivo</span>
+              )}
+              {isActive === true && (
+                <span className="mcd-badge mcd-badge--ok">✓ Activo</span>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-    );
+      );
+    };
 
     const infoItem = (label, value) => (
       <div className="mcd-detail-row" style={{ borderBottomColor: T.border }}>
@@ -485,11 +554,18 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
       <div className="mcd-info-grid">
         {/* Tarjeta Liderazgo */}
         <div className="mcd-card" style={{ backgroundColor: T.cardBg, borderColor: T.border }}>
-          <h4 className="mcd-card-title" style={{ color: '#1e40af' }}>👥 Equipo de Liderazgo</h4>
-          {leaderItem('Líder Principal',  cell.mainLeaderName,  cell.mainLeaderIsActive)}
-          {leaderItem('Líder de Grupo',   cell.groupLeaderName, cell.groupLeaderIsActive)}
-          {leaderItem('Anfitrión/a',      cell.hostName,        cell.hostIsActive)}
-          {leaderItem('Timoteo',          cell.timoteoName,     cell.timoteoIsActive)}
+          <div className="mcd-card-title-row">
+            <h4 className="mcd-card-title" style={{ color: '#1e40af' }}>👥 Equipo de Liderazgo</h4>
+            <button
+              className="mcd-btn mcd-btn--sm mcd-btn--secondary"
+              style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgSecondary, fontSize: '12px' }}
+              onClick={() => setActiveTab('edit')}
+              title="Ir a editar para cambiar o desvincular líderes"
+            >
+              ✏️ Gestionar líderes
+            </button>
+          </div>
+          {LEADER_ROLES.map(leaderItem)}
         </div>
 
         {/* Tarjeta Reunión */}
@@ -507,7 +583,6 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
           {infoItem('Creación',         cell.creationDateFormatted)}
           {infoItem('ID Célula',        `#${cell.id}`)}
           {infoItem('Multiplicaciones', `${cell.multiplicationCount || 0} veces`)}
-          {/* Barra de ocupación */}
           <div className="mcd-detail-row" style={{ borderBottomColor: T.border }}>
             <span className="mcd-detail-label" style={{ color: T.textSub }}>Ocupación</span>
             <div className="mcd-occupancy-inline">
@@ -773,8 +848,16 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
 
   // ── Edit tab ──────────────────────────────────────────────────────────────────
   const renderEdit = () => {
-    const leaderField = (label, idKey, nameKey) => (
-      <div className="mcd-edit-field">
+    // Roles de líderes con sus claves
+    const LEADER_ROLES_EDIT = [
+      { role: 'mainLeader',  label: 'Líder Principal', idKey: 'mainLeaderId',  nameKey: 'mainLeaderName'  },
+      { role: 'groupLeader', label: 'Líder de Grupo',  idKey: 'groupLeaderId', nameKey: 'groupLeaderName' },
+      { role: 'host',        label: 'Anfitrión/a',     idKey: 'hostId',        nameKey: 'hostName'        },
+      { role: 'timoteo',     label: 'Timoteo',         idKey: 'timoteoId',     nameKey: 'timoteoName'     },
+    ];
+
+    const leaderField = (label, idKey, nameKey, role) => (
+      <div className="mcd-edit-field" key={idKey}>
         <label className="mcd-edit-label" style={{ color: T.textSub }}>{label}</label>
         <div className="mcd-edit-leader-row">
           <div
@@ -786,6 +869,8 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
               {editForm[nameKey] || '— Sin asignar —'}
             </span>
           </div>
+
+          {/* Botón Cambiar */}
           <button
             className="mcd-btn mcd-btn--sm mcd-btn--secondary"
             style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgSecondary }}
@@ -795,9 +880,27 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
               setLeaderResults([]);
             }}
             type="button"
+            title={`Buscar y asignar un nuevo ${label}`}
           >
             🔄 Cambiar
           </button>
+
+          {/* Botón Desvincular — solo si hay líder asignado */}
+          {editForm[idKey] && (
+            <button
+              className="mcd-btn mcd-btn--sm mcd-btn--ghost-danger"
+              onClick={() => setUnlinkTarget({
+                leaderId:   editForm[idKey],
+                leaderName: editForm[nameKey] || `Líder #${editForm[idKey]}`,
+                role,
+              })}
+              disabled={loading || unlinking}
+              type="button"
+              title={`Desvincular a ${editForm[nameKey] || 'este líder'} de la célula`}
+            >
+              ✂️ Desvincular
+            </button>
+          )}
         </div>
 
         {/* Inline leader search */}
@@ -961,13 +1064,15 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
           </div>
         </div>
 
-        {/* Líderes */}
+        {/* Líderes — con Cambiar y Desvincular */}
         <div className="mcd-card" style={{ backgroundColor: T.cardBg, borderColor: T.border }}>
           <h4 className="mcd-card-title" style={{ color: '#1e40af' }}>👥 Equipo de Liderazgo</h4>
-          {leaderField('Líder Principal',  'mainLeaderId',  'mainLeaderName')}
-          {leaderField('Líder de Grupo',   'groupLeaderId', 'groupLeaderName')}
-          {leaderField('Anfitrión/a',      'hostId',        'hostName')}
-          {leaderField('Timoteo',          'timoteoId',     'timoteoName')}
+          <p style={{ fontSize: '12px', color: T.textSub, marginBottom: '12px' }}>
+            Usa <strong>🔄 Cambiar</strong> para asignar un nuevo líder, o <strong>✂️ Desvincular</strong> para liberar el rol.
+          </p>
+          {LEADER_ROLES_EDIT.map(({ label, idKey, nameKey, role }) =>
+            leaderField(label, idKey, nameKey, role)
+          )}
         </div>
 
         {/* Botones */}
@@ -987,6 +1092,50 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
           >
             {editLoading ? '⏳ Guardando…' : '💾 Guardar Cambios'}
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Unlink leader confirmation overlay ───────────────────────────────────────
+  const renderUnlinkConfirm = () => {
+    if (!unlinkTarget) return null;
+
+    return (
+      <div className="mcd-delete-overlay" onClick={() => !unlinking && setUnlinkTarget(null)}>
+        <div
+          className="mcd-delete-modal"
+          style={{ backgroundColor: T.bg, borderColor: T.border }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="mcd-delete-icon">✂️</div>
+          <h3 className="mcd-delete-title" style={{ color: T.text }}>¿Desvincular este líder?</h3>
+          <p className="mcd-delete-desc" style={{ color: T.textSub }}>
+            <strong style={{ color: T.text }}>{unlinkTarget.leaderName}</strong> será desvinculado de la célula{' '}
+            <strong style={{ color: T.text }}>{cell.name}</strong>.
+          </p>
+
+          <div className="mcd-confirm-warn" style={{ backgroundColor: T.warnBg, color: T.warnText, borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px' }}>
+            ⚠️ El líder quedará libre para ser asignado a otra célula. El estado de la célula se actualizará automáticamente a <strong>Liderazgo Incompleto</strong>.
+          </div>
+
+          <div className="mcd-delete-actions">
+            <button
+              className="mcd-btn mcd-btn--secondary"
+              onClick={() => setUnlinkTarget(null)}
+              disabled={unlinking}
+              style={{ borderColor: T.border, color: T.text, backgroundColor: T.bgSecondary }}
+            >
+              Cancelar
+            </button>
+            <button
+              className="mcd-btn mcd-btn--danger"
+              onClick={handleConfirmUnlink}
+              disabled={unlinking}
+            >
+              {unlinking ? '⏳ Desvinculando…' : '✂️ Confirmar Desvinculación'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1151,7 +1300,6 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
               📄 PDF
             </button>
 
-            {/* ── BOTÓN ELIMINAR ── */}
             <button
               className="mcd-action-btn mcd-action-btn--delete"
               onClick={() => { setShowDeleteConfirm(true); setDeleteConfirmText(''); }}
@@ -1216,7 +1364,8 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
           {activeTab === 'edit'    && renderEdit()}
         </div>
 
-        {/* ── DELETE CONFIRMATION OVERLAY ── */}
+        {/* ── OVERLAYS ── */}
+        {renderUnlinkConfirm()}
         {renderDeleteConfirm()}
       </div>
     </div>

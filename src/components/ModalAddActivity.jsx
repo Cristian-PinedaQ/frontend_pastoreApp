@@ -1,17 +1,19 @@
 // ============================================
-// ModalAddActivity.jsx
-// Modal para crear/editar actividades
+// ModalAddActivity.jsx - CORREGIDO V3
+// Vincula la actividad a una cohorte concreta (enrollmentId)
+// y usa su LevelEnrollment como requiredLevel automáticamente
 // ============================================
 
 import React, { useState, useEffect } from "react";
+import apiService from "../apiService";
 import "../css/ModalAddActivity.css";
 
-const ModalAddActivity = ({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  initialData, 
-  isEditing 
+const ModalAddActivity = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialData,
+  isEditing,
 }) => {
   const [formData, setFormData] = useState({
     activityName: "",
@@ -19,37 +21,105 @@ const ModalAddActivity = ({
     endDate: "",
     quantity: "",
     isActive: true,
+    activityType: "STANDALONE",
+    // ✅ Ahora guardamos el ID de la cohorte concreta, NO el enum del nivel
+    enrollmentId: null,
+    // requiredLevel se deriva automáticamente de la cohorte seleccionada
+    requiredLevel: null,
   });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [loadingCohorts, setLoadingCohorts] = useState(false);
+  // Cada elemento: { id, cohortName, levelEnrollment, label }
+  const [cohorts, setCohorts] = useState([]);
 
-  // Inicializar formulario con datos existentes si es edición
+  // ── Inicializar formulario ────────────────────────────────────────────────
   useEffect(() => {
-    if (isOpen && initialData) {
+    if (!isOpen) return;
+
+    if (initialData) {
       setFormData({
         activityName: initialData.activityName || "",
         price: initialData.price || "",
-        endDate: initialData.endDate 
-          ? new Date(initialData.endDate).toISOString().split('T')[0]
+        endDate: initialData.endDate
+          ? new Date(initialData.endDate).toISOString().split("T")[0]
           : "",
         quantity: initialData.quantity || "",
         isActive: initialData.isActive !== undefined ? initialData.isActive : true,
+        activityType: initialData.activityType || "STANDALONE",
+        enrollmentId: initialData.enrollmentId || null,
+        requiredLevel: initialData.requiredLevel || null,
       });
-    } else if (isOpen) {
-      // Resetear formulario para nuevo
+    } else {
       setFormData({
         activityName: "",
         price: "",
         endDate: "",
         quantity: "",
         isActive: true,
+        activityType: "STANDALONE",
+        enrollmentId: null,
+        requiredLevel: null,
       });
       setErrors({});
     }
   }, [isOpen, initialData]);
 
-  // Validar formulario
+  // ── Cargar cohortes PENDING cuando se necesitan ───────────────────────────
+  useEffect(() => {
+    if (isOpen && formData.activityType === "ENROLLMENT") {
+      loadCohortsPending();
+    }
+  }, [isOpen, formData.activityType]);
+
+  // ── Función para cargar cohortes PENDING ─────────────────────────────────
+  // ── Función para cargar cohortes PENDING ─────────────────────────────────
+const loadCohortsPending = async () => {
+  setLoadingCohorts(true);
+  try {
+    // ✅ Usar el método que llama a /enrollment/cohorts/findAll
+    //    NO getEnrollmentsCard() que es paginado
+    const data = await apiService.getEnrollments(); 
+
+    console.log("📊 [loadCohortsPending] Cohortes recibidas:", data);
+
+    if (!Array.isArray(data)) {
+      console.warn("⚠️ La respuesta no es un array:", data);
+      setCohorts([]);
+      return;
+    }
+
+    // ✅ FILTRO: solo las que tienen status === 'PENDING'
+    const pendingCohorts = data
+      .filter((cohort) => {
+        const status = cohort.status;
+        console.log(`  → ${cohort.cohortName} | status: ${status} | level: ${cohort.levelEnrollment}`);
+        return status === "PENDING";
+      })
+      .map((cohort) => ({
+        id: cohort.id,
+        cohortName: cohort.cohortName,
+        levelEnrollment: cohort.levelEnrollment,
+        label: `${cohort.cohortName} (${cohort.levelEnrollment})`,
+      }));
+
+    console.log(`✅ Cohortes PENDING disponibles: ${pendingCohorts.length}`);
+
+    if (pendingCohorts.length === 0) {
+      console.warn("⚠️ No hay cohortes con estado PENDING");
+    }
+
+    setCohorts(pendingCohorts);
+  } catch (error) {
+    console.error("❌ Error al cargar cohortes PENDING:", error);
+    setCohorts([]);
+  } finally {
+    setLoadingCohorts(false);
+  }
+};
+
+  // ── Validación ────────────────────────────────────────────────────────────
   const validateForm = () => {
     const newErrors = {};
 
@@ -74,9 +144,7 @@ const ModalAddActivity = ({
     } else {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(formData.endDate);
-      
-      if (selectedDate < today) {
+      if (new Date(formData.endDate) < today) {
         newErrors.endDate = "La fecha no puede ser anterior a hoy";
       }
     }
@@ -85,62 +153,111 @@ const ModalAddActivity = ({
       newErrors.quantity = "La cantidad no puede ser negativa";
     }
 
+    // ✅ Para ENROLLMENT se exige seleccionar una cohorte concreta
+    if (formData.activityType === "ENROLLMENT" && !formData.enrollmentId) {
+      newErrors.enrollmentId = "Debe seleccionar una cohorte PENDING";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Manejar cambio en inputs
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value
-    }));
-    
-    // Limpiar error del campo cuando el usuario empieza a escribir
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: "" }));
-    }
-  };
 
-  // Manejar envío del formulario
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const activityData = {
-        activityName: formData.activityName.trim(),
-        price: parseFloat(formData.price),
-        endDate: formData.endDate,
-        quantity: formData.quantity ? parseInt(formData.quantity) : null,
-        isActive: formData.isActive,
-      };
-
-      await onSave(activityData);
-      onClose();
-    } catch (error) {
-      console.error("Error al guardar actividad:", error);
-      setErrors(prev => ({ 
-        ...prev, 
-        general: error.message || "Error al guardar la actividad" 
+    if (name === "activityType") {
+      setFormData((prev) => ({
+        ...prev,
+        activityType: value,
+        // Limpiar datos de cohorte al cambiar a STANDALONE
+        enrollmentId: value === "STANDALONE" ? null : prev.enrollmentId,
+        requiredLevel: value === "STANDALONE" ? null : prev.requiredLevel,
       }));
-    } finally {
-      setLoading(false);
+      if (value === "ENROLLMENT") loadCohortsPending();
+    } else if (name === "enrollmentId") {
+      // ✅ Al seleccionar una cohorte, derivar automáticamente el requiredLevel
+      const selectedCohort = cohorts.find((c) => String(c.id) === value);
+      setFormData((prev) => ({
+        ...prev,
+        enrollmentId: value ? Number(value) : null,
+        // El nivel del enum se toma directamente de la cohorte seleccionada
+        requiredLevel: selectedCohort ? selectedCohort.levelEnrollment : null,
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      }));
     }
+
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  // Calcular fecha mínima (mañana)
-  const getMinDate = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split('T')[0];
-  };
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validateForm()) return;
+
+  setLoading(true);
+  try {
+    console.log("🔍 [Modal] formData completo:", JSON.stringify(formData, null, 2));
+    console.log("🔍 [Modal] cohorts disponibles:", cohorts);
+
+    // Verificar que para ENROLLMENT, enrollmentId esté presente
+    if (formData.activityType === "ENROLLMENT") {
+      if (!formData.enrollmentId) {
+        throw new Error("Debe seleccionar una cohorte para actividades ENROLLMENT");
+      }
+      console.log("🔍 [Modal] enrollmentId existe:", formData.enrollmentId);
+    }
+
+    // Crear el objeto base
+    const activityData = {
+      activityName: formData.activityName.trim(),
+      price: Number(formData.price),
+      endDate: formData.endDate,
+      quantity: formData.quantity ? Number(formData.quantity) : null,
+      isActive: formData.isActive,
+      activityType: formData.activityType,
+    };
+
+    // Para ENROLLMENT, AGREGAR enrollmentId
+    if (formData.activityType === "ENROLLMENT") {
+      activityData.enrollmentId = Number(formData.enrollmentId);
+      
+      // Verificar que se agregó correctamente
+      console.log("✅ [Modal] enrollmentId agregado:", activityData.enrollmentId);
+    }
+
+    // 🔴 LOG CRÍTICO: Ver el objeto final
+    console.log("📤 [Modal] OBJETO FINAL a enviar:", JSON.stringify(activityData, null, 2));
+    
+    // Verificar que enrollmentId está en el objeto
+    if (formData.activityType === "ENROLLMENT") {
+      console.log("🔍 [Modal] Verificación - activityData tiene enrollmentId:", 
+                  activityData.hasOwnProperty('enrollmentId'));
+      console.log("🔍 [Modal] Valor de enrollmentId en activityData:", activityData.enrollmentId);
+    }
+
+    await onSave(activityData);
+    onClose();
+  } catch (error) {
+    console.error("❌ [Modal] Error:", error);
+    setErrors((prev) => ({
+      ...prev,
+      general: error.message || "Error al guardar la actividad",
+    }));
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const getMinDate = () => new Date().toISOString().split("T")[0];
+
+  // Encontrar la cohorte seleccionada para mostrar info adicional
+  const selectedCohort = cohorts.find(
+    (c) => c.id === formData.enrollmentId
+  );
 
   if (!isOpen) return null;
 
@@ -151,8 +268,8 @@ const ModalAddActivity = ({
           <h2>
             {isEditing ? "✏️ Editar Actividad" : "➕ Crear Nueva Actividad"}
           </h2>
-          <button 
-            className="modal-add-activity__close" 
+          <button
+            className="modal-add-activity__close"
             onClick={onClose}
             disabled={loading}
           >
@@ -161,11 +278,14 @@ const ModalAddActivity = ({
         </div>
 
         <form onSubmit={handleSubmit} className="modal-add-activity__form">
-          {/* Nombre de la actividad */}
+          {/* Error general */}
+          {errors.general && (
+            <div className="form-error-general">❌ {errors.general}</div>
+          )}
+
+          {/* Nombre */}
           <div className="form-group">
-            <label htmlFor="activityName">
-              📋 Nombre de la Actividad *
-            </label>
+            <label htmlFor="activityName">📋 Nombre de la Actividad *</label>
             <input
               type="text"
               id="activityName"
@@ -180,19 +300,15 @@ const ModalAddActivity = ({
             {errors.activityName && (
               <span className="form-error">{errors.activityName}</span>
             )}
-            <div className="form-hint">
-              Mínimo 3 caracteres, máximo 100
-            </div>
+            <div className="form-hint">Mínimo 3 caracteres, máximo 100</div>
           </div>
 
           <div className="form-row">
             {/* Precio */}
             <div className="form-group">
-              <label htmlFor="price">
-                💰 Precio (COP) *
-              </label>
+              <label htmlFor="price">💰 Precio (COP) *</label>
               <div className="input-with-prefix">
-                <span className="input-prefix"></span>
+                <span className="input-prefix">$</span>
                 <input
                   type="number"
                   id="price"
@@ -211,11 +327,9 @@ const ModalAddActivity = ({
               )}
             </div>
 
-            {/* Cantidad (opcional) */}
+            {/* Capacidad */}
             <div className="form-group">
-              <label htmlFor="quantity">
-                👥 Capacidad (opcional)
-              </label>
+              <label htmlFor="quantity">👥 Capacidad (opcional)</label>
               <input
                 type="number"
                 id="quantity"
@@ -230,17 +344,13 @@ const ModalAddActivity = ({
               {errors.quantity && (
                 <span className="form-error">{errors.quantity}</span>
               )}
-              <div className="form-hint">
-                Dejar vacío para capacidad ilimitada
-              </div>
+              <div className="form-hint">Vacío = capacidad ilimitada</div>
             </div>
           </div>
 
-          {/* Fecha de finalización */}
+          {/* Fecha fin */}
           <div className="form-group">
-            <label htmlFor="endDate">
-              📅 Fecha de Finalización *
-            </label>
+            <label htmlFor="endDate">📅 Fecha de Finalización *</label>
             <input
               type="date"
               id="endDate"
@@ -259,7 +369,97 @@ const ModalAddActivity = ({
             </div>
           </div>
 
-          {/* Estado (solo en edición) */}
+          {/* Tipo de actividad */}
+          <div className="form-group">
+            <label htmlFor="activityType">🎯 Tipo de Actividad *</label>
+            <select
+              id="activityType"
+              name="activityType"
+              value={formData.activityType}
+              onChange={handleChange}
+              disabled={loading}
+            >
+              <option value="STANDALONE">📋 Libre (STANDALONE)</option>
+              <option value="ENROLLMENT">
+                📚 Vinculada a Cohorte (ENROLLMENT)
+              </option>
+            </select>
+            <div className="form-hint">
+              {formData.activityType === "STANDALONE"
+                ? "Actividad libre — cualquier miembro puede inscribirse"
+                : "El pago de esta actividad habilitará al miembro para matricularse en la cohorte seleccionada"}
+            </div>
+          </div>
+
+          {/* ✅ Selector de cohorte PENDING */}
+          {formData.activityType === "ENROLLMENT" && (
+            <div className="form-group">
+              <label htmlFor="enrollmentId">
+                📚 Cohorte PENDING *
+              </label>
+              <select
+                id="enrollmentId"
+                name="enrollmentId"
+                value={formData.enrollmentId || ""}
+                onChange={handleChange}
+                className={errors.enrollmentId ? "error" : ""}
+                disabled={loading || loadingCohorts}
+              >
+                <option value="">
+                  {loadingCohorts
+                    ? "⏳ Cargando cohortes..."
+                    : "-- Selecciona una cohorte --"}
+                </option>
+                {cohorts.length > 0
+                  ? cohorts.map((cohort) => (
+                      <option key={cohort.id} value={cohort.id}>
+                        {cohort.label}
+                      </option>
+                    ))
+                  : !loadingCohorts && (
+                      <option disabled>
+                        No hay cohortes con estado PENDING
+                      </option>
+                    )}
+              </select>
+
+              {errors.enrollmentId && (
+                <span className="form-error">{errors.enrollmentId}</span>
+              )}
+
+              {/* ✅ Info derivada automáticamente de la cohorte seleccionada */}
+              {selectedCohort && (
+                <div
+                  className="form-hint"
+                  style={{
+                    background: "#e8f5e9",
+                    border: "1px solid #a5d6a7",
+                    borderRadius: "6px",
+                    padding: "8px 12px",
+                    marginTop: "6px",
+                  }}
+                >
+                  ✅ <strong>Nivel detectado:</strong>{" "}
+                  <code>{selectedCohort.levelEnrollment}</code>
+                  <br />
+                  <small>
+                    El campo <em>requiredLevel</em> se enviará automáticamente
+                    al backend como{" "}
+                    <strong>{selectedCohort.levelEnrollment}</strong>. Los
+                    miembros deben cumplir el nivel previo para inscribirse.
+                  </small>
+                </div>
+              )}
+
+              <div className="form-hint">
+                ℹ️ Solo se muestran cohortes con estado{" "}
+                <strong>PENDING</strong>. Al pagar esta actividad, el miembro
+                quedará habilitado para matricularse en la cohorte.
+              </div>
+            </div>
+          )}
+
+          {/* Estado (solo edición) */}
           {isEditing && (
             <div className="form-group form-group-checkbox">
               <label className="checkbox-label">
@@ -278,13 +478,6 @@ const ModalAddActivity = ({
               <div className="form-hint">
                 Las actividades inactivas no aparecen en búsquedas normales
               </div>
-            </div>
-          )}
-
-          {/* Error general */}
-          {errors.general && (
-            <div className="form-error-general">
-              ❌ {errors.general}
             </div>
           )}
 

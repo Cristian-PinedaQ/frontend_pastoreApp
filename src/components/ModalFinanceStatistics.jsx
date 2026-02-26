@@ -3,7 +3,7 @@
 // ✅ Gráficas dinámicas según filtro seleccionado
 // ✅ Genera PDF con información del filtro
 // ✅ Totalmente legible en modo oscuro
-// ✅ CAMBIOS MÍNIMOS - SIN ROMPER NADA
+// ✅ Números en millones correctamente formateados en gráficas
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
@@ -12,8 +12,7 @@ import {
 } from 'recharts';
 import { generateFilteredFinancePDF } from '../services/financepdfgenerator';
 
-// ========== CONSTANTES GLOBALES (CAMBIO #1) ==========
-// ✅ Movidas aquí para que no cambien en cada render
+// ========== CONSTANTES GLOBALES ==========
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 const COLORS_PALETTE = {
@@ -21,6 +20,26 @@ const COLORS_PALETTE = {
   method: ['#2563eb', '#0891b2', '#059669', '#d97706', '#7c3aed'],
   verified: '#10b981',
   unverified: '#f59e0b',
+};
+
+// ========== FORMATTERS ==========
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value);
+};
+
+const formatYAxis = (value) => {
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(1)}M`;
+  }
+  if (value >= 1) {
+    return `$${value}K`;
+  }
+  return `$${value}`;
 };
 
 const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinances = [] }) => {
@@ -170,7 +189,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
     gridColor: isDarkMode ? '#334155' : '#e0e0e0',
   };
 
-  // ========== CAMBIO #2: Usar COLORS_PALETTE (constante global) ==========
+  // Datos para gráficas
   const conceptChartData = useMemo(() => {
     const stats = getFilteredStatistics;
     if (!stats || !stats.byConcept) return [];
@@ -187,12 +206,12 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
     return Object.entries(stats.byConcept).map(([key, value], index) => ({
       name: conceptMap[key] || key,
       cantidad: value.count,
-      monto: parseFloat((value.total / 1000).toFixed(2)),
+      monto: parseFloat((value.total / 1000).toFixed(2)), // Mantenemos en miles para la gráfica
+      montoReal: value.total, // Guardamos el valor real para el tooltip
       fill: COLORS_PALETTE.concept[index % COLORS_PALETTE.concept.length],
     }));
   }, [getFilteredStatistics]);
 
-  // ========== CAMBIO #3: Usar COLORS_PALETTE (constante global) ==========
   const methodChartData = useMemo(() => {
     const stats = getFilteredStatistics;
     if (!stats || !stats.byMethod) return [];
@@ -205,12 +224,12 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
     return Object.entries(stats.byMethod).map(([key, value], index) => ({
       name: methodMap[key] || key,
       cantidad: value.count,
-      monto: parseFloat((value.total / 1000).toFixed(2)),
+      monto: parseFloat((value.total / 1000).toFixed(2)), // Mantenemos en miles para la gráfica
+      montoReal: value.total, // Guardamos el valor real para el tooltip
       fill: COLORS_PALETTE.method[index % COLORS_PALETTE.method.length],
     }));
   }, [getFilteredStatistics]);
 
-  // ========== CAMBIO #4: Usar COLORS_PALETTE (constante global) ==========
   const verificationData = useMemo(() => {
     const stats = getFilteredStatistics;
     if (!stats) return [];
@@ -231,7 +250,6 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
     ];
   }, [getFilteredStatistics]);
 
-  // ========== CAMBIO #5: useCallback para evitar warnings ==========
   const handleExportFilteredPDF = useCallback(() => {
     try {
       const filterInfo = {
@@ -551,19 +569,19 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
               {
                 icon: '💵',
                 label: 'Monto Total',
-                value: `$ ${(displayStats.totalAmount || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })}`,
+                value: formatCurrency(displayStats.totalAmount || 0),
                 color: theme.text,
               },
               {
                 icon: '✅',
                 label: 'Verificados',
-                value: `${displayStats.verifiedCount} - $ ${(displayStats.verifiedAmount || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })}`,
+                value: `${displayStats.verifiedCount} - ${formatCurrency(displayStats.verifiedAmount || 0)}`,
                 color: COLORS_PALETTE.verified,
               },
               {
                 icon: '⏳',
                 label: 'Pendientes de Verificar',
-                value: `${displayStats.unverifiedCount} - $ ${(displayStats.unverifiedAmount || 0).toLocaleString('es-CO', { maximumFractionDigits: 2 })}`,
+                value: `${displayStats.unverifiedCount} - ${formatCurrency(displayStats.unverifiedAmount || 0)}`,
                 color: COLORS_PALETTE.unverified,
               },
             ].map((stat, idx) => (
@@ -625,7 +643,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                   Comparativa Mensual - {selectedYear}
                 </h3>
                 <ResponsiveContainer width="100%" height={350}>
-                  <LineChart data={monthlyComparisonData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
+                  <LineChart data={monthlyComparisonData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
                     <XAxis
                       dataKey="month"
@@ -634,7 +652,10 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                       height={100}
                       tick={{ fontSize: 12, fill: theme.text }}
                     />
-                    <YAxis tick={{ fontSize: 12, fill: theme.text }} />
+                    <YAxis 
+                      tick={{ fontSize: 12, fill: theme.text }}
+                      tickFormatter={formatYAxis}
+                    />
                     <Tooltip
                       contentStyle={{
                         backgroundColor: theme.card,
@@ -642,7 +663,8 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                         borderRadius: '8px',
                         color: theme.text,
                       }}
-                      formatter={(value) => `$ ${value.toLocaleString()}`}
+                      formatter={(value) => [formatCurrency(value), 'Total Mensual']}
+                      labelFormatter={(label) => `Mes: ${label}`}
                     />
                     <Legend wrapperStyle={{ color: theme.text }} />
                     <Line
@@ -680,7 +702,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                   </h3>
                   {conceptChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={400}>
-                      <BarChart data={conceptChartData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
+                      <BarChart data={conceptChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
                         <XAxis
                           dataKey="name"
@@ -689,7 +711,16 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                           height={100}
                           tick={{ fontSize: 12, fill: theme.text }}
                         />
-                        <YAxis tick={{ fontSize: 12, fill: theme.text }} />
+                        <YAxis 
+                          tick={{ fontSize: 12, fill: theme.text }}
+                          tickFormatter={formatYAxis}
+                          label={{ 
+                            value: 'Valores en Miles', 
+                            angle: -90, 
+                            position: 'insideLeft',
+                            style: { fill: theme.textSecondary, fontSize: 11 }
+                          }}
+                        />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: theme.card,
@@ -697,7 +728,14 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                             borderRadius: '8px',
                             color: theme.text,
                           }}
-                          formatter={(value) => `$ ${value.toLocaleString()}`}
+                          formatter={(value, name, props) => {
+                            if (name === "Monto (Miles)") {
+                              const realValue = props.payload.montoReal;
+                              return [formatCurrency(realValue), "Monto Total"];
+                            }
+                            return [formatCurrency(value), name];
+                          }}
+                          labelFormatter={(label) => `Concepto: ${label}`}
                         />
                         <Legend wrapperStyle={{ color: theme.text }} />
                         <Bar dataKey="monto" fill="#3b82f6" name="Monto (Miles)" />
@@ -728,7 +766,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                   </h3>
                   {methodChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={400}>
-                      <BarChart data={methodChartData} margin={{ top: 20, right: 30, left: 0, bottom: 60 }}>
+                      <BarChart data={methodChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
                         <XAxis
                           dataKey="name"
@@ -737,7 +775,16 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                           height={100}
                           tick={{ fontSize: 12, fill: theme.text }}
                         />
-                        <YAxis tick={{ fontSize: 12, fill: theme.text }} />
+                        <YAxis 
+                          tick={{ fontSize: 12, fill: theme.text }}
+                          tickFormatter={formatYAxis}
+                          label={{ 
+                            value: 'Valores en Miles', 
+                            angle: -90, 
+                            position: 'insideLeft',
+                            style: { fill: theme.textSecondary, fontSize: 11 }
+                          }}
+                        />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: theme.card,
@@ -745,7 +792,14 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                             borderRadius: '8px',
                             color: theme.text,
                           }}
-                          formatter={(value) => `$ ${value.toLocaleString()}`}
+                          formatter={(value, name, props) => {
+                            if (name === "Monto (Miles)") {
+                              const realValue = props.payload.montoReal;
+                              return [formatCurrency(realValue), "Monto Total"];
+                            }
+                            return [formatCurrency(value), name];
+                          }}
+                          labelFormatter={(label) => `Método: ${label}`}
                         />
                         <Legend wrapperStyle={{ color: theme.text }} />
                         <Bar dataKey="monto" fill="#0891b2" name="Monto (Miles)" />
@@ -801,7 +855,12 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => `${value} registros`}
+                          formatter={(value, name, props) => {
+                            if (name === "cantidad") {
+                              return [`${value} registros`, 'Cantidad'];
+                            }
+                            return [value, name];
+                          }}
                           contentStyle={{
                             backgroundColor: theme.card,
                             border: `1px solid ${theme.border}`,
@@ -850,7 +909,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => `${value} registros`}
+                          formatter={(value) => [`${value} registros`, 'Cantidad']}
                           contentStyle={{
                             backgroundColor: theme.card,
                             border: `1px solid ${theme.border}`,
@@ -895,7 +954,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                   </h3>
                   {conceptChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={conceptChartData} margin={{ top: 20, right: 20, left: 0, bottom: 40 }}>
+                      <BarChart data={conceptChartData} margin={{ top: 20, right: 20, left: 20, bottom: 40 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
                         <XAxis
                           dataKey="name"
@@ -904,9 +963,15 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                           height={80}
                           tick={{ fontSize: 11, fill: theme.text }}
                         />
-                        <YAxis tick={{ fontSize: 11, fill: theme.text }} />
+                        <YAxis 
+                          tick={{ fontSize: 11, fill: theme.text }}
+                          tickFormatter={formatYAxis}
+                        />
                         <Tooltip
-                          formatter={(value) => `$ ${value.toLocaleString()}`}
+                          formatter={(value, name, props) => {
+                            const realValue = props.payload.montoReal;
+                            return [formatCurrency(realValue), "Monto Total"];
+                          }}
                           contentStyle={{
                             backgroundColor: theme.card,
                             border: `1px solid ${theme.border}`,
@@ -955,7 +1020,7 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value) => `${value}`}
+                          formatter={(value) => [`${value} registros`, 'Cantidad']}
                           contentStyle={{
                             backgroundColor: theme.card,
                             border: `1px solid ${theme.border}`,
@@ -1042,14 +1107,14 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                             textAlign: 'center',
                             color: theme.text,
                           }}>
-                            $ {(item.monto * 1000).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                            {formatCurrency(item.montoReal)}
                           </td>
                           <td style={{
                             padding: '12px',
                             textAlign: 'center',
                             color: theme.text,
                           }}>
-                            $ {((item.monto * 1000) / item.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                            {formatCurrency(item.montoReal / item.cantidad)}
                           </td>
                         </tr>
                       ))}
@@ -1123,14 +1188,14 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
                             textAlign: 'center',
                             color: theme.text,
                           }}>
-                            $ {(item.monto * 1000).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                            {formatCurrency(item.montoReal)}
                           </td>
                           <td style={{
                             padding: '12px',
                             textAlign: 'center',
                             color: theme.text,
                           }}>
-                            $ {((item.monto * 1000) / item.cantidad).toLocaleString('es-CO', { maximumFractionDigits: 0 })}
+                            {formatCurrency(item.montoReal / item.cantidad)}
                           </td>
                         </tr>
                       ))}

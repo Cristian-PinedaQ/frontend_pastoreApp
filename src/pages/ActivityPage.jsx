@@ -368,74 +368,105 @@ const ActivityPage = () => {
     applyFilters();
   }, [applyFilters]);
 
-  // ========== AGREGAR ACTIVIDAD ==========
-  const handleAddActivity = useCallback(async (activityData) => {
-    try {
-      log("Creando nueva actividad");
+// ========== AGREGAR ACTIVIDAD ==========
+const handleAddActivity = useCallback(async (activityData) => {
+  try {
+    console.log("🔍 [ActivityPage] RECIBIDO del modal:", JSON.stringify(activityData, null, 2));
 
-      if (!activityData || typeof activityData !== "object") {
-        setError("Datos de actividad inválidos");
-        return;
-      }
-
-      await apiService.request("/activity/save", {
-        method: "POST",
-        body: JSON.stringify(activityData),
-      });
-
-      log("Actividad creada exitosamente");
-
-      logUserAction("create_activity", {
-        name: activityData.activityName,
-        price: activityData.price,
-        timestamp: new Date().toISOString(),
-      });
-
-      alert("Actividad creada exitosamente");
-      setShowAddModal(false);
-      loadActivities();
-    } catch (err) {
-      logError("Error creando actividad:", err);
-      setError("Error al crear actividad: " + (err.message || ""));
+    if (!activityData || typeof activityData !== "object") {
+      setError("Datos de actividad inválidos");
+      return;
     }
-  }, [loadActivities]);
+
+    // Verificar específicamente para ENROLLMENT
+    if (activityData.activityType === "ENROLLMENT") {
+      console.log("🔍 [ActivityPage] Es ENROLLMENT, enrollmentId en activityData:", 
+                  activityData.enrollmentId);
+      
+      if (!activityData.enrollmentId) {
+        throw new Error("Falta enrollmentId para actividad ENROLLMENT");
+      }
+      
+      if (isNaN(activityData.enrollmentId)) {
+        throw new Error("enrollmentId debe ser un número");
+      }
+    }
+
+    // 🔴 LOG CRÍTICO: Ver qué se envía al backend
+    console.log("📤 [ActivityPage] Enviando al backend:", JSON.stringify(activityData, null, 2));
+
+    const response = await apiService.request('/activity/save', {
+      method: 'POST',
+      body: JSON.stringify(activityData)
+    });
+
+    console.log("✅ [ActivityPage] Respuesta del backend:", response);
+
+    logUserAction("create_activity", {
+      name: activityData.activityName,
+      price: activityData.price,
+      timestamp: new Date().toISOString(),
+    });
+
+    alert("✅ Actividad creada exitosamente");
+    setShowAddModal(false);
+    await loadActivities();
+    
+    return response;
+  } catch (err) {
+    console.error("❌ [ActivityPage] Error:", err);
+    setError(err.message || "Error al crear actividad");
+    throw err;
+  }
+}, [loadActivities]);
 
   // ========== ACTUALIZAR ACTIVIDAD ==========
-  const handleUpdateActivity = useCallback(async (activityId, activityData) => {
-    try {
-      if (!activityId) {
-        setError("ID de actividad inválido");
-        return;
-      }
-
-      if (!activityData || typeof activityData !== "object") {
-        setError("Datos de actividad inválidos");
-        return;
-      }
-
-      log("Actualizando actividad", { activityId });
-
-      await apiService.request(`/activity/patch/${activityId}`, {
-        method: "PATCH",
-        body: JSON.stringify(activityData),
-      });
-
-      log("Actividad actualizada exitosamente");
-
-      logUserAction("update_activity", {
-        activityId,
-        timestamp: new Date().toISOString(),
-      });
-
-      alert("Actividad actualizada exitosamente");
-      setShowAddModal(false);
-      setSelectedActivity(null);
-      loadActivities();
-    } catch (err) {
-      logError("Error actualizando actividad:", err);
-      setError("Error al actualizar actividad: " + (err.message || ""));
+  // ========== ACTUALIZAR ACTIVIDAD ==========
+const handleUpdateActivity = useCallback(async (activityId, activityData) => {
+  try {
+    if (!activityId) {
+      setError("ID de actividad inválido");
+      return;
     }
-  }, [loadActivities]);
+
+    if (!activityData || typeof activityData !== "object") {
+      setError("Datos de actividad inválidos");
+      return;
+    }
+
+    log("Actualizando actividad", { activityId, activityData });
+
+    // ✅ CORREGIDO: Usar apiService.request con el método correcto
+    const response = await apiService.request(`/activity/patch/${activityId}`, {
+      method: "PATCH",
+      body: JSON.stringify(activityData),
+    });
+
+    log("Actividad actualizada exitosamente", response);
+
+    logUserAction("update_activity", {
+      activityId,
+      timestamp: new Date().toISOString(),
+    });
+
+    alert("✅ Actividad actualizada exitosamente");
+    setShowAddModal(false);
+    setSelectedActivity(null);
+    await loadActivities(); // Recargar la lista
+    
+    return response;
+  } catch (err) {
+    logError("Error actualizando actividad:", err);
+    
+    let errorMessage = "Error al actualizar actividad";
+    if (err.message) {
+      errorMessage = err.message;
+    }
+    
+    setError(errorMessage);
+    throw err;
+  }
+}, [loadActivities]);
 
   // ========== ELIMINAR/DESACTIVAR ACTIVIDAD ==========
   const handleDeleteActivity = useCallback(async (activityId) => {

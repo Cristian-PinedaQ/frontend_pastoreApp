@@ -672,7 +672,6 @@ class ApiService {
 
   async recordAttendance(attendanceData) {
     try {
-      // ✅ Validaciones
       if (!attendanceData || typeof attendanceData !== 'object') {
         throw new Error('Datos de asistencia inválidos');
       }
@@ -826,7 +825,6 @@ async createFinance(financeData) {
       throw new Error('Datos de finanza inválidos');
     }
 
-    // Auto-llenar recordedBy con username del usuario actual
     let recordedBy = financeData.recordedBy;
     if (!recordedBy) {
       const currentUser = this.getCurrentUser();
@@ -846,11 +844,6 @@ async createFinance(financeData) {
       isVerified: financeData.isVerified || false,
     };
 
-    // ✅ NUEVO: Generar idempotency key única para este submit
-    // Formato: finance-{timestamp}-{random8chars}
-    // Esto garantiza que cada clic del botón "Registrar" tenga una key distinta.
-    // Si el mismo request llega dos veces al backend (doble clic, red inestable),
-    // el segundo recibe 409 CONFLICT sin crear un registro duplicado.
     const idempotencyKey = `finance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     log('📤 [createFinance] Enviando con idempotencyKey:', idempotencyKey);
 
@@ -861,7 +854,6 @@ async createFinance(financeData) {
         body: JSON.stringify(body),
       },
       {
-        // ✅ CLAVE: Enviar el header que el Controller espera
         'X-Idempotency-Key': idempotencyKey,
       }
     );
@@ -883,7 +875,6 @@ async createFinance(financeData) {
         throw new Error('Datos de finanza inválidos');
       }
 
-      // ✅ Auto-llenar recordedBy con username del usuario actual
       let recordedBy = financeData.recordedBy;
       if (!recordedBy) {
         const currentUser = this.getCurrentUser();
@@ -1037,10 +1028,6 @@ async createFinance(financeData) {
 
   // ========== 👥 LÍDERES ==========
 
-  /**
-   * Obtener todos los líderes
-   * GET /api/v1/leaders
-   */
   async getLeaders() {
     try {
       log('📋 [getLeaders] Obteniendo todos los líderes');
@@ -1053,10 +1040,6 @@ async createFinance(financeData) {
     }
   }
 
-  /**
-   * Obtener líderes activos
-   * GET /api/v1/leaders/active
-   */
   async getActiveLeaders() {
     try {
       log('✅ [getActiveLeaders] Obteniendo líderes activos');
@@ -1068,10 +1051,6 @@ async createFinance(financeData) {
     }
   }
 
-  /**
-   * Obtener líderes suspendidos
-   * GET /api/v1/leaders/suspended
-   */
   async getSuspendedLeaders() {
     try {
       log('⏸️ [getSuspendedLeaders] Obteniendo líderes suspendidos');
@@ -1083,10 +1062,6 @@ async createFinance(financeData) {
     }
   }
 
-  /**
-   * Obtener líderes inactivos
-   * GET /api/v1/leaders/inactive
-   */
   async getInactiveLeaders() {
     try {
       log('⏹️ [getInactiveLeaders] Obteniendo líderes inactivos');
@@ -1098,10 +1073,6 @@ async createFinance(financeData) {
     }
   }
 
-  /**
-   * Obtener líder por ID
-   * GET /api/v1/leaders/{id}
-   */
   async getLeaderById(id) {
     try {
       validateId(id, 'leaderId');
@@ -1114,10 +1085,6 @@ async createFinance(financeData) {
     }
   }
 
-  /**
-   * Obtener líder por ID de miembro
-   * GET /api/v1/leaders/member/{memberId}
-   */
   async getLeaderByMemberId(memberId) {
     try {
       validateId(memberId, 'memberId');
@@ -1130,111 +1097,79 @@ async createFinance(financeData) {
     }
   }
 
-  /**
- * Obtener líderes por tipo
- * GET /api/v1/leaders/type/{leaderType}
- */
-async getLeadersByType(leaderType) {
-  try {
-    validateString(leaderType, 'leaderType', 1, 50);
-    
-    // ✅ ACTUALIZADO: Validar tipo
-    if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
-      throw new Error('Tipo de líder inválido');
-    }
-    
-    log('🔍 [getLeadersByType] Buscando líderes tipo:', leaderType);
-    const response = await this.request(`/leaders/type/${leaderType}`);
-    return response;
-  } catch (error) {
-    logError('❌ [getLeadersByType] Error:', error.message);
-    throw error;
-  }
-}
-
-  /**
- * Promover miembro a líder
- * POST /api/v1/leaders/promote
- */
-async promoteToLeader(memberId, leaderType, cellGroupCode = null, notes = null) {
-  try {
-    validateId(memberId, 'memberId');
-    validateString(leaderType, 'leaderType', 1, 50);
-    
-    // ✅ ACTUALIZADO: Incluir LEADER_144
-    if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
-      throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
-    }
-
-    const params = new URLSearchParams();
-    params.append('memberId', memberId);
-    params.append('leaderType', leaderType);
-    if (cellGroupCode) params.append('cellGroupCode', cellGroupCode.trim());
-    if (notes) params.append('notes', notes.trim());
-
-    log('🌟 [promoteToLeader] Promoviendo miembro:', { memberId, leaderType });
-
-    const response = await this.request(`/leaders/promote?${params.toString()}`, {
-      method: 'POST',
-    });
-
-    log('✅ [promoteToLeader] Éxito - Líder ID:', response?.leaderId);
-    return response;
-  } catch (error) {
-    logError('❌ [promoteToLeader] Error:', error.message);
-    throw error;
-  }
-}
-
- /**
- * Verificar elegibilidad de un miembro para ser líder
- * GET /api/v1/leaders/eligibility/{memberId}
- */
-async checkEligibility(memberId, leaderType) {
-  try {
-    validateId(memberId, 'memberId');
-    validateString(leaderType, 'leaderType', 1, 50);
-
-    // ✅ ACTUALIZADO: Incluir LEADER_144
-    if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
-      throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
-    }
-
-    log('🔍 [checkEligibility] Verificando miembro:', { memberId, leaderType });
-
-    const response = await this.request(`/leaders/eligibility/${memberId}?leaderType=${leaderType}`);
-
-    log('📊 [checkEligibility] Resultado:', {
-      isEligible: response?.isEligible,
-      passed: response?.passedRequirements?.length || 0,
-      failed: response?.failedRequirements?.length || 0
-    });
-
-    return response;
-  } catch (error) {
-    logError('❌ [checkEligibility] Error:', error.message);
-    throw error;
-  }
-}
-
-  /**
-   * Verificar todos los líderes activos automáticamente
-   * POST /api/v1/leaders/verify-all
-   */
-  async verifyAllLeaders() {
+  async getLeadersByType(leaderType) {
     try {
-      log('🔄 [verifyAllLeaders] Verificando todos los líderes activos');
+      validateString(leaderType, 'leaderType', 1, 50);
+      if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+        throw new Error('Tipo de líder inválido');
+      }
+      log('🔍 [getLeadersByType] Buscando líderes tipo:', leaderType);
+      const response = await this.request(`/leaders/type/${leaderType}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getLeadersByType] Error:', error.message);
+      throw error;
+    }
+  }
 
-      const response = await this.request('/leaders/verify-all', {
+  async promoteToLeader(memberId, leaderType, cellGroupCode = null, notes = null) {
+    try {
+      validateId(memberId, 'memberId');
+      validateString(leaderType, 'leaderType', 1, 50);
+      if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+        throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
+      }
+
+      const params = new URLSearchParams();
+      params.append('memberId', memberId);
+      params.append('leaderType', leaderType);
+      if (cellGroupCode) params.append('cellGroupCode', cellGroupCode.trim());
+      if (notes) params.append('notes', notes.trim());
+
+      log('🌟 [promoteToLeader] Promoviendo miembro:', { memberId, leaderType });
+
+      const response = await this.request(`/leaders/promote?${params.toString()}`, {
         method: 'POST',
       });
 
-      log('✅ [verifyAllLeaders] Éxito -', {
-        total: response?.totalVerified,
-        suspendidos: response?.suspended,
-        válidos: response?.stillValid
+      log('✅ [promoteToLeader] Éxito - Líder ID:', response?.leaderId);
+      return response;
+    } catch (error) {
+      logError('❌ [promoteToLeader] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async checkEligibility(memberId, leaderType) {
+    try {
+      validateId(memberId, 'memberId');
+      validateString(leaderType, 'leaderType', 1, 50);
+      if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+        throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
+      }
+
+      log('🔍 [checkEligibility] Verificando miembro:', { memberId, leaderType });
+
+      const response = await this.request(`/leaders/eligibility/${memberId}?leaderType=${leaderType}`);
+
+      log('📊 [checkEligibility] Resultado:', {
+        isEligible: response?.isEligible,
+        passed: response?.passedRequirements?.length || 0,
+        failed: response?.failedRequirements?.length || 0
       });
 
+      return response;
+    } catch (error) {
+      logError('❌ [checkEligibility] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async verifyAllLeaders() {
+    try {
+      log('🔄 [verifyAllLeaders] Verificando todos los líderes activos');
+      const response = await this.request('/leaders/verify-all', { method: 'POST' });
+      log('✅ [verifyAllLeaders] Éxito -', { total: response?.totalVerified, suspendidos: response?.suspended, válidos: response?.stillValid });
       return response;
     } catch (error) {
       logError('❌ [verifyAllLeaders] Error:', error.message);
@@ -1242,25 +1177,16 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Verificar un líder específico
-   * POST /api/v1/leaders/{id}/verify
-   */
   async verifyLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('🔍 [verifyLeader] Verificando líder ID:', leaderId);
-
-      const response = await this.request(`/leaders/${leaderId}/verify`, {
-        method: 'POST',
-      });
-
+      const response = await this.request(`/leaders/${leaderId}/verify`, { method: 'POST' });
       if (response?.wasSuspended) {
         log('⚠️ [verifyLeader] Líder suspendido automáticamente');
       } else {
         log('✅ [verifyLeader] Líder verificado, cumple requisitos');
       }
-
       return response;
     } catch (error) {
       logError('❌ [verifyLeader] Error:', error.message);
@@ -1268,24 +1194,11 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Intentar reactivar líderes suspendidos
-   * POST /api/v1/leaders/reactivate-suspended
-   */
   async reactivateSuspendedLeaders() {
     try {
       log('▶️ [reactivateSuspendedLeaders] Intentando reactivar suspendidos');
-
-      const response = await this.request('/leaders/reactivate-suspended', {
-        method: 'POST',
-      });
-
-      log('✅ [reactivateSuspendedLeaders] Éxito -', {
-        revisados: response?.totalChecked,
-        reactivados: response?.reactivated,
-        aúnSuspendidos: response?.stillSuspended
-      });
-
+      const response = await this.request('/leaders/reactivate-suspended', { method: 'POST' });
+      log('✅ [reactivateSuspendedLeaders] Éxito -', { revisados: response?.totalChecked, reactivados: response?.reactivated, aúnSuspendidos: response?.stillSuspended });
       return response;
     } catch (error) {
       logError('❌ [reactivateSuspendedLeaders] Error:', error.message);
@@ -1293,24 +1206,14 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Suspender un líder manualmente
-   * PUT /api/v1/leaders/{id}/suspend
-   */
   async suspendLeader(leaderId, reason) {
     try {
       validateId(leaderId, 'leaderId');
       validateString(reason, 'reason', 3, 500);
-
       log('⏸️ [suspendLeader] Suspendiendo líder ID:', leaderId);
-
       const params = new URLSearchParams();
       params.append('reason', reason.trim());
-
-      const response = await this.request(`/leaders/${leaderId}/suspend?${params.toString()}`, {
-        method: 'PUT',
-      });
-
+      const response = await this.request(`/leaders/${leaderId}/suspend?${params.toString()}`, { method: 'PUT' });
       log('✅ [suspendLeader] Líder suspendido');
       return response;
     } catch (error) {
@@ -1319,19 +1222,11 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Reactivar un líder suspendido
-   * PUT /api/v1/leaders/{id}/unsuspend
-   */
   async unsuspendLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('▶️ [unsuspendLeader] Reactivando líder suspendido ID:', leaderId);
-
-      const response = await this.request(`/leaders/${leaderId}/unsuspend`, {
-        method: 'PUT',
-      });
-
+      const response = await this.request(`/leaders/${leaderId}/unsuspend`, { method: 'PUT' });
       log('✅ [unsuspendLeader] Líder reactivado');
       return response;
     } catch (error) {
@@ -1340,24 +1235,14 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Desactivar un líder manualmente
-   * PUT /api/v1/leaders/{id}/deactivate
-   */
   async deactivateLeader(leaderId, reason) {
     try {
       validateId(leaderId, 'leaderId');
       validateString(reason, 'reason', 3, 500);
-
       log('⏹️ [deactivateLeader] Desactivando líder ID:', leaderId);
-
       const params = new URLSearchParams();
       params.append('reason', reason.trim());
-
-      const response = await this.request(`/leaders/${leaderId}/deactivate?${params.toString()}`, {
-        method: 'PUT',
-      });
-
+      const response = await this.request(`/leaders/${leaderId}/deactivate?${params.toString()}`, { method: 'PUT' });
       log('✅ [deactivateLeader] Líder desactivado');
       return response;
     } catch (error) {
@@ -1366,19 +1251,11 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Reactivar un líder inactivo
-   * PUT /api/v1/leaders/{id}/reactivate
-   */
   async reactivateLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('▶️ [reactivateLeader] Reactivando líder inactivo ID:', leaderId);
-
-      const response = await this.request(`/leaders/${leaderId}/reactivate`, {
-        method: 'PUT',
-      });
-
+      const response = await this.request(`/leaders/${leaderId}/reactivate`, { method: 'PUT' });
       log('✅ [reactivateLeader] Líder reactivado');
       return response;
     } catch (error) {
@@ -1387,14 +1264,9 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Actualizar información de un líder
-   * PUT /api/v1/leaders/{id}
-   */
   async updateLeader(leaderId, leaderType = null, cellGroupCode = null, notes = null) {
     try {
       validateId(leaderId, 'leaderId');
-
       const params = new URLSearchParams();
       if (leaderType) {
         validateString(leaderType, 'leaderType', 1, 50);
@@ -1402,13 +1274,8 @@ async checkEligibility(memberId, leaderType) {
       }
       if (cellGroupCode) params.append('cellGroupCode', cellGroupCode.trim());
       if (notes) params.append('notes', notes.trim());
-
       log('📝 [updateLeader] Actualizando líder ID:', leaderId);
-
-      const response = await this.request(`/leaders/${leaderId}?${params.toString()}`, {
-        method: 'PUT',
-      });
-
+      const response = await this.request(`/leaders/${leaderId}?${params.toString()}`, { method: 'PUT' });
       log('✅ [updateLeader] Líder actualizado');
       return response;
     } catch (error) {
@@ -1417,23 +1284,11 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Obtener estadísticas de liderazgo
-   * GET /api/v1/leaders/statistics
-   */
   async getLeaderStatistics() {
     try {
       log('📊 [getLeaderStatistics] Obteniendo estadísticas');
-
       const response = await this.request('/leaders/statistics');
-
-      log('✅ [getLeaderStatistics] Éxito -', {
-        total: response?.totalLeaders,
-        activos: response?.activeLeaders,
-        suspendidos: response?.suspendedLeaders,
-        inactivos: response?.inactiveLeaders
-      });
-
+      log('✅ [getLeaderStatistics] Éxito -', { total: response?.totalLeaders, activos: response?.activeLeaders, suspendidos: response?.suspendedLeaders, inactivos: response?.inactiveLeaders });
       return response;
     } catch (error) {
       logError('❌ [getLeaderStatistics] Error:', error.message);
@@ -1441,46 +1296,26 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Buscar miembros que NO son líderes (para promoción)
-   * GET /api/v1/members/search?term=
-   */
   async searchMembers(term) {
     try {
-      if (!term || term.trim().length < 2) {
-        return [];
-      }
-
+      if (!term || term.trim().length < 2) return [];
       validateString(term, 'searchTerm', 2, 100);
-      
       log('🔍 [searchMembers] Buscando:', term);
-
-      // Primero obtener todos los miembros
       const allMembers = await this.getAllMembers();
-      
-      // Obtener todos los líderes para filtrar
       const leaders = await this.getLeaders();
       const leaderMemberIds = new Set(leaders.map(l => l.memberId));
-
-      // Filtrar miembros que coincidan con el término de búsqueda
       const searchTerm = term.toLowerCase().trim();
       const results = allMembers
         .filter(member => {
-          // Filtrar por término de búsqueda
-          const matches = 
+          const matches =
             (member.name?.toLowerCase().includes(searchTerm)) ||
             (member.document?.toLowerCase().includes(searchTerm)) ||
             (member.email?.toLowerCase().includes(searchTerm)) ||
             (member.phone?.includes(searchTerm));
-          
           return matches && !leaderMemberIds.has(member.id);
         })
-        .map(member => ({
-          ...member,
-          isLeader: false // Explícitamente indicar que no es líder
-        }))
-        .slice(0, 20); // Limitar a 20 resultados
-
+        .map(member => ({ ...member, isLeader: false }))
+        .slice(0, 20);
       log('✅ [searchMembers] Encontrados:', results.length);
       return results;
     } catch (error) {
@@ -1489,19 +1324,11 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-   /**
-   * Eliminar un líder permanentemente
-   * DELETE /api/v1/leaders/{id}
-   */
   async deleteLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('🗑️ [deleteLeader] Eliminando líder ID:', leaderId);
-
-      const response = await this.request(`/leaders/${leaderId}`, {
-        method: 'DELETE',
-      });
-
+      const response = await this.request(`/leaders/${leaderId}`, { method: 'DELETE' });
       log('✅ [deleteLeader] Líder eliminado permanentemente');
       return response;
     } catch (error) {
@@ -1510,36 +1337,22 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  // ========== 🏠 CÉLULAS (VERSIÓN MEJORADA CON JERARQUÍA) ==========
+  // ========== 🏠 CÉLULAS ==========
 
-  /**
-   * Crear nueva célula con estructura jerárquica
-   * POST /api/v1/cells
-   * @param {Object} cellData - Datos completos de la célula
-   */
   async createCell(cellData) {
     try {
-      // Validaciones
-      if (!cellData || typeof cellData !== 'object') {
-        throw new Error('Datos de célula inválidos');
-      }
-
+      if (!cellData || typeof cellData !== 'object') throw new Error('Datos de célula inválidos');
       validateString(cellData.name, 'name', 3, 200);
       validateId(cellData.mainLeaderId, 'mainLeaderId');
       validateId(cellData.groupLeaderId, 'groupLeaderId');
       validateId(cellData.hostId, 'hostId');
       validateId(cellData.timoteoId, 'timoteoId');
-      
-      // branchLeaderId es opcional, pero si viene debe ser válido
       if (cellData.branchLeaderId !== null && cellData.branchLeaderId !== undefined && cellData.branchLeaderId !== '') {
         validateId(cellData.branchLeaderId, 'branchLeaderId');
       }
-
       if (cellData.maxCapacity !== null && cellData.maxCapacity !== undefined) {
         validateNumber(cellData.maxCapacity, 'maxCapacity', 1, 1000);
       }
-
-      // Construir objeto con los datos validados
       const payload = {
         name: cellData.name.trim(),
         mainLeaderId: Number(cellData.mainLeaderId),
@@ -1553,30 +1366,12 @@ async checkEligibility(memberId, leaderType) {
         district: cellData.district?.trim() || null,
         notes: cellData.notes?.trim() || null
       };
-
-      // Agregar branchLeaderId solo si está presente y no es vacío
       if (cellData.branchLeaderId && cellData.branchLeaderId !== '' && cellData.branchLeaderId !== 'null') {
         payload.branchLeaderId = Number(cellData.branchLeaderId);
       }
-
-      log('🏠 [createCell] Creando célula con jerarquía:', {
-        name: payload.name,
-        mainLeaderId: payload.mainLeaderId,
-        branchLeaderId: payload.branchLeaderId || 'sin líder de rama',
-        groupLeaderId: payload.groupLeaderId
-      });
-
-      const response = await this.request('/cells', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-
-      log('✅ [createCell] Éxito - Célula creada:', {
-        id: response?.cellId || response?.id,
-        name: response?.cellName || response?.name,
-        hierarchyType: response?.hierarchyType
-      });
-
+      log('🏠 [createCell] Creando célula:', { name: payload.name, mainLeaderId: payload.mainLeaderId });
+      const response = await this.request('/cells', { method: 'POST', body: JSON.stringify(payload) });
+      log('✅ [createCell] Éxito - ID:', response?.cellId || response?.id);
       return response;
     } catch (error) {
       logError('❌ [createCell] Error:', error.message);
@@ -1584,10 +1379,6 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
-   * Obtener todas las células
-   * GET /api/v1/cells
-   */
   async getCells(ordered = true) {
     try {
       log('📋 [getCells] Obteniendo todas las células (ordered:', ordered, ')');
@@ -1600,275 +1391,180 @@ async checkEligibility(memberId, leaderType) {
     }
   }
 
-  /**
- * Obtener células accesibles para el usuario logueado
- * GET /api/v1/attendance-cell-group/my-cells
- */
-async getAccessibleCells() {
-  try {
-    log('📋 [getAccessibleCells] Obteniendo células accesibles para el usuario logueado');
-    const response = await this.request(`/attendance-cell-group/my-cells`);
-    log('✅ [getAccessibleCells] Éxito -', response?.length || 0, 'células');
-    return response;
-  } catch (error) {
-    logError('❌ [getAccessibleCells] Error:', error.message);
-    throw error;
+  async getAccessibleCells() {
+    try {
+      log('📋 [getAccessibleCells] Obteniendo células accesibles para el usuario logueado');
+      const response = await this.request('/attendance-cell-group/my-cells');
+      log('✅ [getAccessibleCells] Éxito -', response?.length || 0, 'células');
+      return response;
+    } catch (error) {
+      logError('❌ [getAccessibleCells] Error:', error.message);
+      throw error;
+    }
   }
-}
 
-  /**
-   * Obtener célula por ID
-   * GET /api/v1/cells/{id}
-   */
   async getCellById(id) {
     try {
       validateId(id, 'cellId');
       log('🔍 [getCellById] Buscando célula ID:', id);
-      const response = await this.request(`/cells/${id}`);
-      return response;
+      return this.request(`/cells/${id}`);
     } catch (error) {
       logError('❌ [getCellById] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener miembros de una célula
-   * GET /api/v1/cells/{cellId}/members
-   *
-   * El backend responde:
-   *   { cellId, members: [...], memberCount, timestamp }
-   *
-   * Este método extrae y devuelve el array `members` directamente,
-   * así el componente recibe un Array limpio y no tiene que hacer
-   * response?.members (lo que causaba el count: 0).
-   */
   async getCellMembers(cellId) {
     try {
       validateId(cellId, 'cellId');
       log('👥 [getCellMembers] Obteniendo miembros de célula ID:', cellId);
-
       const response = await this.request(`/cells/${cellId}/members`);
-
-      // El backend envuelve la lista en { members: [...] }
       const members = response?.members ?? [];
-
       log('✅ [getCellMembers] Miembros recibidos:', members.length);
-      return members;          // ← siempre devuelve un Array, nunca undefined
+      return members;
     } catch (error) {
       logError('❌ [getCellMembers] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células por estado
-   * GET /api/v1/cells/status/{status}
-   */
   async getCellsByStatus(status, ordered = false) {
     try {
       validateString(status, 'status', 1, 50);
-      log('🔍 [getCellsByStatus] Buscando células con estado:', status, 'ordered:', ordered);
-      const response = await this.request(`/cells/status/${status}?ordered=${ordered}`);
-      return response;
+      log('🔍 [getCellsByStatus] Buscando células con estado:', status);
+      return this.request(`/cells/status/${status}?ordered=${ordered}`);
     } catch (error) {
       logError('❌ [getCellsByStatus] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células de un líder específico
-   * GET /api/v1/cells/leader/{leaderId}
-   */
   async getCellsByLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('🔍 [getCellsByLeader] Buscando células del líder ID:', leaderId);
-      const response = await this.request(`/cells/leader/${leaderId}`);
-      return response;
+      return this.request(`/cells/leader/${leaderId}`);
     } catch (error) {
       logError('❌ [getCellsByLeader] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células por distrito
-   * GET /api/v1/cells/district/{district}
-   */
   async getCellsByDistrict(district, status = null) {
     try {
       validateString(district, 'district', 1, 50);
       let url = `/cells/district/${district}`;
-      if (status) {
-        url += `?status=${status}`;
-      }
+      if (status) url += `?status=${status}`;
       log('🔍 [getCellsByDistrict] Buscando células del distrito:', district);
-      const response = await this.request(url);
-      return response;
+      return this.request(url);
     } catch (error) {
       logError('❌ [getCellsByDistrict] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células disponibles (con cupo)
-   * GET /api/v1/cells/available
-   */
   async getAvailableCells(district = null) {
     try {
       let url = '/cells/available';
-      if (district) {
-        url += `?district=${district}`;
-      }
+      if (district) url += `?district=${district}`;
       log('🔍 [getAvailableCells] Obteniendo células disponibles');
-      const response = await this.request(url);
-      return response;
+      return this.request(url);
     } catch (error) {
       logError('❌ [getAvailableCells] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células con liderazgo incompleto
-   * GET /api/v1/cells/incomplete-leadership
-   */
   async getCellsWithIncompleteLeadership() {
     try {
       log('⚠️ [getCellsWithIncompleteLeadership] Obteniendo células con liderazgo incompleto');
-      const response = await this.request('/cells/incomplete-leadership');
-      return response;
+      return this.request('/cells/incomplete-leadership');
     } catch (error) {
       logError('❌ [getCellsWithIncompleteLeadership] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células con liderazgo completo
-   * GET /api/v1/cells/complete-leadership
-   */
   async getCellsWithCompleteLeadership() {
     try {
       log('✅ [getCellsWithCompleteLeadership] Obteniendo células con liderazgo completo');
-      const response = await this.request('/cells/complete-leadership');
-      return response;
+      return this.request('/cells/complete-leadership');
     } catch (error) {
       logError('❌ [getCellsWithCompleteLeadership] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células activas con todos los líderes (carga optimizada)
-   * GET /api/v1/cells/active-with-leaders
-   */
   async getActiveCellsWithAllLeaders() {
     try {
       log('🚀 [getActiveCellsWithAllLeaders] Obteniendo células activas con líderes');
-      const response = await this.request('/cells/active-with-leaders');
-      return response;
+      return this.request('/cells/active-with-leaders');
     } catch (error) {
       logError('❌ [getActiveCellsWithAllLeaders] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células llenas (sin cupo)
-   * GET /api/v1/cells/full
-   */
   async getFullCells() {
     try {
       log('🔍 [getFullCells] Obteniendo células llenas');
-      const response = await this.request('/cells/full');
-      return response;
+      return this.request('/cells/full');
     } catch (error) {
       logError('❌ [getFullCells] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Buscar células por nombre
-   * GET /api/v1/cells/search?name=
-   */
   async searchCellsByName(name) {
     try {
       validateString(name, 'name', 2, 200);
       log('🔍 [searchCellsByName] Buscando células con nombre:', name);
-      const response = await this.request(`/cells/search?name=${encodeURIComponent(name)}`);
-      return response;
+      return this.request(`/cells/search?name=${encodeURIComponent(name)}`);
     } catch (error) {
       logError('❌ [searchCellsByName] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células de un líder de red (LEADER_12)
-   * GET /api/v1/cells/main-leader/{leaderId}
-   */
   async getCellsByMainLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('🔍 [getCellsByMainLeader] Buscando células del líder de red ID:', leaderId);
-      const response = await this.request(`/cells/main-leader/${leaderId}`);
-      return response;
+      return this.request(`/cells/main-leader/${leaderId}`);
     } catch (error) {
       logError('❌ [getCellsByMainLeader] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células directas de un líder de red (sin líder de rama)
-   * GET /api/v1/cells/main-leader/{leaderId}/direct
-   */
   async getDirectCellsByMainLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('🔍 [getDirectCellsByMainLeader] Buscando células directas del líder ID:', leaderId);
-      const response = await this.request(`/cells/main-leader/${leaderId}/direct`);
-      return response;
+      return this.request(`/cells/main-leader/${leaderId}/direct`);
     } catch (error) {
       logError('❌ [getDirectCellsByMainLeader] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células jerárquicas de un líder de red (con líder de rama)
-   * GET /api/v1/cells/main-leader/{leaderId}/hierarchical
-   */
   async getHierarchicalCellsByMainLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('🔍 [getHierarchicalCellsByMainLeader] Buscando células jerárquicas del líder ID:', leaderId);
-      const response = await this.request(`/cells/main-leader/${leaderId}/hierarchical`);
-      return response;
+      return this.request(`/cells/main-leader/${leaderId}/hierarchical`);
     } catch (error) {
       logError('❌ [getHierarchicalCellsByMainLeader] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener red completa de un líder de red
-   * GET /api/v1/cells/main-leader/{leaderId}/network
-   */
   async getNetworkByMainLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('🕸️ [getNetworkByMainLeader] Obteniendo red completa del líder:', leaderId);
       const response = await this.request(`/cells/main-leader/${leaderId}/network`);
-      log('✅ [getNetworkByMainLeader] Red obtenida:', {
-        totalCélulas: response?.cells?.length || 0,
-        líderesRama: response?.branchLeadersCount || 0
-      });
+      log('✅ [getNetworkByMainLeader] Red obtenida:', { totalCélulas: response?.cells?.length || 0 });
       return response;
     } catch (error) {
       logError('❌ [getNetworkByMainLeader] Error:', error.message);
@@ -1876,26 +1572,17 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Obtener estadísticas de un líder de red
-   * GET /api/v1/cells/main-leader/{leaderId}/statistics
-   */
   async getMainLeaderStatistics(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
       log('📊 [getMainLeaderStatistics] Obteniendo estadísticas del líder ID:', leaderId);
-      const response = await this.request(`/cells/main-leader/${leaderId}/statistics`);
-      return response;
+      return this.request(`/cells/main-leader/${leaderId}/statistics`);
     } catch (error) {
       logError('❌ [getMainLeaderStatistics] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células de un líder de rama
-   * GET /api/v1/cells/branch-leader/{leaderId}
-   */
   async getCellsByBranchLeader(leaderId) {
     try {
       validateId(leaderId, 'leaderId');
@@ -1909,94 +1596,53 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Obtener células por día de reunión
-   * GET /api/v1/cells/meeting-day/{day}
-   */
   async getCellsByMeetingDay(day) {
     try {
       validateString(day, 'day', 1, 20);
       log('🔍 [getCellsByMeetingDay] Buscando células que se reúnen el día:', day);
-      const response = await this.request(`/cells/meeting-day/${day}`);
-      return response;
+      return this.request(`/cells/meeting-day/${day}`);
     } catch (error) {
       logError('❌ [getCellsByMeetingDay] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener células en proceso de multiplicación
-   * GET /api/v1/cells/multiplying
-   */
   async getMultiplyingCells() {
     try {
       log('🌱 [getMultiplyingCells] Obteniendo células en multiplicación');
-      const response = await this.request('/cells/multiplying');
-      return response;
+      return this.request('/cells/multiplying');
     } catch (error) {
       logError('❌ [getMultiplyingCells] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener top de células con más multiplicaciones
-   * GET /api/v1/cells/top-multiplying?limit=
-   */
   async getTopMultiplyingCells(limit = 10) {
     try {
       validateNumber(limit, 'limit', 1, 100);
       log('🏆 [getTopMultiplyingCells] Obteniendo top', limit, 'células con más multiplicaciones');
-      const response = await this.request(`/cells/top-multiplying?limit=${limit}`);
-      return response;
+      return this.request(`/cells/top-multiplying?limit=${limit}`);
     } catch (error) {
       logError('❌ [getTopMultiplyingCells] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Obtener jerarquía completa de una célula
-   * GET /api/v1/cells/hierarchy/{cellId}
-   */
   async getCellHierarchy(cellId) {
     try {
       validateId(cellId, 'cellId');
       log('🏛️ [getCellHierarchy] Obteniendo jerarquía de célula:', cellId);
-      const response = await this.request(`/cells/hierarchy/${cellId}`);
-      if (response) {
-        log('✅ [getCellHierarchy] Jerarquía:', {
-          célula: response.cell?.name,
-          líderRed: response.mainLeader?.name,
-          líderRama: response.branchLeader?.name || 'N/A',
-          líderGrupo: response.groupLeader?.name,
-          anfitrión: response.host?.name,
-          timoteo: response.timoteo?.name
-        });
-      }
-      return response;
+      return this.request(`/cells/hierarchy/${cellId}`);
     } catch (error) {
       logError('❌ [getCellHierarchy] Error:', error.message);
       throw error;
     }
   }
 
-  /**
-   * Actualizar célula existente con soporte jerárquico
-   * PUT /api/v1/cells/{id}
-   * @param {number} id - ID de la célula a actualizar
-   * @param {Object} cellData - Datos a actualizar (todos opcionales)
-   */
   async updateCell(id, cellData) {
     try {
       validateId(id, 'cellId');
-      
-      if (!cellData || typeof cellData !== 'object') {
-        throw new Error('Datos de célula inválidos');
-      }
-
-      // Validar campos si están presentes
+      if (!cellData || typeof cellData !== 'object') throw new Error('Datos de célula inválidos');
       if (cellData.name) validateString(cellData.name, 'name', 3, 200);
       if (cellData.mainLeaderId) validateId(cellData.mainLeaderId, 'mainLeaderId');
       if (cellData.branchLeaderId) validateId(cellData.branchLeaderId, 'branchLeaderId');
@@ -2004,16 +1650,8 @@ async getAccessibleCells() {
       if (cellData.hostId) validateId(cellData.hostId, 'hostId');
       if (cellData.timoteoId) validateId(cellData.timoteoId, 'timoteoId');
       if (cellData.maxCapacity) validateNumber(cellData.maxCapacity, 'maxCapacity', 1, 1000);
-
-      // Construir payload limpiando undefined/null
       const payload = {};
-      
-      const fields = [
-        'name', 'mainLeaderId', 'branchLeaderId', 'groupLeaderId',
-        'hostId', 'timoteoId', 'meetingDay', 'meetingTime',
-        'meetingAddress', 'maxCapacity', 'district', 'notes'
-      ];
-
+      const fields = ['name', 'mainLeaderId', 'branchLeaderId', 'groupLeaderId', 'hostId', 'timoteoId', 'meetingDay', 'meetingTime', 'meetingAddress', 'maxCapacity', 'district', 'notes'];
       fields.forEach(field => {
         if (cellData[field] !== undefined && cellData[field] !== null && cellData[field] !== '') {
           if (typeof cellData[field] === 'string') {
@@ -2025,14 +1663,8 @@ async getAccessibleCells() {
           }
         }
       });
-
-      log('📝 [updateCell] Actualizando célula ID:', id, 'con datos:', payload);
-
-      const response = await this.request(`/cells/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(payload)
-      });
-
+      log('📝 [updateCell] Actualizando célula ID:', id);
+      const response = await this.request(`/cells/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
       log('✅ [updateCell] Célula actualizada');
       return response;
     } catch (error) {
@@ -2041,28 +1673,12 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Cambiar estado de célula
-   * PUT /api/v1/cells/{id}/status
-   * @param {number} id - ID de la célula
-   * @param {string} newStatus - Nuevo estado (ACTIVE, INACTIVE, SUSPENDED, etc.)
-   */
   async changeCellStatus(id, newStatus) {
     try {
       validateId(id, 'cellId');
       validateString(newStatus, 'newStatus', 1, 50);
-
       log('🔄 [changeCellStatus] Cambiando estado de célula', { id, newStatus });
-
-      const payload = {
-        newStatus: newStatus
-      };
-
-      const response = await this.request(`/cells/${id}/status`, {
-        method: 'PUT',
-        body: JSON.stringify(payload)
-      });
-
+      const response = await this.request(`/cells/${id}/status`, { method: 'PUT', body: JSON.stringify({ newStatus }) });
       log('✅ [changeCellStatus] Estado cambiado');
       return response;
     } catch (error) {
@@ -2071,19 +1687,11 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Eliminar célula (soft delete)
-   * DELETE /api/v1/cells/{id}
-   */
   async deleteCell(id) {
     try {
       validateId(id, 'cellId');
       log('🗑️ [deleteCell] Eliminando célula ID:', id);
-
-      const response = await this.request(`/cells/${id}`, {
-        method: 'DELETE',
-      });
-
+      const response = await this.request(`/cells/${id}`, { method: 'DELETE' });
       log('✅ [deleteCell] Célula marcada como inactiva');
       return response;
     } catch (error) {
@@ -2092,28 +1700,12 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Agregar miembro a célula
-   * POST /api/v1/cells/{cellId}/members
-   * @param {number} cellId - ID de la célula
-   * @param {number} memberId - ID del miembro a agregar
-   */
   async addMemberToCell(cellId, memberId) {
     try {
       validateId(cellId, 'cellId');
       validateId(memberId, 'memberId');
-
       log('➕ [addMemberToCell] Agregando miembro', { cellId, memberId });
-
-      const payload = {
-        memberId: memberId
-      };
-
-      const response = await this.request(`/cells/${cellId}/members`, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-
+      const response = await this.request(`/cells/${cellId}/members`, { method: 'POST', body: JSON.stringify({ memberId }) });
       log('✅ [addMemberToCell] Miembro agregado');
       return response;
     } catch (error) {
@@ -2122,21 +1714,12 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Remover miembro de célula
-   * DELETE /api/v1/cells/{cellId}/members/{memberId}
-   */
   async removeMemberFromCell(cellId, memberId) {
     try {
       validateId(cellId, 'cellId');
       validateId(memberId, 'memberId');
-
       log('➖ [removeMemberFromCell] Removiendo miembro', { cellId, memberId });
-
-      const response = await this.request(`/cells/${cellId}/members/${memberId}`, {
-        method: 'DELETE',
-      });
-
+      const response = await this.request(`/cells/${cellId}/members/${memberId}`, { method: 'DELETE' });
       log('✅ [removeMemberFromCell] Miembro removido');
       return response;
     } catch (error) {
@@ -2146,18 +1729,36 @@ async getAccessibleCells() {
   }
 
   /**
-   * Iniciar multiplicación de célula
-   * POST /api/v1/cells/{id}/start-multiplication
+   * Desvincular un líder de una célula manualmente.
+   * DELETE /api/v1/cells/{cellId}/leaders/{leaderId}
+   *
+   * Funciona en cualquier CellStatus. El backend limpia el rol del líder,
+   * actualiza su cellGroupCode a null y recalcula el estado de la célula.
+   *
+   * @param {number} cellId   - ID de la célula
+   * @param {number} leaderId - ID del líder a desvincular
+   * @returns {Object} Respuesta del backend con newCellStatus, newCellStatusDisplay
+   *                   y missingOrInactiveLeaders (si aplica)
    */
+  async unlinkLeaderFromCell(cellId, leaderId) {
+    try {
+      validateId(cellId, 'cellId');
+      validateId(leaderId, 'leaderId');
+      log('✂️ [unlinkLeaderFromCell] Desvinculando líder', { cellId, leaderId });
+      const response = await this.request(`/cells/${cellId}/leaders/${leaderId}`, { method: 'DELETE' });
+      log('✅ [unlinkLeaderFromCell] Éxito - Nuevo estado:', response?.newCellStatus);
+      return response;
+    } catch (error) {
+      logError('❌ [unlinkLeaderFromCell] Error:', error.message);
+      throw error;
+    }
+  }
+
   async startMultiplication(cellId) {
     try {
       validateId(cellId, 'cellId');
       log('🌱 [startMultiplication] Iniciando multiplicación célula ID:', cellId);
-
-      const response = await this.request(`/cells/${cellId}/start-multiplication`, {
-        method: 'POST',
-      });
-
+      const response = await this.request(`/cells/${cellId}/start-multiplication`, { method: 'POST' });
       log('✅ [startMultiplication] Multiplicación iniciada');
       return response;
     } catch (error) {
@@ -2166,19 +1767,11 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Completar multiplicación de célula
-   * POST /api/v1/cells/{id}/complete-multiplication
-   */
   async completeMultiplication(cellId) {
     try {
       validateId(cellId, 'cellId');
       log('✅ [completeMultiplication] Completando multiplicación célula ID:', cellId);
-
-      const response = await this.request(`/cells/${cellId}/complete-multiplication`, {
-        method: 'POST',
-      });
-
+      const response = await this.request(`/cells/${cellId}/complete-multiplication`, { method: 'POST' });
       log('✅ [completeMultiplication] Multiplicación completada');
       return response;
     } catch (error) {
@@ -2187,19 +1780,11 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Verificar estado de célula
-   * POST /api/v1/cells/{id}/verify
-   */
   async verifyCell(cellId) {
     try {
       validateId(cellId, 'cellId');
       log('🔍 [verifyCell] Verificando célula ID:', cellId);
-
-      const response = await this.request(`/cells/${cellId}/verify`, {
-        method: 'POST',
-      });
-
+      const response = await this.request(`/cells/${cellId}/verify`, { method: 'POST' });
       log('✅ [verifyCell] Célula verificada');
       return response;
     } catch (error) {
@@ -2208,23 +1793,11 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Verificar todas las células
-   * POST /api/v1/cells/verify-all
-   */
   async verifyAllCells() {
     try {
       log('🔄 [verifyAllCells] Verificando todas las células');
-
-      const response = await this.request('/cells/verify-all', {
-        method: 'POST',
-      });
-
-      log('✅ [verifyAllCells] Éxito -', {
-        total: response?.totalVerified,
-        cambiaron: response?.statusChanged
-      });
-
+      const response = await this.request('/cells/verify-all', { method: 'POST' });
+      log('✅ [verifyAllCells] Éxito -', { total: response?.totalVerified, cambiaron: response?.statusChanged });
       return response;
     } catch (error) {
       logError('❌ [verifyAllCells] Error:', error.message);
@@ -2232,22 +1805,11 @@ async getAccessibleCells() {
     }
   }
 
-  /**
-   * Obtener estadísticas de células
-   * GET /api/v1/cells/statistics
-   */
   async getCellStatistics() {
     try {
       log('📊 [getCellStatistics] Obteniendo estadísticas de células');
-
       const response = await this.request('/cells/statistics');
-
-      log('✅ [getCellStatistics] Éxito -', {
-        total: response?.totalCells,
-        activas: response?.activeCells,
-        incompletas: response?.incompleteCells
-      });
-
+      log('✅ [getCellStatistics] Éxito -', { total: response?.totalCells, activas: response?.activeCells, incompletas: response?.incompleteCells });
       return response;
     } catch (error) {
       logError('❌ [getCellStatistics] Error:', error.message);
@@ -2260,168 +1822,81 @@ async getAccessibleCells() {
   async getStatisticsByLevelAndYear() {
     try {
       log('📊 [getStatisticsByLevelAndYear] Iniciando');
-
       const enrollments = await this.getEnrollments();
       log(`📋 Cohortes obtenidas: ${enrollments.length}`);
-
       const levelYearData = {};
-
       for (const enrollment of enrollments) {
         const enrollmentId = enrollment.id;
         const cohortName = enrollment.cohortName || enrollment.name;
-
         try {
           const students = await this.getStudentEnrollmentsByEnrollment(enrollmentId);
-
-          if (!students || students.length === 0) {
-            log(`⚠️ ${cohortName} - Sin estudiantes`);
-            continue;
-          }
-
+          if (!students || students.length === 0) { log(`⚠️ ${cohortName} - Sin estudiantes`); continue; }
           log(`✅ ${cohortName} - ${students.length} estudiantes`);
-
           students.forEach(student => {
             let year = 'SIN_AÑO';
             if (student.enrollmentDate || student.enrollment_date) {
               try {
                 const date = new Date(student.enrollmentDate || student.enrollment_date);
                 const extractedYear = date.getFullYear();
-                if (!isNaN(extractedYear) && extractedYear > 1900) {
-                  year = extractedYear.toString();
-                }
-              } catch (e) {
-                // Mantener SIN_AÑO
-              }
+                if (!isNaN(extractedYear) && extractedYear > 1900) year = extractedYear.toString();
+              } catch (e) {}
             }
-
             let level = student.levelEnrollment || student.level || 'SIN_NIVEL';
-
-            if (!levelYearData[year]) {
-              levelYearData[year] = {};
-            }
+            if (!levelYearData[year]) levelYearData[year] = {};
             if (!levelYearData[year][level]) {
-              levelYearData[year][level] = {
-                label: this.getLevelLabel(level),
-                levelEnrollment: level,
-                total: 0,
-                passed: 0,
-                failed: 0,
-                pending: 0,
-                students: []
-              };
+              levelYearData[year][level] = { label: this.getLevelLabel(level), levelEnrollment: level, total: 0, passed: 0, failed: 0, pending: 0, students: [] };
             }
-
             levelYearData[year][level].total += 1;
             levelYearData[year][level].students.push(student);
-
-            if (student.passed === true) {
-              levelYearData[year][level].passed += 1;
-            } else if (student.passed === false) {
-              levelYearData[year][level].failed += 1;
-            } else {
-              levelYearData[year][level].pending += 1;
-            }
+            if (student.passed === true) levelYearData[year][level].passed += 1;
+            else if (student.passed === false) levelYearData[year][level].failed += 1;
+            else levelYearData[year][level].pending += 1;
           });
-
-        } catch (error) {
-          console.warn(`⚠️ ${cohortName} - Error:`, error.message);
-        }
+        } catch (error) { console.warn(`⚠️ ${cohortName} - Error:`, error.message); }
       }
-
       const result = {};
-
-      Object.keys(levelYearData)
-        .sort((a, b) => {
-          if (a === 'SIN_AÑO') return 1;
-          if (b === 'SIN_AÑO') return -1;
-          return b - a;
-        })
-        .forEach(year => {
-          result[year] = {};
-
-          const levelOrder = [
-            'PREENCUENTRO', 'ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS',
-            'ESENCIA_1', 'ESENCIA_2', 'ESENCIA_3', 'SANIDAD_INTEGRAL_RAICES', 'ESENCIA_4',
-            'ADIESTRAMIENTO', 'GRADUACION'
-          ];
-
-          levelOrder.forEach(levelKey => {
-            if (levelYearData[year][levelKey]) {
-              const levelData = levelYearData[year][levelKey];
-              const passPercentage = levelData.total > 0
-                ? ((levelData.passed / levelData.total) * 100).toFixed(1)
-                : 0;
-
-              result[year][levelKey] = {
-                label: levelData.label,
-                total: levelData.total,
-                passed: levelData.passed,
-                failed: levelData.failed,
-                pending: levelData.pending,
-                passPercentage: parseFloat(passPercentage),
-              };
-
-              log(`📊 ${year} - ${levelData.label}: ${levelData.total} estudiantes, ${levelData.passed} aprobados`);
-            }
-          });
+      Object.keys(levelYearData).sort((a, b) => { if (a === 'SIN_AÑO') return 1; if (b === 'SIN_AÑO') return -1; return b - a; }).forEach(year => {
+        result[year] = {};
+        const levelOrder = ['PREENCUENTRO','ENCUENTRO','POST_ENCUENTRO','BAUTIZOS','ESENCIA_1','ESENCIA_2','ESENCIA_3','SANIDAD_INTEGRAL_RAICES','ESENCIA_4','ADIESTRAMIENTO','GRADUACION'];
+        levelOrder.forEach(levelKey => {
+          if (levelYearData[year][levelKey]) {
+            const levelData = levelYearData[year][levelKey];
+            const passPercentage = levelData.total > 0 ? ((levelData.passed / levelData.total) * 100).toFixed(1) : 0;
+            result[year][levelKey] = { label: levelData.label, total: levelData.total, passed: levelData.passed, failed: levelData.failed, pending: levelData.pending, passPercentage: parseFloat(passPercentage) };
+          }
         });
-
+      });
       log('✅ [getStatisticsByLevelAndYear] Completado');
       return result;
-
     } catch (error) {
       logError('❌ [getStatisticsByLevelAndYear] Error:', error);
       throw error;
     }
   }
 
-  /**
-   * ✅ Helper: Traducir nombre del nivel
-   */
   getLevelLabel(levelEnrollment) {
-    const levelMap = {
-      'PREENCUENTRO': 'Pre-encuentro',
-      'ENCUENTRO': 'Encuentro',
-      'POST_ENCUENTRO': 'Post-encuentro',
-      'BAUTIZOS': 'Bautizos',
-      'ESENCIA_1': 'ESENCIA 1',
-      'ESENCIA_2': 'ESENCIA 2',
-      'ESENCIA_3': 'ESENCIA 3',
-      'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces',
-      'ESENCIA_4': 'ESENCIA 4',
-      'ADIESTRAMIENTO': 'Adiestramiento',
-      'GRADUACION': 'Graduación',
-    };
+    const levelMap = { 'PREENCUENTRO': 'Pre-encuentro', 'ENCUENTRO': 'Encuentro', 'POST_ENCUENTRO': 'Post-encuentro', 'BAUTIZOS': 'Bautizos', 'ESENCIA_1': 'ESENCIA 1', 'ESENCIA_2': 'ESENCIA 2', 'ESENCIA_3': 'ESENCIA 3', 'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces', 'ESENCIA_4': 'ESENCIA 4', 'ADIESTRAMIENTO': 'Adiestramiento', 'GRADUACION': 'Graduación' };
     return levelMap[levelEnrollment] || levelEnrollment;
   }
 
-  // ========== 📋 ASISTENCIAS DE CÉLULAS (Cell Group Attendance) ==========
-  // Base path del controller: /api/v1/attendance-cell-group
+  // ========== 📋 ASISTENCIAS DE CÉLULAS ==========
 
-  // ── Configuración ──────────────────────────────────────────────────
   async getAttendanceConfig() {
     try {
       log('📋 [getAttendanceConfig] Obteniendo configuración');
-      const response = await this.request('/attendance-cell-group/config');
-      log('✅ [getAttendanceConfig] Éxito');
-      return response;
+      return this.request('/attendance-cell-group/config');
     } catch (error) {
       logError('❌ [getAttendanceConfig] Error:', error.message);
       throw error;
     }
   }
 
-  // ── Generación automática ─────────────────────────────────────────
   async generateCellAttendances(cellId, date) {
     try {
       validateId(cellId, 'cellId');
       validateString(date, 'date', 10, 10);
       log('📋 [generateCellAttendances] Generando para célula:', cellId, 'fecha:', date);
-
-      const response = await this.request(`/attendance-cell-group/generate/cell/${cellId}?date=${date}`, {
-        method: 'POST',
-      });
-
+      const response = await this.request(`/attendance-cell-group/generate/cell/${cellId}?date=${date}`, { method: 'POST' });
       log('✅ [generateCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
       return response;
     } catch (error) {
@@ -2434,11 +1909,7 @@ async getAccessibleCells() {
     try {
       validateString(date, 'date', 10, 10);
       log('📋 [generateMyCellsAttendances] Generando para mis células, fecha:', date);
-
-      const response = await this.request(`/attendance-cell-group/generate/my-cells?date=${date}`, {
-        method: 'POST',
-      });
-
+      const response = await this.request(`/attendance-cell-group/generate/my-cells?date=${date}`, { method: 'POST' });
       log('✅ [generateMyCellsAttendances] Éxito -', response?.totalCells || 0, 'células');
       return response;
     } catch (error) {
@@ -2450,9 +1921,7 @@ async getAccessibleCells() {
   async generateCurrentMonthAttendances() {
     try {
       log('🔄 [generateCurrentMonthAttendances] Ejecutando generación manual');
-      const response = await this.request('/attendance-cell-group/generate/current-month', {
-        method: 'POST',
-      });
+      const response = await this.request('/attendance-cell-group/generate/current-month', { method: 'POST' });
       log('✅ [generateCurrentMonthAttendances] Éxito');
       return response;
     } catch (error) {
@@ -2461,7 +1930,6 @@ async getAccessibleCells() {
     }
   }
 
-  // ── Consultas ─────────────────────────────────────────────────────
   async getCellAttendancesCurrentMonth() {
     try {
       log('📅 [getCellAttendancesCurrentMonth] Consultando mes actual');
@@ -2479,9 +1947,7 @@ async getAccessibleCells() {
       validateNumber(year, 'year', 2020);
       validateNumber(month, 'month', 1, 12);
       log('📅 [getCellAttendancesByMonth] Consultando:', year, '/', month);
-      const response = await this.request(`/attendance-cell-group/month/${year}/${month}`);
-      log('✅ [getCellAttendancesByMonth] Éxito');
-      return response;
+      return this.request(`/attendance-cell-group/month/${year}/${month}`);
     } catch (error) {
       logError('❌ [getCellAttendancesByMonth] Error:', error.message);
       throw error;
@@ -2502,21 +1968,13 @@ async getAccessibleCells() {
     }
   }
 
-  // ── Registro y actualización ──────────────────────────────────────
   async recordCellAttendance(cellId, date, attendanceData) {
     try {
       validateId(cellId, 'cellId');
       validateString(date, 'date', 10, 10);
-      if (!attendanceData || typeof attendanceData !== 'object') {
-        throw new Error('Datos de asistencia inválidos');
-      }
+      if (!attendanceData || typeof attendanceData !== 'object') throw new Error('Datos de asistencia inválidos');
       log('📝 [recordCellAttendance] Registrando:', { cellId, date, memberId: attendanceData.memberId });
-
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
-        method: 'POST',
-        body: JSON.stringify(attendanceData),
-      });
-
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, { method: 'POST', body: JSON.stringify(attendanceData) });
       log('✅ [recordCellAttendance] Éxito');
       return response;
     } catch (error) {
@@ -2528,20 +1986,9 @@ async getAccessibleCells() {
   async recordBulkCellAttendances(cellId, bulkData) {
     try {
       validateId(cellId, 'cellId');
-      if (!bulkData || typeof bulkData !== 'object') {
-        throw new Error('Datos de asistencias inválidos');
-      }
-      log('📦 [recordBulkCellAttendances] Registrando masivo:', {
-        cellId,
-        date: bulkData.attendanceDate,
-        count: bulkData.attendances?.length || 0,
-      });
-
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/bulk`, {
-        method: 'POST',
-        body: JSON.stringify(bulkData),
-      });
-
+      if (!bulkData || typeof bulkData !== 'object') throw new Error('Datos de asistencias inválidos');
+      log('📦 [recordBulkCellAttendances] Registrando masivo:', { cellId, date: bulkData.attendanceDate, count: bulkData.attendances?.length || 0 });
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/bulk`, { method: 'POST', body: JSON.stringify(bulkData) });
       log('✅ [recordBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
       return response;
     } catch (error) {
@@ -2554,16 +2001,9 @@ async getAccessibleCells() {
     try {
       validateId(cellId, 'cellId');
       validateString(date, 'date', 10, 10);
-      if (!Array.isArray(attendances)) {
-        throw new Error('Datos de asistencias inválidos');
-      }
+      if (!Array.isArray(attendances)) throw new Error('Datos de asistencias inválidos');
       log('📦 [updateBulkCellAttendances] Actualizando:', { cellId, date, count: attendances.length });
-
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, {
-        method: 'PUT',
-        body: JSON.stringify(attendances),
-      });
-
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, { method: 'PUT', body: JSON.stringify(attendances) });
       log('✅ [updateBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
       return response;
     } catch (error) {
@@ -2572,15 +2012,12 @@ async getAccessibleCells() {
     }
   }
 
-  // ── Resumen y estadísticas ────────────────────────────────────────
   async getCellAttendanceSummary(cellId, date) {
     try {
       validateId(cellId, 'cellId');
       validateString(date, 'date', 10, 10);
       log('📊 [getCellAttendanceSummary] Resumen:', { cellId, date });
-      const response = await this.request(`/attendance-cell-group/summary/cell/${cellId}/date/${date}`);
-      log('✅ [getCellAttendanceSummary] Éxito');
-      return response;
+      return this.request(`/attendance-cell-group/summary/cell/${cellId}/date/${date}`);
     } catch (error) {
       logError('❌ [getCellAttendanceSummary] Error:', error.message);
       throw error;
@@ -2593,9 +2030,7 @@ async getAccessibleCells() {
       validateNumber(year, 'year', 2020);
       validateNumber(month, 'month', 1, 12);
       log('📊 [getCellAttendanceMonthlyStats] Stats:', { cellId, year, month });
-      const response = await this.request(`/attendance-cell-group/statistics/cell/${cellId}/month/${year}/${month}`);
-      log('✅ [getCellAttendanceMonthlyStats] Éxito');
-      return response;
+      return this.request(`/attendance-cell-group/statistics/cell/${cellId}/month/${year}/${month}`);
     } catch (error) {
       logError('❌ [getCellAttendanceMonthlyStats] Error:', error.message);
       throw error;
@@ -2605,9 +2040,7 @@ async getAccessibleCells() {
   async getCellAttendanceGlobalStats() {
     try {
       log('📊 [getCellAttendanceGlobalStats] Obteniendo estadísticas globales');
-      const response = await this.request('/attendance-cell-group/statistics/global');
-      log('✅ [getCellAttendanceGlobalStats] Éxito');
-      return response;
+      return this.request('/attendance-cell-group/statistics/global');
     } catch (error) {
       logError('❌ [getCellAttendanceGlobalStats] Error:', error.message);
       throw error;
