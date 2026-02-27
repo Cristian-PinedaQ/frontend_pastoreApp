@@ -283,6 +283,96 @@ const loadCohortsPending = async () => {
             <div className="form-error-general">❌ {errors.general}</div>
           )}
 
+          {/* Tipo de actividad */}
+          <div className="form-group">
+            <label htmlFor="activityType">🎯 Tipo de Actividad *</label>
+            <select
+              id="activityType"
+              name="activityType"
+              value={formData.activityType}
+              onChange={handleChange}
+              disabled={loading}
+            >
+              <option value="STANDALONE">🍃 Libre</option>
+              <option value="ENROLLMENT">
+                🪾 Vinculada a Raiz Viva
+              </option>
+            </select>
+            <div className="form-hint">
+              {formData.activityType === "STANDALONE"
+                ? "Actividad libre — cualquier miembro puede inscribirse"
+                : "El pago de esta actividad habilitará al miembro para matricularse en la cohorte seleccionada"}
+            </div>
+          </div>
+
+          {/* ✅ Selector de cohorte PENDING */}
+          {formData.activityType === "ENROLLMENT" && (
+            <div className="form-group">
+              <label htmlFor="enrollmentId">
+                📚 Cohortes Pendientes *
+              </label>
+              <select
+                id="enrollmentId"
+                name="enrollmentId"
+                value={formData.enrollmentId || ""}
+                onChange={handleChange}
+                className={errors.enrollmentId ? "error" : ""}
+                disabled={loading || loadingCohorts}
+              >
+                <option value="">
+                  {loadingCohorts
+                    ? "⏳ Cargando cohortes..."
+                    : "-- Selecciona una cohorte --"}
+                </option>
+                {cohorts.length > 0
+                  ? cohorts.map((cohort) => (
+                      <option key={cohort.id} value={cohort.id}>
+                        {cohort.label}
+                      </option>
+                    ))
+                  : !loadingCohorts && (
+                      <option disabled>
+                        No hay cohortes con estado PENDIENTE
+                      </option>
+                    )}
+              </select>
+
+              {errors.enrollmentId && (
+                <span className="form-error">{errors.enrollmentId}</span>
+              )}
+
+              {/* ✅ Info derivada automáticamente de la cohorte seleccionada */}
+              {selectedCohort && (
+                <div
+                  className="form-hint"
+                  style={{
+                    background: "#e8f5e9",
+                    border: "1px solid #a5d6a7",
+                    borderRadius: "6px",
+                    padding: "8px 12px",
+                    marginTop: "6px",
+                  }}
+                >
+                  ✅ <strong>Nivel detectado:</strong>{" "}
+                  <code>{selectedCohort.levelEnrollment}</code>
+                  <br />
+                  <small>
+                    El campo <em>requiredLevel</em> se enviará automáticamente
+                    al backend como{" "}
+                    <strong>{selectedCohort.levelEnrollment}</strong>. Los
+                    miembros deben cumplir el nivel previo para inscribirse.
+                  </small>
+                </div>
+              )}
+
+              <div className="form-hint">
+                ℹ️ Solo se muestran cohortes con estado{" "}
+                <strong>PENDIENTE</strong>. Al pagar completamente esta actividad, el miembro
+                quedará habilitado para matricularse en la cohorte.
+              </div>
+            </div>
+          )}
+
           {/* Nombre */}
           <div className="form-group">
             <label htmlFor="activityName">📋 Nombre de la Actividad *</label>
@@ -368,96 +458,6 @@ const loadCohortsPending = async () => {
               La actividad será visible hasta esta fecha
             </div>
           </div>
-
-          {/* Tipo de actividad */}
-          <div className="form-group">
-            <label htmlFor="activityType">🎯 Tipo de Actividad *</label>
-            <select
-              id="activityType"
-              name="activityType"
-              value={formData.activityType}
-              onChange={handleChange}
-              disabled={loading}
-            >
-              <option value="STANDALONE">📋 Libre (STANDALONE)</option>
-              <option value="ENROLLMENT">
-                📚 Vinculada a Cohorte (ENROLLMENT)
-              </option>
-            </select>
-            <div className="form-hint">
-              {formData.activityType === "STANDALONE"
-                ? "Actividad libre — cualquier miembro puede inscribirse"
-                : "El pago de esta actividad habilitará al miembro para matricularse en la cohorte seleccionada"}
-            </div>
-          </div>
-
-          {/* ✅ Selector de cohorte PENDING */}
-          {formData.activityType === "ENROLLMENT" && (
-            <div className="form-group">
-              <label htmlFor="enrollmentId">
-                📚 Cohorte PENDING *
-              </label>
-              <select
-                id="enrollmentId"
-                name="enrollmentId"
-                value={formData.enrollmentId || ""}
-                onChange={handleChange}
-                className={errors.enrollmentId ? "error" : ""}
-                disabled={loading || loadingCohorts}
-              >
-                <option value="">
-                  {loadingCohorts
-                    ? "⏳ Cargando cohortes..."
-                    : "-- Selecciona una cohorte --"}
-                </option>
-                {cohorts.length > 0
-                  ? cohorts.map((cohort) => (
-                      <option key={cohort.id} value={cohort.id}>
-                        {cohort.label}
-                      </option>
-                    ))
-                  : !loadingCohorts && (
-                      <option disabled>
-                        No hay cohortes con estado PENDING
-                      </option>
-                    )}
-              </select>
-
-              {errors.enrollmentId && (
-                <span className="form-error">{errors.enrollmentId}</span>
-              )}
-
-              {/* ✅ Info derivada automáticamente de la cohorte seleccionada */}
-              {selectedCohort && (
-                <div
-                  className="form-hint"
-                  style={{
-                    background: "#e8f5e9",
-                    border: "1px solid #a5d6a7",
-                    borderRadius: "6px",
-                    padding: "8px 12px",
-                    marginTop: "6px",
-                  }}
-                >
-                  ✅ <strong>Nivel detectado:</strong>{" "}
-                  <code>{selectedCohort.levelEnrollment}</code>
-                  <br />
-                  <small>
-                    El campo <em>requiredLevel</em> se enviará automáticamente
-                    al backend como{" "}
-                    <strong>{selectedCohort.levelEnrollment}</strong>. Los
-                    miembros deben cumplir el nivel previo para inscribirse.
-                  </small>
-                </div>
-              )}
-
-              <div className="form-hint">
-                ℹ️ Solo se muestran cohortes con estado{" "}
-                <strong>PENDING</strong>. Al pagar esta actividad, el miembro
-                quedará habilitado para matricularse en la cohorte.
-              </div>
-            </div>
-          )}
 
           {/* Estado (solo edición) */}
           {isEditing && (

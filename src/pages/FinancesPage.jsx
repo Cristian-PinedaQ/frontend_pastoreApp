@@ -2,6 +2,7 @@
 // FinancesPage.jsx - SEGURIDAD MEJORADA
 // Gestión de finanzas con validaciones de seguridad
 // ✅ FIX CONCURRENCIA: Mutex en todas las operaciones con finally correcto
+// ✅ NUEVO: Filtro por LeaderType (cruce frontend con tabla líderes)
 // ============================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -110,6 +111,13 @@ const METHOD_LABELS = {
   BANK_TRANSFER: "🏦 Transferencia Bancaria",
 };
 
+// ✅ NUEVO: Etiquetas para tipos de líder
+const LEADER_TYPE_LABELS = {
+  SERVANT:    "🌱 Servidor",
+  LEADER_144: "🌿 Líder 144",
+  LEADER_12:  "🌳 Líder 12",
+};
+
 const FinancesPage = () => {
   const [allFinances, setAllFinances] = useState([]);
   const [filteredFinances, setFilteredFinances] = useState([]);
@@ -123,6 +131,10 @@ const FinancesPage = () => {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  // ✅ NUEVO: Estado para filtro de tipo de líder y lista de líderes
+  const [selectedLeaderType, setSelectedLeaderType] = useState("ALL");
+  const [leaders, setLeaders] = useState([]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -132,12 +144,27 @@ const FinancesPage = () => {
   // ✅ FIX CONCURRENCIA: Mutex para prevenir operaciones concurrentes
   const operationInProgress = React.useRef(false);
 
+  // ✅ NUEVO: Cargar líderes una sola vez al montar el componente
+  // Se hace en un useEffect separado para no mezclar responsabilidades con loadFinances.
+  // Los líderes son pocos comparado con las finanzas, así que no impacta rendimiento.
+  useEffect(() => {
+    const fetchLeaders = async () => {
+      try {
+        log("Cargando líderes para filtro por tipo");
+        const leaderData = await apiService.getLeaders();
+        setLeaders(leaderData || []);
+        log("Líderes cargados", { count: leaderData?.length });
+      } catch (err) {
+        // No es crítico: si falla, el filtro simplemente no filtrará
+        log("No se pudieron cargar líderes para filtro (no crítico)", err);
+      }
+    };
+    fetchLeaders();
+  }, []);
+
   // ========== LOAD FINANCES - CARGA SECUENCIAL PARA +500 REGISTROS ==========
   // ✅ FIX CONCURRENCIA: Carga página por página de forma secuencial (NO paralela)
-  // Esto evita inconsistencias de datos que ocurren con Promise.all cuando
-  // otro usuario inserta registros entre las peticiones paralelas.
   const loadFinances = useCallback(async () => {
-    // ✅ FIX: Prevenir cargas concurrentes
     if (operationInProgress.current) {
       log("Carga ya en progreso, ignorando");
       return;
@@ -154,18 +181,14 @@ const FinancesPage = () => {
       let currentPage = 0;
       let hasMore = true;
 
-      // ✅ Carga secuencial: una página a la vez, en orden
-      // Cada request espera a que la anterior termine antes de lanzar la siguiente
       while (hasMore) {
         log(`Cargando página ${currentPage}...`);
 
         const response = await apiService.getFinances(currentPage, PAGE_SIZE);
         const pageContent = response?.content || [];
 
-        // Acumular resultados
         allFinancesData = [...allFinancesData, ...pageContent];
 
-        // Verificar si hay más páginas
         hasMore = response?.hasNext === true;
         currentPage++;
 
@@ -175,7 +198,6 @@ const FinancesPage = () => {
           hasMore,
         });
 
-        // Seguridad: límite máximo de páginas para evitar loops infinitos
         if (currentPage > 100) {
           log("⚠️ Límite de páginas alcanzado (100), deteniendo carga");
           break;
@@ -194,7 +216,6 @@ const FinancesPage = () => {
       }
 
       // ✅ Deduplicar por ID para garantizar consistencia
-      // En caso de que un registro aparezca en dos páginas por inserciones concurrentes
       const uniqueMap = new Map();
       allFinancesData.forEach((finance) => {
         uniqueMap.set(finance.id, finance);
@@ -226,7 +247,6 @@ const FinancesPage = () => {
 
       log("Finanzas procesadas", { count: processedFinances.length });
 
-      // Aplicar transformaciones de nombres para mostrar en el frontend
       const transformedFinances = processedFinances.map((finance) =>
         transformForDisplay(finance, ["memberName"]),
       );
@@ -260,6 +280,7 @@ const FinancesPage = () => {
       setSelectedConcept("ALL");
       setSelectedMethod("ALL");
       setSelectedVerification("ALL");
+      setSelectedLeaderType("ALL"); // ✅ NUEVO: limpiar filtro de líder
       setSearchText("");
       setStartDate("");
       setEndDate("");
@@ -312,6 +333,33 @@ const FinancesPage = () => {
           filtered = filtered.filter((finance) => finance.isVerified === true);
         } else if (selectedVerification === "UNVERIFIED") {
           filtered = filtered.filter((finance) => finance.isVerified === false);
+        }
+      }
+
+      // ✅ NUEVO: Filtrar por tipo de líder
+      // Estrategia: construir un Set de memberId según el tipo seleccionado,
+      // luego filtrar las finanzas cuyo memberId esté (o no) en ese Set.
+      // El cruce se hace en frontend porque los líderes son un subconjunto pequeño
+      // y ya están cargados; evita un request adicional al backend.
+      if (selectedLeaderType !== "ALL") {
+        if (selectedLeaderType === "NO_LEADER") {
+          // Opción especial: miembros que NO son líderes en ningún tipo
+          const allLeaderMemberIds = new Set(
+            leaders.map((l) => l.memberId)
+          );
+          filtered = filtered.filter(
+            (finance) => !allLeaderMemberIds.has(finance.memberId)
+          );
+        } else {
+          // Filtrar por tipo específico de líder (SERVANT, LEADER_144, LEADER_12)
+          const memberIdsWithLeaderType = new Set(
+            leaders
+              .filter((l) => l.leaderType === selectedLeaderType)
+              .map((l) => l.memberId)
+          );
+          filtered = filtered.filter((finance) =>
+            memberIdsWithLeaderType.has(finance.memberId)
+          );
         }
       }
 
@@ -370,6 +418,8 @@ const FinancesPage = () => {
     selectedConcept,
     selectedMethod,
     selectedVerification,
+    selectedLeaderType, // ✅ NUEVO
+    leaders,            // ✅ NUEVO
     searchText,
     startDate,
     endDate,
@@ -453,6 +503,7 @@ const FinancesPage = () => {
         selectedMethod !== "ALL" ||
         selectedVerification !== "ALL" ||
         selectedConcept !== "ALL" ||
+        selectedLeaderType !== "ALL" || // ✅ NUEVO
         searchText.trim()
       ) {
         setShowReportModal(true);
@@ -498,6 +549,7 @@ const FinancesPage = () => {
     selectedConcept,
     selectedMethod,
     selectedVerification,
+    selectedLeaderType, // ✅ NUEVO
     searchText,
     filteredFinances,
     calculateStatistics,
@@ -624,7 +676,6 @@ const FinancesPage = () => {
   // ========== ADD FINANCE ==========
   const handleAddFinance = useCallback(
     async (financeData) => {
-      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
       if (operationInProgress.current) {
         log("Operación ya en progreso, ignorando");
         return;
@@ -641,7 +692,6 @@ const FinancesPage = () => {
 
         const backendData = prepareForBackend(financeData, ["memberName"]);
 
-        // ✅ FIX CONCURRENCIA: Agregar idempotency key única
         const idempotencyKey = `finance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         await apiService.createFinance(backendData, idempotencyKey);
@@ -656,11 +706,9 @@ const FinancesPage = () => {
 
         alert("Ingreso registrado exitosamente");
         setShowAddModal(false);
-        // ✅ FIX: Liberar mutex ANTES de recargar (loadFinances tiene su propio mutex)
         operationInProgress.current = false;
         await loadFinances();
       } catch (err) {
-        // ✅ FIX CONCURRENCIA: Manejar respuesta de duplicado del backend
         if (err?.response?.status === 409) {
           log("Registro duplicado detectado por el servidor");
           alert("⚠️ Este registro ya fue procesado. Recargando datos...");
@@ -687,7 +735,6 @@ const FinancesPage = () => {
   // ========== EDIT FINANCE ==========
   const handleEditFinance = useCallback(
     async (financeData) => {
-      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
       if (operationInProgress.current) {
         log("Operación ya en progreso, ignorando");
         return;
@@ -707,7 +754,6 @@ const FinancesPage = () => {
 
         log("Actualizando ingreso", { financeId: editingFinance.id });
 
-        // Preparar datos para backend (mantener nombres originales)
         const backendData = prepareForBackend(financeData, ["memberName"]);
 
         await apiService.updateFinance(editingFinance.id, backendData);
@@ -722,14 +768,12 @@ const FinancesPage = () => {
         alert("Ingreso actualizado exitosamente");
         setShowAddModal(false);
         setEditingFinance(null);
-        // ✅ FIX: Liberar mutex ANTES de recargar
         operationInProgress.current = false;
         await loadFinances();
       } catch (err) {
         logError("Error actualizando ingreso:", err);
         setError("Error al actualizar ingreso");
       } finally {
-        // ✅ FIX CONCURRENCIA: SIEMPRE liberar el mutex
         operationInProgress.current = false;
       }
     },
@@ -739,7 +783,6 @@ const FinancesPage = () => {
   // ========== VERIFY FINANCE ==========
   const handleVerifyFinance = useCallback(
     async (financeId) => {
-      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
       if (operationInProgress.current) {
         log("Operación ya en progreso, ignorando");
         return;
@@ -755,7 +798,6 @@ const FinancesPage = () => {
           return;
         }
 
-        // ✅ FIX: Activar mutex DESPUÉS del confirm() para que cancelar no bloquee
         operationInProgress.current = true;
 
         log("Verificando ingreso", { financeId });
@@ -770,14 +812,12 @@ const FinancesPage = () => {
         });
 
         alert("Registro verificado exitosamente");
-        // ✅ FIX: Liberar mutex ANTES de recargar
         operationInProgress.current = false;
         await loadFinances();
       } catch (err) {
         logError("Error verificando ingreso:", err);
         setError("Error al verificar ingreso");
       } finally {
-        // ✅ FIX CONCURRENCIA: SIEMPRE liberar el mutex
         operationInProgress.current = false;
       }
     },
@@ -787,7 +827,6 @@ const FinancesPage = () => {
   // ========== DELETE FINANCE ==========
   const handleDeleteFinance = useCallback(
     async (financeId) => {
-      // ✅ FIX CONCURRENCIA: Guard contra doble ejecución
       if (operationInProgress.current) {
         log("Operación ya en progreso, ignorando");
         return;
@@ -807,7 +846,6 @@ const FinancesPage = () => {
           return;
         }
 
-        // ✅ FIX: Activar mutex DESPUÉS del confirm() para que cancelar no bloquee
         operationInProgress.current = true;
 
         log("Eliminando ingreso", { financeId });
@@ -822,14 +860,12 @@ const FinancesPage = () => {
         });
 
         alert("Registro eliminado exitosamente");
-        // ✅ FIX: Liberar mutex ANTES de recargar
         operationInProgress.current = false;
         await loadFinances();
       } catch (err) {
         logError("Error eliminando ingreso:", err);
         setError("Error al eliminar registro");
       } finally {
-        // ✅ FIX CONCURRENCIA: SIEMPRE liberar el mutex
         operationInProgress.current = false;
       }
     },
@@ -866,6 +902,18 @@ const FinancesPage = () => {
 
   const getVerificationLabel = (isVerified) => {
     return isVerified ? "✅ Verificado" : "⏳ Pendiente";
+  };
+
+  // ✅ NUEVO: Helper para obtener el tipo de líder de un miembro dado su memberId
+  // Se usa para mostrar la insignia de líder en la tabla de finanzas.
+  const getLeaderTypeForMember = (memberId) => {
+    const leader = leaders.find((l) => l.memberId === memberId);
+    return leader ? leader.leaderType : null;
+  };
+
+  // ✅ NUEVO: Helper para obtener la etiqueta del tipo de líder
+  const getLeaderTypeLabel = (leaderType) => {
+    return LEADER_TYPE_LABELS[leaderType] || leaderType;
   };
 
   // ========== FORMAT DATE RANGE FOR MODAL ==========
@@ -963,6 +1011,23 @@ const FinancesPage = () => {
               </select>
             </div>
 
+            {/* ✅ NUEVO: Filtro por tipo de líder */}
+            <div className="finances-page__filter-item">
+              <label>👤 Filtrar por Tipo de Líder</label>
+              <select
+                value={selectedLeaderType}
+                onChange={(e) => setSelectedLeaderType(e.target.value)}
+              >
+                <option value="ALL">Todos los Miembros</option>
+                <option value="NO_LEADER">🙍 Solo No Líderes</option>
+                {Object.entries(LEADER_TYPE_LABELS).map(([type, label]) => (
+                  <option key={type} value={type}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="finances-page__filter-item">
               <label>📅 Desde</label>
               <input
@@ -1012,6 +1077,7 @@ const FinancesPage = () => {
                   selectedMethod === "ALL" &&
                   selectedVerification === "ALL" &&
                   selectedConcept === "ALL" &&
+                  selectedLeaderType === "ALL" && // ✅ NUEVO
                   !searchText.trim())
               }
               title={
@@ -1022,6 +1088,7 @@ const FinancesPage = () => {
                       selectedMethod === "ALL" &&
                       selectedVerification === "ALL" &&
                       selectedConcept === "ALL" &&
+                      selectedLeaderType === "ALL" && // ✅ NUEVO
                       !searchText.trim()
                     ? "Debes aplicar filtros para generar un reporte específico"
                     : "Generar reporte en PDF"
@@ -1054,6 +1121,13 @@ const FinancesPage = () => {
                 selectedVerification === "VERIFIED"
                   ? "Verificados"
                   : "Pendientes"
+              }`}
+            {/* ✅ NUEVO: mostrar filtro activo de tipo de líder */}
+            {selectedLeaderType !== "ALL" &&
+              ` · Tipo Líder: ${
+                selectedLeaderType === "NO_LEADER"
+                  ? "No Líderes"
+                  : getLeaderTypeLabel(selectedLeaderType)
               }`}
             {startDate &&
               !endDate &&
@@ -1100,88 +1174,104 @@ const FinancesPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredFinances.map((finance) => (
-                  <tr
-                    key={finance.id}
-                    className={finance.isVerified ? "verified" : "unverified"}
-                  >
-                    <td className="finances-page__col-member">
-                      <div className="finances-page__member-info">
-                        <span className="finances-page__avatar">👤</span>
-                        <span className="finances-page__member-name">
-                          {finance.memberName}
+                {filteredFinances.map((finance) => {
+                  // ✅ NUEVO: Obtener el tipo de líder del miembro para mostrar insignia
+                  const leaderType = getLeaderTypeForMember(finance.memberId);
+
+                  return (
+                    <tr
+                      key={finance.id}
+                      className={finance.isVerified ? "verified" : "unverified"}
+                    >
+                      <td className="finances-page__col-member">
+                        <div className="finances-page__member-info">
+                          <span className="finances-page__avatar">👤</span>
+                          <div className="finances-page__member-details">
+                            <span className="finances-page__member-name">
+                              {finance.memberName}
+                            </span>
+                            {/* ✅ NUEVO: Insignia de tipo de líder (solo si es líder) */}
+                            {leaderType && (
+                              <span
+                                className={`finances-page__leader-badge finances-page__leader-badge--${leaderType.toLowerCase()}`}
+                                title={`Tipo de líder: ${getLeaderTypeLabel(leaderType)}`}
+                              >
+                                {getLeaderTypeLabel(leaderType)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="finances-page__col-amount">
+                        <span className="finances-page__amount">
+                          $ {(finance.amount || 0).toLocaleString("es-CO")}
                         </span>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="finances-page__col-amount">
-                      <span className="finances-page__amount">
-                        $ {(finance.amount || 0).toLocaleString("es-CO")}
-                      </span>
-                    </td>
+                      <td className="finances-page__col-concept">
+                        <span className="finances-page__badge">
+                          {getConceptLabel(finance.concept)}
+                        </span>
+                      </td>
 
-                    <td className="finances-page__col-concept">
-                      <span className="finances-page__badge">
-                        {getConceptLabel(finance.concept)}
-                      </span>
-                    </td>
+                      <td className="finances-page__col-method">
+                        <span className="finances-page__method-badge">
+                          {getMethodLabel(finance.method)}
+                        </span>
+                      </td>
 
-                    <td className="finances-page__col-method">
-                      <span className="finances-page__method-badge">
-                        {getMethodLabel(finance.method)}
-                      </span>
-                    </td>
+                      <td className="finances-page__col-status">
+                        <span
+                          className={`finances-page__status-badge ${
+                            finance.isVerified ? "verified" : "unverified"
+                          }`}
+                        >
+                          {getVerificationLabel(finance.isVerified)}
+                        </span>
+                      </td>
 
-                    <td className="finances-page__col-status">
-                      <span
-                        className={`finances-page__status-badge ${
-                          finance.isVerified ? "verified" : "unverified"
-                        }`}
-                      >
-                        {getVerificationLabel(finance.isVerified)}
-                      </span>
-                    </td>
+                      <td className="finances-page__col-date">
+                        {finance.registrationDate
+                          ? new Date(
+                              finance.registrationDate,
+                            ).toLocaleDateString("es-CO")
+                          : "-"}
+                      </td>
 
-                    <td className="finances-page__col-date">
-                      {finance.registrationDate
-                        ? new Date(
-                            finance.registrationDate,
-                          ).toLocaleDateString("es-CO")
-                        : "-"}
-                    </td>
-
-                    <td className="finances-page__col-actions">
-                      <div className="finances-page__action-buttons">
-                        {!finance.isVerified && (
+                      <td className="finances-page__col-actions">
+                        <div className="finances-page__action-buttons">
+                          {!finance.isVerified && (
+                            <button
+                              className="finances-page__btn-action verify"
+                              onClick={() => handleVerifyFinance(finance.id)}
+                              title="Verificar registro"
+                            >
+                              ✅
+                            </button>
+                          )}
                           <button
-                            className="finances-page__btn-action verify"
-                            onClick={() => handleVerifyFinance(finance.id)}
-                            title="Verificar registro"
+                            className="finances-page__btn-action edit"
+                            onClick={() => {
+                              setEditingFinance(finance);
+                              setShowAddModal(true);
+                            }}
+                            title="Editar registro"
                           >
-                            ✅
+                            ✏️
                           </button>
-                        )}
-                        <button
-                          className="finances-page__btn-action edit"
-                          onClick={() => {
-                            setEditingFinance(finance);
-                            setShowAddModal(true);
-                          }}
-                          title="Editar registro"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="finances-page__btn-action delete"
-                          onClick={() => handleDeleteFinance(finance.id)}
-                          title="Eliminar registro"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <button
+                            className="finances-page__btn-action delete"
+                            onClick={() => handleDeleteFinance(finance.id)}
+                            title="Eliminar registro"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1230,6 +1320,41 @@ const FinancesPage = () => {
       <style>{`
         .finances-page {
           transition: all 0.3s ease;
+        }
+
+        /* ✅ NUEVO: Estilos para insignias de tipo de líder en la tabla */
+        .finances-page__member-details {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+
+        .finances-page__leader-badge {
+          display: inline-block;
+          font-size: 0.68rem;
+          font-weight: 600;
+          padding: 1px 7px;
+          border-radius: 10px;
+          line-height: 1.6;
+          white-space: nowrap;
+        }
+
+        .finances-page__leader-badge--servant {
+          background-color: #e0f2fe;
+          color: #0369a1;
+          border: 1px solid #bae6fd;
+        }
+
+        .finances-page__leader-badge--leader_144 {
+          background-color: #dcfce7;
+          color: #15803d;
+          border: 1px solid #bbf7d0;
+        }
+
+        .finances-page__leader-badge--leader_12 {
+          background-color: #fef9c3;
+          color: #a16207;
+          border: 1px solid #fde68a;
         }
       `}</style>
     </div>
