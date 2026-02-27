@@ -267,12 +267,12 @@ const UsersPage = () => {
         );
         setSuccess("✅ Usuario actualizado");
       } else {
-        await authService.register({
-  username: formData.username,
-  email: formData.email,
-  password: formData.password,
-  role: formData.role,
-});
+        await authService.register(
+          formData.username,
+          formData.email,
+          formData.password,
+          formData.role // Envía el rol exacto según RoleName.java
+        );
         setSuccess("✅ Usuario registrado");
       }
 
