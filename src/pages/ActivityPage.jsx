@@ -75,17 +75,17 @@ const formatDate = (dateString) => {
 const getStatusLabel = (isActive, endDate) => {
   try {
     if (!isActive) return { text: "🔴 Inactiva", color: "danger" };
-    
+
     const today = new Date();
     const end = new Date(endDate);
-    
+
     if (isNaN(end.getTime())) return { text: "🟡 Activa", color: "warning" };
-    
+
     if (end < today) return { text: "⚫ Finalizada", color: "dark" };
     if (end.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000) {
       return { text: "🟠 Por finalizar", color: "warning" };
     }
-    
+
     return { text: "🟢 Activa", color: "success" };
   } catch (error) {
     return { text: "⚪ Desconocido", color: "secondary" };
@@ -103,7 +103,86 @@ const formatCurrency = (amount) => {
   }).format(amount);
 };
 
+// ============================================
+// 🔐 CONTROL DE ACCESO POR ROLES
+// ============================================
+
+// Roles con acceso total (GET + POST + PATCH + DELETE)
+const FULL_ACCESS_ROLES = ["ROLE_PASTORES", "ROLE_ECONOMICO"];
+
+// Mapeo de roles restringidos → LevelEnrollments que pueden ver
+const ROLE_LEVEL_MAP = {
+  ROLE_CONEXION: ["PREENCUENTRO"],
+  ROLE_CIMIENTO: ["ENCUENTRO", "POST_ENCUENTRO", "BAUTIZOS"],
+  ROLE_ESENCIA: [
+    "ESENCIA_1",
+    "ESENCIA_2",
+    "ESENCIA_3",
+    "SANIDAD_INTEGRAL_RAICES",
+    "ESENCIA_4",
+  ],
+  ROLE_DESPLIEGUE: ["ADIESTRAMIENTO", "GRADUACION"],
+};
+
+// Etiquetas legibles para mostrar en el badge
+const LEVEL_LABELS = {
+  PREENCUENTRO: "Pre-encuentro",
+  ENCUENTRO: "Encuentro",
+  POST_ENCUENTRO: "Post-encuentro",
+  BAUTIZOS: "Bautizos",
+  ESENCIA_1: "Esencia 1",
+  ESENCIA_2: "Esencia 2",
+  ESENCIA_3: "Esencia 3",
+  SANIDAD_INTEGRAL_RAICES: "Sanidad Integral Raíces",
+  ESENCIA_4: "Esencia 4",
+  ADIESTRAMIENTO: "Adiestramiento",
+  GRADUACION: "Graduación",
+};
+
+// Lee roles del usuario en sessionStorage (soporta string[] y {authority}[])
+const getCurrentUserRoles = () => {
+  try {
+    const raw = sessionStorage.getItem("user");
+    if (!raw) return [];
+    const user = JSON.parse(raw);
+    const roles = user?.roles ?? user?.authorities ?? [];
+    return roles.map((r) => (typeof r === "string" ? r : (r?.authority ?? "")));
+  } catch {
+    return [];
+  }
+};
+
+// true si el usuario tiene acceso total
+const hasFullAccess = (roles) =>
+  roles.some((r) => FULL_ACCESS_ROLES.includes(r));
+
+// null = sin restricción | [] = sin acceso | [...] = niveles permitidos
+const getAllowedLevels = (roles) => {
+  if (hasFullAccess(roles)) return null;
+  const levels = new Set();
+  Object.entries(ROLE_LEVEL_MAP).forEach(([role, lvls]) => {
+    if (roles.includes(role)) lvls.forEach((l) => levels.add(l));
+  });
+  return [...levels];
+};
+
+// Filtra el array de actividades por los niveles permitidos
+const filterActivitiesByRole = (activities, allowedLevels) => {
+  if (allowedLevels === null) return activities;
+  if (allowedLevels.length === 0) return [];
+  return activities.filter((a) => {
+    const level = a.levelEnrollment ?? a.level ?? null;
+    if (!level) return true; // actividades genéricas visibles para todos
+    return allowedLevels.includes(level);
+  });
+};
+
 const ActivityPage = () => {
+  // ========== ROLES DEL USUARIO (calculados una sola vez) ==========
+  const userRoles = getCurrentUserRoles();
+  const canWrite = hasFullAccess(userRoles);
+  const allowedLevels = getAllowedLevels(userRoles);
+
   // ========== ESTADOS ==========
   const [allActivities, setAllActivities] = useState([]);
   const [filteredActivities, setFilteredActivities] = useState([]);
@@ -121,7 +200,7 @@ const ActivityPage = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [showFinanceModal, setShowFinanceModal] = useState(false);
-  
+
   // Datos seleccionados
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [activityBalance, setActivityBalance] = useState(null);
@@ -132,12 +211,12 @@ const ActivityPage = () => {
 
   // ========== VERIFICAR FILTROS APLICADOS ==========
   useEffect(() => {
-    const hasFilters = 
+    const hasFilters =
       searchText.trim() !== "" ||
       selectedStatus !== "ALL" ||
       startDate !== "" ||
       endDate !== "";
-    
+
     setFiltersApplied(hasFilters);
   }, [searchText, selectedStatus, startDate, endDate]);
 
@@ -150,7 +229,7 @@ const ActivityPage = () => {
       log("Cargando actividades");
 
       const response = await apiService.request("/activity");
-      
+
       // 🔧 Validación mejorada de respuesta
       if (!response) {
         log("Respuesta vacía del servidor");
@@ -169,12 +248,12 @@ const ActivityPage = () => {
         log("No hay actividades registradas");
         setAllActivities([]);
         setFilteredActivities([]);
-        
+
         logUserAction("load_activities", {
           activityCount: 0,
           timestamp: new Date().toISOString(),
         });
-        
+
         return;
       }
 
@@ -187,22 +266,38 @@ const ActivityPage = () => {
         quantity: activity.quantity || 0,
         isActive: activity.isActive === true,
         status: getStatusLabel(activity.isActive, activity.endDate),
+        // 🔑 Campos necesarios para el filtrado por rol
+        levelEnrollment: activity.levelEnrollment ?? activity.level ?? null,
+        activityType: activity.activityType ?? null,
       }));
 
       log("Actividades procesadas", { count: processedActivities.length });
-      setAllActivities(processedActivities);
+
+      // 🔐 Aplicar filtro de rol ANTES de guardar en el estado
+      const roleFiltered = filterActivitiesByRole(
+        processedActivities,
+        allowedLevels,
+      );
+
+      log("Actividades visibles para el rol", {
+        total: processedActivities.length,
+        visibles: roleFiltered.length,
+        allowedLevels,
+      });
+
+      setAllActivities(roleFiltered);
 
       logUserAction("load_activities", {
-        activityCount: processedActivities.length,
+        activityCount: roleFiltered.length,
         timestamp: new Date().toISOString(),
       });
     } catch (err) {
       logError("Error cargando actividades:", err);
-      
+
       // 🔧 Mensaje de error más claro
       const errorMessage = err.message || "Error al cargar actividades";
       setError(errorMessage);
-      
+
       // 🔧 Establecer arrays vacíos en caso de error
       setAllActivities([]);
       setFilteredActivities([]);
@@ -215,14 +310,16 @@ const ActivityPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [allowedLevels]);
 
   // ========== CARGAR BALANCE DE ACTIVIDAD ==========
   const loadActivityBalance = useCallback(async (activityId) => {
     try {
       log("Cargando balance de actividad", { activityId });
 
-      const balance = await apiService.request(`/activity/balance/${activityId}`);
+      const balance = await apiService.request(
+        `/activity/balance/${activityId}`,
+      );
       setActivityBalance(balance);
 
       log("Balance cargado", balance);
@@ -244,7 +341,9 @@ const ActivityPage = () => {
       log("Cargando participantes", { activityId });
 
       // ✅ CORREGIDO: Usar el endpoint correcto con información de líder y distrito
-      const participants = await apiService.request(`/activity-contribution/activity/${activityId}/with-leader-info`);
+      const participants = await apiService.request(
+        `/activity-contribution/activity/${activityId}/with-leader-info`,
+      );
       setActivityParticipants(participants || []);
 
       log("Participantes cargados", { count: participants?.length || 0 });
@@ -324,7 +423,7 @@ const ActivityPage = () => {
         filtered = filtered.filter((activity) => {
           try {
             const activityDate = new Date(activity.endDate);
-            const activityDateString = activityDate.toISOString().split('T')[0];
+            const activityDateString = activityDate.toISOString().split("T")[0];
             return activityDateString === targetDate;
           } catch (e) {
             return false;
@@ -334,8 +433,10 @@ const ActivityPage = () => {
         filtered = filtered.filter((activity) => {
           try {
             const activityDate = new Date(activity.endDate);
-            const activityDateString = activityDate.toISOString().split('T')[0];
-            return activityDateString >= startDate && activityDateString <= endDate;
+            const activityDateString = activityDate.toISOString().split("T")[0];
+            return (
+              activityDateString >= startDate && activityDateString <= endDate
+            );
           } catch (e) {
             return false;
           }
@@ -346,7 +447,7 @@ const ActivityPage = () => {
       if (searchText.trim()) {
         const search = searchText.toLowerCase();
         filtered = filtered.filter((activity) =>
-          activity.activityName.toLowerCase().includes(search)
+          activity.activityName.toLowerCase().includes(search),
         );
       }
 
@@ -368,390 +469,488 @@ const ActivityPage = () => {
     applyFilters();
   }, [applyFilters]);
 
-// ========== AGREGAR ACTIVIDAD ==========
-const handleAddActivity = useCallback(async (activityData) => {
-  try {
-    console.log("🔍 [ActivityPage] RECIBIDO del modal:", JSON.stringify(activityData, null, 2));
+  // ========== AGREGAR ACTIVIDAD ==========
+  const handleAddActivity = useCallback(
+    async (activityData) => {
+      // 🔐 Guardia: solo acceso total puede crear
+      if (!canWrite) return;
 
-    if (!activityData || typeof activityData !== "object") {
-      setError("Datos de actividad inválidos");
-      return;
-    }
+      try {
+        console.log(
+          "🔍 [ActivityPage] RECIBIDO del modal:",
+          JSON.stringify(activityData, null, 2),
+        );
 
-    // Verificar específicamente para ENROLLMENT
-    if (activityData.activityType === "ENROLLMENT") {
-      console.log("🔍 [ActivityPage] Es ENROLLMENT, enrollmentId en activityData:", 
-                  activityData.enrollmentId);
-      
-      if (!activityData.enrollmentId) {
-        throw new Error("Falta enrollmentId para actividad ENROLLMENT");
+        if (!activityData || typeof activityData !== "object") {
+          setError("Datos de actividad inválidos");
+          return;
+        }
+
+        // Verificar específicamente para ENROLLMENT
+        if (activityData.activityType === "ENROLLMENT") {
+          console.log(
+            "🔍 [ActivityPage] Es ENROLLMENT, enrollmentId en activityData:",
+            activityData.enrollmentId,
+          );
+
+          if (!activityData.enrollmentId) {
+            throw new Error("Falta enrollmentId para actividad ENROLLMENT");
+          }
+
+          if (isNaN(activityData.enrollmentId)) {
+            throw new Error("enrollmentId debe ser un número");
+          }
+        }
+
+        // 🔴 LOG CRÍTICO: Ver qué se envía al backend
+        console.log(
+          "📤 [ActivityPage] Enviando al backend:",
+          JSON.stringify(activityData, null, 2),
+        );
+
+        const response = await apiService.request("/activity/save", {
+          method: "POST",
+          body: JSON.stringify(activityData),
+        });
+
+        console.log("✅ [ActivityPage] Respuesta del backend:", response);
+
+        logUserAction("create_activity", {
+          name: activityData.activityName,
+          price: activityData.price,
+          timestamp: new Date().toISOString(),
+        });
+
+        alert("✅ Actividad creada exitosamente");
+        setShowAddModal(false);
+        await loadActivities();
+
+        return response;
+      } catch (err) {
+        console.error("❌ [ActivityPage] Error:", err);
+        setError(err.message || "Error al crear actividad");
+        throw err;
       }
-      
-      if (isNaN(activityData.enrollmentId)) {
-        throw new Error("enrollmentId debe ser un número");
-      }
-    }
-
-    // 🔴 LOG CRÍTICO: Ver qué se envía al backend
-    console.log("📤 [ActivityPage] Enviando al backend:", JSON.stringify(activityData, null, 2));
-
-    const response = await apiService.request('/activity/save', {
-      method: 'POST',
-      body: JSON.stringify(activityData)
-    });
-
-    console.log("✅ [ActivityPage] Respuesta del backend:", response);
-
-    logUserAction("create_activity", {
-      name: activityData.activityName,
-      price: activityData.price,
-      timestamp: new Date().toISOString(),
-    });
-
-    alert("✅ Actividad creada exitosamente");
-    setShowAddModal(false);
-    await loadActivities();
-    
-    return response;
-  } catch (err) {
-    console.error("❌ [ActivityPage] Error:", err);
-    setError(err.message || "Error al crear actividad");
-    throw err;
-  }
-}, [loadActivities]);
+    },
+    [canWrite, loadActivities],
+  );
 
   // ========== ACTUALIZAR ACTIVIDAD ==========
-  // ========== ACTUALIZAR ACTIVIDAD ==========
-const handleUpdateActivity = useCallback(async (activityId, activityData) => {
-  try {
-    if (!activityId) {
-      setError("ID de actividad inválido");
-      return;
-    }
+  const handleUpdateActivity = useCallback(
+    async (activityId, activityData) => {
+      // 🔐 Guardia: solo acceso total puede actualizar
+      if (!canWrite) return;
 
-    if (!activityData || typeof activityData !== "object") {
-      setError("Datos de actividad inválidos");
-      return;
-    }
+      try {
+        if (!activityId) {
+          setError("ID de actividad inválido");
+          return;
+        }
 
-    log("Actualizando actividad", { activityId, activityData });
+        if (!activityData || typeof activityData !== "object") {
+          setError("Datos de actividad inválidos");
+          return;
+        }
 
-    // ✅ CORREGIDO: Usar apiService.request con el método correcto
-    const response = await apiService.request(`/activity/patch/${activityId}`, {
-      method: "PATCH",
-      body: JSON.stringify(activityData),
-    });
+        log("Actualizando actividad", { activityId, activityData });
 
-    log("Actividad actualizada exitosamente", response);
+        // ✅ CORREGIDO: Usar apiService.request con el método correcto
+        const response = await apiService.request(
+          `/activity/patch/${activityId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(activityData),
+          },
+        );
 
-    logUserAction("update_activity", {
-      activityId,
-      timestamp: new Date().toISOString(),
-    });
+        log("Actividad actualizada exitosamente", response);
 
-    alert("✅ Actividad actualizada exitosamente");
-    setShowAddModal(false);
-    setSelectedActivity(null);
-    await loadActivities(); // Recargar la lista
-    
-    return response;
-  } catch (err) {
-    logError("Error actualizando actividad:", err);
-    
-    let errorMessage = "Error al actualizar actividad";
-    if (err.message) {
-      errorMessage = err.message;
-    }
-    
-    setError(errorMessage);
-    throw err;
-  }
-}, [loadActivities]);
+        logUserAction("update_activity", {
+          activityId,
+          timestamp: new Date().toISOString(),
+        });
+
+        alert("✅ Actividad actualizada exitosamente");
+        setShowAddModal(false);
+        setSelectedActivity(null);
+        await loadActivities(); // Recargar la lista
+
+        return response;
+      } catch (err) {
+        logError("Error actualizando actividad:", err);
+
+        let errorMessage = "Error al actualizar actividad";
+        if (err.message) {
+          errorMessage = err.message;
+        }
+
+        setError(errorMessage);
+        throw err;
+      }
+    },
+    [canWrite, loadActivities],
+  );
 
   // ========== ELIMINAR/DESACTIVAR ACTIVIDAD ==========
-  const handleDeleteActivity = useCallback(async (activityId) => {
-    try {
-      if (!activityId) {
-        setError("ID de actividad inválido");
-        return;
+  const handleDeleteActivity = useCallback(
+    async (activityId) => {
+      // 🔐 Guardia: solo acceso total puede eliminar
+      if (!canWrite) return;
+
+      try {
+        if (!activityId) {
+          setError("ID de actividad inválido");
+          return;
+        }
+
+        if (
+          !window.confirm(
+            "¿Estás seguro de que deseas desactivar esta actividad?",
+          )
+        ) {
+          return;
+        }
+
+        log("Desactivando actividad", { activityId });
+
+        await apiService.request(`/activity/delete/${activityId}`, {
+          method: "DELETE",
+        });
+
+        log("Actividad desactivada exitosamente");
+
+        logUserAction("delete_activity", {
+          activityId,
+          timestamp: new Date().toISOString(),
+        });
+
+        alert("Actividad desactivada exitosamente");
+        loadActivities();
+      } catch (err) {
+        logError("Error desactivando actividad:", err);
+        setError("Error al desactivar actividad: " + (err.message || ""));
       }
-
-      if (!window.confirm("¿Estás seguro de que deseas desactivar esta actividad?")) {
-        return;
-      }
-
-      log("Desactivando actividad", { activityId });
-
-      await apiService.request(`/activity/delete/${activityId}`, {
-        method: "DELETE",
-      });
-
-      log("Actividad desactivada exitosamente");
-
-      logUserAction("delete_activity", {
-        activityId,
-        timestamp: new Date().toISOString(),
-      });
-
-      alert("Actividad desactivada exitosamente");
-      loadActivities();
-    } catch (err) {
-      logError("Error desactivando actividad:", err);
-      setError("Error al desactivar actividad: " + (err.message || ""));
-    }
-  }, [loadActivities]);
+    },
+    [canWrite, loadActivities],
+  );
 
   // ========== VER DETALLES DE ACTIVIDAD ==========
-  const handleViewDetails = useCallback(async (activity) => {
-    log("Mostrando detalles de actividad", { activityId: activity.id });
-    
-    // 🔧 Abrir modal INMEDIATAMENTE sin esperar
-    setSelectedActivity(activity);
-    setShowDetailsModal(true);
-    
-    // 🔧 Cargar balance en segundo plano (no bloqueante)
-    loadActivityBalance(activity.id);
+  const handleViewDetails = useCallback(
+    async (activity) => {
+      log("Mostrando detalles de actividad", { activityId: activity.id });
 
-    logUserAction("view_activity_details", {
-      activityId: activity.id,
-      timestamp: new Date().toISOString(),
-    });
-  }, [loadActivityBalance]);
+      // 🔧 Abrir modal INMEDIATAMENTE sin esperar
+      setSelectedActivity(activity);
+      setShowDetailsModal(true);
 
-  // ========== VER PARTICIPANTES ==========
-  const handleViewParticipants = useCallback(async (activity) => {
-    log("Mostrando participantes", { activityId: activity.id });
-    
-    // 🔧 Abrir modal INMEDIATAMENTE sin esperar
-    setSelectedActivity(activity);
-    setShowParticipantsModal(true);
-    
-    // 🔧 Cargar participantes en segundo plano (no bloqueante)
-    loadActivityParticipants(activity.id);
+      // 🔧 Cargar balance en segundo plano (no bloqueante)
+      loadActivityBalance(activity.id);
 
-    logUserAction("view_activity_participants", {
-      activityId: activity.id,
-      timestamp: new Date().toISOString(),
-    });
-  }, [loadActivityParticipants]);
-
-  // ========== VER FINANZAS ==========
-  const handleViewFinance = useCallback(async (activity) => {
-    log("Mostrando finanzas", { activityId: activity.id });
-    
-    // 🔧 Abrir modal INMEDIATAMENTE sin esperar
-    setSelectedActivity(activity);
-    setShowFinanceModal(true);
-    
-    // 🔧 Cargar balance en segundo plano (no bloqueante)
-    loadActivityBalance(activity.id);
-
-    logUserAction("view_activity_finance", {
-      activityId: activity.id,
-      timestamp: new Date().toISOString(),
-    });
-  }, [loadActivityBalance]);
-
-// ========== EXPORTAR PDF ==========
-const handleExportPDF = useCallback(async () => {
-  try {
-    setError(""); // Limpiar errores previos
-    log("Generando PDF de actividades");
-
-    // Mostrar loading
-    setLoading(true);
-
-    let title = "Reporte de Actividades";
-    let subtitle = "";
-
-    // Crear subtítulo con filtros aplicados
-    const filterLabels = [];
-
-    if (selectedStatus !== "ALL") {
-      const statusLabels = {
-        "ACTIVE": "Activas",
-        "INACTIVE": "Inactivas",
-        "ENDING_SOON": "Por finalizar",
-        "FINISHED": "Finalizadas",
-      };
-      filterLabels.push(`Estado: ${statusLabels[selectedStatus] || selectedStatus}`);
-    }
-
-    if (searchText.trim()) {
-      filterLabels.push(`Búsqueda: "${searchText}"`);
-    }
-
-    if (startDate && endDate) {
-      filterLabels.push(`Período: ${startDate} al ${endDate}`);
-    } else if (startDate) {
-      filterLabels.push(`Fecha: ${startDate}`);
-    }
-
-    subtitle = filterLabels.join(" • ");
-
-    const data = {
-      title,
-      subtitle: subtitle || "Todos los registros",
-      date: new Date().toLocaleDateString("es-CO"),
-      activities: filteredActivities,
-      statistics: {
-        totalActivities: filteredActivities.length,
-        totalActive: filteredActivities.filter(a => a.isActive).length,
-        totalParticipants: filteredActivities.reduce((sum, a) => sum + (a.quantity || 0), 0),
-        totalValue: filteredActivities.reduce((sum, a) => sum + (a.price || 0) * (a.quantity || 0), 0),
-      },
-    };
-
-    // 🔧 Generar PDF
-    const success = await generateActivityPDF(data, "reporte-actividades");
-
-    if (success) {
-      log("PDF generado exitosamente");
-      
-      logUserAction("export_activity_pdf", {
-        activityCount: filteredActivities.length,
-        filtersApplied: filtersApplied,
+      logUserAction("view_activity_details", {
+        activityId: activity.id,
         timestamp: new Date().toISOString(),
       });
-      
-      // Mostrar mensaje de éxito
-      alert(`✅ PDF generado exitosamente\n📄 Se descargó el archivo: reporte-actividades-${new Date().toISOString().split('T')[0]}.pdf`);
-    } else {
-      throw new Error("No se pudo generar el PDF");
+    },
+    [loadActivityBalance],
+  );
+
+  // ========== VER PARTICIPANTES ==========
+  const handleViewParticipants = useCallback(
+    async (activity) => {
+      log("Mostrando participantes", { activityId: activity.id });
+
+      // 🔧 Abrir modal INMEDIATAMENTE sin esperar
+      setSelectedActivity(activity);
+      setShowParticipantsModal(true);
+
+      // 🔧 Cargar participantes en segundo plano (no bloqueante)
+      loadActivityParticipants(activity.id);
+
+      logUserAction("view_activity_participants", {
+        activityId: activity.id,
+        timestamp: new Date().toISOString(),
+      });
+    },
+    [loadActivityParticipants],
+  );
+
+  // ========== VER FINANZAS ==========
+  const handleViewFinance = useCallback(
+    async (activity) => {
+      log("Mostrando finanzas", { activityId: activity.id });
+
+      // 🔧 Abrir modal INMEDIATAMENTE sin esperar
+      setSelectedActivity(activity);
+      setShowFinanceModal(true);
+
+      // 🔧 Cargar balance en segundo plano (no bloqueante)
+      loadActivityBalance(activity.id);
+
+      logUserAction("view_activity_finance", {
+        activityId: activity.id,
+        timestamp: new Date().toISOString(),
+      });
+    },
+    [loadActivityBalance],
+  );
+
+  // ========== EXPORTAR PDF ==========
+  const handleExportPDF = useCallback(async () => {
+    try {
+      setError(""); // Limpiar errores previos
+      log("Generando PDF de actividades");
+
+      // Mostrar loading
+      setLoading(true);
+
+      let title = "Reporte de Actividades";
+      let subtitle = "";
+
+      // Crear subtítulo con filtros aplicados
+      const filterLabels = [];
+
+      if (selectedStatus !== "ALL") {
+        const statusLabels = {
+          ACTIVE: "Activas",
+          INACTIVE: "Inactivas",
+          ENDING_SOON: "Por finalizar",
+          FINISHED: "Finalizadas",
+        };
+        filterLabels.push(
+          `Estado: ${statusLabels[selectedStatus] || selectedStatus}`,
+        );
+      }
+
+      if (searchText.trim()) {
+        filterLabels.push(`Búsqueda: "${searchText}"`);
+      }
+
+      if (startDate && endDate) {
+        filterLabels.push(`Período: ${startDate} al ${endDate}`);
+      } else if (startDate) {
+        filterLabels.push(`Fecha: ${startDate}`);
+      }
+
+      subtitle = filterLabels.join(" • ");
+
+      const data = {
+        title,
+        subtitle: subtitle || "Todos los registros",
+        date: new Date().toLocaleDateString("es-CO"),
+        activities: filteredActivities,
+        statistics: {
+          totalActivities: filteredActivities.length,
+          totalActive: filteredActivities.filter((a) => a.isActive).length,
+          totalParticipants: filteredActivities.reduce(
+            (sum, a) => sum + (a.quantity || 0),
+            0,
+          ),
+          totalValue: filteredActivities.reduce(
+            (sum, a) => sum + (a.price || 0) * (a.quantity || 0),
+            0,
+          ),
+        },
+      };
+
+      // 🔧 Generar PDF
+      const success = await generateActivityPDF(data, "reporte-actividades");
+
+      if (success) {
+        log("PDF generado exitosamente");
+
+        logUserAction("export_activity_pdf", {
+          activityCount: filteredActivities.length,
+          filtersApplied: filtersApplied,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Mostrar mensaje de éxito
+        alert(
+          `✅ PDF generado exitosamente\n📄 Se descargó el archivo: reporte-actividades-${new Date().toISOString().split("T")[0]}.pdf`,
+        );
+      } else {
+        throw new Error("No se pudo generar el PDF");
+      }
+    } catch (err) {
+      logError("Error generando PDF:", err);
+      setError("Error al generar PDF. Por favor, intente nuevamente.");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    logError("Error generando PDF:", err);
-    setError("Error al generar PDF. Por favor, intente nuevamente.");
-  } finally {
-    setLoading(false);
-  }
-}, [filteredActivities, selectedStatus, searchText, startDate, endDate, filtersApplied]);
+  }, [
+    filteredActivities,
+    selectedStatus,
+    searchText,
+    startDate,
+    endDate,
+    filtersApplied,
+  ]);
 
   // ========== INSCRIBIR PARTICIPANTE ==========
- // ========== INSCRIBIR PARTICIPANTE ==========
-// ========== INSCRIBIR PARTICIPANTE ==========
-// ========== INSCRIBIR PARTICIPANTE ==========
-const handleEnrollParticipant = useCallback(async (activityId, memberId, initialPayment) => {
-  try {
-    log("Inscribiendo participante", { activityId, memberId, initialPayment });
+  // ========== INSCRIBIR PARTICIPANTE ==========
+  // ========== INSCRIBIR PARTICIPANTE ==========
+  // ========== INSCRIBIR PARTICIPANTE ==========
+  const handleEnrollParticipant = useCallback(
+    async (activityId, memberId, initialPayment) => {
+      // 🔐 Guardia: solo acceso total puede inscribir
+      if (!canWrite) return false;
 
-    const currentUser = apiService.getCurrentUser();
-    const recordedBy = currentUser?.username || "Sistema";
+      try {
+        log("Inscribiendo participante", {
+          activityId,
+          memberId,
+          initialPayment,
+        });
 
-    // CORRECCIÓN: Verificar si realmente hay pago inicial
-    const hasInitialPayment = initialPayment && parseFloat(initialPayment) > 0;
+        const currentUser = apiService.getCurrentUser();
+        const recordedBy = currentUser?.username || "Sistema";
 
-    // PRIMERO: Verificar si el miembro ya está inscrito en esta actividad
-    log("Verificando si el miembro ya está inscrito...");
-    
-    let alreadyEnrolled = false;
-    try {
-      // Cargar los participantes actuales de la actividad
-      const currentParticipants = await apiService.request(`/activity-contribution/activity/${activityId}/with-leader-info`);
-      
-      if (Array.isArray(currentParticipants)) {
-        alreadyEnrolled = currentParticipants.some(
-          participant => {
-            // Verificar por memberId directo
-            if (participant.memberId === memberId) return true;
-            
-            // Verificar por objeto member anidado
-            if (participant.member && participant.member.id === memberId) return true;
-            
-            // Verificar por miembro como objeto en member
-            if (participant.member && participant.member.memberId === memberId) return true;
-            
-            return false;
+        // CORRECCIÓN: Verificar si realmente hay pago inicial
+        const hasInitialPayment =
+          initialPayment && parseFloat(initialPayment) > 0;
+
+        // PRIMERO: Verificar si el miembro ya está inscrito en esta actividad
+        log("Verificando si el miembro ya está inscrito...");
+
+        let alreadyEnrolled = false;
+        try {
+          // Cargar los participantes actuales de la actividad
+          const currentParticipants = await apiService.request(
+            `/activity-contribution/activity/${activityId}/with-leader-info`,
+          );
+
+          if (Array.isArray(currentParticipants)) {
+            alreadyEnrolled = currentParticipants.some((participant) => {
+              // Verificar por memberId directo
+              if (participant.memberId === memberId) return true;
+
+              // Verificar por objeto member anidado
+              if (participant.member && participant.member.id === memberId)
+                return true;
+
+              // Verificar por miembro como objeto en member
+              if (
+                participant.member &&
+                participant.member.memberId === memberId
+              )
+                return true;
+
+              return false;
+            });
+
+            if (alreadyEnrolled) {
+              const errorMsg =
+                "❌ Este miembro ya está inscrito en esta actividad";
+              setError(errorMsg);
+              log("Miembro ya inscrito", { activityId, memberId });
+              return false; // 🔴 IMPORTANTE: Retornar false para detener la ejecución
+            }
           }
-        );
-        
-        if (alreadyEnrolled) {
-          const errorMsg = "❌ Este miembro ya está inscrito en esta actividad";
-          setError(errorMsg);
-          log("Miembro ya inscrito", { activityId, memberId });
-          return false; // 🔴 IMPORTANTE: Retornar false para detener la ejecución
+        } catch (checkError) {
+          log(
+            "No se pudo verificar inscripción previa, continuando...",
+            checkError,
+          );
+          // Continuamos aunque falle la verificación, el backend lo validará
         }
+
+        // 🔴 CORRECCIÓN: Si ya está inscrito, NO continuar
+        if (alreadyEnrolled) {
+          return false;
+        }
+
+        let response;
+        let endpoint;
+        let enrollmentData;
+
+        if (hasInitialPayment) {
+          // CASO 1: Con pago inicial
+          endpoint = "/activity-contribution/create-with-initial-payment";
+          enrollmentData = {
+            memberId,
+            activityId,
+            incomeMethod: "CASH", // Valor por defecto
+            recordedBy,
+            initialPaymentAmount: parseFloat(initialPayment),
+          };
+        } else {
+          // CASO 2: Sin pago inicial - usar endpoint diferente
+          endpoint = "/activity-contribution/save";
+          enrollmentData = {
+            memberId,
+            activityId,
+            recordedBy,
+            // NO enviar initialPaymentAmount ni incomeMethod
+          };
+        }
+
+        log(`Enviando a ${endpoint}`, enrollmentData);
+
+        response = await apiService.request(endpoint, {
+          method: "POST",
+          body: JSON.stringify(enrollmentData),
+        });
+
+        log("Participante inscrito exitosamente", response);
+
+        logUserAction("enroll_participant", {
+          activityId,
+          memberId,
+          hasInitialPayment,
+          timestamp: new Date().toISOString(),
+        });
+
+        alert(
+          `✅ Participante inscrito ${hasInitialPayment ? `con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}` : "sin pago inicial"}`,
+        );
+
+        // Recargar datos si estamos viendo participantes o detalles
+        if (showParticipantsModal) {
+          await loadActivityParticipants(activityId);
+        }
+        if (showDetailsModal || showFinanceModal) {
+          await loadActivityBalance(activityId);
+        }
+
+        return true;
+      } catch (err) {
+        logError("Error inscribiendo participante:", err);
+
+        // Mensaje de error más específico
+        let errorMessage = "Error al inscribir participante";
+        if (err.response?.data?.error) {
+          errorMessage = err.response.data.error;
+        } else if (err.message) {
+          errorMessage = err.message;
+        } else if (err.fields) {
+          const fieldErrors = Object.values(err.fields).join(", ");
+          errorMessage = `Error de validación: ${fieldErrors}`;
+        }
+
+        setError(errorMessage);
+        return false;
       }
-    } catch (checkError) {
-      log("No se pudo verificar inscripción previa, continuando...", checkError);
-      // Continuamos aunque falle la verificación, el backend lo validará
-    }
+    },
+    [
+      canWrite,
+      showParticipantsModal,
+      showDetailsModal,
+      showFinanceModal,
+      loadActivityParticipants,
+      loadActivityBalance,
+    ],
+  );
 
-    // 🔴 CORRECCIÓN: Si ya está inscrito, NO continuar
-    if (alreadyEnrolled) {
-      return false;
-    }
-
-    let response;
-    let endpoint;
-    let enrollmentData;
-
-    if (hasInitialPayment) {
-      // CASO 1: Con pago inicial
-      endpoint = "/activity-contribution/create-with-initial-payment";
-      enrollmentData = {
-        memberId,
-        activityId,
-        incomeMethod: "CASH", // Valor por defecto
-        recordedBy,
-        initialPaymentAmount: parseFloat(initialPayment),
-      };
-    } else {
-      // CASO 2: Sin pago inicial - usar endpoint diferente
-      endpoint = "/activity-contribution/save";
-      enrollmentData = {
-        memberId,
-        activityId,
-        recordedBy,
-        // NO enviar initialPaymentAmount ni incomeMethod
-      };
-    }
-
-    log(`Enviando a ${endpoint}`, enrollmentData);
-
-    response = await apiService.request(endpoint, {
-      method: "POST",
-      body: JSON.stringify(enrollmentData),
-    });
-
-    log("Participante inscrito exitosamente", response);
-
-    logUserAction("enroll_participant", {
-      activityId,
-      memberId,
-      hasInitialPayment,
-      timestamp: new Date().toISOString(),
-    });
-
-    alert(`✅ Participante inscrito ${hasInitialPayment ? `con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}` : "sin pago inicial"}`);
-    
-    // Recargar datos si estamos viendo participantes o detalles
-    if (showParticipantsModal) {
-      await loadActivityParticipants(activityId);
-    }
-    if (showDetailsModal || showFinanceModal) {
-      await loadActivityBalance(activityId);
-    }
-    
-    return true;
-  } catch (err) {
-    logError("Error inscribiendo participante:", err);
-    
-    // Mensaje de error más específico
-    let errorMessage = "Error al inscribir participante";
-    if (err.response?.data?.error) {
-      errorMessage = err.response.data.error;
-    } else if (err.message) {
-      errorMessage = err.message;
-    } else if (err.fields) {
-      const fieldErrors = Object.values(err.fields).join(', ');
-      errorMessage = `Error de validación: ${fieldErrors}`;
-    }
-    
-    setError(errorMessage);
-    return false;
-  }
-}, [showParticipantsModal, showDetailsModal, showFinanceModal, loadActivityParticipants, loadActivityBalance]);
+  // ========== BADGE DE ACCESO RESTRINGIDO ==========
+  const accessBadgeInfo = (() => {
+    if (canWrite) return null; // sin badge para acceso total
+    if (!allowedLevels || allowedLevels.length === 0)
+      return { label: "Sin acceso de escritura", levels: [] };
+    return {
+      label: "Vista de solo lectura",
+      levels: allowedLevels.map((l) => LEVEL_LABELS[l] || l),
+    };
+  })();
 
   // ========== RENDER ==========
   return (
@@ -761,6 +960,21 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
         <div className="activity-page__header">
           <h1>📋 Gestión de Actividades</h1>
           <p>Crea y administra actividades, inscripciones y finanzas</p>
+
+          {/* 🔐 Badge de acceso restringido (solo visible para roles limitados) */}
+          {accessBadgeInfo && (
+            <div className="activity-page__access-badge">
+              <span className="activity-page__access-badge__icon">🔒</span>
+              <span className="activity-page__access-badge__label">
+                {accessBadgeInfo.label}
+              </span>
+              {accessBadgeInfo.levels.length > 0 && (
+                <span className="activity-page__access-badge__levels">
+                  Niveles visibles: {accessBadgeInfo.levels.join(" · ")}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* CONTROLES */}
@@ -773,7 +987,9 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
                 type="text"
                 placeholder="Nombre de la actividad..."
                 value={searchText}
-                onChange={(e) => setSearchText(validateSearchText(e.target.value))}
+                onChange={(e) =>
+                  setSearchText(validateSearchText(e.target.value))
+                }
                 maxLength="100"
               />
             </div>
@@ -817,22 +1033,29 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
 
           {/* ACCIONES PRINCIPALES */}
           <div className="activity-page__actions">
-            <button
-              className="activity-page__btn activity-page__btn--primary"
-              onClick={() => {
-                setSelectedActivity(null);
-                setShowAddModal(true);
-              }}
-              title="Crear nueva actividad"
-            >
-              ➕ Nueva Actividad
-            </button>
+            {/* 🔐 Solo roles con acceso total pueden crear actividades */}
+            {canWrite && (
+              <button
+                className="activity-page__btn activity-page__btn--primary"
+                onClick={() => {
+                  setSelectedActivity(null);
+                  setShowAddModal(true);
+                }}
+                title="Crear nueva actividad"
+              >
+                ➕ Nueva Actividad
+              </button>
+            )}
 
             <button
               className="activity-page__btn activity-page__btn--secondary"
               onClick={handleExportPDF}
               disabled={!filtersApplied || filteredActivities.length === 0}
-              title={!filtersApplied ? "Aplica al menos un filtro para exportar" : "Exportar reporte en PDF"}
+              title={
+                !filtersApplied
+                  ? "Aplica al menos un filtro para exportar"
+                  : "Exportar reporte en PDF"
+              }
             >
               📄 Exportar PDF
             </button>
@@ -853,17 +1076,25 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
           <p>
             Mostrando <strong>{filteredActivities.length}</strong> de{" "}
             <strong>{allActivities.length}</strong> actividades
-            {selectedStatus !== "ALL" && ` · ${selectedStatus === "ACTIVE" ? "🟢 Activas" : 
-              selectedStatus === "INACTIVE" ? "🔴 Inactivas" : 
-              selectedStatus === "ENDING_SOON" ? "🟠 Por finalizar" : 
-              "⚫ Finalizadas"}`}
+            {selectedStatus !== "ALL" &&
+              ` · ${
+                selectedStatus === "ACTIVE"
+                  ? "🟢 Activas"
+                  : selectedStatus === "INACTIVE"
+                    ? "🔴 Inactivas"
+                    : selectedStatus === "ENDING_SOON"
+                      ? "🟠 Por finalizar"
+                      : "⚫ Finalizadas"
+              }`}
             {searchText.trim() && ` · 🔍 "${searchText}"`}
             {startDate && endDate && ` · 📅 ${startDate} al ${endDate}`}
             {startDate && !endDate && ` · 📅 ${startDate}`}
           </p>
           {filtersApplied && (
             <div className="activity-page__filters-applied">
-              <small>✅ Filtros aplicados: El botón Exportar PDF está habilitado</small>
+              <small>
+                ✅ Filtros aplicados: El botón Exportar PDF está habilitado
+              </small>
             </div>
           )}
         </div>
@@ -872,15 +1103,15 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
         {error && (
           <div className="activity-page__error">
             ❌ {error}
-            <button 
+            <button
               onClick={() => setError("")}
-              style={{ 
-                marginLeft: '10px', 
-                background: 'none', 
-                border: 'none', 
-                color: 'inherit', 
-                cursor: 'pointer',
-                fontSize: '1.2em'
+              style={{
+                marginLeft: "10px",
+                background: "none",
+                border: "none",
+                color: "inherit",
+                cursor: "pointer",
+                fontSize: "1.2em",
               }}
             >
               ✖
@@ -900,14 +1131,18 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
               <>
                 <p>📋 No hay actividades registradas</p>
                 <p className="activity-page__empty-hint">
-                  💡 Comienza creando tu primera actividad con el botón "➕ Nueva Actividad"
+                  💡 Comienza creando tu primera actividad con el botón "➕
+                  Nueva Actividad"
                 </p>
               </>
             ) : (
               <>
-                <p>📋 No hay actividades que coincidan con los filtros aplicados</p>
+                <p>
+                  📋 No hay actividades que coincidan con los filtros aplicados
+                </p>
                 <p className="activity-page__empty-hint">
-                  💡 Intenta ajustar o limpiar los filtros para ver más resultados
+                  💡 Intenta ajustar o limpiar los filtros para ver más
+                  resultados
                 </p>
               </>
             )}
@@ -920,7 +1155,9 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
                 <tr>
                   <th className="activity-page__col-name">Actividad</th>
                   <th className="activity-page__col-price">Precio</th>
-                  <th className="activity-page__col-participants">Participantes</th>
+                  <th className="activity-page__col-participants">
+                    Participantes
+                  </th>
                   <th className="activity-page__col-status">Estado</th>
                   <th className="activity-page__col-date">Fecha Fin</th>
                   <th className="activity-page__col-actions">Acciones</th>
@@ -928,8 +1165,8 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
               </thead>
               <tbody>
                 {filteredActivities.map((activity) => (
-                  <tr 
-                    key={activity.id} 
+                  <tr
+                    key={activity.id}
                     className={`activity-${activity.status.color} activity-row-clickable`}
                     onClick={() => handleViewDetails(activity)}
                     title="Clic para ver detalles"
@@ -941,6 +1178,14 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
                           <span className="activity-page__activity-name">
                             {activity.activityName}
                           </span>
+                          {/* 🔑 Etiqueta de nivel (útil para saber qué actividades está viendo) */}
+                          {activity.levelEnrollment && (
+                            <small className="activity-page__level-tag">
+                              🎓{" "}
+                              {LEVEL_LABELS[activity.levelEnrollment] ||
+                                activity.levelEnrollment}
+                            </small>
+                          )}
                           {activity.quantity && activity.quantity > 0 && (
                             <small className="activity-page__capacity">
                               Capacidad: {activity.quantity}
@@ -963,7 +1208,9 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
                     </td>
 
                     <td className="activity-page__col-status">
-                      <span className={`activity-page__status-badge ${activity.status.color}`}>
+                      <span
+                        className={`activity-page__status-badge ${activity.status.color}`}
+                      >
                         {activity.status.text}
                       </span>
                     </td>
@@ -972,7 +1219,10 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
                       {formatDate(activity.endDate)}
                     </td>
 
-                    <td className="activity-page__col-actions" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="activity-page__col-actions"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="activity-page__action-buttons">
                         <button
                           className="activity-page__btn-action participants"
@@ -988,23 +1238,29 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
                         >
                           💰
                         </button>
-                        <button
-                          className="activity-page__btn-action edit"
-                          onClick={() => {
-                            setSelectedActivity(activity);
-                            setShowAddModal(true);
-                          }}
-                          title="Editar actividad"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          className="activity-page__btn-action delete"
-                          onClick={() => handleDeleteActivity(activity.id)}
-                          title="Desactivar actividad"
-                        >
-                          🗑️
-                        </button>
+                        {/* 🔐 Editar: solo acceso total */}
+                        {canWrite && (
+                          <button
+                            className="activity-page__btn-action edit"
+                            onClick={() => {
+                              setSelectedActivity(activity);
+                              setShowAddModal(true);
+                            }}
+                            title="Editar actividad"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                        {/* 🔐 Eliminar: solo acceso total */}
+                        {canWrite && (
+                          <button
+                            className="activity-page__btn-action delete"
+                            onClick={() => handleDeleteActivity(activity.id)}
+                            title="Desactivar actividad"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1016,18 +1272,23 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
       </div>
 
       {/* MODALES */}
-      <ModalAddActivity
-        isOpen={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          setSelectedActivity(null);
-        }}
-        onSave={selectedActivity ? 
-          (data) => handleUpdateActivity(selectedActivity.id, data) : 
-          handleAddActivity}
-        initialData={selectedActivity}
-        isEditing={!!selectedActivity}
-      />
+      {/* 🔐 ModalAddActivity solo se monta para roles con acceso total */}
+      {canWrite && (
+        <ModalAddActivity
+          isOpen={showAddModal}
+          onClose={() => {
+            setShowAddModal(false);
+            setSelectedActivity(null);
+          }}
+          onSave={
+            selectedActivity
+              ? (data) => handleUpdateActivity(selectedActivity.id, data)
+              : handleAddActivity
+          }
+          initialData={selectedActivity}
+          isEditing={!!selectedActivity}
+        />
+      )}
 
       <ModalActivityDetails
         isOpen={showDetailsModal}
@@ -1038,7 +1299,8 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
         }}
         activity={selectedActivity}
         balance={activityBalance}
-        onEnrollParticipant={handleEnrollParticipant}
+        onEnrollParticipant={canWrite ? handleEnrollParticipant : null}
+        readOnly={!canWrite}
       />
 
       <ModalActivityParticipants
@@ -1050,7 +1312,8 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
         }}
         activity={selectedActivity}
         participants={activityParticipants}
-        onEnrollParticipant={handleEnrollParticipant}
+        onEnrollParticipant={canWrite ? handleEnrollParticipant : null}
+        readOnly={!canWrite}
       />
 
       <ModalActivityFinance
@@ -1062,6 +1325,7 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
         }}
         activity={selectedActivity}
         balance={activityBalance}
+        readOnly={!canWrite}
       />
 
       <style>{`
@@ -1124,6 +1388,39 @@ const handleEnrollParticipant = useCallback(async (activityId, memberId, initial
           font-size: 0.8em;
           white-space: nowrap;
           z-index: 1000;
+        }
+
+        /* 🔐 Badge de acceso restringido */
+        .activity-page__access-badge {
+          display: inline-flex;
+          flex-wrap: wrap;
+          align-items: center;
+          gap: 8px;
+          margin-top: 10px;
+          padding: 8px 14px;
+          background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+          border: 1px solid #f0c040;
+          border-radius: 8px;
+          font-size: 0.85em;
+          color: #7d5a00;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        .activity-page__access-badge__icon { font-size: 1.1em; }
+        .activity-page__access-badge__label { font-weight: 600; }
+        .activity-page__access-badge__levels {
+          color: #5a4000;
+          font-style: italic;
+          border-left: 1px solid #f0c040;
+          padding-left: 8px;
+        }
+
+        /* Etiqueta de nivel en la tabla */
+        .activity-page__level-tag {
+          display: block;
+          margin-top: 2px;
+          font-size: 0.75em;
+          color: #6c757d;
+          font-style: italic;
         }
       `}</style>
     </div>

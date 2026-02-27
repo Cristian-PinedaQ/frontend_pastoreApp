@@ -139,7 +139,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<ActivityPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
                 />
               }
             />

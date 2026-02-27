@@ -1,6 +1,7 @@
 // ============================================
 // ModalActivityDetails.jsx - CORREGIDO CON FILTRO POR NIVEL Y EXCLUSIONES
 // Modal para ver detalles de actividad y agregar participantes
+// 🔐 AÑADIDO: prop readOnly para roles con solo GET (oculta pestañas de escritura)
 // ============================================
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -13,6 +14,7 @@ const ModalActivityDetails = ({
   activity,
   balance,
   onEnrollParticipant,
+  readOnly = false,   // 🔐 true para ROLE_CONEXION, ROLE_CIMIENTO, ROLE_ESENCIA, ROLE_DESPLIEGUE
 }) => {
   // Estados para pestañas
   const [activeTab, setActiveTab] = useState("info");
@@ -51,6 +53,13 @@ const ModalActivityDetails = ({
 
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  // 🔐 Resetear a pestaña "info" cuando se abre el modal (especialmente para readOnly)
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab("info");
+    }
+  }, [isOpen]);
 
   // Obtener usuario actual
   const getCurrentUser = () => {
@@ -143,12 +152,15 @@ const ModalActivityDetails = ({
   // Efecto para cargar datos cuando se abre el modal
   useEffect(() => {
     if (isOpen && activity) {
-      loadMembers();
-      if (activeTab === "costs") {
+      // 🔐 Solo cargar miembros si tiene acceso de escritura (necesario para la pestaña Inscribir)
+      if (!readOnly) {
+        loadMembers();
+      }
+      if (activeTab === "costs" && !readOnly) {
         loadCosts();
       }
     }
-  }, [isOpen, activity, loadMembers, activeTab, loadCosts]);
+  }, [isOpen, activity, loadMembers, activeTab, loadCosts, readOnly]);
 
   // Efecto para calcular miembros elegibles cuando cambian los miembros o la actividad
   useEffect(() => {
@@ -449,6 +461,12 @@ const ModalActivityDetails = ({
             >
               {activity.status?.text || "Desconocido"}
             </div>
+            {/* 🔐 Badge solo lectura visible para roles restringidos */}
+            {readOnly && (
+              <div className="details-readonly-badge" title="Solo tienes permiso de consulta">
+                🔒 Solo lectura
+              </div>
+            )}
           </div>
           <button className="modal-activity-details__close" onClick={onClose}>
             ×
@@ -463,21 +481,26 @@ const ModalActivityDetails = ({
           >
             📊 Información General
           </button>
-          <button
-            className={`tab ${activeTab === "enroll" ? "active" : ""}`}
-            onClick={() => setActiveTab("enroll")}
-          >
-            👥 Inscribir Participante
-          </button>
-          <button
-            className={`tab ${activeTab === "costs" ? "active" : ""}`}
-            onClick={() => {
-              setActiveTab("costs");
-              loadCosts();
-            }}
-          >
-            💰 Gastos Actividad
-          </button>
+          {/* 🔐 Pestañas de escritura solo visibles con acceso total */}
+          {!readOnly && (
+            <button
+              className={`tab ${activeTab === "enroll" ? "active" : ""}`}
+              onClick={() => setActiveTab("enroll")}
+            >
+              👥 Inscribir Participante
+            </button>
+          )}
+          {!readOnly && (
+            <button
+              className={`tab ${activeTab === "costs" ? "active" : ""}`}
+              onClick={() => {
+                setActiveTab("costs");
+                loadCosts();
+              }}
+            >
+              💰 Gastos Actividad
+            </button>
+          )}
         </div>
 
         <div className="modal-activity-details__content">
@@ -598,8 +621,8 @@ const ModalActivityDetails = ({
             </>
           )}
 
-          {/* PESTAÑA 2: INSCRIBIR PARTICIPANTE */}
-          {activeTab === "enroll" && (
+          {/* PESTAÑA 2: INSCRIBIR PARTICIPANTE (solo !readOnly) */}
+          {activeTab === "enroll" && !readOnly && (
             <div className="details-section enroll-section">
               <h3>👥 Inscribir Nuevo Participante</h3>
 
@@ -842,8 +865,8 @@ const ModalActivityDetails = ({
             </div>
           )}
 
-          {/* PESTAÑA 3: GASTOS DE ACTIVIDAD */}
-          {activeTab === "costs" && (
+          {/* PESTAÑA 3: GASTOS DE ACTIVIDAD (solo !readOnly) */}
+          {activeTab === "costs" && !readOnly && (
             <div className="details-section costs-section">
               <div className="costs-header">
                 <h3>💰 Gastos de la Actividad</h3>
@@ -993,6 +1016,28 @@ const ModalActivityDetails = ({
           </button>
         </div>
       </div>
+
+      {/* 🔐 Estilos del badge solo lectura */}
+      <style>{`
+        .modal-activity-details__header-content {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        .details-readonly-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 10px;
+          background: #fff3cd;
+          border: 1px solid #f0c040;
+          border-radius: 20px;
+          font-size: 0.78em;
+          color: #7d5a00;
+          font-weight: 600;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 // ModalActivityParticipants.jsx - CON FUNCIÓN DE GENERAR PDF (VERSIÓN OPTIMIZADA)
 // ✅ INTEGRADO: nameHelper para transformación de nombres
 // ✅ CORREGIDO: useCallback y useEffect sin warnings
+// 🔐 AÑADIDO: prop readOnly para roles con solo GET
 
 import React, { useState, useEffect, useCallback } from "react";
 import "../css/ModalActivityParticipants.css";
@@ -14,6 +15,8 @@ const ModalActivityParticipants = ({
   onClose,
   activity,
   onAddPayment,
+  onEnrollParticipant,  // null cuando el rol es solo lectura
+  readOnly = false,     // 🔐 true para ROLE_CONEXION, ROLE_CIMIENTO, ROLE_ESENCIA, ROLE_DESPLIEGUE
 }) => {
   const [filterText, setFilterText] = useState("");
   const [selectedParticipant, setSelectedParticipant] = useState(null);
@@ -217,6 +220,12 @@ const ModalActivityParticipants = ({
                   <span className="participants-amount">
                     ${stats.totalPaid.toLocaleString("es-CO")} recaudado
                   </span>
+                  {/* 🔐 Indicador visible solo para roles restringidos */}
+                  {readOnly && (
+                    <span className="readonly-badge-inline" title="Solo tienes permiso de consulta">
+                      🔒 Solo lectura
+                    </span>
+                  )}
                 </div>
               </div>
               
@@ -530,8 +539,26 @@ const ModalActivityParticipants = ({
           activity={activity}
           contribution={contributions[0]}
           onAddPaymentSuccess={handleAddPaymentSuccess}
+          readOnly={readOnly}
         />
       )}
+
+      {/* 🔐 Estilos del badge inline */}
+      <style>{`
+        .readonly-badge-inline {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          padding: 2px 8px;
+          background: #fff3cd;
+          border: 1px solid #f0c040;
+          border-radius: 20px;
+          font-size: 0.75em;
+          color: #7d5a00;
+          font-weight: 600;
+          margin-left: 6px;
+        }
+      `}</style>
     </>
   );
 };

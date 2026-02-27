@@ -117,7 +117,7 @@ export const DashboardLayout = () => {
       label: 'Actividades',
       path: '/dashboard/activity',
       icon: '📅',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_ECONOMICO']),
+      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']),
     },
     {
       label: 'Usuarios',

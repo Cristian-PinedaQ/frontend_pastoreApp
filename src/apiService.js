@@ -5,9 +5,9 @@
 // ✅ Export con nombre (ESLint compliance)
 
 //Produccion
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 //desarrollo
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -2043,6 +2043,206 @@ async createFinance(financeData) {
       return this.request('/attendance-cell-group/statistics/global');
     } catch (error) {
       logError('❌ [getCellAttendanceGlobalStats] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 📅 EVENTOS DE ASISTENCIA ==========
+
+  /**
+   * Obtener todos los eventos de asistencia activos
+   * GET /api/v1/attendance-cell-group/events
+   */
+  async getActiveAttendanceEvents() {
+    try {
+      log('📅 [getActiveAttendanceEvents] Obteniendo eventos activos');
+      const response = await this.request('/attendance-cell-group/events');
+      log('✅ [getActiveAttendanceEvents] Éxito -', response?.events?.length || 0, 'eventos');
+      return response;
+    } catch (error) {
+      logError('❌ [getActiveAttendanceEvents] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener todos los eventos de asistencia (activos e inactivos)
+   * GET /api/v1/attendance-cell-group/events/all
+   * Solo para PASTORES y CONEXION
+   */
+  async getAllAttendanceEvents() {
+    try {
+      log('📅 [getAllAttendanceEvents] Obteniendo todos los eventos');
+      const response = await this.request('/attendance-cell-group/events/all');
+      log('✅ [getAllAttendanceEvents] Éxito -', response?.events?.length || 0, 'eventos');
+      return response;
+    } catch (error) {
+      logError('❌ [getAllAttendanceEvents] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear un nuevo evento de asistencia especial
+   * POST /api/v1/attendance-cell-group/events
+   * Solo para PASTORES y CONEXION
+   * 
+   * @param {Object} eventData - Datos del evento
+   * @param {string} eventData.name - Nombre del evento (obligatorio)
+   * @param {string} eventData.description - Descripción (opcional)
+   * @param {Array<string>} eventData.eventDates - Lista de fechas en formato YYYY-MM-DD (obligatorio)
+   */
+  async createAttendanceEvent(eventData) {
+    try {
+      if (!eventData || typeof eventData !== 'object') {
+        throw new Error('Datos del evento inválidos');
+      }
+      
+      validateString(eventData.name, 'name', 1, 200);
+      
+      if (!eventData.eventDates || !Array.isArray(eventData.eventDates) || eventData.eventDates.length === 0) {
+        throw new Error('Debe especificar al menos una fecha para el evento');
+      }
+      
+      // Validar que todas las fechas tengan formato correcto
+      eventData.eventDates.forEach(date => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          throw new Error(`Formato de fecha inválido: ${date}. Use YYYY-MM-DD`);
+        }
+      });
+      
+      log('📅 [createAttendanceEvent] Creando evento:', { name: eventData.name, fechas: eventData.eventDates.length });
+      
+      const payload = {
+        name: eventData.name.trim(),
+        description: eventData.description?.trim() || null,
+        eventDates: eventData.eventDates
+      };
+      
+      const response = await this.request('/attendance-cell-group/events', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      
+      log('✅ [createAttendanceEvent] Éxito - ID:', response?.event?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [createAttendanceEvent] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Desactivar un evento de asistencia
+   * DELETE /api/v1/attendance-cell-group/events/{eventId}
+   * Solo para PASTORES y CONEXION
+   */
+  async deactivateAttendanceEvent(eventId) {
+    try {
+      validateId(eventId, 'eventId');
+      log('🚫 [deactivateAttendanceEvent] Desactivando evento ID:', eventId);
+      const response = await this.request(`/attendance-cell-group/events/${eventId}`, {
+        method: 'DELETE'
+      });
+      log('✅ [deactivateAttendanceEvent] Evento desactivado');
+      return response;
+    } catch (error) {
+      logError('❌ [deactivateAttendanceEvent] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener datos de sesión de una célula en una fecha específica
+   * GET /api/v1/attendance-cell-group/cell/{cellId}/date/{date}/session-data
+   */
+  async getSessionData(cellId, date) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      log('📊 [getSessionData] Obteniendo datos de sesión:', { cellId, date });
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}/session-data`);
+      log('✅ [getSessionData] Éxito -', response?.hasData ? 'tiene datos' : 'sin datos');
+      return response;
+    } catch (error) {
+      logError('❌ [getSessionData] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Guardar o actualizar datos de sesión de una reunión
+   * PUT /api/v1/attendance-cell-group/cell/{cellId}/date/{date}/session-data
+   * 
+   * @param {number} cellId - ID de la célula
+   * @param {string} date - Fecha en formato YYYY-MM-DD
+   * @param {Object} payload - Datos de sesión
+   * @param {number} payload.newParticipants - Nuevas visitas (opcional, default 0)
+   * @param {number} payload.totalAttendees - Total asistentes (opcional, se calcula si se omite)
+   * @param {string} payload.notes - Notas (opcional, max 500)
+   */
+  async saveSessionData(cellId, date, payload) {
+    try {
+      validateId(cellId, 'cellId');
+      validateString(date, 'date', 10, 10);
+      
+      if (!payload || typeof payload !== 'object') {
+        throw new Error('Datos de sesión inválidos');
+      }
+      
+      // Validar newParticipants
+      if (payload.newParticipants !== undefined && payload.newParticipants !== null && payload.newParticipants !== '') {
+        const newParts = parseInt(payload.newParticipants, 10);
+        if (isNaN(newParts) || newParts < 0) {
+          throw new Error('newParticipants debe ser un número no negativo');
+        }
+      }
+      
+      // Validar totalAttendees
+      if (payload.totalAttendees !== undefined && payload.totalAttendees !== null && payload.totalAttendees !== '') {
+        const total = parseInt(payload.totalAttendees, 10);
+        if (isNaN(total) || total < 0) {
+          throw new Error('totalAttendees debe ser un número no negativo');
+        }
+      }
+      
+      // Validar notes
+      if (payload.notes && payload.notes.length > 500) {
+        throw new Error('Las notas no pueden superar 500 caracteres');
+      }
+      
+      log('📝 [saveSessionData] Guardando datos de sesión:', { 
+        cellId, 
+        date, 
+        newParticipants: payload.newParticipants,
+        totalAttendees: payload.totalAttendees
+      });
+      
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}/session-data`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          newParticipants: payload.newParticipants !== '' ? parseInt(payload.newParticipants, 10) : null,
+          totalAttendees: payload.totalAttendees !== '' ? parseInt(payload.totalAttendees, 10) : null,
+          notes: payload.notes || null
+        })
+      });
+      
+      log('✅ [saveSessionData] Datos guardados');
+      return response;
+    } catch (error) {
+      logError('❌ [saveSessionData] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 🔍 HEALTH CHECK ==========
+
+  async healthCheck() {
+    try {
+      log('🏥 [healthCheck] Verificando estado del servicio');
+      return this.request('/attendance-cell-group/health');
+    } catch (error) {
+      logError('❌ [healthCheck] Error:', error.message);
       throw error;
     }
   }

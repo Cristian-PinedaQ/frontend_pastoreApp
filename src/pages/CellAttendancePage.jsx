@@ -13,6 +13,8 @@ import apiService from "../apiService";
 import { logUserAction } from "../utils/securityLogger";
 import nameHelper from "../services/nameHelper";
 import CellAttendanceStatsModal from "../components/CellAttendanceStatsModal";
+import CreateAttendanceEventModal from "../components/CreateAttendanceEventModal";
+import CellGroupOverviewModal from "../components/CellGroupOverviewModal";
 import "../css/CellAttendancePage.css";
 
 const { getDisplayName } = nameHelper;
@@ -174,6 +176,7 @@ const getAvailableDatesForCurrentMonth = () => {
         dayNum: parts.dayNum,
         dayName: parts.dayName,
         dayIndex: dow,
+        isEvent: false,
       });
     }
   }
@@ -235,12 +238,59 @@ const CellAttendancePage = () => {
   const [generating, setGenerating] = useState(false);
   const [summary, setSummary] = useState(null);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [showOverviewModal, setShowOverviewModal] = useState(false);
   const [activeTab, setActiveTab] = useState("register");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 480);
+  const [userRole, setUserRole] = useState('');
+
+  // ── NUEVO: Eventos especiales y datos de sesión ────────────────────────────
+  const [eventDates, setEventDates] = useState(new Set()); // Set de strings "yyyy-MM-dd"
+  const [sessionData, setSessionData] = useState(null);    // datos guardados en BD
+  const [sessionForm, setSessionForm] = useState({
+    newParticipants: 0,
+    totalAttendees: "",
+    notes: "",
+  });
+  const [savingSession, setSavingSession] = useState(false);
+
   const quickActionRef = useRef(null);
-  const operationRef = useRef(false); // ← NUEVO: mutex para save/generate
-  const availableDates = useMemo(() => getAvailableDatesForCurrentMonth(), []);
+  const operationRef = useRef(false);
+
+  // ── availableDates: preset + fechas de eventos del mes actual ─────────────
+  const availableDates = useMemo(() => {
+    const preset = getAvailableDatesForCurrentMonth();
+    const presetSet = new Set(preset.map((d) => d.value));
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const extras = [];
+
+    eventDates.forEach((dateStr) => {
+      if (!presetSet.has(dateStr) && isCurrentMonth(dateStr)) {
+        const parts = formatDateShortParts(dateStr);
+        const [year, month, day] = dateStr.split("-").map(Number);
+        const d = new Date(year, month - 1, day, 12, 0, 0);
+        extras.push({
+          value: dateStr,
+          label: formatDateShort(dateStr),
+          fullLabel: formatDate(dateStr),
+          isPast: d < today,
+          isToday: d.toDateString() === today.toDateString(),
+          isFuture: d > today,
+          dayShort: parts.dayShort,
+          dayNum: parts.dayNum,
+          dayName: parts.dayName,
+          dayIndex: parts.dayIndex,
+          isEvent: true,
+        });
+      }
+    });
+
+    return [...preset, ...extras].sort((a, b) =>
+      a.value.localeCompare(b.value),
+    );
+  }, [eventDates]);
 
   // ── Resize ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -323,11 +373,24 @@ const CellAttendancePage = () => {
     }
   }, [toastMessage]);
 
+  // ── Obtener rol del usuario ────────────────────────────────────────────────
+  const getUserRole = useCallback(() => {
+    try {
+      const user = apiService.getCurrentUser?.();
+      if (user?.roles?.length > 0) {
+        setUserRole(user.roles[0].replace('ROLE_', ''));
+      }
+    } catch (e) {
+      logError('Error obteniendo rol:', e);
+    }
+  }, []);
+
   // ── Cargar datos iniciales ─────────────────────────────────────────────────
   const loadInitialData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
+      getUserRole();
       const cfgRes = await apiService.getAttendanceConfig();
       setConfig(cfgRes);
 
@@ -350,6 +413,29 @@ const CellAttendancePage = () => {
       }
       setMonthAttendances(attendancesMap);
 
+      // ── NUEVO: Cargar eventos activos para obtener fechas especiales del mes ──
+      try {
+        const eventsRes = await apiService.getActiveAttendanceEvents();
+        const events = eventsRes?.events || [];
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth(); // 0-indexed
+        const dates = new Set();
+        events.forEach((event) => {
+          (event.eventDates || []).forEach((dateStr) => {
+            const [y, m] = dateStr.split("-").map(Number);
+            if (y === currentYear && m - 1 === currentMonth) {
+              dates.add(dateStr);
+            }
+          });
+        });
+        setEventDates(dates);
+        log("Fechas de eventos del mes:", dates.size);
+      } catch (evErr) {
+        logError("Error cargando eventos:", evErr);
+        // No-op: el sistema funciona con los días preestablecidos
+      }
+
       const finalCells = Array.isArray(cellsList) ? cellsList : [];
       if (finalCells.length === 1) setSelectedCellId(String(finalCells[0].id));
 
@@ -363,7 +449,7 @@ const CellAttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getUserRole]);
 
   useEffect(() => {
     loadInitialData();
@@ -374,6 +460,9 @@ const CellAttendancePage = () => {
     if (!selectedCellId || !selectedDate) {
       setAttendances([]);
       setSummary(null);
+      // Limpiar datos de sesión al deseleccionar
+      setSessionData(null);
+      setSessionForm({ newParticipants: 0, totalAttendees: "", notes: "" });
       return;
     }
 
@@ -385,14 +474,11 @@ const CellAttendancePage = () => {
         selectedDate,
       );
 
-      // ✅ FIX: el backend devuelve { attendances: { "1": [...], "2": [...] } }
-      // Se aplana en un array y se filtra por la fecha seleccionada
       const rawAttendances = res?.attendances || {};
       const flatList = Array.isArray(rawAttendances)
         ? rawAttendances
         : Object.values(rawAttendances).flat();
 
-      // Filtrar por fecha seleccionada para evitar mezclar días
       const list = flatList.filter((a) => a.attendanceDate === selectedDate);
 
       log("Asistencias cargadas para", selectedDate, ":", list.length);
@@ -417,6 +503,28 @@ const CellAttendancePage = () => {
       } catch {
         setSummary(null);
       }
+
+      // ── NUEVO: Cargar datos de sesión (newParticipants / totalAttendees) ────
+      try {
+        const sdRes = await apiService.getSessionData(
+          selectedCellId,
+          selectedDate,
+        );
+        if (sdRes?.hasData && sdRes?.sessionData) {
+          setSessionData(sdRes.sessionData);
+          setSessionForm({
+            newParticipants: sdRes.sessionData.newParticipants ?? 0,
+            totalAttendees: sdRes.sessionData.totalAttendees ?? "",
+            notes: sdRes.sessionData.notes ?? "",
+          });
+        } else {
+          setSessionData(null);
+          setSessionForm({ newParticipants: 0, totalAttendees: "", notes: "" });
+        }
+      } catch {
+        setSessionData(null);
+        setSessionForm({ newParticipants: 0, totalAttendees: "", notes: "" });
+      }
     } catch (err) {
       logError("Error cargando asistencias:", err);
       if (
@@ -426,6 +534,8 @@ const CellAttendancePage = () => {
         setAttendances([]);
         setEditedAttendances({});
         setSummary(null);
+        setSessionData(null);
+        setSessionForm({ newParticipants: 0, totalAttendees: "", notes: "" });
       } else if (
         err.message?.includes("Acceso denegado") ||
         err.message?.includes("403") ||
@@ -434,6 +544,8 @@ const CellAttendancePage = () => {
         setAttendances([]);
         setEditedAttendances({});
         setSummary(null);
+        setSessionData(null);
+        setSessionForm({ newParticipants: 0, totalAttendees: "", notes: "" });
         setError("No tienes permiso para acceder a esta célula.");
       } else {
         setError(err.message || "Error al cargar asistencias");
@@ -473,19 +585,20 @@ const CellAttendancePage = () => {
     return { total, presentCount, absentCount, justifiedCount, percentage };
   }, [editedAttendances]);
 
-  // ✅ FIX CRÍTICO: en el JSON del backend todos tienen leaderType (SERVANT, LEADER_12, etc.)
-  // y ninguno tiene isRegularMember=true, por lo que la separación leaders/members
-  // debe basarse en si el leaderType es distinto de null/undefined
   const { leaders, members } = useMemo(() => {
     const l = attendances.filter((a) => a.leaderType && a.leaderType !== "");
     const m = attendances.filter((a) => !a.leaderType || a.leaderType === "");
     return { leaders: l, members: m };
   }, [attendances]);
 
+  // ── MODIFICADO: isEditable también acepta fechas de eventos activos ────────
   const isEditable = useMemo(() => {
     if (!selectedDate) return false;
-    return isCurrentMonth(selectedDate) && isAllowedDay(selectedDate);
-  }, [selectedDate]);
+    const inCurrentMonth = isCurrentMonth(selectedDate);
+    const isPresetDay = inCurrentMonth && isAllowedDay(selectedDate);
+    const isEventDay = inCurrentMonth && eventDates.has(selectedDate);
+    return isPresetDay || isEventDay;
+  }, [selectedDate, eventDates]);
 
   const cellNames = useMemo(() => {
     const names = {};
@@ -513,20 +626,49 @@ const CellAttendancePage = () => {
     setShowStatsModal(true);
   }, [selectedCellId]);
 
+  // ── Crear evento especial ──────────────────────────────────────────────────
+  const handleCreateEvent = useCallback(async (eventData) => {
+    try {
+      const response = await apiService.createAttendanceEvent(eventData);
+      // Recargar fechas de eventos
+      const eventsRes = await apiService.getActiveAttendanceEvents().catch(() => null);
+      if (eventsRes) {
+        const now = new Date();
+        const dates = new Set();
+        (eventsRes?.events || []).forEach((event) => {
+          (event.eventDates || []).forEach((dateStr) => {
+            const [y, m] = dateStr.split('-').map(Number);
+            if (y === now.getFullYear() && m - 1 === now.getMonth()) dates.add(dateStr);
+          });
+        });
+        setEventDates(dates);
+      }
+      setSuccessMessage('✅ Evento creado exitosamente');
+      logUserAction('create_attendance_event', {
+        eventName: eventData.name,
+        datesCount: eventData.eventDates.length,
+        timestamp: new Date().toISOString(),
+      });
+      return response;
+    } catch (err) {
+      logError('Error creando evento:', err);
+      throw err;
+    }
+  }, []);
+
   // ── Generar asistencias ────────────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!selectedCellId || !selectedDate) return;
 
-    // ✅ Prevenir doble generación (doble clic en "Generar Asistencias")
-    // El @UniqueConstraint en BD lo bloquearía igual, pero esto evita el error innecesario
     if (operationRef.current) {
       log("Generación ya en progreso, ignorando doble clic");
       return;
     }
 
-    if (!isAllowedDay(selectedDate)) {
+    // ── MODIFICADO: permitir días de eventos además de los preestablecidos ──
+    if (!isAllowedDay(selectedDate) && !eventDates.has(selectedDate)) {
       setError(
-        "La fecha seleccionada no es un día permitido (Domingo, Miércoles o Jueves)",
+        "La fecha seleccionada no es un día de reunión (Domingo, Miércoles, Jueves) ni corresponde a un evento activo",
       );
       return;
     }
@@ -555,9 +697,9 @@ const CellAttendancePage = () => {
       setError(err.message || "Error al generar asistencias");
     } finally {
       setGenerating(false);
-      operationRef.current = false; // ✅ SIEMPRE liberar el mutex
+      operationRef.current = false;
     }
-  }, [selectedCellId, selectedDate, loadAttendancesForDate]);
+  }, [selectedCellId, selectedDate, eventDates, loadAttendancesForDate]);
 
   // ── Handlers de asistencia ─────────────────────────────────────────────────
   const handleTogglePresent = useCallback((memberId) => {
@@ -632,9 +774,6 @@ const CellAttendancePage = () => {
   const handleSave = useCallback(async () => {
     if (!selectedCellId || !selectedDate) return;
 
-    // ✅ Prevenir doble guardado (doble clic en "Guardar Cambios")
-    // setSaving(true) no es suficiente porque React puede batear el re-render
-    // y el botón sigue clickeable durante ese frame
     if (operationRef.current) {
       log("Guardado ya en progreso, ignorando doble clic");
       return;
@@ -677,16 +816,49 @@ const CellAttendancePage = () => {
       setError(err.message || "Error al guardar asistencias");
     } finally {
       setSaving(false);
-      operationRef.current = false; // ✅ SIEMPRE liberar el mutex
+      operationRef.current = false;
     }
   }, [selectedCellId, selectedDate, editedAttendances, loadAttendancesForDate]);
+
+  // ── NUEVO: Guardar datos de sesión ─────────────────────────────────────────
+  const handleSaveSession = useCallback(async () => {
+    if (!selectedCellId || !selectedDate) return;
+    setSavingSession(true);
+    try {
+      const payload = {
+        newParticipants: parseInt(sessionForm.newParticipants, 10) || 0,
+        totalAttendees:
+          sessionForm.totalAttendees !== ""
+            ? parseInt(sessionForm.totalAttendees, 10)
+            : null,
+        notes: sessionForm.notes || null,
+      };
+      const res = await apiService.saveSessionData(
+        selectedCellId,
+        selectedDate,
+        payload,
+      );
+      setSessionData(res?.sessionData || null);
+      setToastMessage("✅ Datos de sesión guardados");
+      logUserAction("save_session_data", {
+        cellId: selectedCellId,
+        date: selectedDate,
+        ...payload,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      logError("Error guardando datos de sesión:", err);
+      setError(err.message || "Error al guardar datos de sesión");
+    } finally {
+      setSavingSession(false);
+    }
+  }, [selectedCellId, selectedDate, sessionForm]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER HELPERS
   // ═══════════════════════════════════════════════════════════════════════════
 
   // ── Stats bar ─────────────────────────────────────────────────────────────
-  // ── Stats bar ── SIN STICKY PARA MÓVIL ─────────────────────────────────
   const renderLiveStats = () => {
     if (!attendances.length) return null;
 
@@ -702,7 +874,7 @@ const CellAttendancePage = () => {
           borderRadius: "14px",
           padding: "14px 18px",
           marginBottom: "14px",
-          position: "relative" /* Cambiado de sticky a relative */,
+          position: "relative",
           top: "auto",
           zIndex: 1,
         }}
@@ -802,6 +974,187 @@ const CellAttendancePage = () => {
             </div>
           ))}
         </div>
+      </div>
+    );
+  };
+
+  // ── NUEVO: Formulario de datos de sesión ──────────────────────────────────
+  const renderSessionDataForm = () => {
+    // Mostrar si hay asistencias cargadas, o si ya hay datos de sesión guardados
+    if (!attendances.length && !sessionData) return null;
+
+    const totalAttendeesCalc =
+      liveStats.presentCount + (parseInt(sessionForm.newParticipants, 10) || 0);
+
+    return (
+      <div
+        style={{
+          backgroundColor: theme.bgSecondary,
+          border: `1px solid ${theme.border}`,
+          borderRadius: "14px",
+          padding: "14px 18px",
+          marginBottom: "14px",
+        }}
+      >
+        {/* Encabezado */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "12px",
+          }}
+        >
+          <span
+            style={{ fontSize: "0.82rem", fontWeight: 700, color: theme.text }}
+          >
+            👥 Datos de Sesión
+          </span>
+          {sessionData && (
+            <span
+              style={{
+                fontSize: "0.7rem",
+                color: theme.accentGreen,
+                fontWeight: 600,
+              }}
+            >
+              ✅ Guardado
+            </span>
+          )}
+        </div>
+
+        {/* Campos */}
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          {/* Nuevas visitas */}
+          <div style={{ flex: "1 1 100px", minWidth: "90px" }}>
+            <label
+              style={{
+                fontSize: "0.7rem",
+                color: theme.textSecondary,
+                display: "block",
+                marginBottom: "4px",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.3px",
+              }}
+            >
+              Nuevas visitas
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={sessionForm.newParticipants}
+              onChange={(e) =>
+                setSessionForm((prev) => ({
+                  ...prev,
+                  newParticipants: e.target.value,
+                }))
+              }
+              disabled={!isEditable}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                borderRadius: "8px",
+                border: `1px solid ${theme.border}`,
+                backgroundColor: theme.bgTertiary,
+                color: theme.text,
+                fontSize: "0.85rem",
+                outline: "none",
+                opacity: isEditable ? 1 : 0.7,
+              }}
+            />
+          </div>
+
+          {/* Total asistentes */}
+          <div style={{ flex: "1 1 100px", minWidth: "90px" }}>
+            <label
+              style={{
+                fontSize: "0.7rem",
+                color: theme.textSecondary,
+                display: "block",
+                marginBottom: "4px",
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: "0.3px",
+              }}
+            >
+              Total asistentes
+            </label>
+            <input
+              type="number"
+              min="0"
+              placeholder={`Auto (${totalAttendeesCalc})`}
+              value={sessionForm.totalAttendees}
+              onChange={(e) =>
+                setSessionForm((prev) => ({
+                  ...prev,
+                  totalAttendees: e.target.value,
+                }))
+              }
+              disabled={!isEditable}
+              style={{
+                width: "100%",
+                padding: "6px 10px",
+                borderRadius: "8px",
+                border: `1px solid ${theme.border}`,
+                backgroundColor: theme.bgTertiary,
+                color: theme.text,
+                fontSize: "0.85rem",
+                outline: "none",
+                opacity: isEditable ? 1 : 0.7,
+              }}
+            />
+          </div>
+
+          {/* Botón guardar (solo si editable) */}
+          {isEditable && (
+            <div style={{ display: "flex", alignItems: "flex-end" }}>
+              <button
+                onClick={handleSaveSession}
+                disabled={savingSession}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: "8px",
+                  border: "none",
+                  backgroundColor: theme.accentGreen,
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: "0.78rem",
+                  cursor: savingSession ? "not-allowed" : "pointer",
+                  opacity: savingSession ? 0.6 : 1,
+                  transition: "opacity 0.2s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {savingSession ? "⏳" : "💾 Guardar"}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Resumen calculado */}
+        {(parseInt(sessionForm.newParticipants, 10) > 0 ||
+          sessionData?.newParticipants > 0) && (
+          <div
+            style={{
+              marginTop: "10px",
+              fontSize: "0.74rem",
+              color: theme.textSecondary,
+              backgroundColor: theme.bgTertiary,
+              borderRadius: "8px",
+              padding: "6px 10px",
+            }}
+          >
+            🧮 Total calculado:{" "}
+            <strong style={{ color: theme.accentBlue }}>
+              {sessionForm.totalAttendees !== ""
+                ? sessionForm.totalAttendees
+                : totalAttendeesCalc}
+            </strong>{" "}
+            ({liveStats.presentCount} miembros presentes +{" "}
+            {parseInt(sessionForm.newParticipants, 10) || 0} visitas)
+          </div>
+        )}
       </div>
     );
   };
@@ -1026,6 +1379,13 @@ const CellAttendancePage = () => {
         editedAttendances[a.memberId]?.justifiedAbsence ?? a.justifiedAbsence,
     );
 
+    // Calcular totalAttendees para el resumen
+    const newParticipantsVal = parseInt(sessionForm.newParticipants, 10) || 0;
+    const totalAttendeesVal =
+      sessionForm.totalAttendees !== ""
+        ? parseInt(sessionForm.totalAttendees, 10)
+        : present.length + newParticipantsVal;
+
     return (
       <div style={{ padding: "4px 0" }}>
         {/* Tarjetas de resumen */}
@@ -1091,6 +1451,51 @@ const CellAttendancePage = () => {
             </div>
           ))}
         </div>
+
+        {/* ── NUEVO: Bloque de datos de sesión en el resumen ─────────────────── */}
+        {(newParticipantsVal > 0 || sessionData) && (
+          <div
+            style={{
+              backgroundColor: theme.bgSecondary,
+              border: `1px solid ${theme.border}`,
+              borderRadius: "12px",
+              padding: "14px 16px",
+              marginBottom: "16px",
+              display: "flex",
+              gap: "16px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div style={{ textAlign: "center", flex: "1 1 80px" }}>
+              <div
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  color: theme.accentPurple,
+                }}
+              >
+                {newParticipantsVal}
+              </div>
+              <div style={{ fontSize: "0.72rem", color: theme.textSecondary }}>
+                🌟 Nuevas visitas
+              </div>
+            </div>
+            <div style={{ textAlign: "center", flex: "1 1 80px" }}>
+              <div
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  color: theme.accentBlue,
+                }}
+              >
+                {totalAttendeesVal}
+              </div>
+              <div style={{ fontSize: "0.72rem", color: theme.textSecondary }}>
+                🏠 Total en el lugar
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Lista presentes */}
         {present.length > 0 && (
@@ -1254,11 +1659,70 @@ const CellAttendancePage = () => {
               {config?.currentMonth || MONTH_NAMES[new Date().getMonth()]}{" "}
               {config?.currentYear || new Date().getFullYear()}
               {" · "} Días permitidos: {ALLOWED_DAYS_NAMES.join(", ")}
+              {eventDates.size > 0 && (
+                <span style={{ marginLeft: "6px", opacity: 0.85 }}>
+                  · {eventDates.size} evento{eventDates.size !== 1 ? "s" : ""}{" "}
+                  🎯
+                </span>
+              )}
             </p>
           </div>
-          <div className="ca-page__header-badge">
-            <span className="ca-page__cells-count">{userCells.length}</span>
-            <span>Altar de vida{userCells.length !== 1 ? "s" : ""}</span>
+
+          {/* Acciones del header */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "flex-end" }}>
+            {/* Botón Vista General — visible para todos */}
+            {userCells.length > 1 && (
+              <button
+                onClick={() => setShowOverviewModal(true)}
+                style={{
+                  background: "rgba(255,255,255,0.2)",
+                  border: "none",
+                  borderRadius: "30px",
+                  padding: isMobile ? "6px 12px" : "8px 16px",
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: isMobile ? "0.7rem" : "0.8rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  backdropFilter: "blur(5px)",
+                  whiteSpace: "nowrap",
+                }}
+                title="Ver resumen de todos los altares"
+              >
+                🏘️ Vista General
+              </button>
+            )}
+            {/* Botón Crear Evento — solo PASTORES/CONEXION */}
+            {(userRole === "PASTORES" || userRole === "CONEXION") && (
+              <button
+                onClick={() => setShowEventModal(true)}
+                style={{
+                  background: "rgba(255,255,255,0.15)",
+                  border: "none",
+                  borderRadius: "30px",
+                  padding: isMobile ? "6px 12px" : "8px 16px",
+                  color: "white",
+                  fontWeight: 600,
+                  fontSize: isMobile ? "0.7rem" : "0.8rem",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  backdropFilter: "blur(5px)",
+                  whiteSpace: "nowrap",
+                }}
+                title="Crear evento especial"
+              >
+                🎯 Crear Evento
+              </button>
+            )}
+
+            <div className="ca-page__header-badge">
+              <span className="ca-page__cells-count">{userCells.length}</span>
+              <span>Altar de vida{userCells.length !== 1 ? "s" : ""}</span>
+            </div>
           </div>
         </div>
 
@@ -1327,6 +1791,8 @@ const CellAttendancePage = () => {
                 <option value="">— Seleccionar fecha —</option>
                 {availableDates.map((d) => (
                   <option key={d.value} value={d.value}>
+                    {/* ── NUEVO: indicador 🎯 para fechas de eventos ── */}
+                    {d.isEvent ? "🎯 " : ""}
                     {d.dayShort} {d.dayNum} {d.isToday ? "(Hoy)" : ""}{" "}
                     {d.isFuture ? "📌" : ""}
                   </option>
@@ -1359,9 +1825,27 @@ const CellAttendancePage = () => {
             <div className="ca-page__date-info">
               <span className="ca-page__date-full">
                 <span className="ca-page__date-day-highlight">
-                  {selectedDateParts.dayShort}
+                  {/* ── NUEVO: indicador de evento en el date-info ── */}
+                  {eventDates.has(selectedDate) && !isAllowedDay(selectedDate)
+                    ? "🎯"
+                    : selectedDateParts.dayShort}
                 </span>
                 {formatDate(selectedDate)}
+                {eventDates.has(selectedDate) && !isAllowedDay(selectedDate) && (
+                  <span
+                    style={{
+                      marginLeft: "6px",
+                      fontSize: "0.7rem",
+                      backgroundColor: theme.accentPurple,
+                      color: "white",
+                      padding: "1px 6px",
+                      borderRadius: "20px",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Evento especial
+                  </span>
+                )}
               </span>
               {isEditable ? (
                 <span className="ca-page__date-editable">✏️ Editable</span>
@@ -1478,8 +1962,8 @@ const CellAttendancePage = () => {
             <div className="ca-page__empty-icon">📅</div>
             <h2>Selecciona una fecha</h2>
             <p style={{ color: theme.textSecondary }}>
-              Elige un día de reunión ({ALLOWED_DAYS_NAMES.join(", ")}) para
-              registrar la asistencia.
+              Elige un día de reunión ({ALLOWED_DAYS_NAMES.join(", ")}) o un
+              evento especial 🎯 para registrar la asistencia.
             </p>
           </div>
         ) : attendances.length === 0 ? (
@@ -1501,8 +1985,11 @@ const CellAttendancePage = () => {
           renderSummaryTab()
         ) : (
           <div className="ca-page__register-content">
-            {/* Stats - Siempre relative, no sticky */}
+            {/* Stats */}
             <div style={{ width: "100%" }}>{renderLiveStats()}</div>
+
+            {/* ── NUEVO: Datos de sesión (newParticipants / totalAttendees) ── */}
+            {renderSessionDataForm()}
 
             {/* Acciones rápidas */}
             {isEditable && (
@@ -1630,6 +2117,32 @@ const CellAttendancePage = () => {
         isMobile={isMobile}
         onRefresh={() => setShowStatsModal(false)}
         logUserAction={logUserAction}
+      />
+
+      {/* Modal para crear eventos especiales */}
+      <CreateAttendanceEventModal
+        isOpen={showEventModal}
+        onClose={() => setShowEventModal(false)}
+        onCreate={handleCreateEvent}
+        theme={theme}
+        isMobile={isMobile}
+        userRole={userRole}
+      />
+
+      {/* Modal Vista General de todas las células */}
+      <CellGroupOverviewModal
+        isOpen={showOverviewModal}
+        onClose={() => setShowOverviewModal(false)}
+        userCells={userCells}
+        apiService={apiService}
+        isDarkMode={isDarkMode}
+        isMobile={isMobile}
+        logUserAction={logUserAction}
+        onSelectCell={(cellId) => {
+          setShowOverviewModal(false);
+          setSelectedCellId(cellId);
+          setShowStatsModal(true);
+        }}
       />
     </div>
   );

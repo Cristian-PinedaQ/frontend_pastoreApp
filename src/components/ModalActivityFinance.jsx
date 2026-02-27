@@ -1,6 +1,7 @@
 // ============================================
 // ModalActivityFinance.jsx
 // Modal para ver información financiera detallada de una actividad
+// 🔐 AÑADIDO: prop readOnly para roles con solo GET (solo indicador visual)
 // ============================================
 
 import React, { useState } from "react";
@@ -10,7 +11,8 @@ const ModalActivityFinance = ({
   isOpen, 
   onClose, 
   activity, 
-  balance 
+  balance,
+  readOnly = false,   // 🔐 true para ROLE_CONEXION, ROLE_CIMIENTO, ROLE_ESENCIA, ROLE_DESPLIEGUE
 }) => {
   const [activeTab, setActiveTab] = useState("summary");
   //const [loading, setLoading] = useState(false);
@@ -39,6 +41,12 @@ const ModalActivityFinance = ({
             <div className={`finance-status ${profitability >= 0 ? 'profitable' : 'loss'}`}>
               {profitability >= 0 ? '💰 Rentable' : '📉 En Pérdida'}
             </div>
+            {/* 🔐 Badge solo lectura visible para roles restringidos */}
+            {readOnly && (
+              <div className="finance-readonly-badge" title="Solo tienes permiso de consulta">
+                🔒 Solo lectura
+              </div>
+            )}
           </div>
           <button className="modal-finance__close" onClick={onClose}>
             ×
@@ -534,6 +542,28 @@ const ModalActivityFinance = ({
           </button>
         </div>
       </div>
+
+      {/* 🔐 Estilos del badge solo lectura */}
+      <style>{`
+        .modal-finance__header-content {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+        .finance-readonly-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 3px 10px;
+          background: #fff3cd;
+          border: 1px solid #f0c040;
+          border-radius: 20px;
+          font-size: 0.78em;
+          color: #7d5a00;
+          font-weight: 600;
+        }
+      `}</style>
     </div>
   );
 };
