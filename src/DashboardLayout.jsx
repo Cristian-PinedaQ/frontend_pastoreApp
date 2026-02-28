@@ -99,7 +99,7 @@ export const DashboardLayout = () => {
       label: 'Altares de vida',
       path: '/dashboard/cellgroups',
       icon: '🏘️',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_CONEXION']),
+      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_DESPLIEGUE']),
     },
     {
       label: 'Asistencias',

@@ -66,12 +66,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<EnrollmentsPage />}
-                  requiredRoles={[
-                    'ROLE_PASTORES',
-                    'ROLE_GANANDO',
-                    'ROLE_AREAS',
-                    'ROLE_PROFESORES',
-                  ]}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_PROFESORES']}
                 />
               }
             />
@@ -82,11 +77,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<StudentsPage />}
-                  requiredRoles={[
-                    'ROLE_PASTORES',
-                    'ROLE_GANANDO',
-                    'ROLE_AREAS',
-                  ]}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
                 />
               }
             />
@@ -96,7 +87,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<LeadersPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA','ROLE_DESPLIEGUE']}
                 />
               }
             />
@@ -107,7 +98,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<CellGroupsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_AREAS']}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION','ROLE_DESPLIEGUE']}
                 />
               }
             />
@@ -117,7 +108,7 @@ function App() {
               element={
                 <ProtectedRoute
                   element={<CellAttendancePage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_GANANDO', 'ROLE_LIDER']}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_LIDER']}
                 />
               }
             />
