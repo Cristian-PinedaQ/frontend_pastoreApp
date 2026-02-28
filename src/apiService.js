@@ -2003,7 +2003,7 @@ async createFinance(financeData) {
       validateString(date, 'date', 10, 10);
       if (!Array.isArray(attendances)) throw new Error('Datos de asistencias inválidos');
       log('📦 [updateBulkCellAttendances] Actualizando:', { cellId, date, count: attendances.length });
-      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}`, { method: 'PUT', body: JSON.stringify(attendances) });
+      const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}/bulk`, { method: 'PUT', body: JSON.stringify(attendances) });
       log('✅ [updateBulkCellAttendances] Éxito -', response?.totalCount || 0, 'registros');
       return response;
     } catch (error) {
