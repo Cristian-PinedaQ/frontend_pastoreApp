@@ -5,9 +5,9 @@
 // ✅ Export con nombre (ESLint compliance)
 
 //Produccion
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 //desarrollo
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -2246,6 +2246,160 @@ async createFinance(financeData) {
       throw error;
     }
   }
+
+  // ============================================================
+// PEGA ESTE BLOQUE DENTRO DE LA CLASE ApiService,
+// justo antes de la línea:  }  (cierre de la clase)
+// ============================================================
+
+  // ========== 🔔 NOTIFICACIONES ==========
+
+  /**
+   * Conteo de notificaciones sin leer de un usuario.
+   * GET /notifications/user/{userId}/unread-count
+   * Requiere rol: PASTORES  (según NotificationController)
+   * Retorna: { unreadCount: number }
+   */
+  async getUnreadNotificationCount(userId) {
+    try {
+      validateId(userId, 'userId');
+      return this.request(`/notifications/user/${userId}/unread-count`);
+    } catch (error) {
+      logError('❌ [getUnreadNotificationCount] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Notificaciones activas (no archivadas) de un usuario.
+   * GET /notifications/user/{userId}/active
+   * Retorna: NotificationResponse[]
+   */
+  async getActiveNotifications(userId) {
+    try {
+      validateId(userId, 'userId');
+      return this.request(`/notifications/user/${userId}/active`);
+    } catch (error) {
+      logError('❌ [getActiveNotifications] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Todas las notificaciones de un usuario.
+   * GET /notifications/user/{userId}
+   * Retorna: NotificationResponse[]
+   */
+  async getAllNotifications(userId) {
+    try {
+      validateId(userId, 'userId');
+      return this.request(`/notifications/user/${userId}`);
+    } catch (error) {
+      logError('❌ [getAllNotifications] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Notificaciones sin leer de un usuario.
+   * GET /notifications/user/{userId}/unread
+   * Retorna: NotificationResponse[]
+   */
+  async getUnreadNotifications(userId) {
+    try {
+      validateId(userId, 'userId');
+      return this.request(`/notifications/user/${userId}/unread`);
+    } catch (error) {
+      logError('❌ [getUnreadNotifications] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Marca una notificación como leída.
+   * PUT /notifications/{id}/mark-read
+   */
+  async markNotificationAsRead(notificationId) {
+    try {
+      validateId(notificationId, 'notificationId');
+      return this.request(`/notifications/${notificationId}/mark-read`, {
+        method: 'PUT',
+      });
+    } catch (error) {
+      logError('❌ [markNotificationAsRead] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Marca TODAS las notificaciones de un usuario como leídas.
+   * PUT /notifications/user/{userId}/mark-all-read
+   */
+  async markAllNotificationsAsRead(userId) {
+    try {
+      validateId(userId, 'userId');
+      return this.request(`/notifications/user/${userId}/mark-all-read`, {
+        method: 'PUT',
+      });
+    } catch (error) {
+      logError('❌ [markAllNotificationsAsRead] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Archiva una notificación.
+   * PUT /notifications/{id}/archive
+   * Solo PASTORES.
+   */
+  async archiveNotification(notificationId) {
+    try {
+      validateId(notificationId, 'notificationId');
+      return this.request(`/notifications/${notificationId}/archive`, {
+        method: 'PUT',
+      });
+    } catch (error) {
+      logError('❌ [archiveNotification] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Elimina una notificación permanentemente.
+   * DELETE /notifications/{id}
+   * Solo PASTORES.
+   */
+  async deleteNotification(notificationId) {
+    try {
+      validateId(notificationId, 'notificationId');
+      return this.request(`/notifications/${notificationId}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      logError('❌ [deleteNotification] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Estadísticas de notificaciones de un usuario.
+   * GET /notifications/user/{userId}/statistics
+   * Solo PASTORES.
+   */
+  async getNotificationStatistics(userId) {
+    try {
+      validateId(userId, 'userId');
+      return this.request(`/notifications/user/${userId}/statistics`);
+    } catch (error) {
+      logError('❌ [getNotificationStatistics] Error:', error.message);
+      throw error;
+    }
+  }
+
+// ============================================================
+// FIN DEL BLOQUE — recuerda cerrar la clase con  }  después
+// ============================================================
+
 }
 
 const apiService = new ApiService();

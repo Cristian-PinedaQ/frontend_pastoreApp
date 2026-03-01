@@ -52,8 +52,8 @@ export const generateCellDetailPDF = (cell, members = []) => {
     CENTRO: '#ec4899',
   };
 
-  const PAGE = { W: 210, H: 297, marginX: 18, marginY: 20 };
-  const contentW = PAGE.W - PAGE.marginX * 2;
+  //const PAGE = { W: 210, H: 297, marginX: 18, marginY: 20 };
+  //const contentW = PAGE.W - PAGE.marginX * 2;
 
   // ────────────────────────────────────────────
   // Construir el HTML del documento

@@ -1,46 +1,47 @@
 // 📊 DashboardLayout.jsx v2 - Refactorizado con CSS Responsive Profesional
 // Usa clases CSS en lugar de estilos inline para mejor mantenibilidad y performance
 
-import React, { useState, useEffect } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
-import './css/DashboardLayout.css'; // Importar CSS
-import DashboardTopbar from './components/DashboardTopbar';
-
+import React, { useState, useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "./context/AuthContext";
+import "./css/DashboardLayout.css"; // Importar CSS
+import DashboardTopbar from "./components/DashboardTopbar";
+import NotificationBell from "./components/NotificationBell";
 
 export const DashboardLayout = () => {
   // ========== DARK MODE AUTOMÁTICO ==========
   const [, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const savedMode = localStorage.getItem('darkMode');
-    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)",
+    ).matches;
+    const savedMode = localStorage.getItem("darkMode");
+    const htmlHasDarkClass =
+      document.documentElement.classList.contains("dark-mode");
 
-    setIsDarkMode(
-      savedMode === 'true' || htmlHasDarkClass || prefersDark
-    );
+    setIsDarkMode(savedMode === "true" || htmlHasDarkClass || prefersDark);
 
     const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
+      setIsDarkMode(document.documentElement.classList.contains("dark-mode"));
     });
 
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ['class']
+      attributeFilter: ["class"],
     });
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e) => {
-      if (localStorage.getItem('darkMode') === null) {
+      if (localStorage.getItem("darkMode") === null) {
         setIsDarkMode(e.matches);
       }
     };
-    mediaQuery.addEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
 
     return () => {
       observer.disconnect();
-      mediaQuery.removeEventListener('change', handleChange);
+      mediaQuery.removeEventListener("change", handleChange);
     };
   }, []);
 
@@ -52,9 +53,9 @@ export const DashboardLayout = () => {
 
   // ========== HANDLERS ==========
   const handleLogout = () => {
-    if (window.confirm('¿Estás seguro de que quieres cerrar sesión?')) {
+    if (window.confirm("¿Estás seguro de que quieres cerrar sesión?")) {
       logout();
-      navigate('/login');
+      navigate("/login");
     }
   };
 
@@ -66,75 +67,103 @@ export const DashboardLayout = () => {
   // Determinar menú según roles
   const menuItems = [
     {
-      label: 'Inicio',
-      path: '/dashboard',
-      icon: '🏠',
+      label: "Inicio",
+      path: "/dashboard",
+      icon: "🏠",
       visible: true,
     },
     {
-      label: 'Membresia',
-      path: '/dashboard/members',
-      icon: '👥',
+      label: "Membresia",
+      path: "/dashboard/members",
+      icon: "👥",
       visible: true,
     },
     {
-      label: 'Formaciones',
-      path: '/dashboard/enrollments',
-      icon: '🌾',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA']),
+      label: "Formaciones",
+      path: "/dashboard/enrollments",
+      icon: "🌾",
+      visible: hasAnyRole([
+        "ROLE_PASTORES",
+        "ROLE_CONEXION",
+        "ROLE_CIMIENTO",
+        "ROLE_ESENCIA",
+      ]),
     },
     {
-      label: 'Estudiantes',
-      path: '/dashboard/students',
-      icon: '🎓',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA']),
+      label: "Estudiantes",
+      path: "/dashboard/students",
+      icon: "🎓",
+      visible: hasAnyRole([
+        "ROLE_PASTORES",
+        "ROLE_CONEXION",
+        "ROLE_CIMIENTO",
+        "ROLE_ESENCIA",
+      ]),
     },
     {
-      label: 'Servidores',
-      path: '/dashboard/leadership',
-      icon: '🦺',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESOLIEGUE']),
+      label: "Servidores",
+      path: "/dashboard/leadership",
+      icon: "🦺",
+      visible: hasAnyRole([
+        "ROLE_PASTORES",
+        "ROLE_CONEXION",
+        "ROLE_CIMIENTO",
+        "ROLE_ESENCIA",
+        "ROLE_DESOLIEGUE",
+      ]),
     },
     {
-      label: 'Altares de vida',
-      path: '/dashboard/cellgroups',
-      icon: '🏘️',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_DESPLIEGUE']),
+      label: "Altares de vida",
+      path: "/dashboard/cellgroups",
+      icon: "🏘️",
+      visible: hasAnyRole([
+        "ROLE_PASTORES",
+        "ROLE_CONEXION",
+        "ROLE_DESPLIEGUE",
+      ]),
     },
     {
-      label: 'Asistencias',
-      path: '/dashboard/cellgroups-atendance',
-      icon: '✅',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_LIDER', 'ROLE_CONEXION']),
+      label: "Asistencias",
+      path: "/dashboard/cellgroups-atendance",
+      icon: "✅",
+      visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]),
     },
     {
-      label: 'Finanzas',
-      path: '/dashboard/finances',
-      icon: '🏦',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_ECONOMICO']),
+      label: "Finanzas",
+      path: "/dashboard/finances",
+      icon: "🏦",
+      visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]),
     },
     {
-      label: 'Actividades',
-      path: '/dashboard/activity',
-      icon: '📅',
-      visible: hasAnyRole(['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']),
+      label: "Actividades",
+      path: "/dashboard/activity",
+      icon: "📅",
+      visible: hasAnyRole([
+        "ROLE_PASTORES",
+        "ROLE_ECONOMICO",
+        "ROLE_CONEXION",
+        "ROLE_CIMIENTO",
+        "ROLE_ESENCIA",
+        "ROLE_DESPLIEGUE",
+      ]),
     },
     {
-      label: 'Usuarios',
-      path: '/dashboard/users',
-      icon: '👤',
-      visible: hasRole('ROLE_PASTORES'),
+      label: "Usuarios",
+      path: "/dashboard/users",
+      icon: "👤",
+      visible: hasRole("ROLE_PASTORES"),
     },
   ];
 
-  const filteredMenu = menuItems.filter(item => item.visible);
+  const filteredMenu = menuItems.filter((item) => item.visible);
 
   // ========== RENDER ==========
   return (
     <div className="dashboard-layout">
       {/* ========== SIDEBAR ========== */}
-      <aside className={`dashboard-layout__sidebar ${!sidebarOpen ? 'dashboard-layout__sidebar--collapsed' : ''}`}>
-        
+      <aside
+        className={`dashboard-layout__sidebar ${!sidebarOpen ? "dashboard-layout__sidebar--collapsed" : ""}`}
+      >
         {/* Sidebar Header */}
         <div className="dashboard-layout__sidebar-header">
           <button
@@ -145,22 +174,20 @@ export const DashboardLayout = () => {
             ☰
           </button>
           {sidebarOpen && (
-            <h1 className="dashboard-layout__sidebar-title">
-              PastoreApp
-            </h1>
+            <h1 className="dashboard-layout__sidebar-title">PastoreApp</h1>
           )}
         </div>
 
         {/* Sidebar Menu */}
         <nav className="dashboard-layout__menu">
-          {filteredMenu.map(item => {
+          {filteredMenu.map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <button
                 key={item.path}
                 onClick={() => handleNavClick(item.path)}
-                className={`dashboard-layout__menu-item ${isActive ? 'dashboard-layout__menu-item--active' : ''}`}
-                title={!sidebarOpen ? item.label : ''}
+                className={`dashboard-layout__menu-item ${isActive ? "dashboard-layout__menu-item--active" : ""}`}
+                title={!sidebarOpen ? item.label : ""}
               >
                 <span className="dashboard-layout__menu-icon">{item.icon}</span>
                 {sidebarOpen && (
@@ -177,11 +204,9 @@ export const DashboardLayout = () => {
         <div className="dashboard-layout__sidebar-user">
           {sidebarOpen && (
             <div className="dashboard-layout__user-info">
-              <p className="dashboard-layout__user-name">
-                {user?.name}
-              </p>
+              <p className="dashboard-layout__user-name">{user?.name}</p>
               <p className="dashboard-layout__user-roles">
-                {user?.roles?.map(r => r.name || r).join(', ')}
+                {user?.roles?.map((r) => r.name || r).join(", ")}
               </p>
             </div>
           )}
@@ -191,28 +216,27 @@ export const DashboardLayout = () => {
             title="Cerrar Sesión"
           >
             <span className="dashboard-layout__logout-icon">🚪</span>
-            {sidebarOpen && (
-              <span>Cerrar Sesión</span>
-            )}
+            {sidebarOpen && <span>Cerrar Sesión</span>}
           </button>
         </div>
       </aside>
 
       {/* ========== MAIN CONTENT ========== */}
       <div className="dashboard-layout__main">
-        
         {/* Top Bar */}
-        
+
         <header className="dashboard-layout__topbar">
-          
           <div className="dashboard-layout__topbar-left">
-          <DashboardTopbar user={user} />
+            <DashboardTopbar user={user} />
             <h2 className="dashboard-layout__topbar-title">
-              {user?.name || 'Iglesia Raiz de David'}
+              {user?.name || "Iglesia Raiz de David"}
             </h2>
           </div>
-          <div className="dashboard-layout__topbar-welcome">
-            Bienvenido, {user?.username?.split(' ')[0]}
+          <div className="dashboard-layout__topbar-right">
+            <span className="dashboard-layout__topbar-welcome">
+              Bienvenido, {user?.username?.split(" ")[0]}
+            </span>
+            <NotificationBell userId={user?.id} pollInterval={30000} />
           </div>
         </header>
 
