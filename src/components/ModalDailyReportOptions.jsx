@@ -214,22 +214,27 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
   }
 
   let selectedDateFormatted = '';
-  try {
-    if (selectedDate && typeof selectedDate === 'string') {
-      const dateObj = new Date(selectedDate);
-      if (!isNaN(dateObj.getTime())) {
-        selectedDateFormatted = dateObj.toLocaleDateString('es-CO', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-      }
+try {
+  if (selectedDate && typeof selectedDate === 'string') {
+    // ✅ Parseamos manualmente para evitar desfase de zona horaria.
+    // new Date("YYYY-MM-DD") interpreta como UTC 00:00, lo que en Colombia
+    // (UTC-5) retrocede al día anterior. Separando las partes y usando
+    // new Date(year, month, day), la fecha se trata como LOCAL.
+    const [year, month, day] = selectedDate.split('T')[0].split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day); // mes es 0-indexed
+    if (!isNaN(dateObj.getTime())) {
+      selectedDateFormatted = dateObj.toLocaleDateString('es-CO', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
     }
-  } catch (error) {
-    logError('Error formateando selectedDate:', error);
-    selectedDateFormatted = selectedDate || 'Sin fecha';
   }
+} catch (error) {
+  logError('Error formateando selectedDate:', error);
+  selectedDateFormatted = selectedDate || 'Sin fecha';
+}
 
   return (
     <div 
