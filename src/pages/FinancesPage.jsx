@@ -100,6 +100,7 @@ const INCOME_METHODS = ["CASH", "BANK_TRANSFER"];
 const CONCEPT_LABELS = {
   TITHE: "💵 Diezmo",
   OFFERING: "🎁 Ofrenda",
+  TITHE_AND_OFFERING: "💵🎁 Diezmo + Ofrenda", // ✅ NUEVO
   SEED_OFFERING: "🌱 Ofrenda de Semilla",
   BUILDING_FUND: "🏗️ Fondo de Construcción",
   FIRST_FRUITS: "🍇 Primicias",
@@ -113,9 +114,9 @@ const METHOD_LABELS = {
 
 // ✅ NUEVO: Etiquetas para tipos de líder
 const LEADER_TYPE_LABELS = {
-  SERVANT:    "🌱 Servidor",
+  SERVANT: "🌱 Servidor",
   LEADER_144: "🌿 Líder 144",
-  LEADER_12:  "🌳 Líder 12",
+  LEADER_12: "🌳 Líder 12",
 };
 
 const FinancesPage = () => {
@@ -192,11 +193,14 @@ const FinancesPage = () => {
         hasMore = response?.hasNext === true;
         currentPage++;
 
-        log(`Página ${currentPage - 1} cargada: ${pageContent.length} registros`, {
-          acumulado: allFinancesData.length,
-          totalElements: response?.totalElements,
-          hasMore,
-        });
+        log(
+          `Página ${currentPage - 1} cargada: ${pageContent.length} registros`,
+          {
+            acumulado: allFinancesData.length,
+            totalElements: response?.totalElements,
+            hasMore,
+          },
+        );
 
         if (currentPage > 100) {
           log("⚠️ Límite de páginas alcanzado (100), deteniendo carga");
@@ -311,13 +315,18 @@ const FinancesPage = () => {
       });
 
       // Filtrar por concepto
-      if (
-        selectedConcept !== "ALL" &&
-        INCOME_CONCEPTS.includes(selectedConcept)
-      ) {
-        filtered = filtered.filter(
-          (finance) => finance.concept === selectedConcept,
-        );
+      if (selectedConcept !== "ALL") {
+        if (selectedConcept === "TITHE_AND_OFFERING") {
+          // ✅ NUEVO: filtro combinado Diezmo + Ofrenda
+          filtered = filtered.filter(
+            (finance) =>
+              finance.concept === "TITHE" || finance.concept === "OFFERING",
+          );
+        } else if (INCOME_CONCEPTS.includes(selectedConcept)) {
+          filtered = filtered.filter(
+            (finance) => finance.concept === selectedConcept,
+          );
+        }
       }
 
       // Filtrar por método
@@ -344,21 +353,19 @@ const FinancesPage = () => {
       if (selectedLeaderType !== "ALL") {
         if (selectedLeaderType === "NO_LEADER") {
           // Opción especial: miembros que NO son líderes en ningún tipo
-          const allLeaderMemberIds = new Set(
-            leaders.map((l) => l.memberId)
-          );
+          const allLeaderMemberIds = new Set(leaders.map((l) => l.memberId));
           filtered = filtered.filter(
-            (finance) => !allLeaderMemberIds.has(finance.memberId)
+            (finance) => !allLeaderMemberIds.has(finance.memberId),
           );
         } else {
           // Filtrar por tipo específico de líder (SERVANT, LEADER_144, LEADER_12)
           const memberIdsWithLeaderType = new Set(
             leaders
               .filter((l) => l.leaderType === selectedLeaderType)
-              .map((l) => l.memberId)
+              .map((l) => l.memberId),
           );
           filtered = filtered.filter((finance) =>
-            memberIdsWithLeaderType.has(finance.memberId)
+            memberIdsWithLeaderType.has(finance.memberId),
           );
         }
       }
@@ -419,7 +426,7 @@ const FinancesPage = () => {
     selectedMethod,
     selectedVerification,
     selectedLeaderType, // ✅ NUEVO
-    leaders,            // ✅ NUEVO
+    leaders, // ✅ NUEVO
     searchText,
     startDate,
     endDate,
@@ -839,9 +846,7 @@ const FinancesPage = () => {
         }
 
         if (
-          !window.confirm(
-            "¿Estás seguro de que deseas eliminar este registro?",
-          )
+          !window.confirm("¿Estás seguro de que deseas eliminar este registro?")
         ) {
           return;
         }
@@ -976,6 +981,7 @@ const FinancesPage = () => {
                 onChange={(e) => setSelectedConcept(e.target.value)}
               >
                 <option value="ALL">Todos los Conceptos</option>
+                <option value="TITHE_AND_OFFERING">💵🎁 Diezmo + Ofrenda</option> {/* ✅ NUEVO */}
                 {INCOME_CONCEPTS.map((concept) => (
                   <option key={concept} value={concept}>
                     {getConceptLabel(concept)}
