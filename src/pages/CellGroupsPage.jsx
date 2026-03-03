@@ -13,6 +13,7 @@ import ModalCreateCell from '../components/ModalCreateCell';
 import ModalCellStatistics from '../components/ModalCellStatistics';
 import ModalCellDetail from '../components/ModalCellDetail';
 import '../css/CellGroupspage.css';
+import ModalLeaderDetail from '../components/ModalLeaderDetail';
 
 const { getDisplayName } = nameHelper;
 
@@ -89,6 +90,9 @@ const CellGroupsPage = () => {
 
   // Modal de detalle de célula (nuevo)
   const [selectedCell, setSelectedCell] = useState(null);
+
+  const [selectedLeader, setSelectedLeader]       = useState(null);
+const [isLeaderDetailOpen, setIsLeaderDetailOpen] = useState(false);
 
   // Filtros info
   const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
@@ -585,21 +589,34 @@ const CellGroupsPage = () => {
 
       {/* Modal de detalle (click en fila) */}
       <ModalCellDetail
-        isOpen={!!selectedCell}
-        cell={selectedCell}
-        onClose={() => setSelectedCell(null)}
-        onCellChanged={() => {
-          // Actualiza el cell seleccionado en la lista local sin recargar todo
-          loadCells().then(() => {
-            if (selectedCell) {
-              setSelectedCell(prev => {
-                // Buscar el cell actualizado en allCells (se habrá recargado)
-                return prev;
-              });
-            }
-          });
-        }}
-      />
+  isOpen={!!selectedCell}
+  cell={selectedCell}
+  onClose={() => setSelectedCell(null)}
+  onCellChanged={() => { loadCells(); }}
+  onOpenLeaderDetail={async (leaderId) => {
+    try {
+      const leader = await apiService.getLeaderById(leaderId);
+      setSelectedLeader(leader);
+      setIsLeaderDetailOpen(true);
+    } catch (err) {
+      console.error('Error cargando líder:', err);
+    }
+  }}
+/>
+
+<ModalLeaderDetail
+  isOpen={isLeaderDetailOpen}
+  leader={selectedLeader}
+  onClose={() => {
+    setIsLeaderDetailOpen(false);
+    setSelectedLeader(null);
+  }}
+  onLeaderChanged={() => {
+    loadCells();
+    setIsLeaderDetailOpen(false);
+    setSelectedLeader(null);
+  }}
+/>
 
       {/* Modal verificación masiva */}
       {showVerifyAllModal && verificationResult && (
