@@ -328,8 +328,8 @@ const CellGroupsPage = () => {
 
         {/* HEADER */}
         <div className="cells-page__header">
-          <h1>🏠 Gestión de Células</h1>
-          <p>Administra las células, sus líderes y miembros. Toca una fila para ver el detalle.</p>
+          <h1>🏠 Gestión de grupos Célulares</h1>
+          <p>Administra los grupos célulares, sus líderes y miembros. Toca una fila para ver el detalle.</p>
         </div>
 
         {/* CONTROLES */}
@@ -398,7 +398,7 @@ const CellGroupsPage = () => {
                 className="cells-page__btn cells-page__btn--primary"
                 onClick={() => setShowCreateModal(true)}
               >
-                ➕ Nueva Célula
+                ➕ Nuevo Altar
               </button>
 
               <button
