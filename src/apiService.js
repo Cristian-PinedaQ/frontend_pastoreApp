@@ -5,9 +5,9 @@
 // ✅ Export con nombre (ESLint compliance)
 
 //Produccion
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 //desarrollo
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -2395,6 +2395,508 @@ async createFinance(financeData) {
       throw error;
     }
   }
+
+  // ============================================================
+// ⛪ MÓDULO FINANCIERO IGLESIA
+// Pega este bloque dentro de la clase ApiService,
+// justo antes del cierre de la clase  }
+// Base URL del módulo: /api/v1/finance
+// ============================================================
+
+  // ========== 📌 GASTOS FIJOS ==========
+
+  /**
+   * Crear plantilla de gasto fijo mensual.
+   * POST /finance/fixed-expenses
+   * @param {Object} dto - FixedExpenseDTO { name, description, defaultAmount, category, isActive, createdBy }
+   */
+  async createFixedExpense(dto) {
+    try {
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto fijo inválidos');
+      validateString(dto.name, 'name', 3, 150);
+      validateNumber(dto.defaultAmount, 'defaultAmount', 0.01);
+      validateString(dto.category, 'category', 1, 60);
+      validateString(dto.createdBy, 'createdBy', 1, 100);
+
+      log('📌 [createFixedExpense] Creando:', dto.name);
+      const response = await this.request('/finance/fixed-expenses', {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [createFixedExpense] Éxito - ID:', response?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [createFixedExpense] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar plantilla de gasto fijo.
+   * PUT /finance/fixed-expenses/{id}
+   * @param {number} id
+   * @param {Object} dto - FixedExpenseDTO
+   */
+  async updateFixedExpense(id, dto) {
+    try {
+      validateId(id, 'fixedExpenseId');
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto fijo inválidos');
+
+      log('📝 [updateFixedExpense] Actualizando ID:', id);
+      const response = await this.request(`/finance/fixed-expenses/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [updateFixedExpense] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateFixedExpense] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Desactivar gasto fijo (borrado lógico).
+   * El gasto deja de generar registros futuros; historial conservado.
+   * PATCH /finance/fixed-expenses/{id}/deactivate
+   * @param {number} id
+   */
+  async deactivateFixedExpense(id) {
+    try {
+      validateId(id, 'fixedExpenseId');
+      log('⏹️ [deactivateFixedExpense] Desactivando ID:', id);
+      const response = await this.request(`/finance/fixed-expenses/${id}/deactivate`, {
+        method: 'PATCH',
+      });
+      log('✅ [deactivateFixedExpense] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [deactivateFixedExpense] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar gasto fijo permanentemente.
+   * Solo si NO tiene registros mensuales históricos; preferir deactivateFixedExpense.
+   * DELETE /finance/fixed-expenses/{id}
+   * @param {number} id
+   */
+  async deleteFixedExpense(id) {
+    try {
+      validateId(id, 'fixedExpenseId');
+      log('🗑️ [deleteFixedExpense] Eliminando ID:', id);
+      const response = await this.request(`/finance/fixed-expenses/${id}`, {
+        method: 'DELETE',
+      });
+      log('✅ [deleteFixedExpense] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [deleteFixedExpense] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener gasto fijo por ID.
+   * GET /finance/fixed-expenses/{id}
+   * @param {number} id
+   */
+  async getFixedExpenseById(id) {
+    try {
+      validateId(id, 'fixedExpenseId');
+      log('🔍 [getFixedExpenseById] Buscando ID:', id);
+      return this.request(`/finance/fixed-expenses/${id}`);
+    } catch (error) {
+      logError('❌ [getFixedExpenseById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Listar todos los gastos fijos.
+   * GET /finance/fixed-expenses?activeOnly=false|true
+   * @param {boolean} activeOnly - true para solo los activos (default: false)
+   */
+  async getAllFixedExpenses(activeOnly = false) {
+    try {
+      log('📋 [getAllFixedExpenses] activeOnly:', activeOnly);
+      const response = await this.request(`/finance/fixed-expenses?activeOnly=${activeOnly}`);
+      log('✅ [getAllFixedExpenses] Éxito -', response?.length || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [getAllFixedExpenses] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Listar solo los gastos fijos activos (alias conveniente).
+   * GET /finance/fixed-expenses?activeOnly=true
+   */
+  async getActiveFixedExpenses() {
+    return this.getAllFixedExpenses(true);
+  }
+
+  // ========== 📋 REGISTROS MENSUALES DE GASTOS FIJOS ==========
+
+  /**
+   * Obtener (y auto-generar si es la primera vez) los registros
+   * de gastos fijos para un mes/año dado.
+   * GET /finance/monthly-records?month={month}&year={year}
+   * @param {number} month - 1-12
+   * @param {number} year  - ≥ 2000
+   */
+  async getOrCreateMonthlyRecords(month, year) {
+    try {
+      validateNumber(month, 'month', 1, 12);
+      validateNumber(year, 'year', 2000);
+      log('📋 [getOrCreateMonthlyRecords]', { month, year });
+      const response = await this.request(`/finance/monthly-records?month=${month}&year=${year}`);
+      log('✅ [getOrCreateMonthlyRecords] Éxito -', response?.length || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [getOrCreateMonthlyRecords] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar monto, estado de pago y/o notas de un registro mensual.
+   * Permite ajustar el valor de un mes sin alterar la plantilla base.
+   * PATCH /finance/monthly-records/{id}
+   * @param {number}  id
+   * @param {number|null}  newAmount - nuevo monto (null = no cambiar)
+   * @param {boolean|null} isPaid    - estado de pago (null = no cambiar)
+   * @param {string|null}  notes     - notas (null = no cambiar)
+   */
+  async updateMonthlyRecord(id, newAmount = null, isPaid = null, notes = null) {
+    try {
+      validateId(id, 'monthlyRecordId');
+
+      const body = {};
+      if (newAmount !== null) {
+        validateNumber(newAmount, 'amount', 0.01);
+        body.amount = newAmount;
+      }
+      if (isPaid !== null) body.isPaid = isPaid;
+      if (notes !== null) body.notes = notes;
+
+      log('📝 [updateMonthlyRecord] Actualizando ID:', id, body);
+      const response = await this.request(`/finance/monthly-records/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+      log('✅ [updateMonthlyRecord] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateMonthlyRecord] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== ⚡ GASTOS OCASIONALES ==========
+
+  /**
+   * Registrar un gasto no recurrente.
+   * Solo aplica para el mes de su fecha; no se propaga a meses futuros.
+   * POST /finance/occasional-expenses
+   * @param {Object} dto - OccasionalExpenseDTO
+   *   { name, description, amount, category, expenseDate (yyyy-MM-dd), recordedBy, notes }
+   */
+  async createOccasionalExpense(dto) {
+    try {
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
+      validateString(dto.name, 'name', 3, 150);
+      validateNumber(dto.amount, 'amount', 0.01);
+      validateString(dto.category, 'category', 1, 60);
+      validateString(dto.expenseDate, 'expenseDate', 10, 10);
+      validateString(dto.recordedBy, 'recordedBy', 1, 100);
+
+      log('⚡ [createOccasionalExpense] Creando:', dto.name);
+      const response = await this.request('/finance/occasional-expenses', {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [createOccasionalExpense] Éxito - ID:', response?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [createOccasionalExpense] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar gasto ocasional.
+   * PUT /finance/occasional-expenses/{id}
+   * @param {number} id
+   * @param {Object} dto - OccasionalExpenseDTO
+   */
+  async updateOccasionalExpense(id, dto) {
+    try {
+      validateId(id, 'occasionalExpenseId');
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
+
+      log('📝 [updateOccasionalExpense] Actualizando ID:', id);
+      const response = await this.request(`/finance/occasional-expenses/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [updateOccasionalExpense] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateOccasionalExpense] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar gasto ocasional.
+   * DELETE /finance/occasional-expenses/{id}
+   * @param {number} id
+   */
+  async deleteOccasionalExpense(id) {
+    try {
+      validateId(id, 'occasionalExpenseId');
+      log('🗑️ [deleteOccasionalExpense] Eliminando ID:', id);
+      const response = await this.request(`/finance/occasional-expenses/${id}`, {
+        method: 'DELETE',
+      });
+      log('✅ [deleteOccasionalExpense] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [deleteOccasionalExpense] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Listar gastos ocasionales de un mes/año.
+   * GET /finance/occasional-expenses?month={month}&year={year}
+   * @param {number} month - 1-12
+   * @param {number} year  - ≥ 2000
+   */
+  async getOccasionalExpensesByMonth(month, year) {
+    try {
+      validateNumber(month, 'month', 1, 12);
+      validateNumber(year, 'year', 2000);
+      log('⚡ [getOccasionalExpensesByMonth]', { month, year });
+      const response = await this.request(`/finance/occasional-expenses?month=${month}&year=${year}`);
+      log('✅ [getOccasionalExpensesByMonth] Éxito -', response?.length || 0, 'registros');
+      return response;
+    } catch (error) {
+      logError('❌ [getOccasionalExpensesByMonth] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 📊 BALANCE MENSUAL ==========
+
+  /**
+   * Obtener el balance mensual completo.
+   * Incluye ingresos, egresos, saldo anterior, balance final e indicadores.
+   * GET /finance/balance?month={month}&year={year}
+   * @param {number} month - 1-12
+   * @param {number} year  - ≥ 2000
+   * @returns {MonthlyBalanceDTO}
+   */
+  async getMonthlyBalance(month, year) {
+    try {
+      validateNumber(month, 'month', 1, 12);
+      validateNumber(year, 'year', 2000);
+      log('📊 [getMonthlyBalance]', { month, year });
+      const response = await this.request(`/finance/balance?month=${month}&year=${year}`);
+      log('✅ [getMonthlyBalance] finalBalance:', response?.finalBalance);
+      return response;
+    } catch (error) {
+      logError('❌ [getMonthlyBalance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Indicador en tiempo real de salud financiera del mes.
+   * Devuelve semáforo (HEALTHY / WARNING / CRITICAL), barra de cobertura y proyecciones.
+   * GET /finance/health?month={month}&year={year}
+   * @param {number} month - 1-12
+   * @param {number} year  - ≥ 2000
+   * @returns {FinancialHealthDTO}
+   */
+  async getFinancialHealthIndicator(month, year) {
+    try {
+      validateNumber(month, 'month', 1, 12);
+      validateNumber(year, 'year', 2000);
+      log('❤️ [getFinancialHealthIndicator]', { month, year });
+      const response = await this.request(`/finance/health?month=${month}&year=${year}`);
+      log('✅ [getFinancialHealthIndicator] status:', response?.status);
+      return response;
+    } catch (error) {
+      logError('❌ [getFinancialHealthIndicator] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Cerrar el mes.
+   * Congela el balance; el saldo final se arrastra automáticamente al mes siguiente.
+   * POST /finance/balance/close?month={month}&year={year}&closedBy={closedBy}&notes={notes}
+   * @param {number} month
+   * @param {number} year
+   * @param {string} closedBy - username del usuario que cierra
+   * @param {string|null} notes - notas opcionales
+   * @returns {MonthlyBalanceDTO} balance cerrado
+   */
+  async closeMonth(month, year, closedBy, notes = null) {
+    try {
+      validateNumber(month, 'month', 1, 12);
+      validateNumber(year, 'year', 2000);
+      validateString(closedBy, 'closedBy', 1, 100);
+
+      const params = new URLSearchParams();
+      params.append('month', month);
+      params.append('year', year);
+      params.append('closedBy', closedBy.trim());
+      if (notes) params.append('notes', notes.trim());
+
+      log('🔒 [closeMonth] Cerrando mes', { month, year, closedBy });
+      const response = await this.request(`/finance/balance/close?${params.toString()}`, {
+        method: 'POST',
+      });
+      log('✅ [closeMonth] Mes cerrado - finalBalance:', response?.finalBalance);
+      return response;
+    } catch (error) {
+      logError('❌ [closeMonth] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 📄 INFORMES PDF ==========
+
+  /**
+   * Descargar informe PDF mensual.
+   * GET /finance/reports/monthly?month={month}&year={year}
+   * Descarga automáticamente el archivo en el navegador.
+   * @param {number} month
+   * @param {number} year
+   */
+  async downloadMonthlyReport(month, year) {
+    try {
+      validateNumber(month, 'month', 1, 12);
+      validateNumber(year, 'year', 2000);
+
+      log('📄 [downloadMonthlyReport]', { month, year });
+      const token = sessionStorage.getItem('token');
+      const url = `${API_BASE_URL}/finance/reports/monthly?month=${month}&year=${year}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.dispatchEvent(new CustomEvent('authTokenExpired'));
+        throw new Error('Sesión expirada');
+      }
+      if (!res.ok) throw new Error(`Error generando PDF mensual: ${res.status}`);
+
+      const blob = await res.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `informe-mensual-${month}-${year}.pdf`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      log('✅ [downloadMonthlyReport] Descarga iniciada');
+    } catch (error) {
+      logError('❌ [downloadMonthlyReport] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Descargar informe PDF anual con comparativo mes a mes.
+   * GET /finance/reports/yearly?year={year}
+   * @param {number} year
+   */
+  async downloadYearlyReport(year) {
+    try {
+      validateNumber(year, 'year', 2000);
+
+      log('📅 [downloadYearlyReport]', { year });
+      const token = sessionStorage.getItem('token');
+      const url = `${API_BASE_URL}/finance/reports/yearly?year=${year}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.dispatchEvent(new CustomEvent('authTokenExpired'));
+        throw new Error('Sesión expirada');
+      }
+      if (!res.ok) throw new Error(`Error generando PDF anual: ${res.status}`);
+
+      const blob = await res.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `informe-anual-${year}.pdf`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      log('✅ [downloadYearlyReport] Descarga iniciada');
+    } catch (error) {
+      logError('❌ [downloadYearlyReport] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Descargar informe PDF por rango de fechas.
+   * GET /finance/reports/period?startDate={YYYY-MM-DD}&endDate={YYYY-MM-DD}
+   * @param {string} startDate - formato YYYY-MM-DD
+   * @param {string} endDate   - formato YYYY-MM-DD
+   */
+  async downloadPeriodReport(startDate, endDate) {
+    try {
+      validateString(startDate, 'startDate', 10, 10);
+      validateString(endDate, 'endDate', 10, 10);
+
+      log('📆 [downloadPeriodReport]', { startDate, endDate });
+      const token = sessionStorage.getItem('token');
+      const url = `${API_BASE_URL}/finance/reports/period?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.dispatchEvent(new CustomEvent('authTokenExpired'));
+        throw new Error('Sesión expirada');
+      }
+      if (!res.ok) throw new Error(`Error generando PDF por período: ${res.status}`);
+
+      const blob = await res.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `informe-periodo-${startDate}-${endDate}.pdf`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      log('✅ [downloadPeriodReport] Descarga iniciada');
+    } catch (error) {
+      logError('❌ [downloadPeriodReport] Error:', error.message);
+      throw error;
+    }
+  }
+
+// ============================================================
+// FIN DEL BLOQUE ⛪ MÓDULO FINANCIERO IGLESIA
+// ============================================================
 
 // ============================================================
 // FIN DEL BLOQUE — recuerda cerrar la clase con  }  después

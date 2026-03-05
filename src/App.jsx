@@ -24,6 +24,7 @@ import ActivityPage from './pages/ActivityPage';
 import LeadersPage from './pages/LeadersPage';
 import CellGroupsPage from './pages/CellGroupsPage';
 import CellAttendancePage from './pages/CellAttendancePage.jsx';
+import ChurchFinancePage from './pages/ChurchFinancePage.jsx';
 
 function App() {
   return (
@@ -120,6 +121,16 @@ function App() {
                 <ProtectedRoute
                   element={<FinancesPage />}
                   requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
+                />
+              }
+            />
+
+            <Route
+              path="financesChurch"
+              element={
+                <ProtectedRoute
+                  element={<ChurchFinancePage />}
+                  requiredRoles={['ROLE_PASTORES']}
                 />
               }
             />

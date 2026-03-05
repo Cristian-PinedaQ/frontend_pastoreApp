@@ -135,6 +135,12 @@ export const DashboardLayout = () => {
       visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]),
     },
     {
+      label: "Contable",
+      path: "/dashboard/financesChurch",
+      icon: "📊",
+      visible: hasAnyRole(["ROLE_PASTORES"]),
+    },
+    {
       label: "Actividades",
       path: "/dashboard/activity",
       icon: "📅",
