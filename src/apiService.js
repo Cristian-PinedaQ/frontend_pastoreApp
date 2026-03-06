@@ -5,9 +5,9 @@
 // ✅ Export con nombre (ESLint compliance)
 
 //Produccion
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 //desarrollo
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -113,39 +113,53 @@ class ApiService {
     }
 
     if (!response.ok) {
-      let errorData = {};
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        errorData = { message: `Error ${response.status}` };
-      }
+  let errorData = {};
+  try {
+    errorData = await response.json();
+  } catch (e) {
+    errorData = { message: `Error ${response.status}` };
+  }
 
-      logError('❌ [request] Error del servidor:', JSON.stringify(errorData));
+  logError('❌ [request] Error del servidor:', JSON.stringify(errorData));
 
-      let errorMessage = '';
+  // ✅ CREAR UN OBJETO DE ERROR ENRIQUECIDO
+  const enhancedError = new Error();
+  enhancedError.status = response.status;
+  enhancedError.statusText = response.statusText;
+  enhancedError.data = errorData; // Guardar los datos completos del error
+  enhancedError.response = {
+    status: response.status,
+    statusText: response.statusText,
+    data: errorData,
+    headers: Object.fromEntries(response.headers.entries())
+  };
 
-      if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
-        const fieldErrors = Object.entries(errorData.fieldErrors)
-          .map(([field, message]) => `${field}: ${message}`)
-          .join(' | ');
-        errorMessage = fieldErrors;
-      } else if (typeof errorData === 'string') {
-        errorMessage = errorData;
-      } else if (errorData.message) {
-        errorMessage = typeof errorData.message === 'string'
-          ? errorData.message
-          : JSON.stringify(errorData.message);
-      } else if (errorData.error) {
-        errorMessage = typeof errorData.error === 'string'
-          ? errorData.error
-          : JSON.stringify(errorData.error);
-      } else {
-        errorMessage = DEBUG ? JSON.stringify(errorData) : 'Error en la solicitud';
-      }
-
-      logError('❌ [request] Mensaje:', errorMessage);
-      throw new Error(errorMessage);
-    }
+  // Extraer mensaje para el error estándar
+  let errorMessage = '';
+  if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
+    const fieldErrors = Object.entries(errorData.fieldErrors)
+      .map(([field, message]) => `${field}: ${message}`)
+      .join(' | ');
+    errorMessage = fieldErrors;
+  } else if (typeof errorData === 'string') {
+    errorMessage = errorData;
+  } else if (errorData.message) {
+    errorMessage = typeof errorData.message === 'string'
+      ? errorData.message
+      : JSON.stringify(errorData.message);
+  } else if (errorData.error) {
+    errorMessage = typeof errorData.error === 'string'
+      ? errorData.error
+      : JSON.stringify(errorData.error);
+  } else {
+    errorMessage = DEBUG ? JSON.stringify(errorData) : 'Error en la solicitud';
+  }
+  
+  enhancedError.message = errorMessage;
+  logError('❌ [request] Mensaje:', errorMessage);
+  
+  throw enhancedError; // Lanzar el error enriquecido
+}
 
     const data = await response.json();
     log('✅ [request] Exitoso');

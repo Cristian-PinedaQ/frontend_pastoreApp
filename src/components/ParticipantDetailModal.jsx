@@ -372,114 +372,202 @@ const ParticipantDetailModal = ({
   };
 
   const handleAddPayment = async () => {
-    // Validaciones
-    if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
-      setError("El monto debe ser mayor a cero");
-      return;
-    }
+  // Validaciones (igual que antes)
+  if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+    setError("El monto debe ser mayor a cero");
+    return;
+  }
 
-    const amount = parseFloat(paymentAmount);
+  const amount = parseFloat(paymentAmount);
 
-    if (amount > pendingBalance) {
-      setError(
-        `El monto excede el saldo pendiente ($${pendingBalance.toLocaleString("es-CO")})`,
-      );
-      return;
-    }
+  if (amount > pendingBalance) {
+    setError(
+      `El monto excede el saldo pendiente ($${pendingBalance.toLocaleString("es-CO")})`,
+    );
+    return;
+  }
 
-    const recordedByName = getRecordedBy();
-    if (!recordedByName || recordedByName === "Usuario Sistema") {
-      setError(
-        "No se pudo obtener información del usuario logueado. Por favor, inicie sesión.",
-      );
-      return;
-    }
+  const recordedByName = getRecordedBy();
+  if (!recordedByName || recordedByName === "Usuario Sistema") {
+    setError(
+      "No se pudo obtener información del usuario logueado. Por favor, inicie sesión.",
+    );
+    return;
+  }
 
-    const contributionId = contribution?.id || participant.contributionId;
+  const contributionId = contribution?.id || participant.contributionId;
 
-    if (!contributionId) {
-      setError("Error: No se encontró el ID de contribución.");
-      return;
-    }
+  if (!contributionId) {
+    setError("Error: No se encontró el ID de contribución.");
+    return;
+  }
 
-    setLoading(true);
-    setError("");
-    setSuccess("");
+  setLoading(true);
+  setError("");
+  setSuccess("");
 
-    try {
-      console.log("=== REGISTRANDO PAGO ===");
+  try {
+    console.log("=== REGISTRANDO PAGO ===");
 
-      const paymentData = {
-        amount: amount,
-        incomeMethod: incomeMethod,
+    const paymentData = {
+      amount: amount,
+      incomeMethod: incomeMethod,
+      recordedBy: recordedByName,
+    };
+
+    console.log("📤 Enviando pago:", paymentData);
+
+    const result = await apiService.request(
+      `/activity-payment/add-payment/${contributionId}`,
+      {
+        method: "POST",
+        body: JSON.stringify(paymentData),
+      },
+    );
+
+    console.log("✅ Pago registrado exitosamente:", result);
+
+    await refreshContributionData();
+
+    if (onAddPaymentSuccess) {
+      onAddPaymentSuccess({
+        contributionId,
+        amount,
+        incomeMethod,
         recordedBy: recordedByName,
-      };
+        apiResponse: result,
+        updatedContribution: result,
+      });
+    }
 
-      console.log("📤 Enviando pago:", paymentData);
+    setSuccess(result.message || "✅ Pago registrado exitosamente");
+    setPaymentAmount("");
 
-      const result = await apiService.request(
-        `/activity-payment/add-payment/${contributionId}`,
-        {
-          method: "POST",
-          body: JSON.stringify(paymentData),
-        },
+    const newPendingBalance = result.pendingBalance || pendingBalance - amount;
+    if (newPendingBalance <= 0) {
+      setTimeout(() => {
+        onClose();
+      }, 2000);
+    } else {
+      setTimeout(() => setSuccess(""), 3000);
+    }
+    
+  } catch (err) {
+  // Si err.data existe, mostrar cada propiedad
+  if (err.data) {
+    console.error("6. Propiedades de err.data:");
+    Object.keys(err.data).forEach(key => {
+      console.error(`   ${key}:`, err.data[key]);
+    });
+  }
+  
+  // Si hay fieldErrors, mostrarlos
+  if (err.data?.fieldErrors) {
+    console.error("7. fieldErrors:", err.data.fieldErrors);
+  }
+  
+  // Si hay constraintViolations (de Bean Validation)
+  if (err.data?.constraintViolations) {
+    console.error("8. constraintViolations:", err.data.constraintViolations);
+  }
+  
+  // Si hay validationErrors
+  if (err.data?.validationErrors) {
+    console.error("9. validationErrors:", err.data.validationErrors);
+  }
+
+    // ✅ Extraer información del error
+    let errorMessage = "Error al registrar el pago";
+    let detailedError = "";
+    let errorData = err.data || err.response?.data || {};
+
+    // Si el error tiene data (de nuestra nueva implementación)
+    if (err.data) {
+      errorData = err.data;
+    }
+
+    // Convertir a string para búsqueda
+    const errorString = JSON.stringify(errorData).toLowerCase();
+
+    // ✅ DETECTAR ERROR ESPECÍFICO DE EMAIL
+    if (errorString.includes("email") && 
+        (errorString.includes("obligatorio") || 
+         errorString.includes("required") ||
+         errorString.includes("validation failed"))) {
+      
+      const memberName = participant.memberName || "El miembro";
+      
+      setError(
+        <div className="error-details">
+          <div className="error-main">⚠️ No se puede procesar el pago</div>
+          <div className="error-secondary">
+            <strong>{memberName}</strong> no tiene un email registrado en el sistema.
+            <br />
+            <span style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.5rem', display: 'block' }}>
+              Para poder completar el pago, primero debe actualizar los datos del miembro
+              con un correo electrónico válido.
+            </span>
+          </div>
+          <div className="error-actions">
+            <button 
+              className="error-action-btn"
+              onClick={() => {
+                // Cambiar a pestaña de detalles o cerrar modal
+                setActiveTab("details");
+                // Aquí podrías abrir un modal de edición de miembro
+                alert("Funcionalidad de edición de miembro - Próximamente");
+              }}
+            >
+              ✏️ Ver Datos del Miembro
+            </button>
+            <button 
+              className="error-action-btn secondary"
+              onClick={() => setError("")}
+            >
+              ✖️ Cerrar
+            </button>
+          </div>
+        </div>
       );
+      setLoading(false);
+      return;
+    }
 
-      console.log("✅ Pago registrado exitosamente:", result);
+    // ✅ ERROR DE TRANSACCIÓN
+    if (errorString.includes("rollback") || errorString.includes("transaction")) {
+      errorMessage = "❌ Error en la transacción";
+      detailedError = "El pago no pudo ser procesado. Por favor, intente nuevamente.";
+    }
 
-      // ✅ ACTUALIZADO: Recargar datos inmediatamente después del pago
-      await refreshContributionData();
-
-      // Notificar al componente padre con los datos actualizados
-      if (onAddPaymentSuccess) {
-        onAddPaymentSuccess({
-          contributionId,
-          amount,
-          incomeMethod,
-          recordedBy: recordedByName,
-          apiResponse: result,
-          updatedContribution: result, // ✅ Enviar datos actualizados
-        });
+    // ✅ ERRORES COMUNES
+    if (err.status === 404 || errorString.includes("404")) {
+      setError("❌ El endpoint no existe");
+    } else if (err.message?.includes("Failed to fetch") || err.status === 0) {
+      setError("🌐 Error de conexión con el servidor");
+    } else {
+      // Extraer mensaje del errorData
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
       }
-
-      setSuccess(result.message || "✅ Pago registrado exitosamente");
-      setPaymentAmount("");
-
-      // Si se completa el pago, sugerir cerrar el modal
-      const newPendingBalance = result.pendingBalance || pendingBalance - amount;
-      if (newPendingBalance <= 0) {
-        setTimeout(() => {
-          onClose();
-        }, 2000);
-      } else {
-        // Mantener abierto para más pagos
-        setTimeout(() => setSuccess(""), 3000);
-      }
-    } catch (err) {
-      console.error("❌ Error en handleAddPayment:", err);
-
-      let errorMessage = "Error al registrar el pago";
-
-      if (err.response?.data?.error) {
-        errorMessage = err.response.data.error;
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      if (errorMessage.includes("404")) {
-        setError(`❌ Error 404 - Endpoint no encontrado`);
-      } else if (
-        errorMessage.includes("Failed to fetch") ||
-        errorMessage.includes("NetworkError")
-      ) {
-        setError("🌐 Error de conexión con el backend");
+      
+      if (detailedError) {
+        setError(
+          <div className="error-details">
+            <div className="error-main">❌ {errorMessage}</div>
+            <div className="error-secondary">{detailedError}</div>
+          </div>
+        );
       } else {
         setError(`❌ ${errorMessage}`);
       }
-    } finally {
-      setLoading(false);
     }
-  };
+    
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Formatear fecha mejorado
   const formatDate = (dateString) => {
