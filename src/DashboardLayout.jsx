@@ -129,6 +129,12 @@ export const DashboardLayout = () => {
       visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]),
     },
     {
+      label: "Consejeria",
+      path: "/dashboard/Counseling",
+      icon: "❤️‍🩹",
+      visible: hasAnyRole(["ROLE_PASTORES"]),
+    },
+    {
       label: "Finanzas",
       path: "/dashboard/finances",
       icon: "🏦",

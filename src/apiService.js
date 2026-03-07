@@ -5,9 +5,9 @@
 // ✅ Export con nombre (ESLint compliance)
 
 //Produccion
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 //desarrollo
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -2911,9 +2911,339 @@ async createFinance(financeData) {
 // ============================================================
 // FIN DEL BLOQUE ⛪ MÓDULO FINANCIERO IGLESIA
 // ============================================================
+// ============================================================
+// 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
+// Pega este bloque dentro de la clase ApiService,
+// justo antes del cierre de la clase  }
+// Base URL del módulo: /api/v1/counseling
+// ============================================================
+
+  // ========== 🕊️ CONSEJERÍAS ==========
+
+  /**
+   * Agendar una nueva sesión de consejería.
+   * Envía notificación Telegram al pastor y al miembro automáticamente.
+   * POST /counseling
+   * @param {Object} dto - CounselingSessionRequest
+   *   { memberId, scheduledAt (yyyy-MM-dd'T'HH:mm), durationMinutes, location, topic, objectives }
+   */
+  async scheduleSession(dto) {
+    try {
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de sesión inválidos');
+      validateId(dto.memberId, 'memberId');
+      validateString(dto.scheduledAt, 'scheduledAt', 1, 20);
+
+      log('📅 [scheduleSession] Agendando sesión para miembro:', dto.memberId);
+      const response = await this.request('/counseling', {
+        method: 'POST',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [scheduleSession] Éxito - ID:', response?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [scheduleSession] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Listar todas las sesiones del pastor autenticado.
+   * GET /counseling
+   * Retorna: CounselingSessionResponse[]
+   */
+  async getMySessions() {
+    try {
+      log('📋 [getMySessions] Obteniendo sesiones del pastor');
+      const response = await this.request('/counseling');
+      log('✅ [getMySessions] Éxito -', response?.length || 0, 'sesiones');
+      return response;
+    } catch (error) {
+      logError('❌ [getMySessions] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener el detalle de una sesión específica.
+   * El backend valida que la sesión pertenezca al pastor autenticado.
+   * GET /counseling/{id}
+   * @param {number} id - ID de la sesión
+   */
+  async getCounselingSessionById(id) {
+    try {
+      validateId(id, 'sessionId');
+      log('🔍 [getCounselingSessionById] Buscando sesión ID:', id);
+      const response = await this.request(`/counseling/${id}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCounselingSessionById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Filtrar sesiones del pastor autenticado por estado.
+   * GET /counseling/status/{status}
+   * @param {string} status - SCHEDULED | COMPLETED | CANCELLED | NO_SHOW | RESCHEDULED
+   */
+  async getSessionsByStatus(status) {
+    try {
+      validateString(status, 'status', 1, 30);
+      const validStatuses = ['SCHEDULED', 'COMPLETED', 'CANCELLED', 'NO_SHOW', 'RESCHEDULED'];
+      if (!validStatuses.includes(status)) {
+        throw new Error(`Estado inválido. Debe ser uno de: ${validStatuses.join(', ')}`);
+      }
+      log('🔍 [getSessionsByStatus] Filtrando por estado:', status);
+      const response = await this.request(`/counseling/status/${status}`);
+      log('✅ [getSessionsByStatus] Éxito -', response?.length || 0, 'sesiones');
+      return response;
+    } catch (error) {
+      logError('❌ [getSessionsByStatus] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Historial completo de sesiones de un miembro gestionadas por el pastor autenticado.
+   * GET /counseling/member/{memberId}/history
+   * @param {number} memberId
+   */
+  async getMemberCounselingHistory(memberId) {
+    try {
+      validateId(memberId, 'memberId');
+      log('📋 [getMemberCounselingHistory] Historial del miembro ID:', memberId);
+      const response = await this.request(`/counseling/member/${memberId}/history`);
+      log('✅ [getMemberCounselingHistory] Éxito -', response?.length || 0, 'sesiones');
+      return response;
+    } catch (error) {
+      logError('❌ [getMemberCounselingHistory] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar los datos básicos de una sesión SCHEDULED o RESCHEDULED.
+   * Si cambia el horario, el backend reinicia los flags de recordatorio.
+   * PUT /counseling/{id}
+   * @param {number} id - ID de la sesión
+   * @param {Object} dto - CounselingSessionRequest (mismos campos que scheduleSession)
+   */
+  async updateCounselingSession(id, dto) {
+    try {
+      validateId(id, 'sessionId');
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de sesión inválidos');
+      validateId(dto.memberId, 'memberId');
+
+      log('📝 [updateCounselingSession] Actualizando sesión ID:', id);
+      const response = await this.request(`/counseling/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [updateCounselingSession] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateCounselingSession] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Marcar la sesión como COMPLETED y registrar las notas del pastor.
+   * PATCH /counseling/{id}/complete
+   * @param {number} id - ID de la sesión
+   * @param {Object} dto - CompleteSessionRequest
+   *   { notes, followUpRequired, followUpNotes, followUpDate (yyyy-MM-dd'T'HH:mm) }
+   */
+  async completeSession(id, dto) {
+    try {
+      validateId(id, 'sessionId');
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de completado inválidos');
+      if (!dto.notes || !dto.notes.trim()) throw new Error('Las notas son obligatorias para completar la sesión');
+
+      log('✅ [completeSession] Completando sesión ID:', id);
+      const response = await this.request(`/counseling/${id}/complete`, {
+        method: 'PATCH',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [completeSession] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [completeSession] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Cancelar la sesión indicando el motivo.
+   * PATCH /counseling/{id}/cancel
+   * @param {number} id - ID de la sesión
+   * @param {Object} dto - CancelSessionRequest { cancellationReason }
+   */
+  async cancelSession(id, dto) {
+    try {
+      validateId(id, 'sessionId');
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de cancelación inválidos');
+      validateString(dto.cancellationReason, 'cancellationReason', 3, 500);
+
+      log('❌ [cancelSession] Cancelando sesión ID:', id);
+      const response = await this.request(`/counseling/${id}/cancel`, {
+        method: 'PATCH',
+        body: JSON.stringify(dto),
+      });
+      log('✅ [cancelSession] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [cancelSession] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Marcar el miembro como NO_SHOW (no asistió a la sesión programada).
+   * PATCH /counseling/{id}/no-show
+   * @param {number} id - ID de la sesión
+   */
+  async markSessionNoShow(id) {
+    try {
+      validateId(id, 'sessionId');
+      log('👻 [markSessionNoShow] Marcando no-show sesión ID:', id);
+      const response = await this.request(`/counseling/${id}/no-show`, {
+        method: 'PATCH',
+      });
+      log('✅ [markSessionNoShow] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [markSessionNoShow] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 📄 INFORMES PDF DE CONSEJERÍAS ==========
+
+  /**
+   * Genera y descarga el PDF con el historial de consejerías de un miembro.
+   * GET /counseling/report/member/{memberId}
+   * @param {number} memberId
+   * @param {string} memberName - Nombre del miembro (solo para el nombre del archivo)
+   */
+  async downloadCounselingMemberHistoryPdf(memberId, memberName = '') {
+    try {
+      validateId(memberId, 'memberId');
+
+      log('📄 [downloadCounselingMemberHistoryPdf] Generando PDF historial miembro:', memberId);
+      const token = sessionStorage.getItem('token');
+      const url = `${API_BASE_URL}/counseling/report/member/${memberId}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.dispatchEvent(new CustomEvent('authTokenExpired'));
+        throw new Error('Sesión expirada');
+      }
+      if (!res.ok) throw new Error(`Error generando PDF historial: ${res.status}`);
+
+      const blob = await res.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      const safeName = memberName.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-]/g, '') || memberId;
+      link.download = `historial-consejeria-${safeName}.pdf`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      log('✅ [downloadCounselingMemberHistoryPdf] Descarga iniciada');
+    } catch (error) {
+      logError('❌ [downloadCounselingMemberHistoryPdf] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Genera y descarga el PDF con el informe de gestión del pastor (sesiones por mes/año).
+   * GET /counseling/report/management?year={year}
+   * @param {number} year - Año del informe (default: año actual)
+   */
+  async downloadCounselingManagementReportPdf(year = null) {
+    try {
+      const reportYear = year || new Date().getFullYear();
+      validateNumber(reportYear, 'year', 2000);
+
+      log('📊 [downloadCounselingManagementReportPdf] Generando informe gestión año:', reportYear);
+      const token = sessionStorage.getItem('token');
+      const url = `${API_BASE_URL}/counseling/report/management?year=${reportYear}`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.dispatchEvent(new CustomEvent('authTokenExpired'));
+        throw new Error('Sesión expirada');
+      }
+      if (!res.ok) throw new Error(`Error generando PDF de gestión: ${res.status}`);
+
+      const blob = await res.blob();
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `informe-gestion-consejerias-${reportYear}.pdf`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+
+      log('✅ [downloadCounselingManagementReportPdf] Descarga iniciada');
+    } catch (error) {
+      logError('❌ [downloadCounselingManagementReportPdf] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 🔔 RECORDATORIOS DE CONSEJERÍAS (admin/test) ==========
+
+  /**
+   * Fuerza el envío manual de recordatorios D-1 (día anterior).
+   * Útil para pruebas o recuperación de fallos del scheduler.
+   * POST /counseling/reminders/trigger-day-before
+   * Solo PASTORES.
+   */
+  async triggerCounselingDayBeforeReminders() {
+    try {
+      log('🔔 [triggerCounselingDayBeforeReminders] Forzando recordatorios D-1');
+      const response = await this.request('/counseling/reminders/trigger-day-before', {
+        method: 'POST',
+      });
+      log('✅ [triggerCounselingDayBeforeReminders] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [triggerCounselingDayBeforeReminders] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Fuerza el envío manual de recordatorios D-0 (día de la sesión).
+   * POST /counseling/reminders/trigger-day-of
+   * Solo PASTORES.
+   */
+  async triggerCounselingDayOfReminders() {
+    try {
+      log('🔔 [triggerCounselingDayOfReminders] Forzando recordatorios D-0');
+      const response = await this.request('/counseling/reminders/trigger-day-of', {
+        method: 'POST',
+      });
+      log('✅ [triggerCounselingDayOfReminders] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [triggerCounselingDayOfReminders] Error:', error.message);
+      throw error;
+    }
+  }
 
 // ============================================================
-// FIN DEL BLOQUE — recuerda cerrar la clase con  }  después
+// FIN DEL BLOQUE 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
 // ============================================================
 
 }
