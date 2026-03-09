@@ -143,12 +143,17 @@ const ModalAddActivity = ({
       newErrors.price = "El precio es demasiado alto";
     }
 
+    // ✅ Fix: parsear la fecha seleccionada como fecha LOCAL, no UTC
     if (!formData.endDate) {
       newErrors.endDate = "La fecha de finalización es requerida";
     } else {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      if (new Date(formData.endDate) < today) {
+
+      const [year, month, day] = formData.endDate.split("-").map(Number);
+      const selectedDate = new Date(year, month - 1, day); // local, sin UTC
+
+      if (selectedDate < today) {
         newErrors.endDate = "La fecha no puede ser anterior a hoy";
       }
     }

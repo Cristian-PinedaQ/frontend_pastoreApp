@@ -103,6 +103,23 @@ const ERROR_MESSAGES = {
   INVALID_ENROLLMENT: 'Cohorte no válida'
 };
 
+// ✅ FIX timezone: parsea "YYYY-MM-DD" como fecha LOCAL, no UTC
+const parseLocalDate = (dateString) => {
+  if (!dateString) return null;
+  const [year, month, day] = String(dateString).split("T")[0].split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const formatLocalDate = (dateString) => {
+  const date = parseLocalDate(dateString);
+  if (!date || isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("es-CO", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
 const EnrollmentsPage = () => {
 
   const [enrollments, setEnrollments] = useState([]);
@@ -1122,8 +1139,9 @@ const handleSubmit = async (e) => {
                 </div>
                 <div className="card-body">
                   <p><strong>Nivel:</strong> {getLevelLabel(enrollment.levelEnrollment || enrollment.level)}</p>
-                  <p><strong>Inicio:</strong> {new Date(enrollment.startDate).toLocaleDateString('es-CO')}</p>
-                  <p><strong>Fin:</strong> {new Date(enrollment.endDate).toLocaleDateString('es-CO')}</p>
+                  // ✅ Fix
+                  <p><strong>Inicio:</strong> {formatLocalDate(enrollment.startDate)}</p>
+                  <p><strong>Fin:</strong> {formatLocalDate(enrollment.endDate)}</p>
                   <p><strong>Estudiantes:</strong> {enrollment.maxStudents} máx</p>
                   {enrollment.teacher?.name && (
                     <p><strong>👨‍🏫 Maestro:</strong> {getDisplayName(enrollment.teacher.name)}</p>
@@ -1199,16 +1217,16 @@ const handleSubmit = async (e) => {
                     )}
                     <div>
                       <p className="detail-label">Inicio</p>
-                      <p className="detail-value">{new Date(selectedEnrollment.startDate).toLocaleDateString('es-CO')}</p>
+                      <p className="detail-value">{formatLocalDate(selectedEnrollment.startDate)}</p>
                     </div>
                     <div>
                       <p className="detail-label">Fin</p>
-                      <p className="detail-value">{new Date(selectedEnrollment.endDate).toLocaleDateString('es-CO')}</p>
+                      <p className="detail-value">{formatLocalDate(selectedEnrollment.endDate)}</p>
                     </div>
                     <div>
                       <p className="detail-label">Duración</p>
                       <p className="detail-value">
-                        {Math.ceil((new Date(selectedEnrollment.endDate) - new Date(selectedEnrollment.startDate)) / (1000 * 60 * 60 * 24))} días
+                        {Math.ceil((parseLocalDate(selectedEnrollment.endDate) - parseLocalDate(selectedEnrollment.startDate)) / (1000 * 60 * 60 * 24))} días
                       </p>
                     </div>
                     <div>
@@ -1294,7 +1312,7 @@ const handleSubmit = async (e) => {
                             {lesson.isMandatory && <span className="badge-mandatory">🔴 Obligatoria</span>}
                           </div>
                           <div className="lesson-info">
-                            <p>📅 {new Date(lesson.lessonDate).toLocaleDateString('es-CO')}</p>
+                            <p>📅 {formatLocalDate(lesson.lessonDate)}</p>
                             <p>⏱️ {lesson.durationMinutes} min</p>
                             <p>✅ {lesson.attendanceCount || 0} asistencias</p>
                           </div>
@@ -1321,7 +1339,7 @@ const handleSubmit = async (e) => {
                             </span>
                           </div>
                           <div className="student-info">
-                            <p>📅 Inscrito: {new Date(student.enrollmentDate).toLocaleDateString('es-CO')}</p>
+                            <p>📅 Inscrito: {formatLocalDate(student.enrollmentDate)}</p>
                             {student.finalAttendancePercentage !== undefined && student.finalAttendancePercentage !== null && (
                               <p>📊 Asistencia: {student.finalAttendancePercentage.toFixed(1)}%</p>
                             )}
@@ -1359,7 +1377,7 @@ const handleSubmit = async (e) => {
                             <span className="view-details-badge">👁️ Ver detalles</span>
                           </div>
                           <div className="attendance-info">
-                            <p>📅 {new Date(lesson.lessonDate).toLocaleDateString('es-CO')}</p>
+                            <p>📅 {formatLocalDate(lesson.lessonDate)}</p>
                             <p>✅ {lesson.attendanceCount || 0} registros</p>
                           </div>
                         </div>
