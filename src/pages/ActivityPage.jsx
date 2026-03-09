@@ -54,11 +54,12 @@ const validateAmount = (amount) => {
   return num;
 };
 
-// ✅ Formatear fecha
+// ✅ FIX: parsear como fecha local, sin conversión de zona horaria
 const formatDate = (dateString) => {
   try {
     if (!dateString) return "-";
-    const date = new Date(dateString);
+    const [year, month, day] = String(dateString).split("-").map(Number);
+    const date = new Date(year, month - 1, day); // local date, sin UTC
     if (isNaN(date.getTime())) return "-";
     return date.toLocaleDateString("es-CO", {
       year: "numeric",

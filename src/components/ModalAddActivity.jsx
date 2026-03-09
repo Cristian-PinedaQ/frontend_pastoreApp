@@ -42,11 +42,13 @@ const ModalAddActivity = ({
       setFormData({
         activityName: initialData.activityName || "",
         price: initialData.price || "",
+        // ✅ FIX: si ya viene como "YYYY-MM-DD" del backend, usarlo directo
         endDate: initialData.endDate
-          ? new Date(initialData.endDate).toISOString().split("T")[0]
+          ? String(initialData.endDate).split("T")[0] // toma solo la parte de fecha si viene con hora
           : "",
         quantity: initialData.quantity || "",
-        isActive: initialData.isActive !== undefined ? initialData.isActive : true,
+        isActive:
+          initialData.isActive !== undefined ? initialData.isActive : true,
         activityType: initialData.activityType || "STANDALONE",
         enrollmentId: initialData.enrollmentId || null,
         requiredLevel: initialData.requiredLevel || null,
@@ -75,49 +77,51 @@ const ModalAddActivity = ({
 
   // ── Función para cargar cohortes PENDING ─────────────────────────────────
   // ── Función para cargar cohortes PENDING ─────────────────────────────────
-const loadCohortsPending = async () => {
-  setLoadingCohorts(true);
-  try {
-    // ✅ Usar el método que llama a /enrollment/cohorts/findAll
-    //    NO getEnrollmentsCard() que es paginado
-    const data = await apiService.getEnrollments(); 
+  const loadCohortsPending = async () => {
+    setLoadingCohorts(true);
+    try {
+      // ✅ Usar el método que llama a /enrollment/cohorts/findAll
+      //    NO getEnrollmentsCard() que es paginado
+      const data = await apiService.getEnrollments();
 
-    console.log("📊 [loadCohortsPending] Cohortes recibidas:", data);
+      console.log("📊 [loadCohortsPending] Cohortes recibidas:", data);
 
-    if (!Array.isArray(data)) {
-      console.warn("⚠️ La respuesta no es un array:", data);
+      if (!Array.isArray(data)) {
+        console.warn("⚠️ La respuesta no es un array:", data);
+        setCohorts([]);
+        return;
+      }
+
+      // ✅ FILTRO: solo las que tienen status === 'PENDING'
+      const pendingCohorts = data
+        .filter((cohort) => {
+          const status = cohort.status;
+          console.log(
+            `  → ${cohort.cohortName} | status: ${status} | level: ${cohort.levelEnrollment}`,
+          );
+          return status === "PENDING";
+        })
+        .map((cohort) => ({
+          id: cohort.id,
+          cohortName: cohort.cohortName,
+          levelEnrollment: cohort.levelEnrollment,
+          label: `${cohort.cohortName} (${cohort.levelEnrollment})`,
+        }));
+
+      console.log(`✅ Cohortes PENDING disponibles: ${pendingCohorts.length}`);
+
+      if (pendingCohorts.length === 0) {
+        console.warn("⚠️ No hay cohortes con estado PENDING");
+      }
+
+      setCohorts(pendingCohorts);
+    } catch (error) {
+      console.error("❌ Error al cargar cohortes PENDING:", error);
       setCohorts([]);
-      return;
+    } finally {
+      setLoadingCohorts(false);
     }
-
-    // ✅ FILTRO: solo las que tienen status === 'PENDING'
-    const pendingCohorts = data
-      .filter((cohort) => {
-        const status = cohort.status;
-        console.log(`  → ${cohort.cohortName} | status: ${status} | level: ${cohort.levelEnrollment}`);
-        return status === "PENDING";
-      })
-      .map((cohort) => ({
-        id: cohort.id,
-        cohortName: cohort.cohortName,
-        levelEnrollment: cohort.levelEnrollment,
-        label: `${cohort.cohortName} (${cohort.levelEnrollment})`,
-      }));
-
-    console.log(`✅ Cohortes PENDING disponibles: ${pendingCohorts.length}`);
-
-    if (pendingCohorts.length === 0) {
-      console.warn("⚠️ No hay cohortes con estado PENDING");
-    }
-
-    setCohorts(pendingCohorts);
-  } catch (error) {
-    console.error("❌ Error al cargar cohortes PENDING:", error);
-    setCohorts([]);
-  } finally {
-    setLoadingCohorts(false);
-  }
-};
+  };
 
   // ── Validación ────────────────────────────────────────────────────────────
   const validateForm = () => {
@@ -195,69 +199,83 @@ const loadCohortsPending = async () => {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!validateForm()) return;
+    e.preventDefault();
+    if (!validateForm()) return;
 
-  setLoading(true);
-  try {
-    console.log("🔍 [Modal] formData completo:", JSON.stringify(formData, null, 2));
-    console.log("🔍 [Modal] cohorts disponibles:", cohorts);
+    setLoading(true);
+    try {
+      console.log(
+        "🔍 [Modal] formData completo:",
+        JSON.stringify(formData, null, 2),
+      );
+      console.log("🔍 [Modal] cohorts disponibles:", cohorts);
 
-    // Verificar que para ENROLLMENT, enrollmentId esté presente
-    if (formData.activityType === "ENROLLMENT") {
-      if (!formData.enrollmentId) {
-        throw new Error("Debe seleccionar una cohorte para actividades ENROLLMENT");
+      // Verificar que para ENROLLMENT, enrollmentId esté presente
+      if (formData.activityType === "ENROLLMENT") {
+        if (!formData.enrollmentId) {
+          throw new Error(
+            "Debe seleccionar una cohorte para actividades ENROLLMENT",
+          );
+        }
+        console.log("🔍 [Modal] enrollmentId existe:", formData.enrollmentId);
       }
-      console.log("🔍 [Modal] enrollmentId existe:", formData.enrollmentId);
+
+      // Crear el objeto base
+      const activityData = {
+        activityName: formData.activityName.trim(),
+        price: Number(formData.price),
+        endDate: formData.endDate,
+        quantity: formData.quantity ? Number(formData.quantity) : null,
+        isActive: formData.isActive,
+        activityType: formData.activityType,
+      };
+
+      // Para ENROLLMENT, AGREGAR enrollmentId
+      if (formData.activityType === "ENROLLMENT") {
+        activityData.enrollmentId = Number(formData.enrollmentId);
+
+        // Verificar que se agregó correctamente
+        console.log(
+          "✅ [Modal] enrollmentId agregado:",
+          activityData.enrollmentId,
+        );
+      }
+
+      // 🔴 LOG CRÍTICO: Ver el objeto final
+      console.log(
+        "📤 [Modal] OBJETO FINAL a enviar:",
+        JSON.stringify(activityData, null, 2),
+      );
+
+      // Verificar que enrollmentId está en el objeto
+      if (formData.activityType === "ENROLLMENT") {
+        console.log(
+          "🔍 [Modal] Verificación - activityData tiene enrollmentId:",
+          activityData.hasOwnProperty("enrollmentId"),
+        );
+        console.log(
+          "🔍 [Modal] Valor de enrollmentId en activityData:",
+          activityData.enrollmentId,
+        );
+      }
+
+      await onSave(activityData);
+      onClose();
+    } catch (error) {
+      console.error("❌ [Modal] Error:", error);
+      setErrors((prev) => ({
+        ...prev,
+        general: error.message || "Error al guardar la actividad",
+      }));
+    } finally {
+      setLoading(false);
     }
-
-    // Crear el objeto base
-    const activityData = {
-      activityName: formData.activityName.trim(),
-      price: Number(formData.price),
-      endDate: formData.endDate,
-      quantity: formData.quantity ? Number(formData.quantity) : null,
-      isActive: formData.isActive,
-      activityType: formData.activityType,
-    };
-
-    // Para ENROLLMENT, AGREGAR enrollmentId
-    if (formData.activityType === "ENROLLMENT") {
-      activityData.enrollmentId = Number(formData.enrollmentId);
-      
-      // Verificar que se agregó correctamente
-      console.log("✅ [Modal] enrollmentId agregado:", activityData.enrollmentId);
-    }
-
-    // 🔴 LOG CRÍTICO: Ver el objeto final
-    console.log("📤 [Modal] OBJETO FINAL a enviar:", JSON.stringify(activityData, null, 2));
-    
-    // Verificar que enrollmentId está en el objeto
-    if (formData.activityType === "ENROLLMENT") {
-      console.log("🔍 [Modal] Verificación - activityData tiene enrollmentId:", 
-                  activityData.hasOwnProperty('enrollmentId'));
-      console.log("🔍 [Modal] Valor de enrollmentId en activityData:", activityData.enrollmentId);
-    }
-
-    await onSave(activityData);
-    onClose();
-  } catch (error) {
-    console.error("❌ [Modal] Error:", error);
-    setErrors((prev) => ({
-      ...prev,
-      general: error.message || "Error al guardar la actividad",
-    }));
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const getMinDate = () => new Date().toISOString().split("T")[0];
 
   // Encontrar la cohorte seleccionada para mostrar info adicional
-  const selectedCohort = cohorts.find(
-    (c) => c.id === formData.enrollmentId
-  );
+  const selectedCohort = cohorts.find((c) => c.id === formData.enrollmentId);
 
   if (!isOpen) return null;
 
@@ -294,9 +312,7 @@ const loadCohortsPending = async () => {
               disabled={loading}
             >
               <option value="STANDALONE">🍃 Libre</option>
-              <option value="ENROLLMENT">
-                🪾 Vinculada a Raiz Viva
-              </option>
+              <option value="ENROLLMENT">🪾 Vinculada a Raiz Viva</option>
             </select>
             <div className="form-hint">
               {formData.activityType === "STANDALONE"
@@ -308,9 +324,7 @@ const loadCohortsPending = async () => {
           {/* ✅ Selector de cohorte PENDING */}
           {formData.activityType === "ENROLLMENT" && (
             <div className="form-group">
-              <label htmlFor="enrollmentId">
-                📚 Cohortes Pendientes *
-              </label>
+              <label htmlFor="enrollmentId">📚 Cohortes Pendientes *</label>
               <select
                 id="enrollmentId"
                 name="enrollmentId"
@@ -367,8 +381,9 @@ const loadCohortsPending = async () => {
 
               <div className="form-hint">
                 ℹ️ Solo se muestran cohortes con estado{" "}
-                <strong>PENDIENTE</strong>. Al pagar completamente esta actividad, el miembro
-                quedará habilitado para matricularse en la cohorte.
+                <strong>PENDIENTE</strong>. Al pagar completamente esta
+                actividad, el miembro quedará habilitado para matricularse en la
+                cohorte.
               </div>
             </div>
           )}
