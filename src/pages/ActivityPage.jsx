@@ -73,15 +73,24 @@ const formatDate = (dateString) => {
 };
 
 // ✅ Estado de actividad
+// ✅ Fix
 const getStatusLabel = (isActive, endDate) => {
   try {
     if (!isActive) return { text: "🔴 Inactiva", color: "danger" };
 
+    // Comparar solo por fecha, sin hora ni zona horaria
     const today = new Date();
-    const end = new Date(endDate);
+    today.setHours(0, 0, 0, 0);
+
+    const [year, month, day] = String(endDate)
+      .split("T")[0]
+      .split("-")
+      .map(Number);
+    const end = new Date(year, month - 1, day); // local, sin UTC
 
     if (isNaN(end.getTime())) return { text: "🟡 Activa", color: "warning" };
 
+    // end < today: solo días anteriores a hoy (hoy mismo NO es finalizada)
     if (end < today) return { text: "⚫ Finalizada", color: "dark" };
     if (end.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000) {
       return { text: "🟠 Por finalizar", color: "warning" };
@@ -403,16 +412,27 @@ const ActivityPage = () => {
         filtered = filtered.filter((activity) => {
           if (selectedStatus === "ACTIVE") return activity.isActive === true;
           if (selectedStatus === "INACTIVE") return activity.isActive === false;
+          // ✅ Fix
           if (selectedStatus === "ENDING_SOON") {
-            const endDate = new Date(activity.endDate);
+            const [y, m, d] = String(activity.endDate)
+              .split("T")[0]
+              .split("-")
+              .map(Number);
+            const end = new Date(y, m - 1, d);
             const today = new Date();
-            const daysLeft = (endDate - today) / (1000 * 60 * 60 * 24);
+            today.setHours(0, 0, 0, 0);
+            const daysLeft = (end - today) / (1000 * 60 * 60 * 24);
             return activity.isActive && daysLeft <= 7 && daysLeft >= 0;
           }
           if (selectedStatus === "FINISHED") {
-            const endDate = new Date(activity.endDate);
+            const [y, m, d] = String(activity.endDate)
+              .split("T")[0]
+              .split("-")
+              .map(Number);
+            const end = new Date(y, m - 1, d);
             const today = new Date();
-            return endDate < today;
+            today.setHours(0, 0, 0, 0);
+            return end < today; // hoy NO es finalizada, solo días anteriores
           }
           return true;
         });
