@@ -1139,7 +1139,6 @@ const handleSubmit = async (e) => {
                 </div>
                 <div className="card-body">
                   <p><strong>Nivel:</strong> {getLevelLabel(enrollment.levelEnrollment || enrollment.level)}</p>
-                  // ✅ Fix
                   <p><strong>Inicio:</strong> {formatLocalDate(enrollment.startDate)}</p>
                   <p><strong>Fin:</strong> {formatLocalDate(enrollment.endDate)}</p>
                   <p><strong>Estudiantes:</strong> {enrollment.maxStudents} máx</p>

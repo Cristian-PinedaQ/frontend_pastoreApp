@@ -2,6 +2,7 @@
 // ✅ INTEGRADO: nameHelper para transformación de nombres
 // ✅ CORREGIDO: useCallback y useEffect sin warnings
 // 🔐 AÑADIDO: prop readOnly para roles con solo GET
+// 🗑️ AÑADIDO: eliminación de participante (solo en actividades "Por finalizar")
 
 import React, { useState, useEffect, useCallback } from "react";
 import "../css/ModalActivityParticipants.css";
@@ -29,6 +30,27 @@ const ModalActivityParticipants = ({
   const [leaders, setLeaders] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+
+  // 🗑️ Estados para la eliminación de participantes
+  const [participantToDelete, setParticipantToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  // 🗑️ La actividad está "abierta" si isActive=true Y su fecha de fin no ha pasado
+  // (equivale a los estados "Activa" y "Por finalizar" de ActivityPage)
+  const isActivityOpen = (() => {
+    if (!activity?.isActive) return false;       // Inactiva → no
+    if (!activity?.endDate) return true;
+    const [y, m, d] = String(activity.endDate)
+      .split("T")[0].split("-").map(Number);
+    const end = new Date(y, m - 1, d);          // fecha local sin UTC
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return end >= today;                         // Finalizada → no; Activa/Por finalizar → sí
+  })();
+
+  // Puede eliminar si tiene permisos de escritura Y la actividad sigue abierta
+  const canDeleteParticipants = !readOnly && isActivityOpen;
 
   // ✅ DEFINIR loadParticipants CON useCallback ANTES del useEffect
   const loadParticipants = useCallback(async () => {
@@ -81,6 +103,67 @@ const ModalActivityParticipants = ({
       setShowFilters(false);
     }
   }, [isOpen, activity?.id, loadParticipants]);
+
+  // =====================================================
+  // 🗑️ LÓGICA DE ELIMINACIÓN DE PARTICIPANTE
+  // =====================================================
+
+  /** Abre el modal de confirmación para eliminar */
+  const handleDeleteClick = (e, participant) => {
+    // Evitar que el click propague al handleParticipantClick de la fila
+    e.stopPropagation();
+    setDeleteError(null);
+    setParticipantToDelete(participant);
+  };
+
+  /** Cancela la eliminación */
+  const handleCancelDelete = () => {
+    setParticipantToDelete(null);
+    setDeleteError(null);
+  };
+
+  /**
+   * Confirma y ejecuta la eliminación.
+   * El endpoint DELETE /activity-contribution/delete/{id} elimina la contribución.
+   * Si la entidad tiene cascade = CascadeType.ALL sobre los pagos, estos se borran
+   * automáticamente. De lo contrario, el backend debe eliminarlos primero
+   * (ver nota al final del archivo).
+   */
+  const handleConfirmDelete = async () => {
+    if (!participantToDelete) return;
+
+    const contributionId = participantToDelete.contributionId || participantToDelete.id;
+    setDeleting(true);
+    setDeleteError(null);
+
+    try {
+      await apiService.request(
+        `/activity-contribution/delete/${contributionId}`,
+        { method: "DELETE" }
+      );
+
+      // Quitar el participante de la lista local inmediatamente (optimistic update)
+      setParticipants((prev) =>
+        prev.filter(
+          (p) => (p.contributionId || p.id) !== contributionId
+        )
+      );
+
+      setParticipantToDelete(null);
+    } catch (error) {
+      console.error("❌ Error eliminando participante:", error);
+      // Mostrar mensaje de error dentro del modal de confirmación
+      const msg =
+        error?.response?.data?.error ||
+        error?.message ||
+        "Error al eliminar. Verifica que los pagos asociados puedan eliminarse.";
+      setDeleteError(msg);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // =====================================================
 
   const handleGeneratePDF = () => {
     try {
@@ -224,6 +307,12 @@ const ModalActivityParticipants = ({
                   {readOnly && (
                     <span className="readonly-badge-inline" title="Solo tienes permiso de consulta">
                       🔒 Solo lectura
+                    </span>
+                  )}
+                  {/* 🗑️ Indicador visible cuando se puede eliminar participantes */}
+                  {canDeleteParticipants && (
+                    <span className="finishing-badge-inline" title="Actividad abierta — puedes eliminar participantes">
+                      ✏️ Edición activa
                     </span>
                   )}
                 </div>
@@ -415,6 +504,8 @@ const ModalActivityParticipants = ({
                         <th>Pendiente</th>
                         <th>Cumpl.</th>
                         <th>Inscrito</th>
+                        {/* 🗑️ Columna de acciones solo visible cuando se puede eliminar */}
+                        {canDeleteParticipants && <th>Acción</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -509,6 +600,19 @@ const ModalActivityParticipants = ({
                                 : "-"}
                             </div>
                           </td>
+
+                          {/* 🗑️ Botón de eliminar — solo en actividades "Por finalizar" y con permisos */}
+                          {canDeleteParticipants && (
+                            <td onClick={(e) => e.stopPropagation()}>
+                              <button
+                                className="btn-delete-participant"
+                                onClick={(e) => handleDeleteClick(e, participant)}
+                                title={`Eliminar a ${participant.memberName || "participante"}${participant.totalPaid > 0 ? " (tiene pagos, también se eliminarán)" : ""}`}
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -543,7 +647,67 @@ const ModalActivityParticipants = ({
         />
       )}
 
-      {/* 🔐 Estilos del badge inline */}
+      {/* =====================================================
+          🗑️ MODAL DE CONFIRMACIÓN DE ELIMINACIÓN
+          ===================================================== */}
+      {participantToDelete && (
+        <div className="delete-confirm-overlay" onClick={handleCancelDelete}>
+          <div
+            className="delete-confirm-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="delete-confirm-icon">🗑️</div>
+
+            <h3 className="delete-confirm-title">
+              Eliminar participante
+            </h3>
+
+            <p className="delete-confirm-desc">
+              ¿Estás seguro de que deseas eliminar a{" "}
+              <strong>{participantToDelete.memberName || "este participante"}</strong>{" "}
+              de la actividad <strong>{activity.activityName}</strong>?
+            </p>
+
+            {/* Advertencia si tiene pagos registrados */}
+            {(participantToDelete.totalPaid || 0) > 0 && (
+              <div className="delete-confirm-warning">
+                ⚠️ Este participante tiene{" "}
+                <strong>
+                  ${participantToDelete.totalPaid.toLocaleString("es-CO")}
+                </strong>{" "}
+                en pagos registrados. Al eliminarlo, todos sus pagos también
+                serán eliminados permanentemente.
+              </div>
+            )}
+
+            {/* Error si la eliminación falla */}
+            {deleteError && (
+              <div className="delete-confirm-error">
+                ❌ {deleteError}
+              </div>
+            )}
+
+            <div className="delete-confirm-actions">
+              <button
+                className="btn-cancel-delete"
+                onClick={handleCancelDelete}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+              <button
+                className="btn-confirm-delete"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Eliminando..." : "Sí, eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔐 Estilos del badge inline + 🗑️ estilos de eliminación */}
       <style>{`
         .readonly-badge-inline {
           display: inline-flex;
@@ -557,6 +721,158 @@ const ModalActivityParticipants = ({
           color: #7d5a00;
           font-weight: 600;
           margin-left: 6px;
+        }
+
+        /* 🗑️ Badge "Por finalizar" */
+        .finishing-badge-inline {
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          padding: 2px 8px;
+          background: #fde8e8;
+          border: 1px solid #e07070;
+          border-radius: 20px;
+          font-size: 0.75em;
+          color: #8b1a1a;
+          font-weight: 600;
+          margin-left: 6px;
+        }
+
+        /* 🗑️ Botón eliminar en la fila */
+        .btn-delete-participant {
+          background: none;
+          border: 1px solid transparent;
+          border-radius: 6px;
+          padding: 4px 7px;
+          cursor: pointer;
+          font-size: 1em;
+          transition: background 0.15s, border-color 0.15s;
+          line-height: 1;
+        }
+        .btn-delete-participant:hover {
+          background: #fde8e8;
+          border-color: #e07070;
+        }
+
+        /* 🗑️ Overlay del modal de confirmación */
+        .delete-confirm-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.55);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1100;
+          animation: fadeIn 0.15s ease;
+        }
+
+        /* 🗑️ Caja del modal de confirmación */
+        .delete-confirm-modal {
+          background: #fff;
+          border-radius: 14px;
+          padding: 28px 32px 24px;
+          max-width: 420px;
+          width: 92%;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+          text-align: center;
+          animation: slideUp 0.2s ease;
+        }
+
+        .delete-confirm-icon {
+          font-size: 2.4em;
+          margin-bottom: 10px;
+        }
+
+        .delete-confirm-title {
+          font-size: 1.15em;
+          font-weight: 700;
+          color: #1a1a2e;
+          margin: 0 0 10px;
+        }
+
+        .delete-confirm-desc {
+          font-size: 0.93em;
+          color: #444;
+          margin: 0 0 14px;
+          line-height: 1.5;
+        }
+
+        /* Advertencia de pagos */
+        .delete-confirm-warning {
+          background: #fff7e6;
+          border: 1px solid #f0a500;
+          border-radius: 8px;
+          padding: 10px 14px;
+          font-size: 0.85em;
+          color: #7a4500;
+          margin-bottom: 14px;
+          text-align: left;
+          line-height: 1.5;
+        }
+
+        /* Error de eliminación */
+        .delete-confirm-error {
+          background: #fde8e8;
+          border: 1px solid #e07070;
+          border-radius: 8px;
+          padding: 10px 14px;
+          font-size: 0.85em;
+          color: #8b1a1a;
+          margin-bottom: 14px;
+          text-align: left;
+        }
+
+        /* Botones del modal de confirmación */
+        .delete-confirm-actions {
+          display: flex;
+          gap: 10px;
+          justify-content: center;
+        }
+
+        .btn-cancel-delete {
+          flex: 1;
+          padding: 9px 0;
+          border: 1.5px solid #ccc;
+          border-radius: 8px;
+          background: #fff;
+          color: #444;
+          font-size: 0.9em;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .btn-cancel-delete:hover:not(:disabled) {
+          background: #f0f0f0;
+        }
+
+        .btn-confirm-delete {
+          flex: 1;
+          padding: 9px 0;
+          border: none;
+          border-radius: 8px;
+          background: #c0392b;
+          color: #fff;
+          font-size: 0.9em;
+          font-weight: 700;
+          cursor: pointer;
+          transition: background 0.15s;
+        }
+        .btn-confirm-delete:hover:not(:disabled) {
+          background: #a93226;
+        }
+        .btn-confirm-delete:disabled,
+        .btn-cancel-delete:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
         }
       `}</style>
     </>
