@@ -8,6 +8,21 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import apiService from "../apiService";
 import "../css/ModalActivityDetails.css";
 
+// Después de los imports, antes de const ModalActivityDetails = ...
+
+// ✅ FIX timezone
+const parseLocalDate = (dateString) => {
+  if (!dateString) return null;
+  const [year, month, day] = String(dateString).split("T")[0].split("-").map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const formatLocalDate = (dateString) => {
+  const date = parseLocalDate(dateString);
+  if (!date || isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("es-CO");
+};
+
 const ModalActivityDetails = ({
   isOpen,
   onClose,
@@ -439,11 +454,12 @@ const ModalActivityDetails = ({
 
   // Calcular estadísticas
   const totalValue = (activity.price || 0) * (activity.quantity || 0);
+  // ✅ Fix
   const daysLeft = activity.endDate
     ? Math.ceil(
-        (new Date(activity.endDate) - new Date()) / (1000 * 60 * 60 * 24),
+        (parseLocalDate(activity.endDate) - new Date()) / (1000 * 60 * 60 * 24),
       )
-    : null;
+  : null;
 
   // Calcular miembros disponibles
   const enrolledCount = balance?.participantCount || 0;
@@ -525,9 +541,7 @@ const ModalActivityDetails = ({
                   <div className="detail-item">
                     <span className="detail-label">📅 Fecha de creación:</span>
                     <span className="detail-value">
-                      {new Date(activity.registrationDate).toLocaleDateString(
-                        "es-CO",
-                      )}
+                      {formatLocalDate(activity.registrationDate)}
                     </span>
                   </div>
                   <div className="detail-item">
@@ -535,7 +549,7 @@ const ModalActivityDetails = ({
                       📅 Fecha de finalización:
                     </span>
                     <span className="detail-value">
-                      {new Date(activity.endDate).toLocaleDateString("es-CO")}
+                      {formatLocalDate(activity.endDate)}
                       {daysLeft > 0 && (
                         <span className="days-left"> ({daysLeft} días)</span>
                       )}
