@@ -3246,6 +3246,8 @@ async createFinance(financeData) {
 // FIN DEL BLOQUE 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
 // ============================================================
 
+
+
 }
 
 const apiService = new ApiService();
