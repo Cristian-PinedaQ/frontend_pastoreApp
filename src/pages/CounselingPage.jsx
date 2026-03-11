@@ -4,6 +4,8 @@
 // ✅ Botones de acción dentro del modal de detalle
 // ✅ Tabla limpia sin columna de acciones
 // ✅ Tarjetas responsive en móvil
+// ✅ Estado IN_PROGRESS: iniciar sesión en tiempo real
+// ✅ Modal de sesión activa con contexto histórico del miembro
 // ============================================
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -18,11 +20,12 @@ const logError = (msg, err) => console.error(`[CounselingPage] ${msg}`, err);
 // CONSTANTES
 // ============================================================
 const COUNSELING_STATUS = {
-  SCHEDULED:   { label: "Programada",    color: "scheduled",   icon: "📅" },
-  COMPLETED:   { label: "Completada",    color: "completed",   icon: "✅" },
-  CANCELLED:   { label: "Cancelada",     color: "cancelled",   icon: "❌" },
-  NO_SHOW:     { label: "No asistió",    color: "noshow",      icon: "👻" },
-  RESCHEDULED: { label: "Reprogramada",  color: "rescheduled", icon: "🔄" },
+  SCHEDULED:    { label: "Programada",   color: "scheduled",    icon: "📅" },
+  RESCHEDULED:  { label: "Reprogramada", color: "rescheduled",  icon: "🔄" },
+  IN_PROGRESS:  { label: "En curso",     color: "inprogress",   icon: "▶️" },
+  COMPLETED:    { label: "Completada",   color: "completed",    icon: "✅" },
+  CANCELLED:    { label: "Cancelada",    color: "cancelled",    icon: "❌" },
+  NO_SHOW:      { label: "No asistió",   color: "noshow",       icon: "👻" },
 };
 
 const COUNSELING_TOPICS = {
@@ -69,7 +72,7 @@ const formatDateTime = (dt) => {
 
 const formatDate = (dt) => {
   if (!dt) return "-";
-  try { return new Date(dt).toLocaleDateString("es-CO"); }
+  try { return parseLocalDate(dt).toLocaleDateString("es-CO"); } // ✅
   catch { return dt; }
 };
 
@@ -78,8 +81,20 @@ const toLocalDatetimeInput = (iso) => {
   return iso.length >= 16 ? iso.slice(0, 16) : iso;
 };
 
+// Agregar esta función helper al inicio del archivo
+const parseLocalDate = (str) => {
+  if (!str) return null;
+  // Si es solo fecha "YYYY-MM-DD", parsear sin conversión UTC
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    const [y, m, d] = str.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  // Si ya trae hora/timezone, new Date es seguro
+  return new Date(str);
+};
+
 // ============================================================
-// MODAL: Agendar / Editar sesión
+// MODAL: Agendar / Editar sesión  (sin cambios)
 // ============================================================
 function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, isEditing }) {
   const [form, setForm] = useState(EMPTY_SESSION_FORM);
@@ -231,7 +246,7 @@ function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, i
 }
 
 // ============================================================
-// MODAL: Completar sesión
+// MODAL: Completar sesión  (sin cambios)
 // ============================================================
 function ModalCompleteSession({ isOpen, onClose, onSave, session }) {
   const [form, setForm] = useState(EMPTY_COMPLETE_FORM);
@@ -318,7 +333,7 @@ function ModalCompleteSession({ isOpen, onClose, onSave, session }) {
 }
 
 // ============================================================
-// MODAL: Cancelar sesión
+// MODAL: Cancelar sesión  (sin cambios)
 // ============================================================
 function ModalCancelSession({ isOpen, onClose, onSave, session }) {
   const [reason, setReason] = useState("");
@@ -370,13 +385,282 @@ function ModalCancelSession({ isOpen, onClose, onSave, session }) {
 }
 
 // ============================================================
-// MODAL: Detalle de sesión + Acciones integradas
+// MODAL: Sesión Activa (IN_PROGRESS) con contexto histórico  ← NUEVO
 // ============================================================
-function ModalSessionDetail({ isOpen, onClose, session, onEdit, onComplete, onCancel, onNoShow, onPdf }) {
+function ModalActiveSession({ isOpen, onClose, sessionData, onComplete, onCancel, onNoShow }) {
+  const [activeTab, setActiveTab] = useState("current");
+
+  useEffect(() => {
+    if (isOpen) setActiveTab("current");
+  }, [isOpen]);
+
+  if (!isOpen || !sessionData) return null;
+
+  const { activeSession, previousSessions = [], pendingFollowUps = [], memberStats, totalPreviousSessions } = sessionData;
+
+  const hasPrevious  = previousSessions.length > 0;
+  const hasFollowUps = pendingFollowUps.length > 0;
+
+  return (
+    <div className="cp-modal-overlay" onClick={onClose}>
+      <div className="cp-modal cp-modal--active-session" onClick={e => e.stopPropagation()}>
+
+        {/* Header — barra naranja de sesión en curso */}
+        <div className="cp-active-session-header">
+          <div className="cp-active-session-header__left">
+            <span className="cp-active-pulse" />
+            <div>
+              <span className="cp-active-session-label">SESIÓN EN CURSO</span>
+              <h2>{activeSession.memberName}</h2>
+              <span className="cp-active-session-meta">
+                {COUNSELING_TOPICS[activeSession.topic] || activeSession.topic}
+                {activeSession.location ? ` · 📍 ${activeSession.location}` : ""}
+                {activeSession.startedAt ? ` · Inició ${formatDateTime(activeSession.startedAt)}` : ""}
+              </span>
+            </div>
+          </div>
+          <button className="cp-modal__close cp-modal__close--light" onClick={onClose}>✕</button>
+        </div>
+
+        {/* Tabs de navegación */}
+        <div className="cp-active-tabs">
+          <button
+            className={`cp-active-tab ${activeTab === "current" ? "cp-active-tab--active" : ""}`}
+            onClick={() => setActiveTab("current")}
+          >
+            📋 Sesión actual
+          </button>
+          <button
+            className={`cp-active-tab ${activeTab === "history" ? "cp-active-tab--active" : ""}`}
+            onClick={() => setActiveTab("history")}
+          >
+            📂 Historial
+            {hasPrevious && <span className="cp-active-tab__badge">{totalPreviousSessions}</span>}
+          </button>
+          <button
+            className={`cp-active-tab ${activeTab === "followups" ? "cp-active-tab--active" : ""}`}
+            onClick={() => setActiveTab("followups")}
+          >
+            🔔 Seguimientos
+            {hasFollowUps && <span className="cp-active-tab__badge cp-active-tab__badge--warn">{pendingFollowUps.length}</span>}
+          </button>
+          <button
+            className={`cp-active-tab ${activeTab === "stats" ? "cp-active-tab--active" : ""}`}
+            onClick={() => setActiveTab("stats")}
+          >
+            📈 Estadísticas
+          </button>
+        </div>
+
+        <div className="cp-modal__body cp-active-body">
+
+          {/* ── TAB: Sesión actual ─────────────────────────────── */}
+          {activeTab === "current" && (
+            <div className="cp-active-tab-content">
+              <div className="cp-detail-grid">
+                <div className="cp-detail-section">
+                  <h3>👤 Miembro</h3>
+                  <div className="cp-detail-row"><span>Nombre</span><strong>{activeSession.memberName}</strong></div>
+                  <div className="cp-detail-row"><span>Documento</span><strong>{activeSession.memberDocument || "-"}</strong></div>
+                  <div className="cp-detail-row"><span>Teléfono</span><strong>{activeSession.memberPhone || "-"}</strong></div>
+                  <div className="cp-detail-row"><span>Email</span><strong>{activeSession.memberEmail || "-"}</strong></div>
+                </div>
+                <div className="cp-detail-section">
+                  <h3>📅 Esta sesión</h3>
+                  <div className="cp-detail-row"><span>Agendada</span><strong>{formatDateTime(activeSession.scheduledAt)}</strong></div>
+                  <div className="cp-detail-row"><span>Iniciada</span><strong>{formatDateTime(activeSession.startedAt)}</strong></div>
+                  <div className="cp-detail-row"><span>Duración est.</span><strong>{activeSession.durationMinutes} min</strong></div>
+                  <div className="cp-detail-row"><span>Sesión N°</span><strong>#{activeSession.sessionNumber}</strong></div>
+                </div>
+              </div>
+
+              {activeSession.objectives && (
+                <div className="cp-detail-section cp-detail-section--full">
+                  <h3>🎯 Objetivos de esta sesión</h3>
+                  <p className="cp-detail-text">{activeSession.objectives}</p>
+                </div>
+              )}
+
+              {/* Alerta si hay follow-ups vencidos */}
+              {pendingFollowUps.some(f => f.overdue) && (
+                <div className="cp-active-alert cp-active-alert--warn">
+                  ⚠️ <strong>{pendingFollowUps.filter(f => f.overdue).length} seguimiento(s) vencido(s)</strong> de sesiones anteriores.
+                  <button className="cp-active-alert__link" onClick={() => setActiveTab("followups")}>
+                    Ver →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TAB: Historial ─────────────────────────────────── */}
+          {activeTab === "history" && (
+            <div className="cp-active-tab-content">
+              {!hasPrevious ? (
+                <div className="cp-active-empty">
+                  <span>🕊️</span>
+                  <p>Esta es la primera sesión con este miembro.</p>
+                </div>
+              ) : (
+                <div className="cp-history-list">
+                  <p className="cp-history-intro">
+                    Últimas {previousSessions.length} de {totalPreviousSessions} sesión(es) completada(s) con este miembro:
+                  </p>
+                  {previousSessions.map((s, i) => (
+                    <div key={s.sessionId} className="cp-history-card">
+                      <div className="cp-history-card__header">
+                        <span className="cp-history-card__num">Sesión #{s.sessionNumber}</span>
+                        <span className="cp-history-card__date">{formatDate(s.scheduledAt)}</span>
+                        <span className="cp-topic-badge">{COUNSELING_TOPICS[s.topic] || s.topic}</span>
+                      </div>
+
+                      {s.objectives && (
+                        <div className="cp-history-card__block">
+                          <span className="cp-history-card__block-label">🎯 Objetivos</span>
+                          <p>{s.objectives}</p>
+                        </div>
+                      )}
+
+                      {s.notes ? (
+                        <div className="cp-history-card__block cp-history-card__block--notes">
+                          <span className="cp-history-card__block-label">📝 Notas del pastor</span>
+                          <p>{s.notes}</p>
+                        </div>
+                      ) : (
+                        <p className="cp-history-card__empty">Sin notas registradas.</p>
+                      )}
+
+                      {s.followUpRequired && s.followUpNotes && (
+                        <div className="cp-history-card__block cp-history-card__block--followup">
+                          <span className="cp-history-card__block-label">🔔 Seguimiento solicitado</span>
+                          <p>{s.followUpNotes}</p>
+                          {s.followUpDate && (
+                            <span className="cp-history-card__followup-date">
+                              Fecha: {formatDateTime(s.followUpDate)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TAB: Follow-ups ────────────────────────────────── */}
+          {activeTab === "followups" && (
+            <div className="cp-active-tab-content">
+              {!hasFollowUps ? (
+                <div className="cp-active-empty">
+                  <span>✅</span>
+                  <p>No hay seguimientos pendientes de sesiones anteriores.</p>
+                </div>
+              ) : (
+                <div className="cp-followup-list">
+                  {pendingFollowUps.map((fu, i) => (
+                    <div
+                      key={fu.originSessionId}
+                      className={`cp-followup-card ${fu.overdue ? "cp-followup-card--overdue" : ""}`}
+                    >
+                      <div className="cp-followup-card__header">
+                        <span className="cp-followup-card__origin">
+                          De sesión #{fu.originSessionNumber} · {formatDate(fu.originSessionDate)}
+                        </span>
+                        {fu.overdue && (
+                          <span className="cp-followup-card__overdue-badge">⚠️ Vencido</span>
+                        )}
+                      </div>
+                      <p className="cp-followup-card__notes">{fu.followUpNotes}</p>
+                      {fu.followUpDate && (
+                        <span className="cp-followup-card__date">
+                          📅 Fecha sugerida: {formatDateTime(fu.followUpDate)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TAB: Estadísticas ──────────────────────────────── */}
+          {activeTab === "stats" && (
+            <div className="cp-active-tab-content">
+              {!memberStats ? (
+                <div className="cp-active-empty"><span>📊</span><p>Sin estadísticas disponibles.</p></div>
+              ) : (
+                <div className="cp-stats-grid">
+                  <div className="cp-stat-card cp-stat-card--total">
+                    <span className="cp-stat-card__icon">📋</span>
+                    <span className="cp-stat-card__value">{memberStats.totalSessions}</span>
+                    <span className="cp-stat-card__label">Total sesiones</span>
+                  </div>
+                  <div className="cp-stat-card cp-stat-card--completed">
+                    <span className="cp-stat-card__icon">✅</span>
+                    <span className="cp-stat-card__value">{memberStats.completedSessions}</span>
+                    <span className="cp-stat-card__label">Completadas</span>
+                  </div>
+                  <div className="cp-stat-card cp-stat-card--cancelled">
+                    <span className="cp-stat-card__icon">❌</span>
+                    <span className="cp-stat-card__value">{memberStats.cancelledSessions}</span>
+                    <span className="cp-stat-card__label">Canceladas</span>
+                  </div>
+                  <div className="cp-stat-card cp-stat-card--noshow">
+                    <span className="cp-stat-card__icon">👻</span>
+                    <span className="cp-stat-card__value">{memberStats.noShowSessions}</span>
+                    <span className="cp-stat-card__label">No asistió</span>
+                  </div>
+                  <div className="cp-stat-card cp-stat-card--rate">
+                    <span className="cp-stat-card__icon">📈</span>
+                    <span className="cp-stat-card__value">{memberStats.completionRate}%</span>
+                    <span className="cp-stat-card__label">Tasa completadas</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer de acciones */}
+        <div className="cp-modal__footer cp-modal__footer--active">
+          <button className="cp-btn cp-btn--ghost" onClick={onClose}>
+            Minimizar
+          </button>
+          <div className="cp-modal__footer-spacer" />
+          <button
+            className="cp-btn cp-btn--noshow"
+            onClick={() => { onNoShow(activeSession); onClose(); }}
+          >
+            👻 No asistió
+          </button>
+          <button
+            className="cp-btn cp-btn--danger"
+            onClick={() => { onCancel(activeSession); onClose(); }}
+          >
+            ❌ Cancelar
+          </button>
+          <button
+            className="cp-btn cp-btn--complete"
+            onClick={() => { onComplete(activeSession); onClose(); }}
+          >
+            ✅ Completar sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MODAL: Detalle de sesión + Acciones integradas  (actualizado)
+// ============================================================
+function ModalSessionDetail({ isOpen, onClose, session, onEdit, onComplete, onCancel, onNoShow, onPdf, onStart }) {
   if (!isOpen || !session) return null;
 
-  const status = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
+  const status   = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
   const isActive = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
+  const isOngoing = session.status === "IN_PROGRESS";
 
   return (
     <div className="cp-modal-overlay" onClick={onClose}>
@@ -418,6 +702,9 @@ function ModalSessionDetail({ isOpen, onClose, session, onEdit, onComplete, onCa
               <div className="cp-detail-row"><span>Duración</span><strong>{session.durationMinutes} min</strong></div>
               <div className="cp-detail-row"><span>Lugar</span><strong>{session.location || "-"}</strong></div>
               <div className="cp-detail-row"><span>Tema</span><strong>{COUNSELING_TOPICS[session.topic] || session.topic}</strong></div>
+              {session.startedAt && (
+                <div className="cp-detail-row"><span>Iniciada</span><strong>{formatDateTime(session.startedAt)}</strong></div>
+              )}
             </div>
           </div>
 
@@ -469,7 +756,7 @@ function ModalSessionDetail({ isOpen, onClose, session, onEdit, onComplete, onCa
         {/* Footer con acciones */}
         <div className="cp-modal__footer cp-modal__footer--actions">
 
-          {/* Acción siempre disponible: PDF */}
+          {/* PDF siempre disponible */}
           <button
             className="cp-btn cp-btn--report"
             onClick={() => { onPdf(session); onClose(); }}
@@ -480,14 +767,30 @@ function ModalSessionDetail({ isOpen, onClose, session, onEdit, onComplete, onCa
 
           <div className="cp-modal__footer-spacer" />
 
-          {/* Cerrar */}
           <button className="cp-btn cp-btn--ghost" onClick={onClose}>
             Cerrar
           </button>
 
-          {/* Acciones solo si sesión activa */}
+          {/* Sesión EN CURSO: solo mostrar botón para abrir la vista activa */}
+          {isOngoing && (
+            <button
+              className="cp-btn cp-btn--inprogress"
+              onClick={() => { onStart(session); onClose(); }}
+            >
+              ▶️ Ver sesión en curso
+            </button>
+          )}
+
+          {/* Sesión PROGRAMADA: editar, completar, no-show, cancelar */}
           {isActive && (
             <>
+              <button
+                className="cp-btn cp-btn--start"
+                onClick={() => { onStart(session); onClose(); }}
+                title="Iniciar sesión ahora"
+              >
+                ▶️ Iniciar sesión
+              </button>
               <button
                 className="cp-btn cp-btn--edit"
                 onClick={() => { onEdit(session); onClose(); }}
@@ -544,7 +847,9 @@ const CounselingPage = () => {
   const [showComplete, setShowComplete]     = useState(false);
   const [showCancel, setShowCancel]         = useState(false);
   const [showDetail, setShowDetail]         = useState(false);
+  const [showActive, setShowActive]         = useState(false);   // ← NUEVO
   const [activeSession, setActiveSession]   = useState(null);
+  const [activeSessionData, setActiveSessionData] = useState(null); // ← NUEVO: datos de startSession
   const [isEditing, setIsEditing]           = useState(false);
 
   const opInProgress = useRef(false);
@@ -628,6 +933,98 @@ const CounselingPage = () => {
     setShowCancel(true);
   }, []);
 
+  // ── INICIAR SESIÓN ← NUEVO ─────────────────────────────────
+  /**
+   * Llama a PATCH /{id}/start y abre el modal de sesión activa
+   * con el contexto histórico que devuelve el backend.
+   *
+   * Si la sesión ya está IN_PROGRESS (se reabre desde el detalle),
+   * no vuelve a llamar al backend: solo abre el modal con los datos
+   * que ya tenemos.
+   */
+  const handleStartSession = useCallback(async (session) => {
+    if (opInProgress.current) return;
+
+    // Si la sesión ya está en curso, abrir el modal directamente
+    // con datos mínimos (sin historial — el historial se cargó al iniciar).
+    // Para tener historial completo, igual llamamos al endpoint de historial.
+    if (session.status === "IN_PROGRESS") {
+      opInProgress.current = true;
+      try {
+        // Cargar historial del miembro para reconstruir el contexto
+        const historyRaw = await apiService.request(`/counseling/member/${session.memberId}/history`);
+        const currentId = session.id;
+        const previousSessions = (Array.isArray(historyRaw) ? historyRaw : [])
+          .filter(s => s.id !== currentId && s.status === "COMPLETED")
+          .slice(0, 5)
+          .map(s => ({
+            sessionId:       s.id,
+            sessionNumber:   s.sessionNumber,
+            scheduledAt:     s.scheduledAt,
+            startedAt:       s.startedAt,
+            topic:           s.topic,
+            topicDisplayName: COUNSELING_TOPICS[s.topic] || s.topic,
+            status:          s.status,
+            statusDisplayName: COUNSELING_STATUS[s.status]?.label || s.status,
+            objectives:      s.objectives,
+            notes:           s.notes,
+            followUpRequired: s.followUpRequired,
+            followUpNotes:   s.followUpNotes,
+            followUpDate:    s.followUpDate,
+          }));
+
+        const pendingFollowUps = previousSessions
+          .filter(s => s.followUpRequired && s.followUpNotes)
+          .map(s => ({
+            originSessionId:     s.sessionId,
+            originSessionNumber: s.sessionNumber,
+            originSessionDate:   s.scheduledAt,
+            followUpNotes:       s.followUpNotes,
+            followUpDate:        s.followUpDate,
+            overdue:             s.followUpDate && parseLocalDate(s.followUpDate) < new Date(),
+          }));
+
+        setActiveSessionData({
+          activeSession:        session,
+          totalPreviousSessions: previousSessions.length,
+          previousSessions,
+          pendingFollowUps,
+          memberStats: null,
+        });
+        setShowActive(true);
+      } catch (err) {
+        logError("Error cargando historial para sesión en curso:", err);
+        // Aun así abrimos el modal con datos básicos
+        setActiveSessionData({ activeSession: session, previousSessions: [], pendingFollowUps: [], memberStats: null, totalPreviousSessions: 0 });
+        setShowActive(true);
+      } finally {
+        opInProgress.current = false;
+      }
+      return;
+    }
+
+    // Si está SCHEDULED o RESCHEDULED → llamar al endpoint /start
+    if (session.status !== "SCHEDULED" && session.status !== "RESCHEDULED") return;
+
+    opInProgress.current = true;
+    try {
+      log("Iniciando sesión:", session.id);
+      const data = await apiService.request(`/counseling/${session.id}/start`, { method: "PATCH" });
+      // data es un StartSessionResponse
+      setActiveSessionData(data);
+      setShowActive(true);
+      // Actualizar la lista para reflejar IN_PROGRESS
+      await loadSessions();
+    } catch (err) {
+      logError("Error iniciando sesión:", err);
+      const msg = err.message || "Error al iniciar la sesión";
+      setError(msg);
+      alert(`❌ ${msg}`);
+    } finally {
+      opInProgress.current = false;
+    }
+  }, [loadSessions]);
+
   // ── CRUD ───────────────────────────────────────────────────
   const handleSaveSession = useCallback(async (formData) => {
     if (opInProgress.current) return;
@@ -660,7 +1057,9 @@ const CounselingPage = () => {
       await apiService.request(`/counseling/${activeSession.id}/complete`, { method: "PATCH", body: JSON.stringify(formData) });
       alert("✅ Sesión marcada como completada");
       setShowComplete(false);
+      setShowActive(false);
       setActiveSession(null);
+      setActiveSessionData(null);
       opInProgress.current = false;
       await loadSessions();
     } catch (err) {
@@ -676,7 +1075,9 @@ const CounselingPage = () => {
       await apiService.request(`/counseling/${activeSession.id}/cancel`, { method: "PATCH", body: JSON.stringify(formData) });
       alert("✅ Sesión cancelada");
       setShowCancel(false);
+      setShowActive(false);
       setActiveSession(null);
+      setActiveSessionData(null);
       opInProgress.current = false;
       await loadSessions();
     } catch (err) {
@@ -692,6 +1093,8 @@ const CounselingPage = () => {
     try {
       await apiService.request(`/counseling/${session.id}/no-show`, { method: "PATCH" });
       alert("✅ Sesión marcada como No Asistió");
+      setShowActive(false);
+      setActiveSessionData(null);
       opInProgress.current = false;
       await loadSessions();
     } catch (err) {
@@ -750,6 +1153,7 @@ const CounselingPage = () => {
   const stats = {
     total:          sessions.length,
     scheduled:      sessions.filter(s => s.status === "SCHEDULED" || s.status === "RESCHEDULED").length,
+    inProgress:     sessions.filter(s => s.status === "IN_PROGRESS").length,
     completed:      sessions.filter(s => s.status === "COMPLETED").length,
     cancelled:      sessions.filter(s => s.status === "CANCELLED").length,
     noShow:         sessions.filter(s => s.status === "NO_SHOW").length,
@@ -795,6 +1199,16 @@ const CounselingPage = () => {
               <span className="cp-stat__label">Programadas</span>
             </div>
           </div>
+          {/* Tarjeta de sesiones EN CURSO — solo visible si hay alguna */}
+          {stats.inProgress > 0 && (
+            <div className="cp-stat cp-stat--inprogress">
+              <span className="cp-stat__icon">▶️</span>
+              <div>
+                <span className="cp-stat__value">{stats.inProgress}</span>
+                <span className="cp-stat__label">En curso</span>
+              </div>
+            </div>
+          )}
           <div className="cp-stat cp-stat--completed">
             <span className="cp-stat__icon">✅</span>
             <div>
@@ -916,15 +1330,16 @@ const CounselingPage = () => {
                 </thead>
                 <tbody>
                   {filtered.map(session => {
-                    const status = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
-                    const isActive = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
+                    const status   = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
+                    const isActive  = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
+                    const isOngoing = session.status === "IN_PROGRESS";
 
                     return (
                       <tr
                         key={session.id}
-                        className={`cp-table__row cp-table__row--${status.color} cp-table__row--clickable`}
+                        className={`cp-table__row cp-table__row--${status.color} cp-table__row--clickable${isOngoing ? " cp-table__row--ongoing" : ""}`}
                         onClick={() => openDetail(session)}
-                        title="Toca para ver detalle y acciones"
+                        title={isOngoing ? "Sesión en curso — toca para ver" : "Toca para ver detalle y acciones"}
                       >
                         <td>
                           <span className="cp-session-number">#{session.sessionNumber}</span>
@@ -934,7 +1349,12 @@ const CounselingPage = () => {
                           <div className="cp-member-cell">
                             <div className="cp-member-avatar-wrap">
                               <span className="cp-member-avatar">👤</span>
-                              {isActive && <span className="cp-member-active-dot" title="Sesión activa" />}
+                              {(isActive || isOngoing) && (
+                                <span
+                                  className={`cp-member-active-dot${isOngoing ? " cp-member-active-dot--ongoing" : ""}`}
+                                  title={isOngoing ? "En curso" : "Sesión activa"}
+                                />
+                              )}
                             </div>
                             <div className="cp-member-cell__info">
                               <span className="cp-member-cell__name">{session.memberName}</span>
@@ -985,13 +1405,14 @@ const CounselingPage = () => {
             {/* ─── TARJETAS (móvil) ────────────────────────────── */}
             <div className="cp-cards cp-cards--mobile">
               {filtered.map(session => {
-                const status = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
-                const isActive = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
+                const status   = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
+                const isActive  = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
+                const isOngoing = session.status === "IN_PROGRESS";
 
                 return (
                   <div
                     key={session.id}
-                    className={`cp-card cp-card--${status.color}`}
+                    className={`cp-card cp-card--${status.color}${isOngoing ? " cp-card--ongoing" : ""}`}
                     onClick={() => openDetail(session)}
                   >
                     {/* Card header */}
@@ -1036,7 +1457,11 @@ const CounselingPage = () => {
                         <span className="cp-card__followup">🔔 Seguimiento pendiente</span>
                       )}
                       <span className="cp-card__tap-hint">
-                        {isActive ? "Toca para ver detalles y acciones →" : "Toca para ver detalles →"}
+                        {isOngoing
+                          ? "Sesión en curso — toca para ver →"
+                          : isActive
+                            ? "Toca para ver detalles y acciones →"
+                            : "Toca para ver detalles →"}
                       </span>
                     </div>
                   </div>
@@ -1047,7 +1472,7 @@ const CounselingPage = () => {
         )}
       </div>
 
-      {/* MODALES */}
+      {/* ── MODALES ────────────────────────────────────────────── */}
       <ModalScheduleSession
         isOpen={showSchedule}
         onClose={() => { setShowSchedule(false); setActiveSession(null); setIsEditing(false); }}
@@ -1077,6 +1502,16 @@ const CounselingPage = () => {
         onCancel={handleOpenCancel}
         onNoShow={handleNoShow}
         onPdf={handleMemberHistoryPdf}
+        onStart={handleStartSession}
+      />
+      {/* Modal de sesión activa — solo cuando hay datos de start */}
+      <ModalActiveSession
+        isOpen={showActive}
+        onClose={() => setShowActive(false)}
+        sessionData={activeSessionData}
+        onComplete={(s) => { setActiveSession(s); setShowComplete(true); }}
+        onCancel={(s)   => { setActiveSession(s); setShowCancel(true);   }}
+        onNoShow={handleNoShow}
       />
     </div>
   );

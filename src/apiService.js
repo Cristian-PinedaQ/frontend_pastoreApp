@@ -5,9 +5,9 @@
 // ✅ Export con nombre (ESLint compliance)
 
 //Produccion
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
+//const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 //desarrollo
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -161,7 +161,9 @@ class ApiService {
   throw enhancedError; // Lanzar el error enriquecido
 }
 
-    const data = await response.json();
+    const contentType = response.headers.get('content-type');
+    const hasBody = contentType && contentType.includes('application/json');
+    const data = hasBody ? await response.json() : null;
     log('✅ [request] Exitoso');
     return data;
 
@@ -2271,7 +2273,7 @@ async createFinance(financeData) {
   /**
    * Conteo de notificaciones sin leer de un usuario.
    * GET /notifications/user/{userId}/unread-count
-   * Requiere rol: PASTORES  (según NotificationController)
+   * Requiere rol: PASTORES, ESENCIA, CONEXION, DESPLIEGUE, LIDER  (según NotificationController)
    * Retorna: { unreadCount: number }
    */
   async getUnreadNotificationCount(userId) {
@@ -3114,6 +3116,39 @@ async createFinance(financeData) {
       return response;
     } catch (error) {
       logError('❌ [markSessionNoShow] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ── Agrega este método dentro del bloque 🕊️ MÓDULO DE CONSEJERÍAS,
+  // justo después de updateCounselingSession() y antes de completeSession() ──
+
+  /**
+   * Inicia una sesión en tiempo real (SCHEDULED/RESCHEDULED → IN_PROGRESS).
+   * Devuelve StartSessionResponse con la sesión activa + contexto histórico completo del miembro:
+   *   - previousSessions: últimas 5 sesiones completadas con notas y follow-ups
+   *   - pendingFollowUps: seguimientos pendientes de sesiones anteriores
+   *   - memberStats: estadísticas del miembro con este pastor
+   *
+   * PATCH /counseling/{id}/start
+   * @param {number} id - ID de la sesión a iniciar
+   * @returns {StartSessionResponse}
+   */
+  async startCounselingSession(id) {
+    try {
+      validateId(id, 'sessionId');
+      log('▶️ [startCounselingSession] Iniciando sesión ID:', id);
+      const response = await this.request(`/counseling/${id}/start`, {
+        method: 'PATCH',
+      });
+      log('✅ [startCounselingSession] Sesión en curso -',
+        response?.activeSession?.id,
+        '| Sesiones previas:', response?.totalPreviousSessions || 0,
+        '| Follow-ups pendientes:', response?.pendingFollowUps?.length || 0
+      );
+      return response;
+    } catch (error) {
+      logError('❌ [startCounselingSession] Error:', error.message);
       throw error;
     }
   }
