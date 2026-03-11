@@ -12,6 +12,7 @@ import ModalCreateLesson from '../components/ModalCreateLesson';
 import ModalRecordAttendance from '../components/ModalRecordAttendance';
 import ModalLessonAttendanceDetail from '../components/ModalLessonAttendanceDetail';
 import nameHelper from '../services/nameHelper'; // ✅ Importar el helper
+import { useAuth } from '../context/AuthContext'; // ✅ Filtrado de niveles por rol
 import '../css/EnrollmentsPage.css';
 
 // Extraer funciones del helper
@@ -66,7 +67,8 @@ const isValidScore = (score) => {
 };
 
 // ✅ Constantes fuera del componente para evitar problemas de dependencias
-const LEVELS = [
+// Lista maestra con TODOS los niveles del sistema
+const ALL_LEVELS = [
   { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
   { value: 'ENCUENTRO', label: 'Encuentro' },
   { value: 'POST_ENCUENTRO', label: 'Post-encuentro' },
@@ -79,6 +81,54 @@ const LEVELS = [
   { value: 'ADIESTRAMIENTO', label: 'Adiestramiento' },
   { value: 'GRADUACION', label: 'Graduación' },
 ];
+
+
+// ✅ Roles con acceso total (GET + POST + PATCH + DELETE) — ven todos los niveles
+const FULL_ACCESS_ROLES = ['ROLE_PASTORES'];
+
+// ✅ Mapeo de roles restringidos → LevelEnrollments que pueden (GET + POST + PATCH + DELETE)
+const ROLE_LEVEL_MAP = {
+  ROLE_CONEXION: ['PREENCUENTRO'],
+  ROLE_CIMIENTO: ['ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS'],
+  ROLE_ESENCIA: [
+    'ESENCIA_1',
+    'ESENCIA_2',
+    'ESENCIA_3',
+    'SANIDAD_INTEGRAL_RAICES',
+    'ESENCIA_4',
+    'ADIESTRAMIENTO',
+    'GRADUACION',
+  ],
+};
+
+// ════════════════════════════════════════════════════
+// ✅ HOOK: Obtener niveles permitidos según el rol
+// Usa FULL_ACCESS_ROLES y ROLE_LEVEL_MAP para determinar el scope
+// ════════════════════════════════════════════════════
+const useAllowedLevels = () => {
+  const { hasRole } = useAuth();
+
+  // Roles con acceso total ven todos los niveles sin restricción
+  const hasFullAccess = FULL_ACCESS_ROLES.some(role => hasRole(role));
+  if (hasFullAccess) {
+    return ALL_LEVELS;
+  }
+
+  // Roles restringidos: acumular niveles de cada rol que posea el usuario
+  const allowedValues = new Set();
+  Object.entries(ROLE_LEVEL_MAP).forEach(([role, levels]) => {
+    if (hasRole(role)) {
+      levels.forEach(l => allowedValues.add(l));
+    }
+  });
+
+  // Fallback: si no matchea ningún rol, el backend controla el acceso real
+  if (allowedValues.size === 0) {
+    return ALL_LEVELS;
+  }
+
+  return ALL_LEVELS.filter(l => allowedValues.has(l.value));
+};
 
 const STATUSES = [
   { value: 'ACTIVE', label: 'Activa' },
@@ -121,6 +171,9 @@ const formatLocalDate = (dateString) => {
 };
 
 const EnrollmentsPage = () => {
+
+  // ✅ Niveles filtrados según el rol del usuario autenticado
+  const LEVELS = useAllowedLevels();
 
   const [enrollments, setEnrollments] = useState([]);
   const [filteredEnrollments, setFilteredEnrollments] = useState([]);
@@ -246,7 +299,7 @@ const EnrollmentsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterLevel, filterStatus, handleError]);
+  }, [filterLevel, filterStatus, handleError, LEVELS]);
 
   useEffect(() => {
     fetchEnrollments();
@@ -430,41 +483,41 @@ const EnrollmentsPage = () => {
     }
   }, [activeTab, showEnrollmentModal, selectedEnrollment, loadTabData]);
 
-  const applyFilters = (data, level, status) => {
-    try {
-      log('Aplicando filtros', { level, status });
+  const applyFilters = useCallback((data, level, status) => {
+  try {
+    log('Aplicando filtros', { level, status });
 
-      let filtered = data;
+    let filtered = data;
 
-      if (level && level.trim() !== '') {
-        if (!isValidLevel(level, LEVELS)) {
-          handleError('VALIDATION_ERROR', 'invalid_level');
-          setFilteredEnrollments([]);
-          return;
-        }
-
-        filtered = filtered.filter(e => {
-          const enrollmentLevel = e.levelEnrollment || e.level;
-          return enrollmentLevel === level;
-        });
+    if (level && level.trim() !== '') {
+      if (!isValidLevel(level, LEVELS)) {
+        handleError('VALIDATION_ERROR', 'invalid_level');
+        setFilteredEnrollments([]);
+        return;
       }
 
-      if (status && status.trim() !== '') {
-        if (!isValidStatus(status, STATUSES)) {
-          handleError('VALIDATION_ERROR', 'invalid_status');
-          setFilteredEnrollments([]);
-          return;
-        }
-
-        filtered = filtered.filter(e => e.status === status);
-      }
-
-      setFilteredEnrollments(filtered);
-    } catch (error) {
-      logError('Error aplicando filtros:', error);
-      setFilteredEnrollments(data);
+      filtered = filtered.filter(e => {
+        const enrollmentLevel = e.levelEnrollment || e.level;
+        return enrollmentLevel === level;
+      });
     }
-  };
+
+    if (status && status.trim() !== '') {
+      if (!isValidStatus(status, STATUSES)) {
+        handleError('VALIDATION_ERROR', 'invalid_status');
+        setFilteredEnrollments([]);
+        return;
+      }
+
+      filtered = filtered.filter(e => e.status === status);
+    }
+
+    setFilteredEnrollments(filtered);
+  } catch (error) {
+    logError('Error aplicando filtros:', error);
+    setFilteredEnrollments(data);
+  }
+}, [LEVELS, handleError]);
 
   const handleFilterChange = (type, value) => {
     try {
@@ -887,7 +940,8 @@ const handleSubmit = async (e) => {
 
   const getLevelLabel = (levelValue) => {
     if (!levelValue) return '—';
-    return LEVELS.find(l => l.value === levelValue)?.label || levelValue;
+    // Usa ALL_LEVELS para resolver labels aunque el nivel esté fuera del scope del rol
+    return ALL_LEVELS.find(l => l.value === levelValue)?.label || levelValue;
   };
 
   const getStatusLabel = (statusValue) => {

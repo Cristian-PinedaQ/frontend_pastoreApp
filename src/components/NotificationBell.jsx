@@ -1,13 +1,47 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import apiService from "../apiService"; // ← ajusta la ruta si es diferente
 import "../css/NotificationBell.css";
 
 // ── Mapeo tipo → ícono / color ────────────────────────────────────────────────
+// Sincronizado con el enum NotificationType.java del backend.
 const TYPE_CONFIG = {
-  SYSTEM_MESSAGE: { icon: "⚙️", label: "Sistema", color: "#6366f1" },
-  ACTIVITY: { icon: "📅", label: "Actividad", color: "#f59e0b" },
-  PAYMENT: { icon: "💵", label: "Pago", color: "#10b981" },
-  REMINDER: { icon: "⏰", label: "Recordatorio", color: "#ef4444" },
+  // ── Liderazgo ──────────────────────────────────────────────────────────────
+  LEADER_PROMOTION:    { icon: "🌟", label: "Promoción",    color: "#f59e0b" },
+  LEADER_SUSPENSION:   { icon: "⏸️", label: "Suspensión",   color: "#ef4444" },
+  LEADER_REACTIVATION: { icon: "▶️", label: "Reactivación", color: "#10b981" },
+  LEADER_DEACTIVATION: { icon: "⏹️", label: "Baja",         color: "#6b7280" },
+  LEADER_VERIFICATION: { icon: "✅", label: "Verificación", color: "#3b82f6" },
+
+  // Alertas de asistencia (2 faltas = alerta, 3+ = suspensión automática)
+  ATTENDANCE_ALERT:      { icon: "⚠️", label: "Alerta Asist.", color: "#f59e0b" },
+  ATTENDANCE_SUSPENSION: { icon: "🚫", label: "Susp. Asist.",  color: "#ef4444" },
+
+  // ── Finanzas ───────────────────────────────────────────────────────────────
+  TITHE_CONFIRMATION: { icon: "💵", label: "Diezmo",    color: "#10b981" },
+
+  // ── Membresía ──────────────────────────────────────────────────────────────
+  MEMBER_UPDATE: { icon: "👤", label: "Miembro", color: "#8b5cf6" },
+
+  // ── Células y ofrendas ─────────────────────────────────────────────────────
+  CELL_SUSPENSION: { icon: "🏘️", label: "Célula susp.", color: "#ef4444" },
+  CELL_COMPLIANT:  { icon: "🏡", label: "Célula OK",    color: "#10b981" },
+
+  // ── Solicitudes de reinicio de contador ────────────────────────────────────
+  RESET_REQUEST:  { icon: "🔄", label: "Solicitud",  color: "#3b82f6" },
+  RESET_RESPONSE: { icon: "📩", label: "Respuesta",  color: "#8b5cf6" },
+
+  // ── Consejerías ────────────────────────────────────────────────────────────
+  COUNSELING_SCHEDULED: { icon: "📅", label: "Consejería",   color: "#3b82f6" },
+  COUNSELING_REMINDER:  { icon: "⏰", label: "Recordatorio", color: "#f59e0b" },
+  COUNSELING_COMPLETED: { icon: "✅", label: "Completada",   color: "#10b981" },
+  COUNSELING_CANCELLED: { icon: "❌", label: "Cancelada",    color: "#ef4444" },
+
+  // ── Sistema ────────────────────────────────────────────────────────────────
+  SYSTEM_MESSAGE: { icon: "⚙️", label: "Sistema",      color: "#6366f1" },
+  CUSTOM:         { icon: "📌", label: "Personalizado", color: "#6366f1" },
+
+  // ── Fallback para tipos desconocidos ───────────────────────────────────────
   DEFAULT: { icon: "🔔", label: "Notificación", color: "#6366f1" },
 };
 
@@ -32,24 +66,51 @@ function timeAgo(dateString) {
  * Props:
  *  - userId       (number) ID del usuario autenticado (viene de AuthContext → user.id)
  *  - pollInterval (number) ms entre refrescos del contador, default 30 000
+ *
+ * FIX v3 — React Portal:
+ *  El panel se renderiza en document.body via createPortal.
+ *  Esto lo hace completamente inmune a:
+ *    - overflow:hidden en cualquier ancestro
+ *    - transition:all / transform en ancestros (que rompen position:fixed en Chrome)
+ *    - z-index de sidebar u overlays
+ *  El posicionamiento se calcula dinámicamente con getBoundingClientRect().
  */
 export default function NotificationBell({ userId, pollInterval = 30_000 }) {
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [markingAll, setMarkingAll] = useState(false);
+  const [unreadCount, setUnreadCount]     = useState(0);
+  const [open, setOpen]                   = useState(false);
+  const [loading, setLoading]             = useState(false);
+  const [error, setError]                 = useState(null);
+  const [markingAll, setMarkingAll]       = useState(false);
+
+  // Posición del panel calculada dinámicamente desde el botón campana
+  const [panelStyle, setPanelStyle] = useState({});
 
   const panelRef = useRef(null);
-  const bellRef = useRef(null);
+  const bellRef  = useRef(null);
+
+  // ── Calcular posición del panel ──────────────────────────────────────────
+  const calcPanelPosition = useCallback(() => {
+    if (!bellRef.current) return;
+    const rect = bellRef.current.getBoundingClientRect();
+    const PANEL_W = window.innerWidth <= 440 ? window.innerWidth - 16 : 380;
+    const left = Math.max(8, rect.right - PANEL_W);
+
+    setPanelStyle({
+      position: "fixed",
+      top:      `${rect.bottom + 8}px`,
+      left:     `${left}px`,
+      width:    window.innerWidth <= 440 ? `calc(100vw - 16px)` : `${PANEL_W}px`,
+      zIndex:   99999,
+    });
+  }, []);
 
   // ── Contador en background (silencioso) ──────────────────────────────────
   const fetchUnreadCount = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await apiService.getUnreadNotificationCount(userId);
-      setUnreadCount(data.unreadCount ?? 0);
+      setUnreadCount(data?.unreadCount ?? 0);
     } catch {
       /* poll silencioso */
     }
@@ -62,7 +123,8 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
     setError(null);
     try {
       const data = await apiService.getActiveNotifications(userId);
-      const sorted = [...data].sort((a, b) => {
+      const list = Array.isArray(data) ? data : [];
+      const sorted = [...list].sort((a, b) => {
         if (a.status === "UNREAD" && b.status !== "UNREAD") return -1;
         if (a.status !== "UNREAD" && b.status === "UNREAD") return 1;
         return new Date(b.createdAt) - new Date(a.createdAt);
@@ -70,29 +132,31 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
       setNotifications(sorted);
       setUnreadCount(sorted.filter((n) => n.status === "UNREAD").length);
     } catch (err) {
-      setError(err.message || "Error al cargar notificaciones");
+      if (err.status === 403) {
+        setError("No tienes permiso para ver notificaciones.");
+      } else if (err.status === 401) {
+        setError("Sesión expirada. Vuelve a iniciar sesión.");
+      } else {
+        setError(err.message || "Error al cargar notificaciones");
+      }
     } finally {
       setLoading(false);
     }
   }, [userId]);
 
   // ── Marcar una como leída ────────────────────────────────────────────────
-  // NotificationBell.jsx — reemplaza la función markAsRead
   const markAsRead = useCallback(async (notificationId) => {
-    // Actualización optimista PRIMERO
     setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, status: "READ" } : n)),
+      prev.map((n) => (n.id === notificationId ? { ...n, status: "READ" } : n))
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
-
     try {
       await apiService.markNotificationAsRead(notificationId);
     } catch {
-      // Revertir si falla
       setNotifications((prev) =>
         prev.map((n) =>
-          n.id === notificationId ? { ...n, status: "UNREAD" } : n,
-        ),
+          n.id === notificationId ? { ...n, status: "UNREAD" } : n
+        )
       );
       setUnreadCount((prev) => prev + 1);
     }
@@ -101,37 +165,47 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
   // ── Marcar todas como leídas ─────────────────────────────────────────────
   const markAllAsRead = useCallback(async () => {
     setMarkingAll(true);
-    const prevNotifications = notifications; // snapshot para revertir
-
-    // Optimista
-    setNotifications((prev) => prev.map((n) => ({ ...n, status: "READ" })));
+    const prev = notifications;
+    setNotifications((n) => n.map((x) => ({ ...x, status: "READ" })));
     setUnreadCount(0);
-
     try {
       await apiService.markAllNotificationsAsRead(userId);
     } catch {
-      setNotifications(prevNotifications); // revertir
-      setUnreadCount(
-        prevNotifications.filter((n) => n.status === "UNREAD").length,
-      );
+      setNotifications(prev);
+      setUnreadCount(prev.filter((n) => n.status === "UNREAD").length);
     } finally {
       setMarkingAll(false);
     }
   }, [userId, notifications]);
 
-  // ── Efectos ──────────────────────────────────────────────────────────────
-  // En el useEffect del poller, cambia a:
+  // ── Toggle panel ─────────────────────────────────────────────────────────
+  const handleBellClick = useCallback(() => {
+    if (!open) calcPanelPosition();
+    setOpen((prev) => !prev);
+  }, [open, calcPanelPosition]);
+
+  // ── Recalcular posición en resize ────────────────────────────────────────
   useEffect(() => {
-    if (open) return; // no pollear cuando el panel ya tiene datos frescos
+    if (!open) return;
+    const onResize = () => calcPanelPosition();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [open, calcPanelPosition]);
+
+  // ── Polling del contador ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (open) return;
     fetchUnreadCount();
     const timer = setInterval(fetchUnreadCount, pollInterval);
     return () => clearInterval(timer);
   }, [fetchUnreadCount, pollInterval, open]);
 
+  // ── Cargar notificaciones al abrir ───────────────────────────────────────
   useEffect(() => {
     if (open) fetchNotifications();
   }, [open, fetchNotifications]);
 
+  // ── Cerrar al hacer clic fuera ───────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
       if (
@@ -139,48 +213,21 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
         !panelRef.current.contains(e.target) &&
         bellRef.current &&
         !bellRef.current.contains(e.target)
-      )
+      ) {
         setOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Render ───────────────────────────────────────────────────────────────
-  return (
-    <div className="nb-wrapper">
-      {/* Botón campana */}
-      <button
-        ref={bellRef}
-        className={`nb-bell ${open ? "nb-bell--active" : ""} ${unreadCount > 0 ? "nb-bell--has-unread" : ""}`}
-        onClick={() => setOpen((prev) => !prev)}
-        title="Notificaciones"
-        aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
-      >
-        <svg
-          className="nb-bell__icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg>
-        {unreadCount > 0 && (
-          <span className="nb-badge" aria-hidden="true">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
-      </button>
-
-      {/* Panel desplegable */}
-      {open && (
+  // ── Panel JSX — montado en document.body via createPortal ────────────────
+  const panel = open
+    ? createPortal(
         <div
           ref={panelRef}
           className="nb-panel"
+          style={panelStyle}
           role="dialog"
           aria-label="Panel de notificaciones"
         >
@@ -212,8 +259,8 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
 
             {error && !loading && (
               <div className="nb-state nb-state--error">
-                <span>⚠️</span>
-                <p>{error}</p>
+                <span className="nb-state__icon">⚠️</span>
+                <p className="nb-state__text">{error}</p>
                 <button onClick={fetchNotifications} className="nb-retry">
                   Reintentar
                 </button>
@@ -256,10 +303,7 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
                     )}
                     <div
                       className="nb-item__icon"
-                      style={{
-                        "--icon-bg": cfg.color + "22",
-                        "--icon-color": cfg.color,
-                      }}
+                      style={{ "--icon-bg": cfg.color + "22" }}
                     >
                       {cfg.icon}
                     </div>
@@ -284,8 +328,43 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
                 );
               })}
           </div>
-        </div>
-      )}
+        </div>,
+        document.body // ← PORTAL: el panel vive en el body, fuera de todo contenedor
+      )
+    : null;
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  return (
+    <div className="nb-wrapper">
+      {/* Botón campana — siempre en el flujo normal del topbar */}
+      <button
+        ref={bellRef}
+        className={`nb-bell ${open ? "nb-bell--active" : ""} ${unreadCount > 0 ? "nb-bell--has-unread" : ""}`}
+        onClick={handleBellClick}
+        title="Notificaciones"
+        aria-label={`Notificaciones${unreadCount > 0 ? ` (${unreadCount} sin leer)` : ""}`}
+      >
+        <svg
+          className="nb-bell__icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        {unreadCount > 0 && (
+          <span className="nb-badge" aria-hidden="true">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* Panel → montado en document.body via createPortal */}
+      {panel}
     </div>
   );
 }

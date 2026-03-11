@@ -65,7 +65,6 @@
   }
 }
 
-/* CLASE ALTERNATIVA PARA DARK MODE MANUAL */
 html.dark-mode {
   --sidebar-bg: #0f172a;
   --sidebar-border: #334155;
@@ -115,7 +114,8 @@ body {
   display: flex;
   height: 100vh;
   background-color: var(--content-bg);
-  transition: all var(--transition-base);
+  /* ⚠️ NO usar transition:all — crea un containing block que rompe position:fixed en Chrome */
+  transition: background-color var(--transition-base);
 }
 
 /* ========== SIDEBAR ========== */
@@ -220,7 +220,7 @@ body {
   background-color: transparent;
   color: var(--sidebar-text);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: background-color var(--transition-base), color var(--transition-base);
   font-size: var(--font-size-base);
   font-weight: 500;
   min-height: 44px;
@@ -325,7 +325,22 @@ body {
   display: flex;
   flex-direction: column;
   background-color: var(--content-bg);
-  overflow: hidden;
+  /*
+   * FIX CRÍTICO: Se eliminó "overflow: hidden" de aquí.
+   *
+   * El problema: overflow:hidden en un contenedor flex recorta los elementos
+   * hijos con position:absolute (como el panel de notificaciones), haciéndolos
+   * invisibles en desktop aunque el DOM los renderice correctamente.
+   *
+   * En móvil el panel usa position:fixed (escapa el overflow), por eso
+   * funcionaba. En desktop usaba position:absolute → quedaba recortado.
+   *
+   * Solución: min-height:0 en el contenedor + overflow:auto en __content
+   * es suficiente para contener el scroll sin necesitar overflow:hidden aquí.
+   * El panel de notificaciones ahora usa position:fixed calculado dinámicamente
+   * en el componente React, así que tampoco lo necesita.
+   */
+  min-height: 0; /* necesario para que los flex children scrolleen correctamente */
 }
 
 /* ========== TOP BAR ========== */
@@ -337,17 +352,29 @@ body {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--topbar-border);
-  transition: all var(--transition-base);
+  /* NO transition:all — crearía un containing block que rompe position:fixed */
+  transition: background-color var(--transition-base), border-color var(--transition-base);
   gap: var(--spacing-lg);
-  flex-wrap: wrap;
+  /* NO flex-wrap: wrap — wrap hace que topbar-right caiga a una segunda línea
+     oculta porque topbar-left tiene flex:1 y absorbe todo el ancho */
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .dashboard-layout__topbar-left {
   display: flex;
   align-items: center;
   gap: var(--spacing-lg);
-  flex: 1;
-  min-width: 0;
+  flex: 1 1 0;   /* crece pero no empuja a topbar-right fuera del contenedor */
+  min-width: 0;  /* permite que el título se trunque con ellipsis si es necesario */
+  overflow: hidden;
+}
+
+.dashboard-layout__topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;  /* tamaño fijo — nunca crece ni se encoge */
 }
 
 .dashboard-layout__topbar-title {
@@ -371,10 +398,12 @@ body {
 .dashboard-layout__content {
   flex: 1;
   padding: var(--spacing-xl);
-  overflow-y: auto;
+  overflow-y: auto;   /* scroll aquí, no en __main */
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   background-color: var(--content-bg);
   color: var(--content-text);
+  min-height: 0; /* necesario en flex column para que el scroll funcione */
 }
 
 .dashboard-layout__content::-webkit-scrollbar {
@@ -430,14 +459,17 @@ body {
     display: none;
   }
 
+  .dashboard-layout__topbar-right {
+    display: flex; /* siempre visible en tablet */
+  }
+
   .dashboard-layout__content {
     padding: var(--spacing-lg);
   }
 }
 
-/* MOBILE (480px - 768px) - SIDEBAR SIEMPRE VISIBLE, COLAPSADO */
+/* MOBILE (480px - 768px) */
 @media (max-width: 768px) {
-  /* Sidebar SIEMPRE visible, colapsado a la izquierda */
   .dashboard-layout__sidebar {
     width: 5rem;
     height: 100vh;
@@ -529,14 +561,18 @@ body {
     gap: var(--spacing-sm);
   }
 
+  .dashboard-layout__topbar-right {
+    display: flex;
+    margin-left: auto;
+  }
+
   .dashboard-layout__content {
     padding: var(--spacing-lg);
   }
 }
 
-/* SMALL MOBILE (<480px) - SIDEBAR SIEMPRE VISIBLE, COLAPSADO */
+/* SMALL MOBILE (<480px) */
 @media (max-width: 480px) {
-  /* Sidebar SIEMPRE visible, colapsado a la izquierda */
   .dashboard-layout__sidebar {
     width: 4.5rem;
     height: 100vh;
@@ -635,12 +671,17 @@ body {
     display: none;
   }
 
+  .dashboard-layout__topbar-right {
+    display: flex;
+    margin-left: auto;
+  }
+
   .dashboard-layout__content {
     padding: var(--spacing-md);
   }
 }
 
-/* ========== COLLAPSED STATE MOBILE FIX ========== */
+/* ========== COLLAPSED STATE TABLET FIX ========== */
 @media (max-width: 1024px) {
   .dashboard-layout__sidebar--collapsed .dashboard-layout__menu-icon {
     min-width: auto;
@@ -664,17 +705,11 @@ body {
 
   .dashboard-layout__main {
     height: auto;
+    min-height: unset;
   }
 
   .dashboard-layout__content {
     padding: 0;
     overflow: visible;
   }
-
-.dashboard-layout__topbar-right {
-  display: flex;
-   align-items: center;
-   gap: 12px;
- }
-
 }

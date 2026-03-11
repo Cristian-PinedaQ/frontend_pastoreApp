@@ -129,9 +129,9 @@ const ROLE_LEVEL_MAP = {
     "ESENCIA_2",
     "ESENCIA_3",
     "SANIDAD_INTEGRAL_RAICES",
-    "ESENCIA_4",
+    "ESENCIA_4","ADIESTRAMIENTO", 
+    "GRADUACION"
   ],
-  ROLE_DESPLIEGUE: ["ADIESTRAMIENTO", "GRADUACION"],
 };
 
 // Etiquetas legibles para mostrar en el badge
