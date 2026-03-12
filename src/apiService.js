@@ -807,7 +807,7 @@ async getLevelStudents(level, status = null) {
 
   async getUsers() {
     try {
-      return this.request('/users');
+      return this.request('/auth/users');
     } catch (error) {
       logError('❌ [getUsers] Error:', error.message);
       throw error;
@@ -820,7 +820,7 @@ async getLevelStudents(level, status = null) {
       if (!userData || typeof userData !== 'object') {
         throw new Error('Datos de usuario inválidos');
       }
-      return this.request(`/users/${id}`, {
+      return this.request(`/auth/users/${id}`, {
         method: 'PUT',
         body: JSON.stringify(userData),
       });
@@ -833,7 +833,7 @@ async getLevelStudents(level, status = null) {
   async deleteUser(id) {
     try {
       validateId(id, 'userId');
-      return this.request(`/users/${id}`, {
+      return this.request(`/auth/users/${id}`, {
         method: 'DELETE',
       });
     } catch (error) {

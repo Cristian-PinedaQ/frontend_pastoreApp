@@ -7,6 +7,8 @@ import { useAuth } from "./context/AuthContext";
 import "./css/DashboardLayout.css"; // Importar CSS
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
+import apiService from "./apiService";
+
 
 export const DashboardLayout = () => {
   // ========== DARK MODE AUTOMÁTICO ==========
@@ -51,6 +53,26 @@ export const DashboardLayout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const [resolvedUserId, setResolvedUserId] = useState(null);
+
+  useEffect(() => {
+    if (!user?.username) return;
+
+    apiService.getUsers()
+      .then((users) => {
+        if (!Array.isArray(users)) return;
+        const found = users.find(
+          (u) => u.username === user.username
+        );
+        if (found?.id) {
+          setResolvedUserId(found.id);
+        }
+      })
+      .catch(() => {
+        // Fallo silencioso — las notificaciones simplemente no cargan
+      });
+  }, [user?.username]);
+
   // ========== HANDLERS ==========
   const handleLogout = () => {
     if (window.confirm("¿Estás seguro de que quieres cerrar sesión?")) {
@@ -64,7 +86,6 @@ export const DashboardLayout = () => {
   };
 
   // ========== MENU CONFIG ==========
-  // Determinar menú según roles
   const menuItems = [
     {
       label: "Inicio",
@@ -109,7 +130,7 @@ export const DashboardLayout = () => {
         "ROLE_CONEXION",
         "ROLE_CIMIENTO",
         "ROLE_ESENCIA",
-        "ROLE_DESOLIEGUE",
+        "ROLE_DESPLIEGUE",
       ]),
     },
     {
@@ -236,7 +257,6 @@ export const DashboardLayout = () => {
       {/* ========== MAIN CONTENT ========== */}
       <div className="dashboard-layout__main">
         {/* Top Bar */}
-
         <header className="dashboard-layout__topbar">
           <div className="dashboard-layout__topbar-left">
             <DashboardTopbar user={user} />
@@ -248,7 +268,7 @@ export const DashboardLayout = () => {
             <span className="dashboard-layout__topbar-welcome">
               Bienvenido, {user?.username?.split(" ")[0]}
             </span>
-            <NotificationBell userId={user?.id} pollInterval={30000} />
+            <NotificationBell userId={resolvedUserId} pollInterval={30000} />
           </div>
         </header>
 

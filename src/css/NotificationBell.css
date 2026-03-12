@@ -3,7 +3,15 @@
    ============================================================ */
 
 /* ── Variables ─────────────────────────────────────────────── */
-.nb-wrapper {
+/*
+ * FIX PORTAL: Variables en :root, NO en .nb-wrapper.
+ * El panel usa createPortal → se monta en document.body, fuera del
+ * árbol DOM de .nb-wrapper. CSS custom properties NO se heredan fuera
+ * del árbol, por lo que el panel recibía 'transparent' como fondo y
+ * las letras se confundían con el fondo de la página.
+ * Solución: definir las variables en :root para que sean globales.
+ */
+:root {
   --nb-bg: #ffffff;
   --nb-border: #e5e7eb;
   --nb-text-primary: #111827;
@@ -15,16 +23,10 @@
   --nb-accent: #3b82f6;
   --nb-shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
   --nb-radius: 14px;
-
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
 }
 
-/* Dark mode */
 @media (prefers-color-scheme: dark) {
-  .nb-wrapper {
+  :root {
     --nb-bg: #1e2130;
     --nb-border: #2d3148;
     --nb-text-primary: #f1f5f9;
@@ -37,7 +39,7 @@
   }
 }
 
-:root.dark-mode .nb-wrapper {
+:root.dark-mode {
   --nb-bg: #1e2130;
   --nb-border: #2d3148;
   --nb-text-primary: #f1f5f9;
@@ -49,6 +51,13 @@
   --nb-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
+.nb-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 /* ── Botón campana ─────────────────────────────────────────── */
 .nb-bell {
   position: relative;
@@ -57,6 +66,9 @@
   justify-content: center;
   width: 40px;
   height: 40px;
+  padding: 0;
+  min-height: 40px;
+  overflow: visible;
   border: none;
   background: transparent;
   border-radius: 10px;
@@ -85,7 +97,6 @@
   transition: transform 0.3s ease;
 }
 
-/* Animación de tintinear cuando hay no leídas */
 .nb-bell--has-unread .nb-bell__icon {
   animation: nb-ring 2.5s ease-in-out infinite;
 }
@@ -125,22 +136,10 @@
 }
 
 /* ── Panel desplegable ─────────────────────────────────────── */
-/*
- * FIX CRÍTICO: Usar position:fixed en TODAS las resoluciones.
- *
- * El problema original: .dashboard-layout__main tiene overflow:hidden,
- * lo que recorta cualquier hijo con position:absolute. En móvil ya
- * se usaba position:fixed (escapando ese corte), pero en desktop se
- * seguía usando position:absolute → el panel quedaba invisible.
- *
- * Con position:fixed el panel escapa de CUALQUIER overflow del árbol
- * padre y siempre es visible. El posicionamiento se ajusta via JS
- * en el componente (panelStyle), con un fallback CSS seguro aquí.
- */
 .nb-panel {
-  position: fixed;           /* ← CAMBIO CLAVE: fixed en lugar de absolute */
-  top: 60px;                 /* fallback; el componente lo sobrescribe via style */
-  right: 16px;               /* fallback; el componente lo sobrescribe via style */
+  position: fixed;
+  top: 60px;
+  right: 16px;
   width: 380px;
   max-height: 540px;
   background: var(--nb-bg);
@@ -150,7 +149,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  z-index: 99999;            /* encima de sidebar (z-index:100) y cualquier overlay */
+  z-index: 99999;
   animation: nb-slide-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -159,7 +158,6 @@
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* Panel en móvil: full width */
 @media (max-width: 440px) {
   .nb-panel {
     right: 8px;
@@ -174,6 +172,7 @@
   padding: 16px 18px 12px;
   border-bottom: 1px solid var(--nb-border);
   flex-shrink: 0;
+  background: var(--nb-bg);
 }
 
 .nb-panel__title-row {
@@ -200,7 +199,7 @@
 }
 
 :root.dark-mode .nb-panel__count {
-  background: rgba(59,130,246,0.15);
+  background: rgba(59, 130, 246, 0.15);
 }
 
 .nb-panel__mark-all {
@@ -212,9 +211,11 @@
   padding: 0;
   font-weight: 500;
   transition: opacity 0.15s ease;
+  min-height: unset;
+  width: auto;
 }
 
-.nb-panel__mark-all:hover  { opacity: 0.7; }
+.nb-panel__mark-all:hover   { opacity: 0.7; }
 .nb-panel__mark-all:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ── Body (lista scrollable) ───────────────────────────────── */
@@ -223,9 +224,10 @@
   flex: 1;
   scrollbar-width: thin;
   scrollbar-color: var(--nb-border) transparent;
+  background: var(--nb-bg);
 }
 
-.nb-panel__body::-webkit-scrollbar { width: 4px; }
+.nb-panel__body::-webkit-scrollbar       { width: 4px; }
 .nb-panel__body::-webkit-scrollbar-track { background: transparent; }
 .nb-panel__body::-webkit-scrollbar-thumb { background: var(--nb-border); border-radius: 4px; }
 
@@ -273,9 +275,11 @@
   cursor: pointer;
   font-size: 12px;
   transition: background 0.15s;
+  min-height: unset;
+  width: auto;
 }
 
-.nb-retry:hover { background: rgba(239,68,68,0.08); }
+.nb-retry:hover { background: rgba(239, 68, 68, 0.08); }
 
 /* ── Spinner ───────────────────────────────────────────────── */
 .nb-spinner {
@@ -301,6 +305,7 @@
   border-bottom: 1px solid var(--nb-border);
   transition: background 0.15s ease;
   cursor: default;
+  background: var(--nb-bg);
 }
 
 .nb-item:last-child { border-bottom: none; }
@@ -316,7 +321,6 @@
 }
 
 .nb-item--unread:hover {
-  background: var(--nb-unread-border);
   filter: brightness(0.97);
 }
 
@@ -329,7 +333,7 @@
   height: 8px;
   border-radius: 50%;
   background: var(--dot-color, #3b82f6);
-  box-shadow: 0 0 0 2px rgba(59,130,246,0.25);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
   flex-shrink: 0;
 }
 

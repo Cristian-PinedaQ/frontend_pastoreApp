@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import apiService from "../apiService"; // ← ajusta la ruta si es diferente
+import apiService from "../apiService";
 import "../css/NotificationBell.css";
 
-// ── Mapeo tipo → ícono / color ────────────────────────────────────────────────
-// Sincronizado con el enum NotificationType.java del backend.
+// ── TYPE_CONFIG — sincronizado 1:1 con NotificationType.java ─────────────────
+// Tipos legacy (no existen en el enum Java pero hay filas históricas en DB)
+// se conservan al final para que no caigan al DEFAULT.
 const TYPE_CONFIG = {
   // ── Liderazgo ──────────────────────────────────────────────────────────────
   LEADER_PROMOTION:    { icon: "🌟", label: "Promoción",    color: "#f59e0b" },
@@ -13,21 +14,21 @@ const TYPE_CONFIG = {
   LEADER_DEACTIVATION: { icon: "⏹️", label: "Baja",         color: "#6b7280" },
   LEADER_VERIFICATION: { icon: "✅", label: "Verificación", color: "#3b82f6" },
 
-  // Alertas de asistencia (2 faltas = alerta, 3+ = suspensión automática)
-  ATTENDANCE_ALERT:      { icon: "⚠️", label: "Alerta Asist.", color: "#f59e0b" },
-  ATTENDANCE_SUSPENSION: { icon: "🚫", label: "Susp. Asist.",  color: "#ef4444" },
+  // ── Asistencias ────────────────────────────────────────────────────────────
+  ATTENDANCE_ALERT:      { icon: "⚠️", label: "Riesgo susp.", color: "#f59e0b" },
+  ATTENDANCE_SUSPENSION: { icon: "🚫", label: "Susp. asist.", color: "#ef4444" },
 
   // ── Finanzas ───────────────────────────────────────────────────────────────
-  TITHE_CONFIRMATION: { icon: "💵", label: "Diezmo",    color: "#10b981" },
+  TITHE_CONFIRMATION: { icon: "💵", label: "Diezmo", color: "#10b981" },
 
   // ── Membresía ──────────────────────────────────────────────────────────────
   MEMBER_UPDATE: { icon: "👤", label: "Miembro", color: "#8b5cf6" },
 
-  // ── Células y ofrendas ─────────────────────────────────────────────────────
+  // ── Células ────────────────────────────────────────────────────────────────
   CELL_SUSPENSION: { icon: "🏘️", label: "Célula susp.", color: "#ef4444" },
   CELL_COMPLIANT:  { icon: "🏡", label: "Célula OK",    color: "#10b981" },
 
-  // ── Solicitudes de reinicio de contador ────────────────────────────────────
+  // ── Reinicio de contador ───────────────────────────────────────────────────
   RESET_REQUEST:  { icon: "🔄", label: "Solicitud",  color: "#3b82f6" },
   RESET_RESPONSE: { icon: "📩", label: "Respuesta",  color: "#8b5cf6" },
 
@@ -41,7 +42,12 @@ const TYPE_CONFIG = {
   SYSTEM_MESSAGE: { icon: "⚙️", label: "Sistema",      color: "#6366f1" },
   CUSTOM:         { icon: "📌", label: "Personalizado", color: "#6366f1" },
 
-  // ── Fallback para tipos desconocidos ───────────────────────────────────────
+  // ── Legacy (filas históricas en DB; ya no los emite el backend) ───────────
+  COUNSELING_NO_SHOW:             { icon: "👻", label: "No asistió",    color: "#6b7280" },
+  COUNSELING_REMINDER_DAY_BEFORE: { icon: "⏰", label: "Recordat. D-1", color: "#f59e0b" },
+  COUNSELING_REMINDER_DAY_OF:     { icon: "🔔", label: "Recordat. hoy", color: "#f97316" },
+
+  // ── Fallback ───────────────────────────────────────────────────────────────
   DEFAULT: { icon: "🔔", label: "Notificación", color: "#6366f1" },
 };
 
@@ -59,22 +65,6 @@ function timeAgo(dateString) {
   });
 }
 
-// ── Componente ────────────────────────────────────────────────────────────────
-/**
- * NotificationBell
- *
- * Props:
- *  - userId       (number) ID del usuario autenticado (viene de AuthContext → user.id)
- *  - pollInterval (number) ms entre refrescos del contador, default 30 000
- *
- * FIX v3 — React Portal:
- *  El panel se renderiza en document.body via createPortal.
- *  Esto lo hace completamente inmune a:
- *    - overflow:hidden en cualquier ancestro
- *    - transition:all / transform en ancestros (que rompen position:fixed en Chrome)
- *    - z-index de sidebar u overlays
- *  El posicionamiento se calcula dinámicamente con getBoundingClientRect().
- */
 export default function NotificationBell({ userId, pollInterval = 30_000 }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
@@ -82,20 +72,16 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
   const [loading, setLoading]             = useState(false);
   const [error, setError]                 = useState(null);
   const [markingAll, setMarkingAll]       = useState(false);
-
-  // Posición del panel calculada dinámicamente desde el botón campana
-  const [panelStyle, setPanelStyle] = useState({});
+  const [panelStyle, setPanelStyle]       = useState({});
 
   const panelRef = useRef(null);
   const bellRef  = useRef(null);
 
-  // ── Calcular posición del panel ──────────────────────────────────────────
   const calcPanelPosition = useCallback(() => {
     if (!bellRef.current) return;
-    const rect = bellRef.current.getBoundingClientRect();
+    const rect    = bellRef.current.getBoundingClientRect();
     const PANEL_W = window.innerWidth <= 440 ? window.innerWidth - 16 : 380;
-    const left = Math.max(8, rect.right - PANEL_W);
-
+    const left    = Math.max(8, rect.right - PANEL_W);
     setPanelStyle({
       position: "fixed",
       top:      `${rect.bottom + 8}px`,
@@ -105,25 +91,21 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
     });
   }, []);
 
-  // ── Contador en background (silencioso) ──────────────────────────────────
   const fetchUnreadCount = useCallback(async () => {
     if (!userId) return;
     try {
       const data = await apiService.getUnreadNotificationCount(userId);
       setUnreadCount(data?.unreadCount ?? 0);
-    } catch {
-      /* poll silencioso */
-    }
+    } catch { /* poll silencioso */ }
   }, [userId]);
 
-  // ── Lista completa al abrir el panel ─────────────────────────────────────
   const fetchNotifications = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await apiService.getActiveNotifications(userId);
-      const list = Array.isArray(data) ? data : [];
+      const data   = await apiService.getActiveNotifications(userId);
+      const list   = Array.isArray(data) ? data : [];
       const sorted = [...list].sort((a, b) => {
         if (a.status === "UNREAD" && b.status !== "UNREAD") return -1;
         if (a.status !== "UNREAD" && b.status === "UNREAD") return 1;
@@ -132,19 +114,14 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
       setNotifications(sorted);
       setUnreadCount(sorted.filter((n) => n.status === "UNREAD").length);
     } catch (err) {
-      if (err.status === 403) {
-        setError("No tienes permiso para ver notificaciones.");
-      } else if (err.status === 401) {
-        setError("Sesión expirada. Vuelve a iniciar sesión.");
-      } else {
-        setError(err.message || "Error al cargar notificaciones");
-      }
+      if (err.status === 403)      setError("No tienes permiso para ver notificaciones.");
+      else if (err.status === 401) setError("Sesión expirada. Vuelve a iniciar sesión.");
+      else                         setError(err.message || "Error al cargar notificaciones");
     } finally {
       setLoading(false);
     }
   }, [userId]);
 
-  // ── Marcar una como leída ────────────────────────────────────────────────
   const markAsRead = useCallback(async (notificationId) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === notificationId ? { ...n, status: "READ" } : n))
@@ -154,15 +131,12 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
       await apiService.markNotificationAsRead(notificationId);
     } catch {
       setNotifications((prev) =>
-        prev.map((n) =>
-          n.id === notificationId ? { ...n, status: "UNREAD" } : n
-        )
+        prev.map((n) => (n.id === notificationId ? { ...n, status: "UNREAD" } : n))
       );
       setUnreadCount((prev) => prev + 1);
     }
   }, []);
 
-  // ── Marcar todas como leídas ─────────────────────────────────────────────
   const markAllAsRead = useCallback(async () => {
     setMarkingAll(true);
     const prev = notifications;
@@ -178,21 +152,17 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
     }
   }, [userId, notifications]);
 
-  // ── Toggle panel ─────────────────────────────────────────────────────────
   const handleBellClick = useCallback(() => {
     if (!open) calcPanelPosition();
     setOpen((prev) => !prev);
   }, [open, calcPanelPosition]);
 
-  // ── Recalcular posición en resize ────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    const onResize = () => calcPanelPosition();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener("resize", calcPanelPosition);
+    return () => window.removeEventListener("resize", calcPanelPosition);
   }, [open, calcPanelPosition]);
 
-  // ── Polling del contador ─────────────────────────────────────────────────
   useEffect(() => {
     if (open) return;
     fetchUnreadCount();
@@ -200,28 +170,21 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
     return () => clearInterval(timer);
   }, [fetchUnreadCount, pollInterval, open]);
 
-  // ── Cargar notificaciones al abrir ───────────────────────────────────────
   useEffect(() => {
     if (open) fetchNotifications();
   }, [open, fetchNotifications]);
 
-  // ── Cerrar al hacer clic fuera ───────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
       if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target) &&
-        bellRef.current &&
-        !bellRef.current.contains(e.target)
-      ) {
-        setOpen(false);
-      }
+        panelRef.current && !panelRef.current.contains(e.target) &&
+        bellRef.current  && !bellRef.current.contains(e.target)
+      ) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // ── Panel JSX — montado en document.body via createPortal ────────────────
   const panel = open
     ? createPortal(
         <div
@@ -271,72 +234,51 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
               <div className="nb-state nb-state--empty">
                 <span className="nb-state__icon">🎉</span>
                 <p className="nb-state__text">¡Todo al día!</p>
-                <p className="nb-state__sub">
-                  No tienes notificaciones activas.
-                </p>
+                <p className="nb-state__sub">No tienes notificaciones activas.</p>
               </div>
             )}
 
-            {!loading &&
-              !error &&
-              notifications.map((notification) => {
-                const cfg = getTypeConfig(notification.notificationType);
-                const isUnread = notification.status === "UNREAD";
-                return (
-                  <div
-                    key={notification.id}
-                    className={`nb-item ${isUnread ? "nb-item--unread" : ""}`}
-                    onClick={() => isUnread && markAsRead(notification.id)}
-                    role={isUnread ? "button" : undefined}
-                    tabIndex={isUnread ? 0 : undefined}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" &&
-                      isUnread &&
-                      markAsRead(notification.id)
-                    }
-                  >
-                    {isUnread && (
-                      <span
-                        className="nb-item__dot"
-                        style={{ "--dot-color": cfg.color }}
-                      />
-                    )}
-                    <div
-                      className="nb-item__icon"
-                      style={{ "--icon-bg": cfg.color + "22" }}
-                    >
-                      {cfg.icon}
-                    </div>
-                    <div className="nb-item__content">
-                      <div className="nb-item__header-row">
-                        <span className="nb-item__subject">
-                          {notification.subject}
-                        </span>
-                        <span className="nb-item__time">
-                          {timeAgo(notification.createdAt)}
-                        </span>
-                      </div>
-                      <p className="nb-item__message">{notification.message}</p>
-                      <span
-                        className="nb-item__tag"
-                        style={{ "--tag-color": cfg.color }}
-                      >
-                        {cfg.label}
-                      </span>
-                    </div>
+            {!loading && !error && notifications.map((notification) => {
+              const cfg      = getTypeConfig(notification.notificationType);
+              const isUnread = notification.status === "UNREAD";
+              return (
+                <div
+                  key={notification.id}
+                  className={`nb-item ${isUnread ? "nb-item--unread" : ""}`}
+                  onClick={() => isUnread && markAsRead(notification.id)}
+                  role={isUnread ? "button" : undefined}
+                  tabIndex={isUnread ? 0 : undefined}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && isUnread && markAsRead(notification.id)
+                  }
+                >
+                  {isUnread && (
+                    <span className="nb-item__dot" style={{ "--dot-color": cfg.color }} />
+                  )}
+                  <div className="nb-item__icon" style={{ "--icon-bg": cfg.color + "22" }}>
+                    {cfg.icon}
                   </div>
-                );
-              })}
+                  <div className="nb-item__content">
+                    <div className="nb-item__header-row">
+                      <span className="nb-item__subject">{notification.subject}</span>
+                      <span className="nb-item__time">{timeAgo(notification.createdAt)}</span>
+                    </div>
+                    <p className="nb-item__message">{notification.message}</p>
+                    <span className="nb-item__tag" style={{ "--tag-color": cfg.color }}>
+                      {cfg.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>,
-        document.body // ← PORTAL: el panel vive en el body, fuera de todo contenedor
+        document.body
       )
     : null;
 
-  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="nb-wrapper">
-      {/* Botón campana — siempre en el flujo normal del topbar */}
       <button
         ref={bellRef}
         className={`nb-bell ${open ? "nb-bell--active" : ""} ${unreadCount > 0 ? "nb-bell--has-unread" : ""}`}
@@ -362,8 +304,6 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
           </span>
         )}
       </button>
-
-      {/* Panel → montado en document.body via createPortal */}
       {panel}
     </div>
   );
