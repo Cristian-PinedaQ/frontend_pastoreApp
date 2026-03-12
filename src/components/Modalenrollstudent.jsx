@@ -1,14 +1,14 @@
-// 📝 ModalEnrollStudent.jsx - v2 CON MODO OSCURO
-// Modal para inscribir estudiantes a cohortes
-// Legible automáticamente en modo oscuro
-// ✅ ARREGLADO: loadAvailableCohorts envuelto en useCallback
-// ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
+// 📝 ModalEnrollStudent.jsx - v3 CON FLUJO MEJORADO
+// Modal para inscribir múltiples estudiantes a cohortes por nivel
+// ✅ FLUJO CORREGIDO: Nivel → Estudiantes con ese nivel → Cohortes del nivel
+// ✅ GENERADOR PDF: Exportar listado de estudiantes por nivel
 
 import React, { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
-import nameHelper from '../services/nameHelper'; // ✅ Importar el helper
+import nameHelper from '../services/nameHelper';
+// Al inicio del archivo ModalEnrollStudent.jsx
+import { generateStudentsByLevelPDF } from '../services/studentsByLevelPdfGenerator';
 
-// Extraer función del helper
 const { getDisplayName } = nameHelper;
 
 const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
@@ -71,45 +71,65 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
   // ========== ESTADO ==========
   const [step, setStep] = useState(1);
-  const [members, setMembers] = useState([]);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [selectedLevel, setSelectedLevel] = useState(null);
+  const [studentsByLevel, setStudentsByLevel] = useState([]);
+  const [selectedStudents, setSelectedStudents] = useState([]);
   const [availableCohorts, setAvailableCohorts] = useState([]);
   const [selectedCohort, setSelectedCohort] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [searchMember, setSearchMember] = useState('');
+  const [searchStudent, setSearchStudent] = useState('');
+  const [enrollingStatus, setEnrollingStatus] = useState({});
+  const [allMembers, setAllMembers] = useState([]);
 
+  // Definir niveles con su orden
   const LEVELS = [
-    { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
-    { value: 'ENCUENTRO', label: 'Encuentro' },
-    { value: 'POST_ENCUENTRO', label: 'Post-encuentro' },
-    { value: 'BAUTIZOS', label: 'Bautizos' },
-    { value: 'ESENCIA_1', label: 'ESENCIA 1' },
-    { value: 'ESENCIA_2', label: 'ESENCIA 2' },
-    { value: 'ESENCIA_3', label: 'ESENCIA 3' },
-    { value: 'SANIDAD_INTEGRAL_RAICES', label: 'Sanidad Integral Raíces' },
-    { value: 'ESENCIA_4', label: 'ESENCIA 4' },
-    { value: 'ADIESTRAMIENTO', label: 'Adiestramiento' },
-    { value: 'GRADUACION', label: 'Graduación' },
+    { value: 'PREENCUENTRO', label: 'Pre-encuentro', order: 1 },
+    { value: 'ENCUENTRO', label: 'Encuentro', order: 2 },
+    { value: 'POST_ENCUENTRO', label: 'Post-encuentro', order: 3 },
+    { value: 'BAUTIZOS', label: 'Bautizos', order: 4 },
+    { value: 'ESENCIA_1', label: 'ESENCIA 1', order: 5 },
+    { value: 'ESENCIA_2', label: 'ESENCIA 2', order: 6 },
+    { value: 'ESENCIA_3', label: 'ESENCIA 3', order: 7 },
+    { value: 'SANIDAD_INTEGRAL_RAICES', label: 'Sanidad Integral Raíces', order: 8 },
+    { value: 'ESENCIA_4', label: 'ESENCIA 4', order: 9 },
+    { value: 'ADIESTRAMIENTO', label: 'Adiestramiento', order: 10 },
+    { value: 'GRADUACION', label: 'Graduación', order: 11 },
   ];
 
-  // Cargar miembros al abrir modal
-  useEffect(() => {
-    if (isOpen && step === 1) {
-      loadMembers();
-    }
-  }, [isOpen, step]);
+  // ========== RESETEAR MODAL ==========
+  const handleReset = useCallback(() => {
+  setStep(1);
+  setSelectedLevel(null);
+  setStudentsByLevel([]);
+  setSelectedStudents([]);
+  setAvailableCohorts([]);
+  setSelectedCohort(null);
+  setSearchStudent('');
+  setError('');
+  setEnrollingStatus({});
+  onClose();
+}, [onClose]);
 
-  // ========== CARGAR MIEMBROS ==========
-  const loadMembers = async () => {
+  // Cargar todos los miembros al abrir modal
+  useEffect(() => {
+    if (isOpen) {
+      loadAllMembers();
+    } else {
+      // Resetear estado al cerrar
+      handleReset();
+    }
+  }, [isOpen, handleReset]);
+
+  // Cargar todos los miembros
+  const loadAllMembers = async () => {
     setLoading(true);
     setError('');
 
     try {
-      console.log('📚 Cargando miembros...');
+      console.log('📚 Cargando todos los miembros...');
       const data = await apiService.getAllMembers();
-      setMembers(data || []);
+      setAllMembers(data || []);
       console.log('✅ Miembros cargados:', data?.length || 0);
     } catch (err) {
       console.error('❌ Error cargando miembros:', err);
@@ -119,9 +139,167 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     }
   };
 
+  // ========== GENERAR PDF POR NIVEL ==========
+// En ModalEnrollStudent.jsx - actualizar generatePDFByLevel
+
+// En ModalEnrollStudent.jsx - Reemplazar la función generatePDFByLevel existente
+
+const generatePDFByLevel = async (level) => {
+  const levelInfo = LEVELS.find(l => l.value === level);
+  if (!levelInfo) return;
+
+  try {
+    setLoading(true);
+    
+    // Usar el nuevo método que obtiene datos del backend
+    const levelDetail = await apiService.getLevelStudents(level);
+    
+    if (!levelDetail || levelDetail.totalStudents === 0) {
+      alert(`No hay estudiantes en el nivel ${levelInfo.label}`);
+      return;
+    }
+
+    // Combinar todos los estudiantes con su categoría de estado
+    const allStudents = [
+      ...(levelDetail.currentlyStudying || []).map(s => ({ 
+        ...s, 
+        statusCategory: 'Cursando',
+        // Asegurar que todos los campos necesarios estén presentes
+        name: s.memberName || 'Sin nombre',
+        document: s.document || '—',
+        email: s.email || '—',
+        phone: s.phone || '—',
+        address: s.address || '—',
+        district: s.district || '—',
+        districtDescription: s.districtDescription || s.district || '—',
+        gender: s.gender || '—',
+        maritalStatus: s.maritalStatus || '—',
+        // Datos de progreso
+        attendancePercentage: s.attendancePercentage || 0,
+        averageScore: s.averageScore || 0,
+        passed: s.passed
+      })),
+      ...(levelDetail.completed || []).map(s => ({ 
+        ...s, 
+        statusCategory: 'Completado',
+        name: s.memberName || 'Sin nombre',
+        document: s.document || '—',
+        email: s.email || '—',
+        phone: s.phone || '—',
+        address: s.address || '—',
+        district: s.district || '—',
+        districtDescription: s.districtDescription || s.district || '—',
+        gender: s.gender || '—',
+        maritalStatus: s.maritalStatus || '—',
+        attendancePercentage: s.attendancePercentage || 0,
+        averageScore: s.averageScore || 0,
+        passed: s.passed
+      })),
+      ...(levelDetail.failed || []).map(s => ({ 
+        ...s, 
+        statusCategory: 'Reprobado',
+        name: s.memberName || 'Sin nombre',
+        document: s.document || '—',
+        email: s.email || '—',
+        phone: s.phone || '—',
+        address: s.address || '—',
+        district: s.district || '—',
+        districtDescription: s.districtDescription || s.district || '—',
+        gender: s.gender || '—',
+        maritalStatus: s.maritalStatus || '—',
+        attendancePercentage: s.attendancePercentage || 0,
+        averageScore: s.averageScore || 0,
+        passed: s.passed
+      }))
+    ];
+
+    // Calcular estadísticas mejoradas
+    const maleCount = allStudents.filter(s => s.gender === 'MASCULINO').length;
+    const femaleCount = allStudents.filter(s => s.gender === 'FEMENINO').length;
+    const withEmail = allStudents.filter(s => s.email && s.email !== '—' && s.email).length;
+    const withPhone = allStudents.filter(s => s.phone && s.phone !== '—' && s.phone).length;
+    const withDocument = allStudents.filter(s => s.document && s.document !== '—' && s.document).length;
+    const withAddress = allStudents.filter(s => s.address && s.address !== '—' && s.address).length;
+    
+    // Distribución por distrito usando districtDescription
+    const districtMap = {};
+    allStudents.forEach(s => {
+      const district = s.districtDescription || s.district || 'SIN DISTRITO';
+      districtMap[district] = (districtMap[district] || 0) + 1;
+    });
+    
+    const districts = Object.entries(districtMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Generar PDF con todos los datos
+    generateStudentsByLevelPDF({
+      students: allStudents,
+      level: level,
+      levelLabel: levelInfo.label,
+      totalStudents: allStudents.length,
+      stats: {
+        maleCount,
+        femaleCount,
+        withEmail,
+        withPhone,
+        withDocument,
+        withAddress,
+        districts,
+        // Estadísticas adicionales del backend
+        passedCount: levelDetail.passedCount || levelDetail.completed?.length || 0,
+        activeCount: levelDetail.activeCount || levelDetail.currentlyStudying?.length || 0,
+        failedCount: levelDetail.failedCount || levelDetail.failed?.length || 0,
+        averageAttendance: levelDetail.averageAttendance || 0,
+        averageScore: levelDetail.averageScore || 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Error generando PDF:', error);
+    alert('Error al generar el PDF: ' + (error.message || 'Error desconocido'));
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // ========== CARGAR ESTUDIANTES POR NIVEL ==========
+  const loadStudentsByLevel = useCallback(async () => {
+    if (!selectedLevel) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      console.log('📚 Cargando estudiantes con nivel:', selectedLevel);
+      
+      // Filtrar miembros cuyo currentLevel sea el seleccionado
+      const filtered = allMembers.filter(member => 
+        member.currentLevel === selectedLevel
+      );
+      
+      setStudentsByLevel(filtered);
+      console.log('✅ Estudiantes encontrados:', filtered.length);
+    } catch (err) {
+      console.error('❌ Error filtrando estudiantes:', err);
+      setError('Error al cargar estudiantes: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedLevel, allMembers]);
+
+  // Cargar estudiantes cuando se selecciona nivel y se avanza al paso 2
+  useEffect(() => {
+    if (selectedLevel && step === 2) {
+      loadStudentsByLevel();
+      setSelectedStudents([]); // Resetear selección
+    }
+  }, [selectedLevel, step, loadStudentsByLevel]);
+
   // ========== CARGAR COHORTES DISPONIBLES ==========
-  // ✅ ARREGLADO: Envuelto en useCallback
   const loadAvailableCohorts = useCallback(async () => {
+    if (!selectedLevel) return;
+    
     setLoading(true);
     setError('');
 
@@ -129,12 +307,11 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
       console.log('📚 Cargando cohortes disponibles para nivel:', selectedLevel);
       const data = await apiService.getAvailableCohortsByLevel(selectedLevel);
       
-      // ✅ Transformar nombres de maestros para visualización
       const transformedCohorts = (data || []).map(cohort => ({
         ...cohort,
         maestro: cohort.maestro ? {
           ...cohort.maestro,
-          displayName: getDisplayName(cohort.maestro.name) // ✅ Nombre transformado para mostrar
+          displayName: getDisplayName(cohort.maestro.name)
         } : null
       }));
       
@@ -148,7 +325,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     }
   }, [selectedLevel]);
 
-  // Cargar cohortes disponibles cuando se selecciona nivel
+  // Cargar cohortes cuando se avanza al paso 3
   useEffect(() => {
     if (selectedLevel && step === 3) {
       loadAvailableCohorts();
@@ -157,21 +334,17 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
   // ========== MANEJAR SIGUIENTE PASO ==========
   const handleNext = () => {
-    if (step === 1 && !selectedMember) {
-      setError('Debes seleccionar un estudiante');
-      return;
-    }
-    if (step === 2 && !selectedLevel) {
+    if (step === 1 && !selectedLevel) {
       setError('Debes seleccionar un nivel');
       return;
     }
-    if (step === 1) {
-      setStep(2);
-      setError('');
-    } else if (step === 2) {
-      setStep(3);
-      setError('');
+    if (step === 2 && selectedStudents.length === 0) {
+      setError('Debes seleccionar al menos un estudiante');
+      return;
     }
+    
+    setStep(step + 1);
+    setError('');
   };
 
   // ========== MANEJAR PASO ANTERIOR ==========
@@ -182,54 +355,106 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     }
   };
 
-  // ========== INSCRIBIR ESTUDIANTE ==========
-  const handleEnroll = async () => {
-  if (!selectedMember || !selectedCohort) {
-    setError('Falta seleccionar información');
-    return;
-  }
-
-  setLoading(true);
-  setError('');
-
-  try {
-    console.log('📝 Inscribiendo estudiante...');
-    
-    // Crear la inscripción
-    await apiService.createStudentEnrollment(selectedMember.id, selectedCohort.cohortId);
-
-    console.log('✅ Estudiante inscrito exitosamente');
-    
-    // ✅ Mostrar alert inmediatamente
-    alert('Estudiante inscrito exitosamente en la cohorte');
-    
-    // ✅ Luego ejecutar otras operaciones
-    handleReset();
-    onEnrollmentSuccess();
-    
-  } catch (err) {
-    console.error('❌ Error inscribiendo estudiante:', err);
-    setError('Error al inscribir: ' + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // ========== RESETEAR MODAL ==========
-  const handleReset = () => {
-    setStep(1);
-    setSelectedMember(null);
-    setSelectedLevel(null);
-    setSelectedCohort(null);
-    setSearchMember('');
-    setError('');
-    onClose();
+  // ========== SELECCIONAR/DESELECCIONAR ESTUDIANTE ==========
+  const toggleStudent = (student) => {
+    setSelectedStudents(prev => {
+      const isSelected = prev.some(s => s.id === student.id);
+      if (isSelected) {
+        return prev.filter(s => s.id !== student.id);
+      } else {
+        return [...prev, student];
+      }
+    });
   };
 
-  // Filtrar miembros por búsqueda
-  const filteredMembers = members.filter(member =>
-    member.name?.toLowerCase().includes(searchMember.toLowerCase()) ||
-    getDisplayName(member.name)?.toLowerCase().includes(searchMember.toLowerCase())
+  // ========== SELECCIONAR TODOS LOS ESTUDIANTES ==========
+  const selectAllStudents = () => {
+    if (selectedStudents.length === filteredStudents.length) {
+      setSelectedStudents([]);
+    } else {
+      setSelectedStudents(filteredStudents);
+    }
+  };
+
+  // ========== INSCRIBIR ESTUDIANTES ==========
+  const handleEnroll = async () => {
+    if (selectedStudents.length === 0 || !selectedCohort) {
+      setError('Falta seleccionar información');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setEnrollingStatus({});
+
+    try {
+      console.log(`📝 Inscribiendo ${selectedStudents.length} estudiantes...`);
+      
+      const results = [];
+      const errors = [];
+
+      // Inscribir cada estudiante secuencialmente
+      for (const student of selectedStudents) {
+        try {
+          setEnrollingStatus(prev => ({
+            ...prev,
+            [student.id]: { status: 'enrolling', name: student.name }
+          }));
+
+          await apiService.createStudentEnrollment(student.id, selectedCohort.cohortId);
+          
+          setEnrollingStatus(prev => ({
+            ...prev,
+            [student.id]: { status: 'success', name: student.name }
+          }));
+          
+          results.push(student.name);
+        } catch (err) {
+          console.error(`❌ Error inscribiendo a ${student.name}:`, err);
+          
+          setEnrollingStatus(prev => ({
+            ...prev,
+            [student.id]: { status: 'error', name: student.name, error: err.message }
+          }));
+          
+          errors.push({ name: student.name, error: err.message });
+        }
+      }
+
+      // Mostrar resumen
+      if (results.length > 0) {
+        const successMessage = `✅ ${results.length} estudiante(s) inscrito(s) exitosamente`;
+        if (errors.length === 0) {
+          alert(successMessage);
+        } else {
+          alert(`${successMessage}\n❌ ${errors.length} error(es):\n${errors.map(e => `${e.name}: ${e.error}`).join('\n')}`);
+        }
+      } else if (errors.length > 0) {
+        alert(`❌ No se pudo inscribir ningún estudiante:\n${errors.map(e => `${e.name}: ${e.error}`).join('\n')}`);
+      }
+      
+      // Si al menos uno fue exitoso, refrescar y cerrar
+      if (results.length > 0) {
+        setTimeout(() => {
+          handleReset();
+          onEnrollmentSuccess();
+        }, 2000);
+      }
+      
+    } catch (err) {
+      console.error('❌ Error en proceso de inscripción:', err);
+      setError('Error en el proceso de inscripción: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filtrar estudiantes por búsqueda
+  const filteredStudents = studentsByLevel.filter(student =>
+    student.name?.toLowerCase().includes(searchStudent.toLowerCase()) ||
+    getDisplayName(student.name)?.toLowerCase().includes(searchStudent.toLowerCase()) ||
+    student.email?.toLowerCase().includes(searchStudent.toLowerCase()) ||
+    student.document?.toLowerCase().includes(searchStudent.toLowerCase())
   );
 
   if (!isOpen) return null;
@@ -247,6 +472,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         style={{
           backgroundColor: themeColors.bg,
           color: themeColors.text,
+          maxWidth: step === 2 ? '800px' : '700px'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -258,8 +484,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           }}
         >
           <h2 className="modal-title">
-            {step === 1 && '👤 Seleccionar Estudiante'}
-            {step === 2 && '📚 Seleccionar Nivel'}
+            {step === 1 && '📚 Seleccionar Nivel'}
+            {step === 2 && '👥 Seleccionar Estudiantes'}
             {step === 3 && '🎓 Seleccionar Cohorte'}
           </h2>
           <button className="modal-close-btn" onClick={handleReset}>✕</button>
@@ -294,93 +520,41 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
             </div>
           )}
 
-          {loading ? (
+          {loading && step !== 2 ? (
             <div className="loading-state" style={{ color: themeColors.textSecondary }}>
               ⏳ Cargando información...
             </div>
           ) : (
             <>
-              {/* PASO 1: Seleccionar Estudiante */}
+              {/* PASO 1: Seleccionar Nivel con botón PDF */}
               {step === 1 && (
                 <div className="step-content">
-                  <div className="search-box">
-                    <input
-                      type="text"
-                      placeholder="🔍 Buscar estudiante por nombre..."
-                      value={searchMember}
-                      onChange={(e) => setSearchMember(e.target.value)}
-                      className="search-input"
+                  <div className="level-header">
+                    <p
+                      className="step-info"
                       style={{
-                        backgroundColor: themeColors.card,
-                        color: themeColors.text,
-                        borderColor: themeColors.border,
-                      }}
-                    />
-                  </div>
-
-                  <div className="options-list">
-                    {filteredMembers.length === 0 ? (
-                      <p className="no-options" style={{ color: themeColors.textTertiary }}>
-                        No hay estudiantes disponibles
-                      </p>
-                    ) : (
-                      filteredMembers.map(member => (
-                        <div
-                          key={member.id}
-                          className={`option-item ${selectedMember?.id === member.id ? 'selected' : ''}`}
-                          style={{
-                            borderColor: selectedMember?.id === member.id ? themeColors.selectedBorder : themeColors.border,
-                            backgroundColor: selectedMember?.id === member.id ? themeColors.selected : themeColors.card,
-                          }}
-                          onClick={() => setSelectedMember(member)}
-                        >
-                          <input
-                            type="radio"
-                            checked={selectedMember?.id === member.id}
-                            onChange={() => setSelectedMember(member)}
-                          />
-                          <span className="option-text">
-                            {/* ✅ Mostrar nombre transformado */}
-                            <strong style={{ color: themeColors.text }}>
-                              {getDisplayName(member.name)}
-                            </strong>
-                            <small style={{ color: themeColors.textSecondary }}>{member.email}</small>
-                          </span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  {selectedMember && (
-                    <div
-                      className="selection-summary"
-                      style={{
-                        backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4',
-                        borderLeftColor: isDarkMode ? '#10b981' : '#10b981',
-                        color: isDarkMode ? '#86efac' : '#065f46',
+                        backgroundColor: themeColors.infoBox,
+                        borderLeftColor: themeColors.infoBorder,
+                        color: themeColors.infoText,
                       }}
                     >
-                      {/* ✅ Mostrar nombre transformado */}
-                      <p>✅ Estudiante seleccionado: <strong>{getDisplayName(selectedMember.name)}</strong></p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* PASO 2: Seleccionar Nivel */}
-              {step === 2 && (
-                <div className="step-content">
-                  <p
-                    className="step-info"
-                    style={{
-                      backgroundColor: themeColors.infoBox,
-                      borderLeftColor: themeColors.infoBorder,
-                      color: themeColors.infoText,
-                    }}
-                  >
-                    {/* ✅ Mostrar nombre transformado */}
-                    Estudiante: <strong>{getDisplayName(selectedMember?.name)}</strong>
-                  </p>
+                      Selecciona el nivel para ver los estudiantes disponibles
+                    </p>
+                    
+                    {selectedLevel && (
+                      <button
+                        className="pdf-button"
+                        onClick={() => generatePDFByLevel(selectedLevel)}
+                        style={{
+                          backgroundColor: isDarkMode ? '#4b5563' : '#f3f4f6',
+                          color: isDarkMode ? '#f1f5f9' : '#374151',
+                          border: `1px solid ${themeColors.border}`,
+                        }}
+                      >
+                        📄 Exportar Listado PDF
+                      </button>
+                    )}
+                  </div>
 
                   <div className="options-grid">
                     {LEVELS.map(level => (
@@ -413,13 +587,14 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                       }}
                     >
                       <p>✅ Nivel seleccionado: <strong>{LEVELS.find(l => l.value === selectedLevel)?.label}</strong></p>
+                      <p>📊 Estudiantes en este nivel: <strong>{allMembers.filter(m => m.currentLevel === selectedLevel).length}</strong></p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* PASO 3: Seleccionar Cohorte */}
-              {step === 3 && (
+              {/* PASO 2: Seleccionar Estudiantes del nivel */}
+              {step === 2 && (
                 <div className="step-content">
                   <p
                     className="step-info"
@@ -429,76 +604,257 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
                       color: themeColors.infoText,
                     }}
                   >
-                    {/* ✅ Mostrar nombre transformado */}
-                    Estudiante: <strong>{getDisplayName(selectedMember?.name)}</strong><br />
                     Nivel: <strong>{LEVELS.find(l => l.value === selectedLevel)?.label}</strong>
+                    {' | '}
+                    Estudiantes encontrados: <strong>{studentsByLevel.length}</strong>
                   </p>
 
-                  <div className="cohorts-list">
-                    {availableCohorts.length === 0 ? (
+                  <div className="search-box">
+                    <input
+                      type="text"
+                      placeholder="🔍 Buscar estudiante por nombre, email o documento..."
+                      value={searchStudent}
+                      onChange={(e) => setSearchStudent(e.target.value)}
+                      className="search-input"
+                      style={{
+                        backgroundColor: themeColors.card,
+                        color: themeColors.text,
+                        borderColor: themeColors.border,
+                      }}
+                    />
+                  </div>
+
+                  {studentsByLevel.length > 0 && (
+                    <div className="select-all-container">
+                      <label className="select-all-label">
+                        <input
+                          type="checkbox"
+                          checked={selectedStudents.length === filteredStudents.length && filteredStudents.length > 0}
+                          onChange={selectAllStudents}
+                          disabled={filteredStudents.length === 0}
+                        />
+                        <span style={{ color: themeColors.text }}>
+                          {selectedStudents.length === filteredStudents.length 
+                            ? 'Deseleccionar todos' 
+                            : 'Seleccionar todos'}
+                        </span>
+                      </label>
+                      <span className="selected-count" style={{ color: themeColors.textSecondary }}>
+                        {selectedStudents.length} seleccionados
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="students-list">
+                    {loading ? (
+                      <div className="loading-state" style={{ color: themeColors.textSecondary }}>
+                        ⏳ Cargando estudiantes...
+                      </div>
+                    ) : filteredStudents.length === 0 ? (
                       <p className="no-options" style={{ color: themeColors.textTertiary }}>
-                        No hay cohortes disponibles para este nivel
+                        {searchStudent 
+                          ? 'No hay estudiantes que coincidan con la búsqueda'
+                          : 'No hay estudiantes disponibles en este nivel'}
                       </p>
                     ) : (
-                      availableCohorts.map(cohort => (
+                      filteredStudents.map(student => (
                         <div
-                          key={cohort.cohortId}
-                          className={`cohort-item ${selectedCohort?.cohortId === cohort.cohortId ? 'selected' : ''}`}
+                          key={student.id}
+                          className={`student-item ${selectedStudents.some(s => s.id === student.id) ? 'selected' : ''}`}
                           style={{
-                            borderColor: selectedCohort?.cohortId === cohort.cohortId ? themeColors.selectedBorder : themeColors.border,
-                            backgroundColor: selectedCohort?.cohortId === cohort.cohortId ? themeColors.selected : themeColors.card,
+                            borderColor: selectedStudents.some(s => s.id === student.id) ? themeColors.selectedBorder : themeColors.border,
+                            backgroundColor: selectedStudents.some(s => s.id === student.id) ? themeColors.selected : themeColors.card,
+                            opacity: enrollingStatus[student.id]?.status === 'success' ? 0.6 : 1,
                           }}
-                          onClick={() => setSelectedCohort(cohort)}
+                          onClick={() => toggleStudent(student)}
                         >
                           <input
-                            type="radio"
-                            checked={selectedCohort?.cohortId === cohort.cohortId}
-                            onChange={() => setSelectedCohort(cohort)}
+                            type="checkbox"
+                            checked={selectedStudents.some(s => s.id === student.id)}
+                            onChange={() => toggleStudent(student)}
+                            disabled={enrollingStatus[student.id]?.status === 'success'}
                           />
-                          <div className="cohort-info">
-                            <strong style={{ color: themeColors.text }}>{cohort.cohortName}</strong>
-                            <p style={{ color: themeColors.textSecondary }}>
-                              {/* ✅ Mostrar nombre transformado del maestro */}
-                              Maestro: {cohort.maestro?.displayName || getDisplayName(cohort.maestro?.name) || 'No asignado'} |
-                              Estudiantes: {cohort.currentStudents}/{cohort.maxStudents} |
-                              Espacios: {cohort.availableSpots}
-                            </p>
-                            <span
-                              className={`status-badge ${cohort.available ? 'available' : 'full'}`}
-                              style={{
-                                backgroundColor: cohort.available
-                                  ? isDarkMode ? '#064e3b' : '#d1fae5'
-                                  : isDarkMode ? '#7f1d1d' : '#fee2e2',
-                                color: cohort.available
-                                  ? isDarkMode ? '#86efac' : '#065f46'
-                                  : isDarkMode ? '#fca5a5' : '#991b1b',
-                              }}
-                            >
-                              {cohort.available ? '✅ Disponible' : '❌ Llena'}
-                            </span>
+                          <div className="student-info">
+                            <div className="student-name">
+                              <strong style={{ color: themeColors.text }}>
+                                {getDisplayName(student.name)}
+                              </strong>
+                              {enrollingStatus[student.id]?.status === 'success' && (
+                                <span className="success-badge" style={{ color: isDarkMode ? '#86efac' : '#065f46' }}>
+                                  ✅ Inscrito
+                                </span>
+                              )}
+                              {enrollingStatus[student.id]?.status === 'error' && (
+                                <span className="error-badge" style={{ color: isDarkMode ? '#fca5a5' : '#991b1b' }}>
+                                  ❌ Error
+                                </span>
+                              )}
+                            </div>
+                            <div className="student-details" style={{ color: themeColors.textSecondary }}>
+                              <span>{student.email || 'Sin email'}</span>
+                              <span>{student.document || 'Sin documento'}</span>
+                              <span>{student.phone || 'Sin teléfono'}</span>
+                            </div>
                           </div>
                         </div>
                       ))
                     )}
                   </div>
+                </div>
+              )}
 
-                  {selectedCohort && (
-                    <div
-                      className="selection-summary"
+              {/* PASO 3: Seleccionar Cohorte */}
+              {/* PASO 3: Seleccionar Cohorte */}
+{step === 3 && (
+  <div className="step-content">
+    <p
+      className="step-info"
+      style={{
+        backgroundColor: themeColors.infoBox,
+        borderLeftColor: themeColors.infoBorder,
+        color: themeColors.infoText,
+      }}
+    >
+      <strong>Nivel:</strong> {LEVELS.find(l => l.value === selectedLevel)?.label}<br />
+      <strong>Estudiantes seleccionados:</strong> {selectedStudents.length}
+    </p>
+
+    {loading ? (
+      <div className="loading-state" style={{ color: themeColors.textSecondary }}>
+        ⏳ Cargando cohortes disponibles...
+      </div>
+    ) : (
+      <>
+        <div className="cohorts-list">
+          {availableCohorts.length === 0 ? (
+            <div 
+              className="no-cohorts"
+              style={{
+                backgroundColor: isDarkMode ? '#1e293b' : '#f9fafb',
+                border: `1px dashed ${themeColors.border}`,
+                borderRadius: '8px',
+                padding: '30px 20px',
+                textAlign: 'center'
+              }}
+            >
+              <span style={{ fontSize: '40px', display: 'block', marginBottom: '12px' }}>📭</span>
+              <p style={{ color: themeColors.textSecondary, marginBottom: '8px' }}>
+                No hay cohortes disponibles para el nivel {LEVELS.find(l => l.value === selectedLevel)?.label}
+              </p>
+              <p style={{ color: themeColors.textTertiary, fontSize: '12px' }}>
+                Verifica que existan cohortes creadas y activas para este nivel
+              </p>
+            </div>
+          ) : (
+            availableCohorts.map(cohort => (
+              <div
+                key={cohort.cohortId}
+                className={`cohort-item ${selectedCohort?.cohortId === cohort.cohortId ? 'selected' : ''}`}
+                style={{
+                  borderColor: selectedCohort?.cohortId === cohort.cohortId ? themeColors.selectedBorder : themeColors.border,
+                  backgroundColor: selectedCohort?.cohortId === cohort.cohortId ? themeColors.selected : themeColors.card,
+                  cursor: cohort.available ? 'pointer' : 'not-allowed',
+                  opacity: cohort.available ? 1 : 0.6
+                }}
+                onClick={() => cohort.available && setSelectedCohort(cohort)}
+              >
+                <input
+                  type="radio"
+                  name="cohort"
+                  checked={selectedCohort?.cohortId === cohort.cohortId}
+                  onChange={() => setSelectedCohort(cohort)}
+                  disabled={!cohort.available}
+                />
+                <div className="cohort-info" style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <strong style={{ color: themeColors.text, fontSize: '14px' }}>
+                      {cohort.cohortName}
+                    </strong>
+                    <span
+                      className="status-badge"
                       style={{
-                        backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4',
-                        borderLeftColor: isDarkMode ? '#10b981' : '#10b981',
-                        color: isDarkMode ? '#86efac' : '#065f46',
+                        backgroundColor: cohort.available
+                          ? isDarkMode ? '#064e3b' : '#d1fae5'
+                          : isDarkMode ? '#7f1d1d' : '#fee2e2',
+                        color: cohort.available
+                          ? isDarkMode ? '#86efac' : '#065f46'
+                          : isDarkMode ? '#fca5a5' : '#991b1b',
+                        padding: '4px 8px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: '600'
                       }}
                     >
-                      <p>✅ Cohorte seleccionada: <strong>{selectedCohort.cohortName}</strong></p>
-                      {selectedCohort.maestro && (
-                        <p>Maestro: <strong>{selectedCohort.maestro.displayName || getDisplayName(selectedCohort.maestro.name)}</strong></p>
-                      )}
+                      {cohort.available ? '✅ Disponible' : '❌ Llena'}
+                    </span>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '11px', color: themeColors.textSecondary }}>
+                      <span style={{ color: themeColors.textTertiary }}>📅 Inicio:</span>{' '}
+                      {new Date(cohort.startDate).toLocaleDateString()}
+                    </div>
+                    <div style={{ fontSize: '11px', color: themeColors.textSecondary }}>
+                      <span style={{ color: themeColors.textTertiary }}>📅 Fin:</span>{' '}
+                      {new Date(cohort.endDate).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '11px', color: themeColors.textSecondary }}>
+                      <span style={{ color: themeColors.textTertiary }}>👤 Maestro:</span>{' '}
+                      {cohort.maestro?.displayName || 'No asignado'}
+                    </div>
+                    <div style={{ fontSize: '11px', color: themeColors.textSecondary }}>
+                      <span style={{ color: themeColors.textTertiary }}>📊 Cupo:</span>{' '}
+                      {cohort.currentStudents}/{cohort.maxStudents}
+                    </div>
+                    <div style={{ fontSize: '11px', color: themeColors.textSecondary }}>
+                      <span style={{ color: themeColors.textTertiary }}>🪑 Disponibles:</span>{' '}
+                      <span style={{ 
+                        color: cohort.availableSpots > 0 ? themeColors.success : themeColors.danger,
+                        fontWeight: 'bold'
+                      }}>
+                        {cohort.availableSpots}
+                      </span>
+                    </div>
+                  </div>
+
+                  {cohort.status && (
+                    <div style={{ fontSize: '10px', color: themeColors.textTertiary }}>
+                      Estado: {cohort.status}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {selectedCohort && (
+          <div
+            className="selection-summary"
+            style={{
+              backgroundColor: isDarkMode ? '#064e3b' : '#f0fdf4',
+              borderLeftColor: isDarkMode ? '#10b981' : '#10b981',
+              color: isDarkMode ? '#86efac' : '#065f46',
+              marginTop: '16px',
+              padding: '12px 16px',
+              borderRadius: '6px'
+            }}
+          >
+            <p style={{ margin: '0 0 4px 0' }}>
+              <strong>✅ Cohorte seleccionada:</strong> {selectedCohort.cohortName}
+            </p>
+            <p style={{ margin: 0, fontSize: '12px' }}>
+              Inscribirás <strong>{selectedStudents.length}</strong> estudiante(s) en esta cohorte
+            </p>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+)}
             </>
           )}
         </div>
@@ -528,7 +884,11 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
             <button
               className="btn-primary"
               onClick={handleNext}
-              disabled={loading || (step === 1 && !selectedMember) || (step === 2 && !selectedLevel)}
+              disabled={
+                loading || 
+                (step === 1 && !selectedLevel) || 
+                (step === 2 && selectedStudents.length === 0)
+              }
             >
               Siguiente →
             </button>
@@ -538,7 +898,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
               onClick={handleEnroll}
               disabled={loading || !selectedCohort}
             >
-              ✅ Inscribir
+              {loading ? '⏳ Inscribiendo...' : `✅ Inscribir ${selectedStudents.length} estudiante(s)`}
             </button>
           )}
 
@@ -574,7 +934,6 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
         .modal-container {
           border-radius: 12px;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          max-width: 700px;
           width: 100%;
           max-height: 90vh;
           overflow-y: auto;
@@ -672,13 +1031,37 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           animation: fadeIn 0.3s ease-in-out;
         }
 
+        .level-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+          gap: 16px;
+        }
+
+        .pdf-button {
+          padding: 8px 16px;
+          border-radius: 8px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          white-space: nowrap;
+        }
+
+        .pdf-button:hover {
+          opacity: 0.8;
+          transform: translateY(-2px);
+        }
+
         .step-info {
-          margin: 0 0 20px;
+          margin: 0;
           padding: 12px 16px;
           border-left: 4px solid;
           border-radius: 6px;
           font-size: 13px;
           transition: all 300ms ease-in-out;
+          flex: 1;
         }
 
         .step-info strong {
@@ -705,8 +1088,34 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        .options-list,
-        .cohorts-list {
+        .select-all-container {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+          padding: 8px 12px;
+          background-color: ${themeColors.bgLight};
+          border-radius: 8px;
+        }
+
+        .select-all-label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-size: 14px;
+        }
+
+        .select-all-label input {
+          cursor: pointer;
+        }
+
+        .selected-count {
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .students-list {
           display: flex;
           flex-direction: column;
           gap: 8px;
@@ -714,8 +1123,7 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           overflow-y: auto;
         }
 
-        .option-item,
-        .cohort-item {
+        .student-item {
           padding: 12px 16px;
           border: 1.5px solid;
           border-radius: 8px;
@@ -726,52 +1134,41 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           gap: 12px;
         }
 
-        .option-item:hover,
-        .cohort-item:hover {
+        .student-item:hover {
           transform: translateX(4px);
         }
 
-        .option-item input,
-        .cohort-item input {
+        .student-item input {
           margin-top: 2px;
           cursor: pointer;
         }
 
-        .option-text {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-        }
-
-        .option-text strong {
-          font-weight: 600;
-        }
-
-        .option-text small {
-          font-size: 12px;
-        }
-
-        .cohort-info {
+        .student-info {
           flex: 1;
         }
 
-        .cohort-info strong {
-          display: block;
+        .student-name {
+          display: flex;
+          align-items: center;
+          gap: 8px;
           margin-bottom: 4px;
         }
 
-        .cohort-info p {
-          margin: 0 0 8px;
-          font-size: 12px;
+        .student-name strong {
+          font-weight: 600;
         }
 
-        .status-badge {
-          display: inline-block;
-          padding: 4px 8px;
-          border-radius: 4px;
+        .success-badge,
+        .error-badge {
           font-size: 11px;
           font-weight: 600;
-          transition: all 300ms ease-in-out;
+        }
+
+        .student-details {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          font-size: 12px;
         }
 
         .options-grid {
@@ -804,6 +1201,57 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
           font-weight: 500;
           font-size: 13px;
           transition: color 300ms ease-in-out;
+        }
+
+        .cohorts-list {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+
+        .cohort-item {
+          padding: 12px 16px;
+          border: 1.5px solid;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+        }
+
+        .cohort-item:hover {
+          transform: translateX(4px);
+        }
+
+        .cohort-item input {
+          margin-top: 2px;
+          cursor: pointer;
+        }
+
+        .cohort-info {
+          flex: 1;
+        }
+
+        .cohort-info strong {
+          display: block;
+          margin-bottom: 4px;
+        }
+
+        .cohort-info p {
+          margin: 0 0 8px;
+          font-size: 12px;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+          transition: all 300ms ease-in-out;
         }
 
         .no-options {
@@ -903,6 +1351,20 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
 
           .options-grid {
             grid-template-columns: repeat(2, 1fr);
+          }
+
+          .level-header {
+            flex-direction: column;
+            align-items: stretch;
+          }
+
+          .pdf-button {
+            width: 100%;
+          }
+
+          .student-details {
+            flex-direction: column;
+            gap: 4px;
           }
 
           .modal-footer {

@@ -181,17 +181,19 @@ class authService {
       });
 
       if (!res.ok) {
-        // ✅ Manejo específico de errores
-        if (res.status === 403) {
-          throw new Error('No tienes permisos para registrar usuarios');
-        }
-        if (res.status === 409) {
-          throw new Error('El usuario ya existe');
-        }
-        if (res.status === 400) {
-          throw new Error('Datos inválidos');
-        }
-        throw new Error('Error al registrar usuario');
+
+        const errorData = await res.json().catch(() => null);
+
+        const error = new Error(
+          errorData?.message ||
+          errorData?.error ||
+          "Error al registrar usuario"
+        );
+
+        // 🔑 conservar status HTTP
+        error.status = res.status;
+
+        throw error;
       }
 
       const data = await res.json();
@@ -212,10 +214,10 @@ class authService {
 
       // ⚠️ Solo decodifica - no valida firma (el backend lo hace)
       const payload = JSON.parse(atob(token.split('.')[1]));
-      
+
       // Verificar si ha expirado
       if (!payload.exp) return false;
-      
+
       return payload.exp * 1000 > Date.now();
     } catch (error) {
       logError('❌ [isTokenValid] Error validando token:', error.message);
@@ -275,7 +277,7 @@ class authService {
 
       const data = await response.json();
       log('✅ [changePassword] Contraseña cambiada exitosamente');
-      
+
       return data;
     } catch (error) {
       logError('❌ [changePassword] Error:', error.message);
@@ -307,7 +309,7 @@ class authService {
 
       const data = await response.json();
       log('✅ [checkPasswordChangeRequired] Resultado:', data);
-      
+
       return data;
     } catch (error) {
       logError('❌ [checkPasswordChangeRequired] Error:', error.message);
@@ -512,7 +514,7 @@ class authService {
   hasRole(role) {
     try {
       const user = this.getCurrentUser();
-      
+
       if (!user || !user.roles || !Array.isArray(user.roles)) {
         return false;
       }
@@ -547,7 +549,7 @@ class authService {
   isAuthenticated() {
     const token = this.getToken();
     const user = this.getCurrentUser();
-    
+
     if (!token || !user) {
       return false;
     }

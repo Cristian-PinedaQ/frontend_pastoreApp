@@ -287,14 +287,27 @@ const UsersPage = () => {
       setShowPassword(false);
       await loadUsers();
     } catch (err) {
-      if (err.code === "CONFLICT") {
-        handleError("CONFLICT", "handleSubmit");
-      } else if (err.code === "VALIDATION_ERROR") {
-        handleError("VALIDATION_ERROR", "handleSubmit");
-      } else {
-        handleError("SERVER_ERROR", "handleSubmit");
-      }
-    } finally {
+
+  const status = err.status;
+  const message = err.message;
+
+  if (status === 409) {
+    setError(message || ERROR_MESSAGES.CONFLICT);
+  } 
+  else if (status === 400) {
+    setError(message || ERROR_MESSAGES.VALIDATION_ERROR);
+  } 
+  else if (status === 404) {
+    setError(ERROR_MESSAGES.NOT_FOUND);
+  } 
+  else if (status === 403) {
+    setError(ERROR_MESSAGES.UNAUTHORIZED);
+  }
+  else {
+    setError(message || ERROR_MESSAGES.SERVER_ERROR);
+  }
+
+} finally {
       setLoading(false);
     }
   };

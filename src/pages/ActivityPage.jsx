@@ -2,7 +2,7 @@
 // ActivityPage.jsx - Gestión de Actividades
 // ============================================
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiService from "../apiService";
 import ModalAddActivity from "../components/ModalAddActivity";
 import ModalActivityDetails from "../components/ModalActivityDetails";
@@ -73,12 +73,10 @@ const formatDate = (dateString) => {
 };
 
 // ✅ Estado de actividad
-// ✅ Fix
 const getStatusLabel = (isActive, endDate) => {
   try {
     if (!isActive) return { text: "🔴 Inactiva", color: "danger" };
 
-    // Comparar solo por fecha, sin hora ni zona horaria
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -86,11 +84,10 @@ const getStatusLabel = (isActive, endDate) => {
       .split("T")[0]
       .split("-")
       .map(Number);
-    const end = new Date(year, month - 1, day); // local, sin UTC
+    const end = new Date(year, month - 1, day);
 
     if (isNaN(end.getTime())) return { text: "🟡 Activa", color: "warning" };
 
-    // end < today: solo días anteriores a hoy (hoy mismo NO es finalizada)
     if (end < today) return { text: "⚫ Finalizada", color: "dark" };
     if (end.getTime() - today.getTime() <= 7 * 24 * 60 * 60 * 1000) {
       return { text: "🟠 Por finalizar", color: "warning" };
@@ -117,10 +114,8 @@ const formatCurrency = (amount) => {
 // 🔐 CONTROL DE ACCESO POR ROLES
 // ============================================
 
-// Roles con acceso total (GET + POST + PATCH + DELETE)
 const FULL_ACCESS_ROLES = ["ROLE_PASTORES", "ROLE_ECONOMICO"];
 
-// Mapeo de roles restringidos → LevelEnrollments que pueden ver
 const ROLE_LEVEL_MAP = {
   ROLE_CONEXION: ["PREENCUENTRO"],
   ROLE_CIMIENTO: ["ENCUENTRO", "POST_ENCUENTRO", "BAUTIZOS"],
@@ -129,12 +124,12 @@ const ROLE_LEVEL_MAP = {
     "ESENCIA_2",
     "ESENCIA_3",
     "SANIDAD_INTEGRAL_RAICES",
-    "ESENCIA_4","ADIESTRAMIENTO", 
-    "GRADUACION"
+    "ESENCIA_4",
+    "ADIESTRAMIENTO",
+    "GRADUACION",
   ],
 };
 
-// Etiquetas legibles para mostrar en el badge
 const LEVEL_LABELS = {
   PREENCUENTRO: "Pre-encuentro",
   ENCUENTRO: "Encuentro",
@@ -162,36 +157,50 @@ const getCurrentUserRoles = () => {
   }
 };
 
-// true si el usuario tiene acceso total
 const hasFullAccess = (roles) =>
   roles.some((r) => FULL_ACCESS_ROLES.includes(r));
 
 // null = sin restricción | [] = sin acceso | [...] = niveles permitidos
 const getAllowedLevels = (roles) => {
-  if (hasFullAccess(roles)) return null;
+  // acceso total
+  if (hasFullAccess(roles)) {
+    return null;
+  }
+
   const levels = new Set();
+
   Object.entries(ROLE_LEVEL_MAP).forEach(([role, lvls]) => {
-    if (roles.includes(role)) lvls.forEach((l) => levels.add(l));
+    if (roles.includes(role)) {
+      lvls.forEach((level) => levels.add(level));
+    }
   });
-  return [...levels];
+
+  return Array.from(levels);
 };
 
 // Filtra el array de actividades por los niveles permitidos
 const filterActivitiesByRole = (activities, allowedLevels) => {
   if (allowedLevels === null) return activities;
   if (allowedLevels.length === 0) return [];
+
   return activities.filter((a) => {
-    const level = a.levelEnrollment ?? a.level ?? null;
-    if (!level) return true; // actividades genéricas visibles para todos
+    if (a.activityType === "STANDALONE") return false;
+
+    const level = a.levelEnrollment;
+
+    if (!level) return false;
+
     return allowedLevels.includes(level);
   });
 };
 
 const ActivityPage = () => {
-  // ========== ROLES DEL USUARIO (calculados una sola vez) ==========
-  const userRoles = getCurrentUserRoles();
-  const canWrite = hasFullAccess(userRoles);
-  const allowedLevels = getAllowedLevels(userRoles);
+
+  // ========== ROLES DEL USUARIO (memoizados — sin loops) ==========
+  // ✅ useMemo garantiza referencia estable: sessionStorage no cambia en la sesión
+  const userRoles = useMemo(() => getCurrentUserRoles(), []);
+  const canWrite = useMemo(() => hasFullAccess(userRoles), [userRoles]);
+  const allowedLevels = useMemo(() => getAllowedLevels(userRoles), [userRoles]);
 
   // ========== ESTADOS ==========
   const [allActivities, setAllActivities] = useState([]);
@@ -233,14 +242,13 @@ const ActivityPage = () => {
   // ========== CARGAR ACTIVIDADES ==========
   const loadActivities = useCallback(async () => {
     setLoading(true);
-    setError(""); // 🔧 Limpiar errores previos
+    setError("");
 
     try {
       log("Cargando actividades");
 
       const response = await apiService.request("/activity");
 
-      // 🔧 Validación mejorada de respuesta
       if (!response) {
         log("Respuesta vacía del servidor");
         setAllActivities([]);
@@ -248,12 +256,10 @@ const ActivityPage = () => {
         return;
       }
 
-      // 🔧 Asegurar que response es un array
       const activities = Array.isArray(response) ? response : [];
 
       log("Actividades cargadas", { count: activities.length });
 
-      // 🔧 Si no hay actividades, establecer arrays vacíos sin error
       if (activities.length === 0) {
         log("No hay actividades registradas");
         setAllActivities([]);
@@ -276,14 +282,17 @@ const ActivityPage = () => {
         quantity: activity.quantity || 0,
         isActive: activity.isActive === true,
         status: getStatusLabel(activity.isActive, activity.endDate),
-        // 🔑 Campos necesarios para el filtrado por rol
-        levelEnrollment: activity.levelEnrollment ?? activity.level ?? null,
+        levelEnrollment:
+  activity.requiredLevel ??
+  activity.levelEnrollment ??
+  activity.level ??
+  null,
         activityType: activity.activityType ?? null,
       }));
 
       log("Actividades procesadas", { count: processedActivities.length });
 
-      // 🔐 Aplicar filtro de rol ANTES de guardar en el estado
+      // ✅ allowedLevels es estable gracias a useMemo — no causa loop
       const roleFiltered = filterActivitiesByRole(
         processedActivities,
         allowedLevels,
@@ -304,11 +313,9 @@ const ActivityPage = () => {
     } catch (err) {
       logError("Error cargando actividades:", err);
 
-      // 🔧 Mensaje de error más claro
       const errorMessage = err.message || "Error al cargar actividades";
       setError(errorMessage);
 
-      // 🔧 Establecer arrays vacíos en caso de error
       setAllActivities([]);
       setFilteredActivities([]);
 
@@ -320,7 +327,8 @@ const ActivityPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [allowedLevels]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowedLevels]); // allowedLevels es estable gracias a useMemo
 
   // ========== CARGAR BALANCE DE ACTIVIDAD ==========
   const loadActivityBalance = useCallback(async (activityId) => {
@@ -335,11 +343,9 @@ const ActivityPage = () => {
       log("Balance cargado", balance);
       return balance;
     } catch (err) {
-      // 🔧 Solo loguear en modo DEBUG, no en producción
       if (DEBUG) {
         logError("Error cargando balance (no crítico):", err);
       }
-      // Establecer balance como null silenciosamente
       setActivityBalance(null);
       return null;
     }
@@ -350,7 +356,6 @@ const ActivityPage = () => {
     try {
       log("Cargando participantes", { activityId });
 
-      // ✅ CORREGIDO: Usar el endpoint correcto con información de líder y distrito
       const participants = await apiService.request(
         `/activity-contribution/activity/${activityId}/with-leader-info`,
       );
@@ -359,11 +364,9 @@ const ActivityPage = () => {
       log("Participantes cargados", { count: participants?.length || 0 });
       return participants || [];
     } catch (err) {
-      // 🔧 Solo loguear en modo DEBUG, no en producción
       if (DEBUG) {
         logError("Error cargando participantes (no crítico):", err);
       }
-      // Establecer array vacío silenciosamente
       setActivityParticipants([]);
       return [];
     }
@@ -374,7 +377,6 @@ const ActivityPage = () => {
     try {
       log("Recargando datos y limpiando filtros");
 
-      // 🔧 Limpiar error antes de recargar
       setError("");
       setSelectedStatus("ALL");
       setSearchText("");
@@ -396,7 +398,6 @@ const ActivityPage = () => {
     try {
       let filtered = [...allActivities];
 
-      // Ordenar por fecha de finalización (más cercanas primero)
       filtered.sort((a, b) => {
         try {
           const dateA = new Date(a.endDate || 0).getTime();
@@ -407,12 +408,10 @@ const ActivityPage = () => {
         }
       });
 
-      // Filtrar por estado
       if (selectedStatus !== "ALL") {
         filtered = filtered.filter((activity) => {
           if (selectedStatus === "ACTIVE") return activity.isActive === true;
           if (selectedStatus === "INACTIVE") return activity.isActive === false;
-          // ✅ Fix
           if (selectedStatus === "ENDING_SOON") {
             const [y, m, d] = String(activity.endDate)
               .split("T")[0]
@@ -432,13 +431,12 @@ const ActivityPage = () => {
             const end = new Date(y, m - 1, d);
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            return end < today; // hoy NO es finalizada, solo días anteriores
+            return end < today;
           }
           return true;
         });
       }
 
-      // Filtrar por fechas personalizadas
       if (startDate && !endDate) {
         const targetDate = startDate;
         filtered = filtered.filter((activity) => {
@@ -464,7 +462,6 @@ const ActivityPage = () => {
         });
       }
 
-      // Filtrar por búsqueda
       if (searchText.trim()) {
         const search = searchText.toLowerCase();
         filtered = filtered.filter((activity) =>
@@ -493,7 +490,6 @@ const ActivityPage = () => {
   // ========== AGREGAR ACTIVIDAD ==========
   const handleAddActivity = useCallback(
     async (activityData) => {
-      // 🔐 Guardia: solo acceso total puede crear
       if (!canWrite) return;
 
       try {
@@ -507,7 +503,6 @@ const ActivityPage = () => {
           return;
         }
 
-        // Verificar específicamente para ENROLLMENT
         if (activityData.activityType === "ENROLLMENT") {
           console.log(
             "🔍 [ActivityPage] Es ENROLLMENT, enrollmentId en activityData:",
@@ -523,7 +518,6 @@ const ActivityPage = () => {
           }
         }
 
-        // 🔴 LOG CRÍTICO: Ver qué se envía al backend
         console.log(
           "📤 [ActivityPage] Enviando al backend:",
           JSON.stringify(activityData, null, 2),
@@ -559,7 +553,6 @@ const ActivityPage = () => {
   // ========== ACTUALIZAR ACTIVIDAD ==========
   const handleUpdateActivity = useCallback(
     async (activityId, activityData) => {
-      // 🔐 Guardia: solo acceso total puede actualizar
       if (!canWrite) return;
 
       try {
@@ -575,7 +568,6 @@ const ActivityPage = () => {
 
         log("Actualizando actividad", { activityId, activityData });
 
-        // ✅ CORREGIDO: Usar apiService.request con el método correcto
         const response = await apiService.request(
           `/activity/patch/${activityId}`,
           {
@@ -594,7 +586,7 @@ const ActivityPage = () => {
         alert("✅ Actividad actualizada exitosamente");
         setShowAddModal(false);
         setSelectedActivity(null);
-        await loadActivities(); // Recargar la lista
+        await loadActivities();
 
         return response;
       } catch (err) {
@@ -615,7 +607,6 @@ const ActivityPage = () => {
   // ========== ELIMINAR/DESACTIVAR ACTIVIDAD ==========
   const handleDeleteActivity = useCallback(
     async (activityId) => {
-      // 🔐 Guardia: solo acceso total puede eliminar
       if (!canWrite) return;
 
       try {
@@ -660,11 +651,9 @@ const ActivityPage = () => {
     async (activity) => {
       log("Mostrando detalles de actividad", { activityId: activity.id });
 
-      // 🔧 Abrir modal INMEDIATAMENTE sin esperar
       setSelectedActivity(activity);
       setShowDetailsModal(true);
 
-      // 🔧 Cargar balance en segundo plano (no bloqueante)
       loadActivityBalance(activity.id);
 
       logUserAction("view_activity_details", {
@@ -680,11 +669,9 @@ const ActivityPage = () => {
     async (activity) => {
       log("Mostrando participantes", { activityId: activity.id });
 
-      // 🔧 Abrir modal INMEDIATAMENTE sin esperar
       setSelectedActivity(activity);
       setShowParticipantsModal(true);
 
-      // 🔧 Cargar participantes en segundo plano (no bloqueante)
       loadActivityParticipants(activity.id);
 
       logUserAction("view_activity_participants", {
@@ -700,11 +687,9 @@ const ActivityPage = () => {
     async (activity) => {
       log("Mostrando finanzas", { activityId: activity.id });
 
-      // 🔧 Abrir modal INMEDIATAMENTE sin esperar
       setSelectedActivity(activity);
       setShowFinanceModal(true);
 
-      // 🔧 Cargar balance en segundo plano (no bloqueante)
       loadActivityBalance(activity.id);
 
       logUserAction("view_activity_finance", {
@@ -718,16 +703,14 @@ const ActivityPage = () => {
   // ========== EXPORTAR PDF ==========
   const handleExportPDF = useCallback(async () => {
     try {
-      setError(""); // Limpiar errores previos
+      setError("");
       log("Generando PDF de actividades");
 
-      // Mostrar loading
       setLoading(true);
 
       let title = "Reporte de Actividades";
       let subtitle = "";
 
-      // Crear subtítulo con filtros aplicados
       const filterLabels = [];
 
       if (selectedStatus !== "ALL") {
@@ -773,7 +756,6 @@ const ActivityPage = () => {
         },
       };
 
-      // 🔧 Generar PDF
       const success = await generateActivityPDF(data, "reporte-actividades");
 
       if (success) {
@@ -785,7 +767,6 @@ const ActivityPage = () => {
           timestamp: new Date().toISOString(),
         });
 
-        // Mostrar mensaje de éxito
         alert(
           `✅ PDF generado exitosamente\n📄 Se descargó el archivo: reporte-actividades-${new Date().toISOString().split("T")[0]}.pdf`,
         );
@@ -808,12 +789,8 @@ const ActivityPage = () => {
   ]);
 
   // ========== INSCRIBIR PARTICIPANTE ==========
-  // ========== INSCRIBIR PARTICIPANTE ==========
-  // ========== INSCRIBIR PARTICIPANTE ==========
-  // ========== INSCRIBIR PARTICIPANTE ==========
   const handleEnrollParticipant = useCallback(
     async (activityId, memberId, initialPayment) => {
-      // 🔐 Guardia: solo acceso total puede inscribir
       if (!canWrite) return false;
 
       try {
@@ -826,36 +803,27 @@ const ActivityPage = () => {
         const currentUser = apiService.getCurrentUser();
         const recordedBy = currentUser?.username || "Sistema";
 
-        // CORRECCIÓN: Verificar si realmente hay pago inicial
         const hasInitialPayment =
           initialPayment && parseFloat(initialPayment) > 0;
 
-        // PRIMERO: Verificar si el miembro ya está inscrito en esta actividad
         log("Verificando si el miembro ya está inscrito...");
 
         let alreadyEnrolled = false;
         try {
-          // Cargar los participantes actuales de la actividad
           const currentParticipants = await apiService.request(
             `/activity-contribution/activity/${activityId}/with-leader-info`,
           );
 
           if (Array.isArray(currentParticipants)) {
             alreadyEnrolled = currentParticipants.some((participant) => {
-              // Verificar por memberId directo
               if (participant.memberId === memberId) return true;
-
-              // Verificar por objeto member anidado
               if (participant.member && participant.member.id === memberId)
                 return true;
-
-              // Verificar por miembro como objeto en member
               if (
                 participant.member &&
                 participant.member.memberId === memberId
               )
                 return true;
-
               return false;
             });
 
@@ -864,7 +832,7 @@ const ActivityPage = () => {
                 "❌ Este miembro ya está inscrito en esta actividad";
               setError(errorMsg);
               log("Miembro ya inscrito", { activityId, memberId });
-              return false; // 🔴 IMPORTANTE: Retornar false para detener la ejecución
+              return false;
             }
           }
         } catch (checkError) {
@@ -872,10 +840,8 @@ const ActivityPage = () => {
             "No se pudo verificar inscripción previa, continuando...",
             checkError,
           );
-          // Continuamos aunque falle la verificación, el backend lo validará
         }
 
-        // 🔴 CORRECCIÓN: Si ya está inscrito, NO continuar
         if (alreadyEnrolled) {
           return false;
         }
@@ -885,23 +851,20 @@ const ActivityPage = () => {
         let enrollmentData;
 
         if (hasInitialPayment) {
-          // CASO 1: Con pago inicial
           endpoint = "/activity-contribution/create-with-initial-payment";
           enrollmentData = {
             memberId,
             activityId,
-            incomeMethod: "CASH", // Valor por defecto
+            incomeMethod: "CASH",
             recordedBy,
             initialPaymentAmount: parseFloat(initialPayment),
           };
         } else {
-          // CASO 2: Sin pago inicial - usar endpoint diferente
           endpoint = "/activity-contribution/save";
           enrollmentData = {
             memberId,
             activityId,
             recordedBy,
-            // NO enviar initialPaymentAmount ni incomeMethod
           };
         }
 
@@ -925,7 +888,6 @@ const ActivityPage = () => {
           `✅ Participante inscrito ${hasInitialPayment ? `con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}` : "sin pago inicial"}`,
         );
 
-        // Recargar datos si estamos viendo participantes o detalles
         if (showParticipantsModal) {
           await loadActivityParticipants(activityId);
         }
@@ -937,7 +899,6 @@ const ActivityPage = () => {
       } catch (err) {
         logError("Error inscribiendo participante:", err);
 
-        // Mensaje de error más específico
         let errorMessage = "Error al inscribir participante";
         if (err.response?.data?.error) {
           errorMessage = err.response.data.error;
@@ -964,7 +925,7 @@ const ActivityPage = () => {
 
   // ========== BADGE DE ACCESO RESTRINGIDO ==========
   const accessBadgeInfo = (() => {
-    if (canWrite) return null; // sin badge para acceso total
+    if (canWrite) return null;
     if (!allowedLevels || allowedLevels.length === 0)
       return { label: "Sin acceso de escritura", levels: [] };
     return {
@@ -982,7 +943,7 @@ const ActivityPage = () => {
           <h1>📋 Gestión de Actividades</h1>
           <p>Crea y administra actividades, inscripciones y finanzas</p>
 
-          {/* 🔐 Badge de acceso restringido (solo visible para roles limitados) */}
+          {/* 🔐 Badge de acceso restringido */}
           {accessBadgeInfo && (
             <div className="activity-page__access-badge">
               <span className="activity-page__access-badge__icon">🔒</span>
@@ -1001,7 +962,6 @@ const ActivityPage = () => {
         {/* CONTROLES */}
         <div className="activity-page__controls">
           <div className="activity-page__controls-grid">
-            {/* Búsqueda */}
             <div className="activity-page__filter-item">
               <label>🔍 Buscar Actividad</label>
               <input
@@ -1015,7 +975,6 @@ const ActivityPage = () => {
               />
             </div>
 
-            {/* Filtro por estado */}
             <div className="activity-page__filter-item">
               <label>📊 Estado</label>
               <select
@@ -1030,7 +989,6 @@ const ActivityPage = () => {
               </select>
             </div>
 
-            {/* Filtro por fechas - DESDE */}
             <div className="activity-page__filter-item">
               <label>📅 Desde</label>
               <input
@@ -1040,7 +998,6 @@ const ActivityPage = () => {
               />
             </div>
 
-            {/* Filtro por fechas - HASTA */}
             <div className="activity-page__filter-item">
               <label>📅 Hasta</label>
               <input
@@ -1147,7 +1104,6 @@ const ActivityPage = () => {
           </div>
         ) : filteredActivities.length === 0 ? (
           <div className="activity-page__empty">
-            {/* 🔧 Mensaje mejorado cuando no hay actividades */}
             {allActivities.length === 0 ? (
               <>
                 <p>📋 No hay actividades registradas</p>
@@ -1199,7 +1155,6 @@ const ActivityPage = () => {
                           <span className="activity-page__activity-name">
                             {activity.activityName}
                           </span>
-                          {/* 🔑 Etiqueta de nivel (útil para saber qué actividades está viendo) */}
                           {activity.levelEnrollment && (
                             <small className="activity-page__level-tag">
                               🎓{" "}
@@ -1358,7 +1313,6 @@ const ActivityPage = () => {
           opacity: 0.7;
         }
         
-        /* Estilos para filas clickeables */
         .activity-row-clickable {
           cursor: pointer;
           transition: all 0.2s ease;
@@ -1374,12 +1328,10 @@ const ActivityPage = () => {
           transform: scale(0.99);
         }
         
-        /* Evitar que la columna de acciones active el clic de la fila */
         .activity-page__col-actions {
           pointer-events: auto;
         }
         
-        /* Estilo para indicador de filtros aplicados */
         .activity-page__filters-applied {
           margin-top: 5px;
           padding: 5px 10px;
@@ -1389,7 +1341,6 @@ const ActivityPage = () => {
           font-size: 0.9em;
         }
         
-        /* Estilo para botón deshabilitado con tooltip */
         .activity-page__btn:disabled {
           opacity: 0.5;
           cursor: not-allowed;
@@ -1435,7 +1386,6 @@ const ActivityPage = () => {
           padding-left: 8px;
         }
 
-        /* Etiqueta de nivel en la tabla */
         .activity-page__level-tag {
           display: block;
           margin-top: 2px;

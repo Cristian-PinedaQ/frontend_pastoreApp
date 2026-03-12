@@ -597,6 +597,36 @@ class ApiService {
     }
   }
 
+  // ========== NUEVO MÉTODO PARA REPORTE POR NIVEL ==========
+
+/**
+ * Obtener reporte detallado de estudiantes por nivel específico
+ * GET /student-enrollment/by-level/{level}
+ * @param {string} level - Nivel (PREENCUENTRO, ENCUENTRO, etc.)
+ * @param {string|null} status - Filtrar por estado (ACTIVE, COMPLETED, FAILED)
+ */
+async getLevelStudents(level, status = null) {
+  try {
+    validateString(level, 'level', 1, 50);
+    
+    // Construir URL - EL ENDPOINT CORRECTO ES /by-level/{level}
+    let url = `/student-enrollment/by-level/${level}`;
+    if (status) {
+      url += `?status=${status}`;
+    }
+    
+    log(`📊 [getLevelStudents] Obteniendo estudiantes del nivel: ${level}`);
+    const response = await this.request(url);
+    
+    // La respuesta es un StudentsByLevelReportDTO.LevelDetail
+    return response;
+    
+  } catch (error) {
+    logError('❌ [getLevelStudents] Error:', error.message);
+    throw error;
+  }
+}
+
   // ========== 📖 LECCIONES ==========
 
   async getLessons(page = 0, limit = 10) {

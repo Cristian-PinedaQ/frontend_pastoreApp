@@ -2,18 +2,19 @@
 // EnrollmentsPage.jsx - SEGURIDAD MEJORADA
 // Gestión de cohortes con validaciones de seguridad
 // ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
+// ✅ IMPLEMENTADO: Control de acceso por rol (allowedLevels con useMemo)
 // ============================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import apiService from '../apiService';
 import { logSecurityEvent } from '../utils/securityLogger';
 import { throttle } from 'lodash';
 import ModalCreateLesson from '../components/ModalCreateLesson';
 import ModalRecordAttendance from '../components/ModalRecordAttendance';
 import ModalLessonAttendanceDetail from '../components/ModalLessonAttendanceDetail';
-import nameHelper from '../services/nameHelper'; // ✅ Importar el helper
-import { useAuth } from '../context/AuthContext'; // ✅ Filtrado de niveles por rol
+import nameHelper from '../services/nameHelper';
 import '../css/EnrollmentsPage.css';
+import { useAuth } from '../context/AuthContext';
 
 // Extraer funciones del helper
 const { getDisplayName } = nameHelper;
@@ -31,7 +32,7 @@ const logError = (message, error) => {
   console.error(`[EnrollmentsPage] ${message}`, error);
 };
 
-// ✅ Sanitización de HTML (manteniendo nombres originales para seguridad)
+// ✅ Sanitización de HTML
 const escapeHtml = (text) => {
   if (!text || typeof text !== 'string') return '';
   const map = {
@@ -66,9 +67,8 @@ const isValidScore = (score) => {
   return !isNaN(num) && num >= 0 && num <= 5;
 };
 
-// ✅ Constantes fuera del componente para evitar problemas de dependencias
-// Lista maestra con TODOS los niveles del sistema
-const ALL_LEVELS = [
+// ✅ Constantes fuera del componente
+const LEVELS = [
   { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
   { value: 'ENCUENTRO', label: 'Encuentro' },
   { value: 'POST_ENCUENTRO', label: 'Post-encuentro' },
@@ -82,52 +82,37 @@ const ALL_LEVELS = [
   { value: 'GRADUACION', label: 'Graduación' },
 ];
 
+// ============================================
+// 🔐 CONTROL DE ACCESO POR ROL
+// ============================================
+const FULL_ACCESS_ROLES = ["ROLE_PASTORES", "ROLE_ECONOMICO"];
 
-// ✅ Roles con acceso total (GET + POST + PATCH + DELETE) — ven todos los niveles
-const FULL_ACCESS_ROLES = ['ROLE_PASTORES'];
-
-// ✅ Mapeo de roles restringidos → LevelEnrollments que pueden (GET + POST + PATCH + DELETE)
 const ROLE_LEVEL_MAP = {
-  ROLE_CONEXION: ['PREENCUENTRO'],
-  ROLE_CIMIENTO: ['ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS'],
+  ROLE_CONEXION: ["PREENCUENTRO"],
+  ROLE_CIMIENTO: ["ENCUENTRO", "POST_ENCUENTRO", "BAUTIZOS"],
   ROLE_ESENCIA: [
-    'ESENCIA_1',
-    'ESENCIA_2',
-    'ESENCIA_3',
-    'SANIDAD_INTEGRAL_RAICES',
-    'ESENCIA_4',
-    'ADIESTRAMIENTO',
-    'GRADUACION',
+    "ESENCIA_1", "ESENCIA_2", "ESENCIA_3",
+    "SANIDAD_INTEGRAL_RAICES", "ESENCIA_4",
+    "ADIESTRAMIENTO", "GRADUACION",
   ],
 };
 
-// ════════════════════════════════════════════════════
-// ✅ HOOK: Obtener niveles permitidos según el rol
-// Usa FULL_ACCESS_ROLES y ROLE_LEVEL_MAP para determinar el scope
-// ════════════════════════════════════════════════════
-const useAllowedLevels = () => {
-  const { hasRole } = useAuth();
+const getAllowedLevels = (userRoles = []) => {
+  const normalized = userRoles.map((r) =>
+    typeof r === "object" && r.name ? r.name.toUpperCase() : String(r).toUpperCase()
+  );
 
-  // Roles con acceso total ven todos los niveles sin restricción
-  const hasFullAccess = FULL_ACCESS_ROLES.some(role => hasRole(role));
-  if (hasFullAccess) {
-    return ALL_LEVELS;
+  if (normalized.some((r) => FULL_ACCESS_ROLES.includes(r))) {
+    return LEVELS;
   }
 
-  // Roles restringidos: acumular niveles de cada rol que posea el usuario
-  const allowedValues = new Set();
-  Object.entries(ROLE_LEVEL_MAP).forEach(([role, levels]) => {
-    if (hasRole(role)) {
-      levels.forEach(l => allowedValues.add(l));
-    }
+  const allowed = new Set();
+  normalized.forEach((role) => {
+    const mapped = ROLE_LEVEL_MAP[role];
+    if (mapped) mapped.forEach((v) => allowed.add(v));
   });
 
-  // Fallback: si no matchea ningún rol, el backend controla el acceso real
-  if (allowedValues.size === 0) {
-    return ALL_LEVELS;
-  }
-
-  return ALL_LEVELS.filter(l => allowedValues.has(l.value));
+  return LEVELS.filter((l) => allowed.has(l.value));
 };
 
 const STATUSES = [
@@ -153,7 +138,7 @@ const ERROR_MESSAGES = {
   INVALID_ENROLLMENT: 'Cohorte no válida'
 };
 
-// ✅ FIX timezone: parsea "YYYY-MM-DD" como fecha LOCAL, no UTC
+// ✅ FIX timezone
 const parseLocalDate = (dateString) => {
   if (!dateString) return null;
   const [year, month, day] = String(dateString).split("T")[0].split("-").map(Number);
@@ -172,8 +157,26 @@ const formatLocalDate = (dateString) => {
 
 const EnrollmentsPage = () => {
 
-  // ✅ Niveles filtrados según el rol del usuario autenticado
-  const LEVELS = useAllowedLevels();
+  // ✅ 1. PRIMERO: contexto de auth
+  const { user } = useAuth();
+
+  // ✅ 2. useMemo para allowedLevels — referencia estable, sin loops
+  const allowedLevels = useMemo(
+    () => getAllowedLevels(user?.roles ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user?.id] // solo recalcula si cambia el usuario
+  );
+
+  // ✅ 3. Estados — formData usa allowedLevels que ya está definido
+  const [formData, setFormData] = useState({
+    level: allowedLevels[0]?.value ?? '',
+    startDate: '',
+    endDate: '',
+    maxStudents: 30,
+    minAttendancePercentage: 80,
+    minAverageScore: 3.0,
+    teacher: null,
+  });
 
   const [enrollments, setEnrollments] = useState([]);
   const [filteredEnrollments, setFilteredEnrollments] = useState([]);
@@ -193,15 +196,6 @@ const EnrollmentsPage = () => {
   const [selectedLesson, setSelectedLesson] = useState(null);
 
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    level: 'PREENCUENTRO',
-    startDate: '',
-    endDate: '',
-    maxStudents: 30,
-    minAttendancePercentage: 80,
-    minAverageScore: 3.0,
-    teacher: null,
-  });
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [editFormData, setEditFormData] = useState({
@@ -228,7 +222,6 @@ const EnrollmentsPage = () => {
   const handleError = useCallback((errorKey, context = '') => {
     const errorMessage = ERROR_MESSAGES[errorKey] || ERROR_MESSAGES.GENERIC;
     setError(errorMessage);
-    
     logSecurityEvent('error_event', {
       errorKey,
       context,
@@ -247,6 +240,7 @@ const EnrollmentsPage = () => {
     }
   }, [handleError]);
 
+  // ✅ allowedLevels es estable gracias a useMemo — no causa loop
   const fetchEnrollments = useCallback(async () => {
     try {
       setLoading(true);
@@ -266,10 +260,16 @@ const EnrollmentsPage = () => {
         return dateB - dateA;
       });
 
-      setEnrollments(sorted);
-      
-      // Aplicar filtros inline
-      let filtered = sorted;
+      // ✅ Filtrar por niveles permitidos según el rol del usuario
+      const allowedValues = allowedLevels.map(l => l.value);
+      const roleFiltered = allowedValues.length > 0
+        ? sorted.filter(e => allowedValues.includes(e.levelEnrollment || e.level))
+        : sorted;
+
+      setEnrollments(roleFiltered);
+
+      // Aplicar filtros de nivel y estado
+      let filtered = roleFiltered;
 
       if (filterLevel && filterLevel.trim() !== '') {
         if (!isValidLevel(filterLevel, LEVELS)) {
@@ -299,7 +299,7 @@ const EnrollmentsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filterLevel, filterStatus, handleError, LEVELS]);
+  }, [filterLevel, filterStatus, handleError, allowedLevels]);
 
   useEffect(() => {
     fetchEnrollments();
@@ -332,7 +332,6 @@ const EnrollmentsPage = () => {
     }
   };
 
-  // ✅ ACTUALIZADO: Usar getDisplayName para mostrar, pero guardar nombre original
   const handleSelectTeacher = (teacher) => {
     try {
       if (!teacher || !teacher.id || typeof teacher.id !== 'number') {
@@ -340,17 +339,15 @@ const EnrollmentsPage = () => {
         return;
       }
 
-      // Guardar nombre ORIGINAL para el backend
       setFormData((prev) => ({
         ...prev,
-        teacher: { id: teacher.id, name: teacher.name }, // Nombre ORIGINAL
+        teacher: { id: teacher.id, name: teacher.name },
       }));
-      
-      // Mostrar nombre transformado en el input
+
       setTeacherSearchTerm(getDisplayName(teacher.name));
       setShowTeacherDropdown(false);
       setFilteredTeachers([]);
-      
+
       log('Maestro seleccionado', { teacherId: teacher.id });
     } catch (error) {
       logError('Error seleccionando maestro:', error);
@@ -359,10 +356,7 @@ const EnrollmentsPage = () => {
   };
 
   const handleClearTeacher = () => {
-    setFormData((prev) => ({
-      ...prev,
-      teacher: null,
-    }));
+    setFormData((prev) => ({ ...prev, teacher: null }));
     setTeacherSearchTerm('');
     setFilteredTeachers([]);
   };
@@ -393,7 +387,6 @@ const EnrollmentsPage = () => {
     }
   };
 
-  // ✅ ACTUALIZADO: Usar getDisplayName para mostrar, pero guardar nombre original
   const handleEditSelectTeacher = (teacher) => {
     try {
       if (!teacher || !teacher.id || typeof teacher.id !== 'number') {
@@ -401,13 +394,11 @@ const EnrollmentsPage = () => {
         return;
       }
 
-      // Guardar nombre ORIGINAL para el backend
       setEditFormData((prev) => ({
         ...prev,
-        teacher: { id: teacher.id, name: teacher.name }, // Nombre ORIGINAL
+        teacher: { id: teacher.id, name: teacher.name },
       }));
-      
-      // Mostrar nombre transformado en el input
+
       setEditTeacherSearchTerm(getDisplayName(teacher.name));
       setEditShowTeacherDropdown(false);
       setEditFilteredTeachers([]);
@@ -418,10 +409,7 @@ const EnrollmentsPage = () => {
   };
 
   const handleEditClearTeacher = () => {
-    setEditFormData((prev) => ({
-      ...prev,
-      teacher: null,
-    }));
+    setEditFormData((prev) => ({ ...prev, teacher: null }));
     setEditTeacherSearchTerm('');
     setEditFilteredTeachers([]);
   };
@@ -483,41 +471,39 @@ const EnrollmentsPage = () => {
     }
   }, [activeTab, showEnrollmentModal, selectedEnrollment, loadTabData]);
 
-  const applyFilters = useCallback((data, level, status) => {
-  try {
-    log('Aplicando filtros', { level, status });
+  const applyFilters = (data, level, status) => {
+    try {
+      log('Aplicando filtros', { level, status });
 
-    let filtered = data;
+      let filtered = data;
 
-    if (level && level.trim() !== '') {
-      if (!isValidLevel(level, LEVELS)) {
-        handleError('VALIDATION_ERROR', 'invalid_level');
-        setFilteredEnrollments([]);
-        return;
+      if (level && level.trim() !== '') {
+        if (!isValidLevel(level, LEVELS)) {
+          handleError('VALIDATION_ERROR', 'invalid_level');
+          setFilteredEnrollments([]);
+          return;
+        }
+        filtered = filtered.filter(e => {
+          const enrollmentLevel = e.levelEnrollment || e.level;
+          return enrollmentLevel === level;
+        });
       }
 
-      filtered = filtered.filter(e => {
-        const enrollmentLevel = e.levelEnrollment || e.level;
-        return enrollmentLevel === level;
-      });
-    }
-
-    if (status && status.trim() !== '') {
-      if (!isValidStatus(status, STATUSES)) {
-        handleError('VALIDATION_ERROR', 'invalid_status');
-        setFilteredEnrollments([]);
-        return;
+      if (status && status.trim() !== '') {
+        if (!isValidStatus(status, STATUSES)) {
+          handleError('VALIDATION_ERROR', 'invalid_status');
+          setFilteredEnrollments([]);
+          return;
+        }
+        filtered = filtered.filter(e => e.status === status);
       }
 
-      filtered = filtered.filter(e => e.status === status);
+      setFilteredEnrollments(filtered);
+    } catch (error) {
+      logError('Error aplicando filtros:', error);
+      setFilteredEnrollments(data);
     }
-
-    setFilteredEnrollments(filtered);
-  } catch (error) {
-    logError('Error aplicando filtros:', error);
-    setFilteredEnrollments(data);
-  }
-}, [LEVELS, handleError]);
+  };
 
   const handleFilterChange = (type, value) => {
     try {
@@ -566,7 +552,6 @@ const EnrollmentsPage = () => {
     try {
       if (!selectedEnrollment) return;
 
-      // 🔒 No permitir editar cohortes en estado terminal
       if (selectedEnrollment.status === 'COMPLETED' || selectedEnrollment.status === 'CANCELLED') {
         const message = selectedEnrollment.status === 'COMPLETED'
           ? 'No se puede editar una cohorte completada'
@@ -592,7 +577,6 @@ const EnrollmentsPage = () => {
       });
 
       if (selectedEnrollment.teacher?.name) {
-        // Mostrar nombre transformado en el input
         setEditTeacherSearchTerm(getDisplayName(selectedEnrollment.teacher.name));
       }
 
@@ -658,7 +642,6 @@ const EnrollmentsPage = () => {
     try {
       if (!selectedEnrollment) return;
 
-      // 🔒 No permitir cambiar estado de cohortes en estado terminal
       if (selectedEnrollment.status === 'COMPLETED' || selectedEnrollment.status === 'CANCELLED') {
         const message = selectedEnrollment.status === 'COMPLETED'
           ? 'No se puede cambiar el estado de una cohorte completada'
@@ -755,33 +738,26 @@ const EnrollmentsPage = () => {
     if (!formData.level || !isValidLevel(formData.level, LEVELS)) {
       errors.push('Nivel inválido');
     }
-
     if (!formData.startDate) {
       errors.push('Fecha de inicio requerida');
     }
-
     if (!formData.endDate) {
       errors.push('Fecha de fin requerida');
     }
-
     if (formData.startDate && formData.endDate) {
       if (!validateDates(formData.startDate, formData.endDate)) {
         errors.push('Fecha de inicio debe ser anterior a fecha de fin');
       }
     }
-
     if (!formData.teacher || !formData.teacher.id || typeof formData.teacher.id !== 'number') {
       errors.push('Maestro requerido');
     }
-
     if (!isValidMaxStudents(formData.maxStudents)) {
       errors.push('Máximo de estudiantes debe estar entre 1 y 500');
     }
-
     if (!isValidPercentage(formData.minAttendancePercentage)) {
       errors.push('Porcentaje de asistencia debe estar entre 0 y 100');
     }
-
     if (!isValidScore(formData.minAverageScore)) {
       errors.push('Calificación mínima debe estar entre 0 y 5');
     }
@@ -797,15 +773,12 @@ const EnrollmentsPage = () => {
         errors.push('Fecha de inicio debe ser anterior a fecha de fin');
       }
     }
-
     if (editFormData.maxStudents && !isValidMaxStudents(editFormData.maxStudents)) {
       errors.push('Máximo de estudiantes debe estar entre 1 y 500');
     }
-
     if (editFormData.minAttendancePercentage !== '' && !isValidPercentage(editFormData.minAttendancePercentage)) {
       errors.push('Porcentaje de asistencia debe estar entre 0 y 100');
     }
-
     if (editFormData.minAverageScore !== '' && !isValidScore(editFormData.minAverageScore)) {
       errors.push('Calificación mínima debe estar entre 0 y 5');
     }
@@ -813,56 +786,51 @@ const EnrollmentsPage = () => {
     return errors;
   };
 
-  // ✅ IMPORTANTE: El formulario envía nombres ORIGINALES al backend
-  // ========== FORM SUBMIT HANDLER (Versión mejorada) ==========
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  try {
-    setError('');
+    try {
+      setError('');
 
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join('. '));
-      return;
+      const validationErrors = validateForm();
+      if (validationErrors.length > 0) {
+        setError(validationErrors.join('. '));
+        return;
+      }
+
+      const enrollmentData = {
+        level: formData.level,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        maxStudents: parseInt(formData.maxStudents),
+        minAttendancePercentage: parseFloat(formData.minAttendancePercentage),
+        minAverageScore: parseFloat(formData.minAverageScore),
+        teacher: formData.teacher,
+      };
+
+      log('Creando cohorte', { level: formData.level });
+
+      await apiService.createEnrollment(enrollmentData);
+
+      logSecurityEvent('enrollment_created', {
+        level: formData.level,
+        timestamp: new Date().toISOString()
+      });
+
+      alert("✅ Cohorte creada exitosamente");
+
+      setShowForm(false);
+      resetForm();
+
+      await fetchEnrollments();
+
+    } catch (err) {
+      handleError('CREATE_ENROLLMENT', 'handleSubmit');
+      logError('Error creando cohorte:', err);
+      alert("❌ Error al crear la cohorte: " + err.message);
     }
+  };
 
-    const enrollmentData = {
-      level: formData.level,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      maxStudents: parseInt(formData.maxStudents),
-      minAttendancePercentage: parseFloat(formData.minAttendancePercentage),
-      minAverageScore: parseFloat(formData.minAverageScore),
-      teacher: formData.teacher,
-    };
-
-    log('Creando cohorte', { level: formData.level });
-
-    await apiService.createEnrollment(enrollmentData);
-
-    logSecurityEvent('enrollment_created', {
-      level: formData.level,
-      timestamp: new Date().toISOString()
-    });
-
-    // ✅ Mostrar alert inmediatamente
-    alert("✅ Cohorte creada exitosamente");
-    
-    setShowForm(false);
-    resetForm();
-    
-    // ✅ Luego actualizar datos en segundo plano
-    await fetchEnrollments();
-    
-  } catch (err) {
-    handleError('CREATE_ENROLLMENT', 'handleSubmit');
-    logError('Error creando cohorte:', err);
-    alert("❌ Error al crear la cohorte: " + err.message);
-  }
-};
-
-  // ✅ IMPORTANTE: El formulario de edición envía nombres ORIGINALES al backend
   const handleEditSubmit = async (e) => {
     e.preventDefault();
 
@@ -896,7 +864,7 @@ const handleSubmit = async (e) => {
         updateData.minAverageScore = parseFloat(editFormData.minAverageScore);
       }
       if (editFormData.teacher?.id && typeof editFormData.teacher.id === 'number') {
-        updateData.teacher = editFormData.teacher; // Contiene nombre ORIGINAL
+        updateData.teacher = editFormData.teacher;
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -923,9 +891,10 @@ const handleSubmit = async (e) => {
     }
   };
 
+  // ✅ resetForm usa el primer nivel permitido del rol actual
   const resetForm = () => {
     setFormData({
-      level: 'PREENCUENTRO',
+      level: allowedLevels[0]?.value ?? '',
       startDate: '',
       endDate: '',
       maxStudents: 30,
@@ -940,8 +909,7 @@ const handleSubmit = async (e) => {
 
   const getLevelLabel = (levelValue) => {
     if (!levelValue) return '—';
-    // Usa ALL_LEVELS para resolver labels aunque el nivel esté fuera del scope del rol
-    return ALL_LEVELS.find(l => l.value === levelValue)?.label || levelValue;
+    return LEVELS.find(l => l.value === levelValue)?.label || levelValue;
   };
 
   const getStatusLabel = (statusValue) => {
@@ -995,7 +963,7 @@ const handleSubmit = async (e) => {
                   onChange={(e) => setFormData({ ...formData, level: e.target.value })}
                   required
                 >
-                  {LEVELS.map(level => (
+                  {allowedLevels.map(level => (
                     <option key={level.value} value={level.value}>
                       {level.label}
                     </option>
@@ -1031,7 +999,7 @@ const handleSubmit = async (e) => {
                   <input
                     type="text"
                     placeholder="Busca un maestro por nombre..."
-                    value={teacherSearchTerm} // ✅ Mostrar nombre TRANSFORMADO
+                    value={teacherSearchTerm}
                     onChange={(e) => handleTeacherSearch(e.target.value)}
                     onFocus={() => teacherSearchTerm && setShowTeacherDropdown(true)}
                     className="teacher-search-input"
@@ -1059,7 +1027,7 @@ const handleSubmit = async (e) => {
                           onClick={() => handleSelectTeacher(teacher)}
                           className="teacher-option"
                         >
-                          <div className="teacher-name">{getDisplayName(teacher.name)}</div> {/* ✅ Mostrar transformado */}
+                          <div className="teacher-name">{getDisplayName(teacher.name)}</div>
                         </button>
                       ))}
                     </div>
@@ -1067,7 +1035,7 @@ const handleSubmit = async (e) => {
 
                   {formData.teacher && (
                     <div className="teacher-selected">
-                      <p className="teacher-selected-name">✅ {getDisplayName(formData.teacher.name)}</p> {/* ✅ Mostrar transformado */}
+                      <p className="teacher-selected-name">✅ {getDisplayName(formData.teacher.name)}</p>
                     </div>
                   )}
                 </div>
@@ -1129,7 +1097,7 @@ const handleSubmit = async (e) => {
               onChange={(e) => handleFilterChange('level', e.target.value)}
             >
               <option value="">Todos los niveles</option>
-              {LEVELS.map(level => (
+              {allowedLevels.map(level => (
                 <option key={level.value} value={level.value}>
                   {level.label}
                 </option>
@@ -1211,37 +1179,20 @@ const handleSubmit = async (e) => {
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{escapeHtml(selectedEnrollment.cohortName || getLevelLabel(selectedEnrollment.levelEnrollment))}</h2>
-              <button
-                className="modal-close-btn"
-                onClick={handleCloseEnrollmentModal}
-              >
-                ✕
-              </button>
+              <button className="modal-close-btn" onClick={handleCloseEnrollmentModal}>✕</button>
             </div>
 
             <div className="modal-tabs">
-              <button
-                className={`tab-btn ${activeTab === 'details' ? 'active' : ''}`}
-                onClick={() => setActiveTab('details')}
-              >
+              <button className={`tab-btn ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>
                 📋 Detalles
               </button>
-              <button
-                className={`tab-btn ${activeTab === 'lessons' ? 'active' : ''}`}
-                onClick={() => setActiveTab('lessons')}
-              >
+              <button className={`tab-btn ${activeTab === 'lessons' ? 'active' : ''}`} onClick={() => setActiveTab('lessons')}>
                 📚 Lecciones
               </button>
-              <button
-                className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`}
-                onClick={() => setActiveTab('students')}
-              >
+              <button className={`tab-btn ${activeTab === 'students' ? 'active' : ''}`} onClick={() => setActiveTab('students')}>
                 👥 Estudiantes
               </button>
-              <button
-                className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`}
-                onClick={() => setActiveTab('attendance')}
-              >
+              <button className={`tab-btn ${activeTab === 'attendance' ? 'active' : ''}`} onClick={() => setActiveTab('attendance')}>
                 ✅ Asistencias
               </button>
             </div>
@@ -1300,34 +1251,22 @@ const handleSubmit = async (e) => {
                     <h3>🎯 Cambiar Estado</h3>
                     <div className="actions-grid">
                       {selectedEnrollment.status !== 'ACTIVE' && (
-                        <button
-                          onClick={() => handleStatusChange(selectedEnrollment.id, 'ACTIVE')}
-                          className="action-btn btn-success"
-                        >
+                        <button onClick={() => handleStatusChange(selectedEnrollment.id, 'ACTIVE')} className="action-btn btn-success">
                           ▶️ Activar
                         </button>
                       )}
                       {selectedEnrollment.status !== 'SUSPENDED' && (
-                        <button
-                          onClick={() => handleStatusChange(selectedEnrollment.id, 'SUSPENDED')}
-                          className="action-btn btn-warning"
-                        >
+                        <button onClick={() => handleStatusChange(selectedEnrollment.id, 'SUSPENDED')} className="action-btn btn-warning">
                           ⏸️ Pausar
                         </button>
                       )}
                       {selectedEnrollment.status !== 'COMPLETED' && (
-                        <button
-                          onClick={() => handleStatusChange(selectedEnrollment.id, 'COMPLETED')}
-                          className="action-btn btn-info"
-                        >
+                        <button onClick={() => handleStatusChange(selectedEnrollment.id, 'COMPLETED')} className="action-btn btn-info">
                           ✅ Completar
                         </button>
                       )}
                       {selectedEnrollment.status !== 'CANCELLED' && (
-                        <button
-                          onClick={() => handleStatusChange(selectedEnrollment.id, 'CANCELLED')}
-                          className="action-btn btn-danger"
-                        >
+                        <button onClick={() => handleStatusChange(selectedEnrollment.id, 'CANCELLED')} className="action-btn btn-danger">
                           ❌ Cancelar
                         </button>
                       )}
@@ -1335,11 +1274,7 @@ const handleSubmit = async (e) => {
                   </div>
 
                   <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #e5e7eb' }}>
-                    <button
-                      onClick={handleOpenEditModal}
-                      className="action-btn btn-warning"
-                      style={{ width: '100%' }}
-                    >
+                    <button onClick={handleOpenEditModal} className="action-btn btn-warning" style={{ width: '100%' }}>
                       ✏️ Editar Cohorte
                     </button>
                   </div>
@@ -1449,12 +1384,7 @@ const handleSubmit = async (e) => {
           <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
             <div className="modal-header">
               <h2>✏️ Editar Cohorte</h2>
-              <button
-                className="modal-close-btn"
-                onClick={handleCloseEditModal}
-              >
-                ✕
-              </button>
+              <button className="modal-close-btn" onClick={handleCloseEditModal}>✕</button>
             </div>
 
             <div className="modal-body">
@@ -1500,7 +1430,7 @@ const handleSubmit = async (e) => {
                     <input
                       type="text"
                       placeholder="Busca un maestro por nombre..."
-                      value={editTeacherSearchTerm} // ✅ Mostrar nombre TRANSFORMADO
+                      value={editTeacherSearchTerm}
                       onChange={(e) => handleEditTeacherSearch(e.target.value)}
                       onFocus={() => editTeacherSearchTerm && setEditShowTeacherDropdown(true)}
                       className="teacher-search-input"
@@ -1508,12 +1438,7 @@ const handleSubmit = async (e) => {
                     />
 
                     {editFormData.teacher && (
-                      <button
-                        type="button"
-                        onClick={handleEditClearTeacher}
-                        className="teacher-clear-btn"
-                        title="Limpiar selección"
-                      >
+                      <button type="button" onClick={handleEditClearTeacher} className="teacher-clear-btn" title="Limpiar selección">
                         ✕
                       </button>
                     )}
@@ -1527,7 +1452,7 @@ const handleSubmit = async (e) => {
                             onClick={() => handleEditSelectTeacher(teacher)}
                             className="teacher-option"
                           >
-                            <div className="teacher-name">{getDisplayName(teacher.name)}</div> {/* ✅ Mostrar transformado */}
+                            <div className="teacher-name">{getDisplayName(teacher.name)}</div>
                           </button>
                         ))}
                       </div>
@@ -1535,7 +1460,7 @@ const handleSubmit = async (e) => {
 
                     {editFormData.teacher && (
                       <div className="teacher-selected">
-                        <p className="teacher-selected-name">✅ {getDisplayName(editFormData.teacher.name)}</p> {/* ✅ Mostrar transformado */}
+                        <p className="teacher-selected-name">✅ {getDisplayName(editFormData.teacher.name)}</p>
                       </div>
                     )}
                   </div>
@@ -1580,12 +1505,7 @@ const handleSubmit = async (e) => {
                   <button type="submit" className="btn-primary" style={{ flex: 1 }}>
                     ✅ Guardar Cambios
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleCloseEditModal}
-                    className="btn-secondary"
-                    style={{ flex: 1 }}
-                  >
+                  <button type="button" onClick={handleCloseEditModal} className="btn-secondary" style={{ flex: 1 }}>
                     ❌ Cancelar
                   </button>
                 </div>
@@ -1630,21 +1550,17 @@ const handleSubmit = async (e) => {
           border-radius: 4px;
           border: 1px solid;
         }
-
         .alert-danger {
           background-color: #fee;
           border-color: #fcc;
           color: #c00;
         }
-
         .form-field-full {
           grid-column: 1 / -1;
         }
-
         .teacher-search-container {
           position: relative;
         }
-
         .teacher-search-input {
           width: 100%;
           padding: 8px 12px;
@@ -1652,13 +1568,11 @@ const handleSubmit = async (e) => {
           border-radius: 4px;
           font-size: 14px;
         }
-
         .teacher-search-input:focus {
           outline: none;
           border-color: #2563eb;
           box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
-
         .teacher-clear-btn {
           position: absolute;
           right: 8px;
@@ -1671,7 +1585,6 @@ const handleSubmit = async (e) => {
           font-size: 18px;
           padding: 4px 8px;
         }
-
         .teacher-dropdown {
           position: absolute;
           top: 100%;
@@ -1685,7 +1598,6 @@ const handleSubmit = async (e) => {
           overflow-y: auto;
           z-index: 10;
         }
-
         .teacher-option {
           width: 100%;
           padding: 8px 12px;
@@ -1695,16 +1607,13 @@ const handleSubmit = async (e) => {
           cursor: pointer;
           border-bottom: 1px solid #eee;
         }
-
         .teacher-option:hover {
           background-color: #f3f4f6;
         }
-
         .teacher-name {
           font-weight: 500;
           color: #333;
         }
-
         .teacher-selected {
           margin-top: 8px;
           padding: 8px 12px;
@@ -1712,23 +1621,19 @@ const handleSubmit = async (e) => {
           border: 1px solid #93c5fd;
           border-radius: 4px;
         }
-
         .teacher-selected-name {
           color: #1e40af;
           font-weight: 500;
           margin: 0;
         }
-
         .attendance-item.clickable {
           cursor: pointer;
           transition: all 0.2s ease;
         }
-
         .attendance-item.clickable:hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 16px rgba(37, 99, 235, 0.15);
         }
-
         .view-details-badge {
           display: inline-block;
           background: linear-gradient(135deg, #2563eb 0%, #10b981 100%);
