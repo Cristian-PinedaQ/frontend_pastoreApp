@@ -1,8 +1,5 @@
 // ============================================
-// EnrollmentsPage.jsx - SEGURIDAD MEJORADA
-// Gestión de cohortes con validaciones de seguridad
-// ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
-// ✅ IMPLEMENTADO: Control de acceso por rol (allowedLevels con useMemo)
+// EnrollmentsPage.jsx - VERSIÓN ACTUALIZADA
 // ============================================
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -46,7 +43,7 @@ const escapeHtml = (text) => {
 };
 
 // ✅ Validaciones
-const isValidLevel = (level, LEVELS) => LEVELS.some(l => l.value === level);
+const isValidLevel = (level, LEVELS) => LEVELS.some(l => l.code === level);
 const isValidStatus = (status, STATUSES) => STATUSES.some(s => s.value === status);
 const validateDates = (startDate, endDate) => {
   if (!startDate || !endDate) return false;
@@ -68,18 +65,12 @@ const isValidScore = (score) => {
 };
 
 // ✅ Constantes fuera del componente
-const LEVELS = [
-  { value: 'PREENCUENTRO', label: 'Pre-encuentro' },
-  { value: 'ENCUENTRO', label: 'Encuentro' },
-  { value: 'POST_ENCUENTRO', label: 'Post-encuentro' },
-  { value: 'BAUTIZOS', label: 'Bautizos' },
-  { value: 'ESENCIA_1', label: 'ESENCIA 1' },
-  { value: 'ESENCIA_2', label: 'ESENCIA 2' },
-  { value: 'ESENCIA_3', label: 'ESENCIA 3' },
-  { value: 'SANIDAD_INTEGRAL_RAICES', label: 'Sanidad Integral Raíces' },
-  { value: 'ESENCIA_4', label: 'ESENCIA 4' },
-  { value: 'ADIESTRAMIENTO', label: 'Adiestramiento' },
-  { value: 'GRADUACION', label: 'Graduación' },
+const STATUSES = [
+  { value: 'ACTIVE', label: 'Activa' },
+  { value: 'SUSPENDED', label: 'Inactiva' },
+  { value: 'PENDING', label: 'Programada' },
+  { value: 'COMPLETED', label: 'Completada' },
+  { value: 'CANCELLED', label: 'Cancelada' },
 ];
 
 // ============================================
@@ -97,38 +88,13 @@ const ROLE_LEVEL_MAP = {
   ],
 };
 
-const getAllowedLevels = (userRoles = []) => {
-  const normalized = userRoles.map((r) =>
-    typeof r === "object" && r.name ? r.name.toUpperCase() : String(r).toUpperCase()
-  );
-
-  if (normalized.some((r) => FULL_ACCESS_ROLES.includes(r))) {
-    return LEVELS;
-  }
-
-  const allowed = new Set();
-  normalized.forEach((role) => {
-    const mapped = ROLE_LEVEL_MAP[role];
-    if (mapped) mapped.forEach((v) => allowed.add(v));
-  });
-
-  return LEVELS.filter((l) => allowed.has(l.value));
-};
-
-const STATUSES = [
-  { value: 'ACTIVE', label: 'Activa' },
-  { value: 'SUSPENDED', label: 'Inactiva' },
-  { value: 'PENDING', label: 'Programada' },
-  { value: 'COMPLETED', label: 'Completada' },
-  { value: 'CANCELLED', label: 'Cancelada' },
-];
-
 const ERROR_MESSAGES = {
   FETCH_ENROLLMENTS: 'Error al cargar cohortes',
   FETCH_TEACHERS: 'Error al cargar maestros',
   FETCH_LESSONS: 'Error al cargar lecciones',
   FETCH_STUDENTS: 'Error al cargar estudiantes',
   FETCH_ATTENDANCE: 'Error al cargar asistencias',
+  FETCH_LEVELS: 'Error al cargar niveles',
   CREATE_ENROLLMENT: 'Error al crear cohorte',
   UPDATE_STATUS: 'Error al actualizar estado',
   EDIT_ENROLLMENT: 'Error al editar cohorte',
@@ -156,20 +122,58 @@ const formatLocalDate = (dateString) => {
 };
 
 const EnrollmentsPage = () => {
-
-  // ✅ 1. PRIMERO: contexto de auth
   const { user } = useAuth();
 
-  // ✅ 2. useMemo para allowedLevels — referencia estable, sin loops
+  // Estado para los niveles
+  const [levels, setLevels] = useState([]);
+  const [levelsLoading, setLevelsLoading] = useState(true);
+
+  // Cargar niveles al montar el componente
+  useEffect(() => {
+    const loadLevels = async () => {
+      try {
+        setLevelsLoading(true);
+        const data = await apiService.getActiveLevels();
+        setLevels(data);
+      } catch (error) {
+        logError('Error cargando niveles:', error);
+        // Fallback a niveles por defecto
+        setLevels(apiService.getDefaultLevels());
+      } finally {
+        setLevelsLoading(false);
+      }
+    };
+    loadLevels();
+  }, []);
+
+  // Obtener niveles permitidos según el rol del usuario
+  const getAllowedLevels = useCallback((userRoles = [], allLevels) => {
+    const normalized = userRoles.map((r) =>
+      typeof r === "object" && r.name ? r.name.toUpperCase() : String(r).toUpperCase()
+    );
+
+    if (normalized.some((r) => FULL_ACCESS_ROLES.includes(r))) {
+      return allLevels;
+    }
+
+    const allowedCodes = new Set();
+    normalized.forEach((role) => {
+      const mapped = ROLE_LEVEL_MAP[role];
+      if (mapped) mapped.forEach((v) => allowedCodes.add(v));
+    });
+
+    return allLevels.filter((level) => allowedCodes.has(level.code));
+  }, []);
+
+  // ✅ useMemo para allowedLevels
   const allowedLevels = useMemo(
-    () => getAllowedLevels(user?.roles ?? []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user?.id] // solo recalcula si cambia el usuario
+    () => getAllowedLevels(user?.roles ?? [], levels),
+    [user?.id, levels, getAllowedLevels]
   );
 
-  // ✅ 3. Estados — formData usa allowedLevels que ya está definido
+  // ✅ Estados — formData
   const [formData, setFormData] = useState({
-    level: allowedLevels[0]?.value ?? '',
+    level: allowedLevels[0]?.code ?? '',
     startDate: '',
     endDate: '',
     maxStudents: 30,
@@ -240,71 +244,168 @@ const EnrollmentsPage = () => {
     }
   }, [handleError]);
 
-  // ✅ allowedLevels es estable gracias a useMemo — no causa loop
   const fetchEnrollments = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError('');
-      log('Obteniendo cohortes');
+  try {
+    setLoading(true);
+    setError('');
+    log('Obteniendo cohortes');
 
-      const data = await apiService.getEnrollments();
-      const enrollmentsArray = Array.isArray(data) ? data : (data.content || []);
+    const data = await apiService.getEnrollments();
+    const enrollmentsArray = Array.isArray(data) ? data : (data.content || []);
 
-      if (!Array.isArray(enrollmentsArray)) {
-        throw new Error('Formato de respuesta inválido');
-      }
+    if (!Array.isArray(enrollmentsArray)) {
+      throw new Error('Formato de respuesta inválido');
+    }
 
-      const sorted = enrollmentsArray.sort((a, b) => {
-        const dateA = new Date(a.startDate);
-        const dateB = new Date(b.startDate);
-        return dateB - dateA;
+    // LOG PARA VER QUÉ ESTÁ LLEGANDO
+    console.log('📦 Datos crudos de cohortes:', enrollmentsArray);
+
+    const sorted = enrollmentsArray.sort((a, b) => {
+      const dateA = new Date(a.startDate);
+      const dateB = new Date(b.startDate);
+      return dateB - dateA;
+    });
+
+    // ✅ CORRECCIÓN: Normalizar los datos de nivel correctamente
+    const normalized = sorted.map(enrollment => {
+      // LOG PARA CADA COHORTE
+      console.log(`🔍 Procesando cohorte ID ${enrollment.id}:`, {
+        levelEnrollment: enrollment.levelEnrollment,
+        levelType: typeof enrollment.levelEnrollment,
+        isObject: enrollment.levelEnrollment && typeof enrollment.levelEnrollment === 'object'
       });
 
-      // ✅ Filtrar por niveles permitidos según el rol del usuario
-      const allowedValues = allowedLevels.map(l => l.value);
-      const roleFiltered = allowedValues.length > 0
-        ? sorted.filter(e => allowedValues.includes(e.levelEnrollment || e.level))
-        : sorted;
-
-      setEnrollments(roleFiltered);
-
-      // Aplicar filtros de nivel y estado
-      let filtered = roleFiltered;
-
-      if (filterLevel && filterLevel.trim() !== '') {
-        if (!isValidLevel(filterLevel, LEVELS)) {
-          handleError('VALIDATION_ERROR', 'invalid_level');
-          setFilteredEnrollments([]);
-          return;
-        }
-        filtered = filtered.filter(e => {
-          const enrollmentLevel = e.levelEnrollment || e.level;
-          return enrollmentLevel === filterLevel;
-        });
+      // Determinar el código del nivel
+      let levelCode = null;
+      let levelObject = null;
+      
+      if (enrollment.levelEnrollment && typeof enrollment.levelEnrollment === 'object') {
+        // Si es un objeto (como en tus datos)
+        levelObject = enrollment.levelEnrollment;
+        levelCode = enrollment.levelEnrollment.code;
+        console.log(`✅ Nivel encontrado como objeto: ${levelCode}`);
+      } else if (typeof enrollment.levelEnrollment === 'string') {
+        // Si es string directamente
+        levelCode = enrollment.levelEnrollment;
+        console.log(`✅ Nivel encontrado como string: ${levelCode}`);
+      } else if (enrollment.level?.code) {
+        // Si viene en level.code
+        levelCode = enrollment.level.code;
+        levelObject = enrollment.level;
+        console.log(`✅ Nivel encontrado en level.code: ${levelCode}`);
+      } else if (enrollment.level && typeof enrollment.level === 'string') {
+        // Si level es string
+        levelCode = enrollment.level;
+        console.log(`✅ Nivel encontrado en level string: ${levelCode}`);
       }
+      
+      // Buscar el displayName correspondiente en el array de levels
+      const levelObj = levels.find(l => l.code === levelCode);
+      const levelDisplayName = levelObj?.displayName || levelObject?.displayName || levelCode;
+      
+      // Determinar el nombre de la cohorte
+      const cohortName = enrollment.cohortName || 
+                        (levelDisplayName ? `${levelDisplayName} ${new Date(enrollment.startDate).getFullYear()}` : `Cohorte ${enrollment.id}`);
+      
+      const normalizedEnrollment = {
+        id: enrollment.id,
+        cohortName: cohortName,
+        levelCode: levelCode,
+        levelDisplayName: levelDisplayName,
+        levelObject: levelObject, // Guardar el objeto original por si acaso
+        startDate: enrollment.startDate,
+        endDate: enrollment.endDate,
+        maxStudents: enrollment.maxStudents,
+        currentStudentCount: enrollment.currentStudentCount || 0,
+        minAttendancePercentage: enrollment.minAttendancePercentage,
+        minAverageScore: enrollment.minAverageScore,
+        status: enrollment.status,
+        teacher: enrollment.teacher,
+        studentEnrollments: enrollment.studentEnrollments || [],
+        lessons: enrollment.lessons || [],
+        // Mantener datos originales
+        ...enrollment
+      };
+      
+      console.log(`✅ Cohorte normalizada:`, {
+        id: normalizedEnrollment.id,
+        name: normalizedEnrollment.cohortName,
+        levelCode: normalizedEnrollment.levelCode,
+        levelDisplayName: normalizedEnrollment.levelDisplayName
+      });
+      
+      return normalizedEnrollment;
+    });
 
-      if (filterStatus && filterStatus.trim() !== '') {
-        if (!isValidStatus(filterStatus, STATUSES)) {
-          handleError('VALIDATION_ERROR', 'invalid_status');
-          setFilteredEnrollments([]);
-          return;
-        }
-        filtered = filtered.filter(e => e.status === filterStatus);
+    console.log('📊 Cohortes normalizadas:', normalized);
+
+    // ✅ Obtener códigos de niveles permitidos
+    const allowedCodes = allowedLevels.map(l => l.code);
+    console.log('🔑 Niveles permitidos:', allowedCodes);
+
+    // Filtrar por niveles permitidos
+    const roleFiltered = allowedCodes.length > 0
+      ? normalized.filter(e => {
+          const hasAccess = allowedCodes.includes(e.levelCode);
+          if (!hasAccess) {
+            console.log(`🚫 Cohorte ${e.id} (${e.levelCode}) no accesible para este rol`);
+          }
+          return hasAccess;
+        })
+      : normalized;
+
+    console.log('✅ Cohortes después de filtro por rol:', roleFiltered.length);
+
+    setEnrollments(roleFiltered);
+
+    // Aplicar filtros de nivel y estado
+    let filtered = roleFiltered;
+
+    if (filterLevel && filterLevel.trim() !== '') {
+      console.log('🔍 Filtrando por nivel:', filterLevel);
+      if (!isValidLevel(filterLevel, levels)) {
+        handleError('VALIDATION_ERROR', 'invalid_level');
+        setFilteredEnrollments([]);
+        return;
       }
-
-      setFilteredEnrollments(filtered);
-    } catch (err) {
-      handleError('FETCH_ENROLLMENTS', 'fetchEnrollments');
-      logError('Error obteniendo cohortes:', err);
-    } finally {
-      setLoading(false);
+      filtered = filtered.filter(e => e.levelCode === filterLevel);
     }
-  }, [filterLevel, filterStatus, handleError, allowedLevels]);
+
+    if (filterStatus && filterStatus.trim() !== '') {
+      console.log('🔍 Filtrando por estado:', filterStatus);
+      if (!isValidStatus(filterStatus, STATUSES)) {
+        handleError('VALIDATION_ERROR', 'invalid_status');
+        setFilteredEnrollments([]);
+        return;
+      }
+      filtered = filtered.filter(e => e.status === filterStatus);
+    }
+
+    console.log('✅ Cohortes después de filtros:', filtered.length);
+    setFilteredEnrollments(filtered);
+    
+  } catch (err) {
+    handleError('FETCH_ENROLLMENTS', 'fetchEnrollments');
+    logError('Error obteniendo cohortes:', err);
+    console.error('❌ Error detallado:', err);
+  } finally {
+    setLoading(false);
+  }
+}, [filterLevel, filterStatus, handleError, allowedLevels, levels]);
 
   useEffect(() => {
-    fetchEnrollments();
-    loadTeachers();
-  }, [fetchEnrollments, loadTeachers]);
+    if (!levelsLoading) {
+      fetchEnrollments();
+      loadTeachers();
+    }
+  }, [fetchEnrollments, loadTeachers, levelsLoading]);
+
+  // Actualizar formData cuando cambien los niveles permitidos
+  useEffect(() => {
+    if (allowedLevels.length > 0 && !formData.level) {
+      setFormData(prev => ({ ...prev, level: allowedLevels[0].code }));
+    }
+  }, [allowedLevels, formData.level]);
 
   const handleTeacherSearch = (value) => {
     try {
@@ -478,15 +579,12 @@ const EnrollmentsPage = () => {
       let filtered = data;
 
       if (level && level.trim() !== '') {
-        if (!isValidLevel(level, LEVELS)) {
+        if (!isValidLevel(level, levels)) {
           handleError('VALIDATION_ERROR', 'invalid_level');
           setFilteredEnrollments([]);
           return;
         }
-        filtered = filtered.filter(e => {
-          const enrollmentLevel = e.levelEnrollment || e.level;
-          return enrollmentLevel === level;
-        });
+        filtered = filtered.filter(e => e.levelCode === level);
       }
 
       if (status && status.trim() !== '') {
@@ -735,7 +833,7 @@ const EnrollmentsPage = () => {
   const validateForm = () => {
     const errors = [];
 
-    if (!formData.level || !isValidLevel(formData.level, LEVELS)) {
+    if (!formData.level || !isValidLevel(formData.level, levels)) {
       errors.push('Nivel inválido');
     }
     if (!formData.startDate) {
@@ -799,7 +897,7 @@ const EnrollmentsPage = () => {
       }
 
       const enrollmentData = {
-        level: formData.level,
+        level: formData.level,  // ✅ Enviamos solo el código del nivel
         startDate: formData.startDate,
         endDate: formData.endDate,
         maxStudents: parseInt(formData.maxStudents),
@@ -808,12 +906,13 @@ const EnrollmentsPage = () => {
         teacher: formData.teacher,
       };
 
-      log('Creando cohorte', { level: formData.level });
+      log('Creando cohorte', enrollmentData);
 
-      await apiService.createEnrollment(enrollmentData);
+      const response = await apiService.createEnrollment(enrollmentData);
 
       logSecurityEvent('enrollment_created', {
         level: formData.level,
+        cohortId: response?.cohortId,
         timestamp: new Date().toISOString()
       });
 
@@ -827,7 +926,10 @@ const EnrollmentsPage = () => {
     } catch (err) {
       handleError('CREATE_ENROLLMENT', 'handleSubmit');
       logError('Error creando cohorte:', err);
-      alert("❌ Error al crear la cohorte: " + err.message);
+      
+      // Mostrar mensaje de error más específico
+      const errorMsg = err.response?.data?.message || err.message || "Error desconocido";
+      alert(`❌ Error al crear la cohorte: ${errorMsg}`);
     }
   };
 
@@ -872,7 +974,7 @@ const EnrollmentsPage = () => {
         return;
       }
 
-      log('Editando cohorte', { enrollmentId: selectedEnrollment.id });
+      log('Editando cohorte', { enrollmentId: selectedEnrollment.id, updateData });
 
       await apiService.editEnrollment(selectedEnrollment.id, updateData);
 
@@ -891,10 +993,9 @@ const EnrollmentsPage = () => {
     }
   };
 
-  // ✅ resetForm usa el primer nivel permitido del rol actual
   const resetForm = () => {
     setFormData({
-      level: allowedLevels[0]?.value ?? '',
+      level: allowedLevels[0]?.code ?? '',
       startDate: '',
       endDate: '',
       maxStudents: 30,
@@ -907,9 +1008,10 @@ const EnrollmentsPage = () => {
     setError('');
   };
 
-  const getLevelLabel = (levelValue) => {
-    if (!levelValue) return '—';
-    return LEVELS.find(l => l.value === levelValue)?.label || levelValue;
+  const getLevelLabel = (levelCode) => {
+    if (!levelCode) return '—';
+    const level = levels.find(l => l.code === levelCode);
+    return level?.displayName || levelCode;
   };
 
   const getStatusLabel = (statusValue) => {
@@ -927,6 +1029,10 @@ const EnrollmentsPage = () => {
       default: return 'bg-gray-100';
     }
   };
+
+  if (levelsLoading) {
+    return <div className="loading-container">Cargando niveles...</div>;
+  }
 
   return (
     <div className="enrollments-page">
@@ -964,8 +1070,8 @@ const EnrollmentsPage = () => {
                   required
                 >
                   {allowedLevels.map(level => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
+                    <option key={level.code} value={level.code}>
+                      {level.displayName}
                     </option>
                   ))}
                 </select>
@@ -1098,8 +1204,8 @@ const EnrollmentsPage = () => {
             >
               <option value="">Todos los niveles</option>
               {allowedLevels.map(level => (
-                <option key={level.value} value={level.value}>
-                  {level.label}
+                <option key={level.code} value={level.code}>
+                  {level.displayName}
                 </option>
               ))}
             </select>
@@ -1154,13 +1260,13 @@ const EnrollmentsPage = () => {
                 tabIndex={0}
               >
                 <div className="card-header">
-                  <h3>{escapeHtml(enrollment.cohortName || getLevelLabel(enrollment.levelEnrollment || enrollment.level))}</h3>
+                  <h3>{escapeHtml(enrollment.cohortName || getLevelLabel(enrollment.levelCode))}</h3>
                   <span className={`status-badge ${getStatusColor(enrollment.status)}`}>
                     {getStatusLabel(enrollment.status)}
                   </span>
                 </div>
                 <div className="card-body">
-                  <p><strong>Nivel:</strong> {getLevelLabel(enrollment.levelEnrollment || enrollment.level)}</p>
+                  <p><strong>Nivel:</strong> {getLevelLabel(enrollment.levelCode)}</p>
                   <p><strong>Inicio:</strong> {formatLocalDate(enrollment.startDate)}</p>
                   <p><strong>Fin:</strong> {formatLocalDate(enrollment.endDate)}</p>
                   <p><strong>Estudiantes:</strong> {enrollment.maxStudents} máx</p>
@@ -1178,7 +1284,7 @@ const EnrollmentsPage = () => {
         <div className="modal-overlay" onClick={handleCloseEnrollmentModal}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{escapeHtml(selectedEnrollment.cohortName || getLevelLabel(selectedEnrollment.levelEnrollment))}</h2>
+              <h2>{escapeHtml(selectedEnrollment.cohortName || getLevelLabel(selectedEnrollment.levelCode))}</h2>
               <button className="modal-close-btn" onClick={handleCloseEnrollmentModal}>✕</button>
             </div>
 
@@ -1203,7 +1309,7 @@ const EnrollmentsPage = () => {
                   <div className="details-grid">
                     <div>
                       <p className="detail-label">Nivel</p>
-                      <p className="detail-value">{getLevelLabel(selectedEnrollment.levelEnrollment || selectedEnrollment.level)}</p>
+                      <p className="detail-value">{getLevelLabel(selectedEnrollment.levelCode)}</p>
                     </div>
                     <div>
                       <p className="detail-label">Estado</p>
@@ -1642,6 +1748,14 @@ const EnrollmentsPage = () => {
           border-radius: 4px;
           font-size: 11px;
           font-weight: 600;
+        }
+        .loading-container {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 300px;
+          font-size: 1.2rem;
+          color: #666;
         }
       `}</style>
     </div>

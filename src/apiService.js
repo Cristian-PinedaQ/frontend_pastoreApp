@@ -452,6 +452,76 @@ class ApiService {
     }
   }
 
+  // ========== 📚 NIVELES FORMATIVOS ==========
+
+/**
+ * Obtener todos los niveles activos
+ * GET /api/v1/levels
+ */
+async getActiveLevels() {
+  try {
+    log('📚 [getActiveLevels] Obteniendo niveles activos');
+    const response = await this.request('/levels');
+    log('✅ [getActiveLevels] Éxito -', response?.length || 0, 'niveles');
+    return response;
+  } catch (error) {
+    logError('❌ [getActiveLevels] Error:', error.message);
+    // Fallback a niveles por defecto si el endpoint falla
+    return this.getDefaultLevels();
+  }
+}
+
+/**
+ * Obtener todos los niveles (incluye inactivos)
+ * GET /api/v1/levels/all
+ */
+async getAllLevels() {
+  try {
+    log('📚 [getAllLevels] Obteniendo todos los niveles');
+    const response = await this.request('/levels/all');
+    log('✅ [getAllLevels] Éxito -', response?.length || 0, 'niveles');
+    return response;
+  } catch (error) {
+    logError('❌ [getAllLevels] Error:', error.message);
+    return this.getDefaultLevels();
+  }
+}
+
+/**
+ * Obtener nivel por código
+ * GET /api/v1/levels/code/{code}
+ */
+async getLevelByCode(code) {
+  try {
+    validateString(code, 'code', 1, 50);
+    log('🔍 [getLevelByCode] Buscando nivel:', code);
+    const response = await this.request(`/levels/code/${code}`);
+    return response;
+  } catch (error) {
+    logError('❌ [getLevelByCode] Error:', error.message);
+    throw error;
+  }
+}
+
+/**
+ * Niveles por defecto (fallback)
+ */
+getDefaultLevels() {
+  return [
+    { id: 1, code: 'PREENCUENTRO', displayName: 'Pre-encuentro', levelOrder: 1, isActive: true },
+    { id: 2, code: 'ENCUENTRO', displayName: 'Encuentro', levelOrder: 2, isActive: true },
+    { id: 3, code: 'POST_ENCUENTRO', displayName: 'Post-encuentro', levelOrder: 3, isActive: true },
+    { id: 4, code: 'BAUTIZOS', displayName: 'Bautizos', levelOrder: 4, isActive: true },
+    { id: 5, code: 'ESENCIA_1', displayName: 'ESENCIA 1', levelOrder: 5, isActive: true },
+    { id: 6, code: 'ESENCIA_2', displayName: 'ESENCIA 2', levelOrder: 6, isActive: true },
+    { id: 7, code: 'ESENCIA_3', displayName: 'ESENCIA 3', levelOrder: 7, isActive: true },
+    { id: 8, code: 'SANIDAD_INTEGRAL_RAICES', displayName: 'Sanidad Integral Raíces', levelOrder: 8, isActive: true },
+    { id: 9, code: 'ESENCIA_4', displayName: 'ESENCIA 4', levelOrder: 9, isActive: true },
+    { id: 10, code: 'ADIESTRAMIENTO', displayName: 'Adiestramiento', levelOrder: 10, isActive: true },
+    { id: 11, code: 'GRADUACION', displayName: 'Graduación', levelOrder: 11, isActive: true }
+  ];
+}
+
   // ========== 🎓 INSCRIPCIONES DE ESTUDIANTES ==========
 
   async getStudentEnrollments(page = 0, limit = 10) {

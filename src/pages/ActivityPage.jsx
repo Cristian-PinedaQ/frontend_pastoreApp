@@ -12,6 +12,7 @@ import { generateActivityPDF } from "../services/activityPdfGenerator";
 import { logSecurityEvent, logUserAction } from "../utils/securityLogger";
 import "../css/ActivityPage.css";
 
+
 // 🔐 Debug condicional
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
 
@@ -138,7 +139,6 @@ const LEVEL_LABELS = {
   ESENCIA_1: "Esencia 1",
   ESENCIA_2: "Esencia 2",
   ESENCIA_3: "Esencia 3",
-  SANIDAD_INTEGRAL_RAICES: "Sanidad Integral Raíces",
   ESENCIA_4: "Esencia 4",
   ADIESTRAMIENTO: "Adiestramiento",
   GRADUACION: "Graduación",
@@ -190,6 +190,7 @@ const filterActivitiesByRole = (activities, allowedLevels) => {
 
     if (!level) return false;
 
+    // Ahora level es un string (el código)
     return allowedLevels.includes(level);
   });
 };
@@ -282,11 +283,31 @@ const ActivityPage = () => {
         quantity: activity.quantity || 0,
         isActive: activity.isActive === true,
         status: getStatusLabel(activity.isActive, activity.endDate),
-        levelEnrollment:
-  activity.requiredLevel ??
-  activity.levelEnrollment ??
-  activity.level ??
-  null,
+        levelEnrollment: (() => {
+  // Caso 1: Es un objeto con propiedad 'code' (nueva estructura)
+  if (activity.levelEnrollment && typeof activity.levelEnrollment === 'object' && activity.levelEnrollment.code) {
+    return activity.levelEnrollment.code;
+  }
+  // Caso 2: Es un string directo (estructura antigua)
+  if (typeof activity.levelEnrollment === 'string') {
+    return activity.levelEnrollment;
+  }
+  // Caso 3: Está en requiredLevel (backwards compatibility)
+  if (activity.requiredLevel && typeof activity.requiredLevel === 'object' && activity.requiredLevel.code) {
+    return activity.requiredLevel.code;
+  }
+  if (typeof activity.requiredLevel === 'string') {
+    return activity.requiredLevel;
+  }
+  // Caso 4: Está en activity.level
+  if (activity.level && typeof activity.level === 'object' && activity.level.code) {
+    return activity.level.code;
+  }
+  if (typeof activity.level === 'string') {
+    return activity.level;
+  }
+  return null;
+})(),
         activityType: activity.activityType ?? null,
       }));
 
