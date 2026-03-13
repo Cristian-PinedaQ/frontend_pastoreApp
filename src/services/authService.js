@@ -1,3 +1,5 @@
+import apiClient from "./apiClient";
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
@@ -157,54 +159,62 @@ class authService {
   }
 
   // ✅ CORREGIDO: Registro de nuevo usuario
-  async register(username, email, password, roleName) {
-    try {
-      // ✅ Validación de entrada
-      validateUsername(username);
-      validateEmail(email);
-      validatePassword(password);
-      if (!roleName || typeof roleName !== 'string' || roleName.trim().length === 0) {
-        throw new Error('Rol inválido');
-      }
+  // ✅ CORREGIDO: Registro de nuevo usuario usando apiClient
+async register(username, email, password, role) {
+  try {
 
-      log('📨 [register] Registrando usuario:', { username, email });
+    // mantener tus validaciones
+    validateUsername(username);
+    validateEmail(email);
+    validatePassword(password);
 
-      const res = await fetch(`${this.baseURL}/register`, {
-        method: 'POST',
-        headers: this.getHeaders(), // ✅ CORREGIDO: Ahora incluye token JWT
-        body: JSON.stringify({
-          username,
-          email,
-          password,
-          roleName: roleName.toUpperCase()
-        })
-      });
-
-      if (!res.ok) {
-
-        const errorData = await res.json().catch(() => null);
-
-        const error = new Error(
-          errorData?.message ||
-          errorData?.error ||
-          "Error al registrar usuario"
-        );
-
-        // 🔑 conservar status HTTP
-        error.status = res.status;
-
-        throw error;
-      }
-
-      const data = await res.json();
-      log('✅ [register] Usuario registrado correctamente');
-
-      return data;
-    } catch (error) {
-      logError('❌ [register] Error:', error.message);
-      throw error;
+    if (!role || typeof role !== "string") {
+      throw new Error("Rol inválido");
     }
+
+    log("📨 [register] Registrando usuario:", { username, email });
+
+    const response = await apiClient.post("/auth/register", {
+      username,
+      email,
+      password,
+      roleName: role.toUpperCase()
+    });
+
+    log("✅ [register] Usuario registrado correctamente");
+
+    return response.data;
+
+  } catch (err) {
+
+    const status = err?.response?.status;
+    const data = err?.response?.data;
+
+    let message = "Error al registrar usuario";
+
+    // ✅ errores de validación enviados por Spring
+    if (data?.fieldErrors) {
+      message = Object.values(data.fieldErrors).join(". ");
+    }
+    else if (data?.message) {
+      message = data.message;
+    }
+    else if (data?.error) {
+      message = data.error;
+    }
+    else if (err.message) {
+      message = err.message;
+    }
+
+    logError("❌ [register] Error:", message);
+
+    const error = new Error(message);
+    error.status = status;
+    error.data = data;
+
+    throw error;
   }
+}
 
   // ✅ Verificar si el token es válido (sin exponer detalles)
   isTokenValid() {

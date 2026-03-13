@@ -5,6 +5,7 @@
   "dependencies": {
     "autoprefixer": "^10.4.14",
     "autotable": "^1.0.0",
+    "axios": "^1.13.6",
     "bootstrap": "^5.3.8",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",

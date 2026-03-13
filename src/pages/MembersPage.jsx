@@ -511,7 +511,7 @@ const handleSubmit = async (e) => {
   const isFiltering =
     filters.gender || filters.district || filters.leader || isSearching;
 
-  const canEdit = hasAnyRole(["ROLE_PASTORES", "ROLE_GANANDO"]);
+  const canEdit = hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION"]);
 
   // ========== OBTENER LÍDERES ÚNICOS ==========
   const uniqueLeaders = Array.from(
