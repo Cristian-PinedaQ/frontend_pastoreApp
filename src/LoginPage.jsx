@@ -212,7 +212,7 @@ const LoginPage = () => {
                 type="text"
                 id="username"
                 name="username"
-                value={credentials.username}
+                value={credentials.username.trim()}
                 onChange={handleInputChange}
                 placeholder="tu_usuario o tu@email.com"
                 disabled={loading}

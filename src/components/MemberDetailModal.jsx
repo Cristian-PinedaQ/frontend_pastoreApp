@@ -22,6 +22,12 @@ export const MemberDetailModal = ({
   const [activeTab, setActiveTab] = useState("info");
   const [enrollmentDetail, setEnrollmentDetail] = useState(null);
 
+  const getLevelName = (level) => {
+  if (!level) return "N/A";
+  if (typeof level === "string") return level;
+  return level.displayName || level.code || "N/A";
+};
+
   // ✅ ARREGLADO: Envolver loadEnrollments en useCallback
   const loadEnrollments = useCallback(async () => {
     try {
@@ -273,7 +279,7 @@ export const MemberDetailModal = ({
                   </label>
                   <p className="text-lg font-semibold">
                     <span className="inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-4 py-2 rounded-full mt-1 border border-blue-300 dark:border-blue-600">
-                      {member.currentLevel || "Sin nivel asignado"}
+                      {member.currentLevel.displayName || "Sin nivel asignado"}
                     </span>
                   </p>
                 </div>
@@ -356,10 +362,7 @@ export const MemberDetailModal = ({
                               "Cohorte sin nombre"}
                           </h4>
                           <p className="text-gray-600 dark:text-gray-400 text-sm">
-                            Nivel:{" "}
-                            {enrollment.enrollment?.level?.displayName ||
-                              enrollment.enrollment?.level ||
-                              "N/A"}
+                            Nivel: {getLevelName(enrollment.enrollment?.level)}
                           </p>
                         </div>
                         <span
@@ -467,7 +470,8 @@ export const MemberDetailModal = ({
                         Nivel Actual
                       </p>
                       <p className="font-semibold text-gray-900 dark:text-white">
-                        {enrollmentDetail.currentLevel}
+                        {getLevelName(enrollmentDetail.currentLevel)}
+}
                       </p>
                     </div>
                     <div>

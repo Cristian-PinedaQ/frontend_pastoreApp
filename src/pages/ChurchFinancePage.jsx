@@ -186,6 +186,7 @@ const ModalFixedExpense = ({ isOpen, onClose, onSave, initialData, isEditing }) 
 };
 
 // Modal: Crear/Editar Gasto Ocasional
+// Modal: Crear/Editar Gasto Ocasional
 const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditing, currentMonth, currentYear }) => {
   const [form, setForm] = useState({
     name: "", description: "", amount: "", category: "OTROS",
@@ -193,6 +194,27 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
   });
   const [errors, setErrors] = useState({});
   const operationRef = useRef(false);
+
+  // Función para obtener el último día del mes seleccionado
+  const getLastDayOfMonth = (year, month) => {
+    return new Date(year, month, 0).getDate();
+  };
+
+  // Función para obtener una fecha por defecto dentro del mes seleccionado
+  const getDefaultDateForSelectedMonth = (() => {
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth() + 1;
+    const todayDay = today.getDate();
+    
+    // Si el mes actual es el mismo que el seleccionado, usar la fecha actual
+    if (todayYear === currentYear && todayMonth === currentMonth) {
+      return `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(todayDay).padStart(2, "0")}`;
+    }
+    
+    // Si no, usar el primer día del mes seleccionado
+    return `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+  }, [currentYear, currentMonth]);
 
   useEffect(() => {
     if (isOpen) {
@@ -208,19 +230,36 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
           notes: initialData.notes || "",
         });
       } else {
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-        setForm({ name: "", description: "", amount: "", category: "OTROS", expenseDate: todayStr, recordedBy: user?.username || "", notes: "" });
+        // Usar la fecha por defecto basada en el mes seleccionado
+        const defaultDate = getDefaultDateForSelectedMonth();
+        setForm({ 
+          name: "", 
+          description: "", 
+          amount: "", 
+          category: "OTROS", 
+          expenseDate: defaultDate, 
+          recordedBy: user?.username || "", 
+          notes: "" 
+        });
       }
       setErrors({});
     }
-  }, [isOpen, isEditing, initialData]);
+  }, [isOpen, isEditing, initialData, currentMonth, currentYear, getDefaultDateForSelectedMonth]);
 
+  // Validar que la fecha esté dentro del mes seleccionado
   const validate = () => {
     const e = {};
     if (!form.name || form.name.trim().length < 3) e.name = "Mínimo 3 caracteres";
     if (!form.amount || isNaN(form.amount) || parseFloat(form.amount) <= 0) e.amount = "Monto mayor a 0";
-    if (!form.expenseDate) e.expenseDate = "Fecha obligatoria";
+    if (!form.expenseDate) {
+      e.expenseDate = "Fecha obligatoria";
+    } else {
+      // Verificar que la fecha esté dentro del mes seleccionado
+      const [year, month] = form.expenseDate.split("-").map(Number);
+      if (year !== currentYear || month !== currentMonth) {
+        e.expenseDate = `La fecha debe estar en ${MONTH_NAMES[currentMonth]} ${currentYear}`;
+      }
+    }
     if (!form.recordedBy || form.recordedBy.trim().length < 1) e.recordedBy = "Campo obligatorio";
     return e;
   };
@@ -260,13 +299,20 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
           <div className="cfm-form-row">
             <div className="cfm-form-group">
               <label>Monto *</label>
-              <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" min="0" />
+              <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" min="0" step="0.01" />
               {errors.amount && <span className="cfm-error">{errors.amount}</span>}
             </div>
             <div className="cfm-form-group">
               <label>Fecha del Gasto *</label>
-              <input type="date" value={form.expenseDate} onChange={(e) => setForm({ ...form, expenseDate: e.target.value })} />
+              <input 
+                type="date" 
+                value={form.expenseDate} 
+                onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+                min={`${currentYear}-${String(currentMonth).padStart(2, "0")}-01`}
+                max={`${currentYear}-${String(currentMonth).padStart(2, "0")}-${getLastDayOfMonth(currentYear, currentMonth)}`}
+              />
               {errors.expenseDate && <span className="cfm-error">{errors.expenseDate}</span>}
+              <span className="cfm-hint">📅 Mes seleccionado: {MONTH_NAMES[currentMonth]} {currentYear}</span>
             </div>
           </div>
           <div className="cfm-form-group">
