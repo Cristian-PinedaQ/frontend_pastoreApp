@@ -2714,57 +2714,79 @@ async createFinance(financeData) {
   // ========== ⚡ GASTOS OCASIONALES ==========
 
   /**
-   * Registrar un gasto no recurrente.
-   * Solo aplica para el mes de su fecha; no se propaga a meses futuros.
-   * POST /finance/occasional-expenses
-   * @param {Object} dto - OccasionalExpenseDTO
-   *   { name, description, amount, category, expenseDate (yyyy-MM-dd), recordedBy, notes }
-   */
-  async createOccasionalExpense(dto) {
-    try {
-      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
-      validateString(dto.name, 'name', 3, 150);
-      validateNumber(dto.amount, 'amount', 0.01);
-      validateString(dto.category, 'category', 1, 60);
-      validateString(dto.expenseDate, 'expenseDate', 10, 10);
-      validateString(dto.recordedBy, 'recordedBy', 1, 100);
-
-      log('⚡ [createOccasionalExpense] Creando:', dto.name);
-      const response = await this.request('/finance/occasional-expenses', {
-        method: 'POST',
-        body: JSON.stringify(dto),
-      });
-      log('✅ [createOccasionalExpense] Éxito - ID:', response?.id);
-      return response;
-    } catch (error) {
-      logError('❌ [createOccasionalExpense] Error:', error.message);
-      throw error;
+ * Registrar un gasto no recurrente.
+ * POST /finance/occasional-expenses
+ */
+async createOccasionalExpense(dto) {
+  try {
+    if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
+    validateString(dto.name, 'name', 3, 150);
+    
+    // ✅ CORREGIDO: Validar y procesar el monto
+    const numAmount = Number(dto.amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
+      throw new Error('El monto debe ser un número válido mayor a 0');
     }
+    const validatedAmount = Math.round(numAmount * 100) / 100;
+    
+    validateString(dto.category, 'category', 1, 60);
+    validateString(dto.expenseDate, 'expenseDate', 10, 10);
+    validateString(dto.recordedBy, 'recordedBy', 1, 100);
+
+    const processedDto = {
+      ...dto,
+      amount: validatedAmount
+    };
+
+    log('⚡ [createOccasionalExpense] Creando:', dto.name, 'monto:', validatedAmount);
+    const response = await this.request('/finance/occasional-expenses', {
+      method: 'POST',
+      body: JSON.stringify(processedDto),
+    });
+    log('✅ [createOccasionalExpense] Éxito - ID:', response?.id);
+    return response;
+  } catch (error) {
+    logError('❌ [createOccasionalExpense] Error:', error.message);
+    throw error;
   }
+}
 
   /**
-   * Actualizar gasto ocasional.
-   * PUT /finance/occasional-expenses/{id}
-   * @param {number} id
-   * @param {Object} dto - OccasionalExpenseDTO
-   */
-  async updateOccasionalExpense(id, dto) {
-    try {
-      validateId(id, 'occasionalExpenseId');
-      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
+ * Actualizar gasto ocasional.
+ * PUT /finance/occasional-expenses/{id}
+ * @param {number} id
+ * @param {Object} dto - OccasionalExpenseDTO
+ */
+async updateOccasionalExpense(id, dto) {
+  try {
+    validateId(id, 'occasionalExpenseId');
+    if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
 
-      log('📝 [updateOccasionalExpense] Actualizando ID:', id);
-      const response = await this.request(`/finance/occasional-expenses/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(dto),
-      });
-      log('✅ [updateOccasionalExpense] Éxito');
-      return response;
-    } catch (error) {
-      logError('❌ [updateOccasionalExpense] Error:', error.message);
-      throw error;
+    // ✅ CORREGIDO: Procesar el monto correctamente
+    const processedDto = { ...dto };
+    
+    // Asegurar que el monto sea un número con 2 decimales
+    if (processedDto.amount !== undefined && processedDto.amount !== null) {
+      const numAmount = Number(processedDto.amount);
+      if (isNaN(numAmount)) {
+        throw new Error('El monto debe ser un número válido');
+      }
+      // Redondear a 2 decimales para evitar problemas de precisión
+      processedDto.amount = Math.round(numAmount * 100) / 100;
     }
+
+    log('📝 [updateOccasionalExpense] Actualizando ID:', id, 'monto:', processedDto.amount);
+    const response = await this.request(`/finance/occasional-expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(processedDto),
+    });
+    log('✅ [updateOccasionalExpense] Éxito');
+    return response;
+  } catch (error) {
+    logError('❌ [updateOccasionalExpense] Error:', error.message);
+    throw error;
   }
+}
 
   /**
    * Eliminar gasto ocasional.

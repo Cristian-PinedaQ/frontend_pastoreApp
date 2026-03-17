@@ -186,7 +186,6 @@ const ModalFixedExpense = ({ isOpen, onClose, onSave, initialData, isEditing }) 
 };
 
 // Modal: Crear/Editar Gasto Ocasional
-// Modal: Crear/Editar Gasto Ocasional
 const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditing, currentMonth, currentYear }) => {
   const [form, setForm] = useState({
     name: "", description: "", amount: "", category: "OTROS",
@@ -200,38 +199,38 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
     return new Date(year, month, 0).getDate();
   };
 
-  // Función para obtener una fecha por defecto dentro del mes seleccionado
-  const getDefaultDateForSelectedMonth = (() => {
-    const today = new Date();
-    const todayYear = today.getFullYear();
-    const todayMonth = today.getMonth() + 1;
-    const todayDay = today.getDate();
-    
-    // Si el mes actual es el mismo que el seleccionado, usar la fecha actual
-    if (todayYear === currentYear && todayMonth === currentMonth) {
-      return `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(todayDay).padStart(2, "0")}`;
-    }
-    
-    // Si no, usar el primer día del mes seleccionado
-    return `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
-  }, [currentYear, currentMonth]);
-
   useEffect(() => {
     if (isOpen) {
       const user = JSON.parse(sessionStorage.getItem("user") || "{}");
       if (isEditing && initialData) {
+        // ✅ CORREGIDO: Manejar correctamente el monto al editar
+        const amountValue = initialData.amount !== null && initialData.amount !== undefined 
+          ? initialData.amount.toString() 
+          : "";
+        
         setForm({
           name: initialData.name || "",
           description: initialData.description || "",
-          amount: initialData.amount || "",
+          amount: amountValue,
           category: initialData.category || "OTROS",
           expenseDate: initialData.expenseDate || "",
-          recordedBy: initialData.recordedBy || "",
+          recordedBy: initialData.recordedBy || user?.username || "",
           notes: initialData.notes || "",
         });
       } else {
-        // Usar la fecha por defecto basada en el mes seleccionado
-        const defaultDate = getDefaultDateForSelectedMonth();
+        // Crear nuevo: usar fecha por defecto
+        const today = new Date();
+        const todayYear = today.getFullYear();
+        const todayMonth = today.getMonth() + 1;
+        const todayDay = today.getDate();
+        
+        let defaultDate;
+        if (todayYear === currentYear && todayMonth === currentMonth) {
+          defaultDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(todayDay).padStart(2, "0")}`;
+        } else {
+          defaultDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+        }
+        
         setForm({ 
           name: "", 
           description: "", 
@@ -244,17 +243,30 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
       }
       setErrors({});
     }
-  }, [isOpen, isEditing, initialData, currentMonth, currentYear, getDefaultDateForSelectedMonth]);
+  }, [isOpen, isEditing, initialData, currentMonth, currentYear]);
 
   // Validar que la fecha esté dentro del mes seleccionado
   const validate = () => {
     const e = {};
     if (!form.name || form.name.trim().length < 3) e.name = "Mínimo 3 caracteres";
-    if (!form.amount || isNaN(form.amount) || parseFloat(form.amount) <= 0) e.amount = "Monto mayor a 0";
+    
+    // ✅ CORREGIDO: Mejor validación del monto
+    if (!form.amount || form.amount.trim() === "") {
+      e.amount = "Monto requerido";
+    } else {
+      const numAmount = parseFloat(form.amount);
+      if (isNaN(numAmount)) {
+        e.amount = "Monto inválido";
+      } else if (numAmount <= 0) {
+        e.amount = "Monto debe ser mayor a 0";
+      } else if (numAmount > 999999999.99) {
+        e.amount = "Monto demasiado grande";
+      }
+    }
+    
     if (!form.expenseDate) {
       e.expenseDate = "Fecha obligatoria";
     } else {
-      // Verificar que la fecha esté dentro del mes seleccionado
       const [year, month] = form.expenseDate.split("-").map(Number);
       if (year !== currentYear || month !== currentMonth) {
         e.expenseDate = `La fecha debe estar en ${MONTH_NAMES[currentMonth]} ${currentYear}`;
@@ -267,11 +279,38 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
   const handleSubmit = async () => {
     if (operationRef.current) return;
     const e = validate();
-    if (Object.keys(e).length > 0) { setErrors(e); return; }
+    if (Object.keys(e).length > 0) { 
+      setErrors(e); 
+      return; 
+    }
+    
     operationRef.current = true;
     try {
+      // ✅ CORREGIDO: Procesar el monto correctamente
+      const rawAmount = form.amount.replace(/,/g, '');
+      const numAmount = parseFloat(rawAmount);
+      // Redondear a 2 decimales para evitar problemas de precisión
+      const roundedAmount = Math.round(numAmount * 100) / 100;
+      
       const [y, m] = form.expenseDate.split("-");
-      await onSave({ ...form, amount: parseFloat(form.amount), month: parseInt(m), year: parseInt(y) });
+      
+      const expenseData = {
+        ...form,
+        amount: roundedAmount,
+        month: parseInt(m),
+        year: parseInt(y)
+      };
+      
+      // Si es edición, asegurar que se incluya el ID
+      if (isEditing && initialData?.id) {
+        expenseData.id = initialData.id;
+      }
+      
+      log("💾 Guardando gasto ocasional:", expenseData);
+      await onSave(expenseData);
+    } catch (error) {
+      console.error("Error al guardar:", error);
+      setErrors({ submit: error.message });
     } finally {
       operationRef.current = false;
     }
@@ -289,17 +328,41 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
         <div className="cfm-modal__body">
           <div className="cfm-form-group">
             <label>Nombre *</label>
-            <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej: Reparación sillas" maxLength="150" />
+            <input 
+              value={form.name} 
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value });
+                setErrors({ ...errors, name: null });
+              }} 
+              placeholder="Ej: Reparación sillas" 
+              maxLength="150" 
+            />
             {errors.name && <span className="cfm-error">{errors.name}</span>}
           </div>
           <div className="cfm-form-group">
             <label>Descripción</label>
-            <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Descripción opcional" maxLength="500" rows="2" />
+            <textarea 
+              value={form.description} 
+              onChange={(e) => setForm({ ...form, description: e.target.value })} 
+              placeholder="Descripción opcional" 
+              maxLength="500" 
+              rows="2" 
+            />
           </div>
           <div className="cfm-form-row">
             <div className="cfm-form-group">
               <label>Monto *</label>
-              <input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} placeholder="0" min="0" step="0.01" />
+              <input 
+                type="number" 
+                value={form.amount} 
+                onChange={(e) => {
+                  setForm({ ...form, amount: e.target.value });
+                  setErrors({ ...errors, amount: null });
+                }} 
+                placeholder="0" 
+                min="0" 
+                step="0.01"
+              />
               {errors.amount && <span className="cfm-error">{errors.amount}</span>}
             </div>
             <div className="cfm-form-group">
@@ -307,7 +370,10 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
               <input 
                 type="date" 
                 value={form.expenseDate} 
-                onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, expenseDate: e.target.value });
+                  setErrors({ ...errors, expenseDate: null });
+                }}
                 min={`${currentYear}-${String(currentMonth).padStart(2, "0")}-01`}
                 max={`${currentYear}-${String(currentMonth).padStart(2, "0")}-${getLastDayOfMonth(currentYear, currentMonth)}`}
               />
@@ -317,7 +383,10 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
           </div>
           <div className="cfm-form-group">
             <label>Categoría *</label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+            <select 
+              value={form.category} 
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+            >
               {Object.entries(EXPENSE_CATEGORY_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
               ))}
@@ -326,19 +395,40 @@ const ModalOccasionalExpense = ({ isOpen, onClose, onSave, initialData, isEditin
           <div className="cfm-form-row">
             <div className="cfm-form-group">
               <label>Registrado por *</label>
-              <input value={form.recordedBy} onChange={(e) => setForm({ ...form, recordedBy: e.target.value })} placeholder="Usuario" maxLength="100" />
+              <input 
+                value={form.recordedBy} 
+                onChange={(e) => {
+                  setForm({ ...form, recordedBy: e.target.value });
+                  setErrors({ ...errors, recordedBy: null });
+                }} 
+                placeholder="Usuario" 
+                maxLength="100" 
+              />
               {errors.recordedBy && <span className="cfm-error">{errors.recordedBy}</span>}
             </div>
           </div>
           <div className="cfm-form-group">
             <label>Notas</label>
-            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Notas adicionales" maxLength="500" rows="2" />
+            <textarea 
+              value={form.notes} 
+              onChange={(e) => setForm({ ...form, notes: e.target.value })} 
+              placeholder="Notas adicionales" 
+              maxLength="500" 
+              rows="2" 
+            />
           </div>
+          {errors.submit && (
+            <div className="cfm-alert cfm-alert--error">{errors.submit}</div>
+          )}
         </div>
         <div className="cfm-modal__footer">
           <button className="cfm-btn cfm-btn--ghost" onClick={onClose}>Cancelar</button>
-          <button className="cfm-btn cfm-btn--primary" onClick={handleSubmit}>
-            {isEditing ? "Guardar Cambios" : "Registrar Gasto"}
+          <button 
+            className="cfm-btn cfm-btn--primary" 
+            onClick={handleSubmit}
+            disabled={operationRef.current}
+          >
+            {operationRef.current ? "Guardando..." : (isEditing ? "Guardar Cambios" : "Registrar Gasto")}
           </button>
         </div>
       </div>
@@ -538,30 +628,46 @@ const ChurchFinancePage = () => {
     } catch (err) { setError(err.message); }
   }, [loadFixedExpenses]);
 
-  // ── Gastos Ocasionales CRUD ───────────────────────────────
-  const handleSaveOccasional = useCallback(async (formData) => {
-    if (operationInProgress.current) return;
-    operationInProgress.current = true;
-    try {
-      if (editingOccasional) {
-        await apiService.updateOccasionalExpense(editingOccasional.id, formData);
-        showSuccess("✅ Gasto ocasional actualizado");
-      } else {
-        await apiService.createOccasionalExpense(formData);
-        showSuccess("✅ Gasto ocasional registrado");
-      }
-      setShowOccasionalModal(false);
-      setEditingOccasional(null);
-      operationInProgress.current = false;
-      await loadOccasionalExpenses();
-      await loadBalance();
-      await loadHealth();
-    } catch (err) {
-      setError(err.message || "Error al guardar gasto ocasional");
-    } finally {
-      operationInProgress.current = false;
+// ── Gastos Ocasionales CRUD ───────────────────────────────
+const handleSaveOccasional = useCallback(async (formData) => {
+  if (operationInProgress.current) return;
+  operationInProgress.current = true;
+  
+  try {
+    // ✅ CORREGIDO: Asegurar que el monto esté redondeado
+    const dataToSave = {
+      ...formData,
+      amount: Math.round(parseFloat(formData.amount) * 100) / 100
+    };
+    
+    log("💾 handleSaveOccasional - Datos a guardar:", dataToSave);
+    
+    if (editingOccasional) {
+      await apiService.updateOccasionalExpense(editingOccasional.id, dataToSave);
+      showSuccess("✅ Gasto ocasional actualizado");
+    } else {
+      await apiService.createOccasionalExpense(dataToSave);
+      showSuccess("✅ Gasto ocasional registrado");
     }
-  }, [editingOccasional, loadOccasionalExpenses, loadBalance, loadHealth]);
+    
+    setShowOccasionalModal(false);
+    setEditingOccasional(null);
+    
+    // Recargar datos
+    await Promise.all([
+      loadOccasionalExpenses(),
+      loadBalance(),
+      loadHealth()
+    ]);
+    
+  } catch (err) {
+    const errorMsg = err.data?.message || err.message || "Error al guardar gasto ocasional";
+    setError(errorMsg);
+    logError("❌ Error en handleSaveOccasional:", err);
+  } finally {
+    operationInProgress.current = false;
+  }
+}, [editingOccasional, loadOccasionalExpenses, loadBalance, loadHealth]);
 
   const handleDeleteOccasional = useCallback(async (id) => {
     if (!window.confirm("¿Eliminar este gasto ocasional?")) return;

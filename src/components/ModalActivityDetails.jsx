@@ -2,13 +2,12 @@
 // ModalActivityDetails.jsx - CORREGIDO CON FILTRO POR NIVEL Y EXCLUSIONES
 // Modal para ver detalles de actividad y agregar participantes
 // 🔐 AÑADIDO: prop readOnly para roles con solo GET (oculta pestañas de escritura)
+// ✅ ACTUALIZADO: LevelEnrollment ahora es clase JPA (no enum)
 // ============================================
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import apiService from "../apiService";
 import "../css/ModalActivityDetails.css";
-
-// Después de los imports, antes de const ModalActivityDetails = ...
 
 // ✅ FIX timezone
 const parseLocalDate = (dateString) => {
@@ -35,16 +34,16 @@ const ModalActivityDetails = ({
   const [activeTab, setActiveTab] = useState("info");
 
   // IDs de pastores a excluir - REEMPLAZAR CON LOS IDS CORRECTOS
-  const EXCLUDED_MEMBER_IDS = useRef([1, 2]); // ← Usar useRef para evitar dependencias en useCallback
+  const EXCLUDED_MEMBER_IDS = useRef([1, 2]);
 
-  // Estados para membres
+  // Estados para miembros y niveles
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [eligibleMembers, setEligibleMembers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [selectedMemberName, setSelectedMemberName] = useState("");
-  const [selectedMemberLevel, setSelectedMemberLevel] = useState("");
+  const [selectedMemberLevel, setSelectedMemberLevel] = useState(null);
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [initialPayment, setInitialPayment] = useState("");
   const [incomeMethod, setIncomeMethod] = useState("CASH");
@@ -53,6 +52,10 @@ const ModalActivityDetails = ({
   const [enrollError, setEnrollError] = useState("");
   const [enrollSuccess, setEnrollSuccess] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // ✅ NUEVO: Estados para niveles
+  const [levels, setLevels] = useState([]);
+  const [loadingLevels, setLoadingLevels] = useState(false);
 
   // Estados para costos
   const [costs, setCosts] = useState([]);
@@ -69,7 +72,7 @@ const ModalActivityDetails = ({
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  // 🔐 Resetear a pestaña "info" cuando se abre el modal (especialmente para readOnly)
+  // 🔐 Resetear a pestaña "info" cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
       setActiveTab("info");
@@ -87,51 +90,66 @@ const ModalActivityDetails = ({
     }
   };
 
-  // Función para determinar si un miembro es elegible según el nivel de la actividad
+  // ✅ NUEVO: Cargar niveles activos
+  const loadLevels = useCallback(async () => {
+    if (!readOnly) {
+      setLoadingLevels(true);
+      try {
+        const data = await apiService.getActiveLevels();
+        setLevels(data || []);
+      } catch (error) {
+        console.error("Error cargando niveles:", error);
+        // Fallback a niveles por defecto
+        setLevels(apiService.getDefaultLevels());
+      } finally {
+        setLoadingLevels(false);
+      }
+    }
+  }, [readOnly]);
+
+  // ✅ NUEVO: Función para determinar si un miembro es elegible según el nivel de la actividad
   const isMemberEligible = useCallback((member) => {
-    // Excluir pastores específicos usando useRef
+    // Excluir pastores específicos
     if (EXCLUDED_MEMBER_IDS.current.includes(member.id)) {
       return false;
     }
 
+    // Si la actividad no requiere nivel, todos son elegibles
     if (!activity?.requiredLevel) {
-      // Si no hay requiredLevel, todos son elegibles
       return true;
     }
 
-    // Para PREENCUENTRO, todos son elegibles
-    if (activity.requiredLevel === 'PREENCUENTRO') {
+    // PREENCUENTRO es el nivel inicial, todos son elegibles
+    if (activity.requiredLevel.code === 'PREENCUENTRO') {
       return true;
     }
 
-    // Para otros niveles, el miembro debe tener el nivel anterior
-    const requiredLevel = activity.requiredLevel;
-    const memberLevel = member.currentLevel;
-
-    // Mapa de niveles anteriores
-    const previousLevelMap = {
-      'ENCUENTRO': 'PREENCUENTRO',
-      'POST_ENCUENTRO': 'ENCUENTRO',
-      'BAUTIZOS': 'POST_ENCUENTRO',
-      'ESENCIA_1': 'BAUTIZOS',
-      'ESENCIA_2': 'ESENCIA_1',
-      'ESENCIA_3': 'ESENCIA_2',
-      'SANIDAD_INTEGRAL_RAICES': 'ESENCIA_3',
-      'ESENCIA_4': 'SANIDAD_INTEGRAL_RAICES',
-      'ADIESTRAMIENTO': 'ESENCIA_4',
-      'GRADUACION': 'ADIESTRAMIENTO'
-    };
-
-    const requiredPreviousLevel = previousLevelMap[requiredLevel];
-    
-    // Si el miembro no tiene nivel actual, no es elegible (excepto PREENCUENTRO)
-    if (!memberLevel) {
+    // Si el miembro no tiene nivel actual, no es elegible
+    if (!member.currentLevel) {
       return false;
     }
 
-    // Comparar el nivel del miembro con el nivel requerido anterior
-    return memberLevel === requiredPreviousLevel;
-  }, [activity]); // EXCLUDED_MEMBER_IDS ya no es dependencia porque es useRef
+    // Encontrar el nivel requerido y el nivel del miembro en la lista de niveles
+    const requiredLevelObj = levels.find(l => l.code === activity.requiredLevel.code);
+    const memberLevelObj = levels.find(l => l.code === member.currentLevel.code);
+
+    if (!requiredLevelObj || !memberLevelObj) {
+      return false;
+    }
+
+    // Para ser elegible, el miembro debe tener el nivel inmediatamente anterior
+    // al nivel requerido (usando levelOrder)
+    const requiredPreviousOrder = requiredLevelObj.levelOrder - 1;
+    
+    // Si el nivel requerido es el primero (order 1), todos son elegibles
+    if (requiredPreviousOrder < 1) {
+      return true;
+    }
+
+    // El miembro es elegible si su nivel tiene el order inmediatamente anterior
+    return memberLevelObj.levelOrder === requiredPreviousOrder;
+    
+  }, [activity, levels]);
 
   // Cargar lista de miembros
   const loadMembers = useCallback(async () => {
@@ -167,34 +185,35 @@ const ModalActivityDetails = ({
   // Efecto para cargar datos cuando se abre el modal
   useEffect(() => {
     if (isOpen && activity) {
-      // 🔐 Solo cargar miembros si tiene acceso de escritura (necesario para la pestaña Inscribir)
+      // 🔐 Solo cargar datos si tiene acceso de escritura
       if (!readOnly) {
         loadMembers();
+        loadLevels(); // ✅ Cargar niveles
       }
       if (activeTab === "costs" && !readOnly) {
         loadCosts();
       }
     }
-  }, [isOpen, activity, loadMembers, activeTab, loadCosts, readOnly]);
+  }, [isOpen, activity, loadMembers, loadLevels, activeTab, loadCosts, readOnly]);
 
-  // Efecto para calcular miembros elegibles cuando cambian los miembros o la actividad
+  // ✅ NUEVO: Efecto para calcular miembros elegibles cuando cambian los miembros, niveles o actividad
   useEffect(() => {
-    if (members.length > 0 && activity) {
+    if (members.length > 0 && activity && levels.length > 0) {
       const eligible = members.filter(member => isMemberEligible(member));
       setEligibleMembers(eligible);
       
-      // También resetear selección si el miembro seleccionado ya no es elegible
+      // Resetear selección si el miembro seleccionado ya no es elegible
       if (selectedMemberId) {
         const selectedIsEligible = eligible.some(m => m.id === selectedMemberId);
         if (!selectedIsEligible) {
           setSelectedMemberId("");
           setSelectedMemberName("");
-          setSelectedMemberLevel("");
+          setSelectedMemberLevel(null);
           setSearchTerm("");
         }
       }
     }
-  }, [members, activity, isMemberEligible, selectedMemberId]);
+  }, [members, activity, levels, isMemberEligible, selectedMemberId]);
 
   // Efecto para filtrar miembros elegibles según el término de búsqueda
   useEffect(() => {
@@ -202,7 +221,7 @@ const ModalActivityDetails = ({
       setFilteredMembers(eligibleMembers);
     } else {
       const filtered = eligibleMembers.filter((member) =>
-        member.name.toLowerCase().includes(searchTerm.toLowerCase())
+        member.name?.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredMembers(filtered);
     }
@@ -228,13 +247,20 @@ const ModalActivityDetails = ({
     setShowDropdown(true);
     setSelectedMemberId("");
     setSelectedMemberName("");
-    setSelectedMemberLevel("");
+    setSelectedMemberLevel(null);
+  };
+
+  // ✅ NUEVO: Obtener nombre de visualización del nivel
+  const getLevelDisplayName = (level) => {
+    if (!level) return "Sin nivel";
+    if (typeof level === 'string') return level;
+    return level.displayName || level.code || "Sin nivel";
   };
 
   const handleSelectMember = (member) => {
     setSelectedMemberId(member.id);
     setSelectedMemberName(member.name);
-    setSelectedMemberLevel(member.currentLevel || "Sin nivel");
+    setSelectedMemberLevel(member.currentLevel);
     setSearchTerm(member.name);
     setShowDropdown(false);
   };
@@ -242,7 +268,7 @@ const ModalActivityDetails = ({
   const handleClearSelection = () => {
     setSelectedMemberId("");
     setSelectedMemberName("");
-    setSelectedMemberLevel("");
+    setSelectedMemberLevel(null);
     setSearchTerm("");
     setShowPaymentSection(false);
     setInitialPayment("");
@@ -321,7 +347,7 @@ const ModalActivityDetails = ({
         // Resetear formulario después de éxito
         setSelectedMemberId("");
         setSelectedMemberName("");
-        setSelectedMemberLevel("");
+        setSelectedMemberLevel(null);
         setSearchTerm("");
         setShowPaymentSection(false);
         setInitialPayment("");
@@ -349,7 +375,7 @@ const ModalActivityDetails = ({
     }
   };
 
-  // Métodos para pestaña de costos
+  // Métodos para pestaña de costos (sin cambios)
   const handleCostInputChange = (e) => {
     const { name, value } = e.target;
     setCostForm({
@@ -375,11 +401,9 @@ const ModalActivityDetails = ({
     setCostSuccess("");
 
     try {
-      // Obtener usuario actual para recordedBy
       const currentUser = getCurrentUser();
       const recordedBy = currentUser?.username || "Sistema";
 
-      // Crear objeto de datos según el DTO del backend
       const costData = {
         detail: costForm.detail.trim(),
         price: parseFloat(costForm.price),
@@ -401,14 +425,12 @@ const ModalActivityDetails = ({
       if (response.id || response.message) {
         setCostSuccess("✅ Costo registrado correctamente");
 
-        // Resetear formulario
         setCostForm({
           detail: "",
           price: "",
           incomeMethod: "CASH",
         });
 
-        // Recargar lista de costos
         setTimeout(() => {
           loadCosts();
           setCostSuccess("");
@@ -416,8 +438,6 @@ const ModalActivityDetails = ({
       }
     } catch (error) {
       console.error("❌ Error registrando costo:", error);
-      console.error("❌ Detalles del error:", error.response || error.message);
-
       let errorMsg = "Error al registrar el costo";
       if (error.message && error.message.includes("JSON")) {
         errorMsg =
@@ -438,8 +458,6 @@ const ModalActivityDetails = ({
       await apiService.request(`/cost/delete/${costId}`, {
         method: "DELETE",
       });
-
-      // Recargar lista de costos
       loadCosts();
     } catch (error) {
       console.error("❌ Error eliminando costo:", error);
@@ -454,7 +472,6 @@ const ModalActivityDetails = ({
 
   // Calcular estadísticas
   const totalValue = (activity.price || 0) * (activity.quantity || 0);
-  // ✅ Fix
   const daysLeft = activity.endDate
     ? Math.ceil(
         (parseLocalDate(activity.endDate) - new Date()) / (1000 * 60 * 60 * 24),
@@ -465,6 +482,11 @@ const ModalActivityDetails = ({
   const enrolledCount = balance?.participantCount || 0;
   const eligibleCount = eligibleMembers.length;
   const hasCapacity = !activity.quantity || enrolledCount < activity.quantity;
+
+  // ✅ Obtener nombre de visualización del nivel requerido
+  const requiredLevelDisplay = activity.requiredLevel 
+    ? getLevelDisplayName(activity.requiredLevel)
+    : "Sin nivel requerido";
 
   return (
     <div className="modal-activity-details-overlay">
@@ -477,7 +499,7 @@ const ModalActivityDetails = ({
             >
               {activity.status?.text || "Desconocido"}
             </div>
-            {/* 🔐 Badge solo lectura visible para roles restringidos */}
+            {/* 🔐 Badge solo lectura */}
             {readOnly && (
               <div className="details-readonly-badge" title="Solo tienes permiso de consulta">
                 🔒 Solo lectura
@@ -489,6 +511,12 @@ const ModalActivityDetails = ({
           </button>
         </div>
 
+        {/* ✅ Mostrar nivel requerido */}
+        <div className="activity-required-level">
+          <span className="level-label">🎓 Nivel requerido:</span>
+          <span className="level-value">{requiredLevelDisplay}</span>
+        </div>
+
         {/* PESTAÑAS */}
         <div className="modal-activity-details__tabs">
           <button
@@ -497,7 +525,6 @@ const ModalActivityDetails = ({
           >
             📊 Información General
           </button>
-          {/* 🔐 Pestañas de escritura solo visibles con acceso total */}
           {!readOnly && (
             <button
               className={`tab ${activeTab === "enroll" ? "active" : ""}`}
@@ -635,15 +662,15 @@ const ModalActivityDetails = ({
             </>
           )}
 
-          {/* PESTAÑA 2: INSCRIBIR PARTICIPANTE (solo !readOnly) */}
+          {/* PESTAÑA 2: INSCRIBIR PARTICIPANTE */}
           {activeTab === "enroll" && !readOnly && (
             <div className="details-section enroll-section">
               <h3>👥 Inscribir Nuevo Participante</h3>
 
               {/* Información de disponibilidad */}
-              {loadingMembers ? (
+              {loadingMembers || loadingLevels ? (
                 <div className="info-message">
-                  ⏳ Cargando lista de miembros...
+                  ⏳ Cargando datos...
                 </div>
               ) : (
                 <div className="info-message">
@@ -724,8 +751,10 @@ const ModalActivityDetails = ({
                                   <div className="member-name">
                                     {member.name}
                                   </div>
-                                  <div style={{ fontSize: '0.75em', color: '#666' }}>
-                                    {member.currentLevel || "Sin nivel"}
+                                  <div className="member-level">
+                                    {member.currentLevel 
+                                      ? getLevelDisplayName(member.currentLevel)
+                                      : "Sin nivel"}
                                   </div>
                                 </div>
                               ))}
@@ -751,8 +780,10 @@ const ModalActivityDetails = ({
                           <span className="selected-member-name">
                             ✅ Seleccionado: {selectedMemberName}
                           </span>
-                          <span style={{ fontSize: '0.75em', color: '#666', marginLeft: '8px' }}>
-                            (Nivel actual: {selectedMemberLevel})
+                          <span className="selected-member-level">
+                            (Nivel actual: {selectedMemberLevel 
+                              ? getLevelDisplayName(selectedMemberLevel)
+                              : "Sin nivel"})
                           </span>
                         </div>
                       </div>
@@ -879,7 +910,7 @@ const ModalActivityDetails = ({
             </div>
           )}
 
-          {/* PESTAÑA 3: GASTOS DE ACTIVIDAD (solo !readOnly) */}
+          {/* PESTAÑA 3: GASTOS DE ACTIVIDAD (sin cambios) */}
           {activeTab === "costs" && !readOnly && (
             <div className="details-section costs-section">
               <div className="costs-header">
@@ -1031,7 +1062,7 @@ const ModalActivityDetails = ({
         </div>
       </div>
 
-      {/* 🔐 Estilos del badge solo lectura */}
+      {/* Estilos adicionales */}
       <style>{`
         .modal-activity-details__header-content {
           display: flex;
@@ -1050,6 +1081,37 @@ const ModalActivityDetails = ({
           font-size: 0.78em;
           color: #7d5a00;
           font-weight: 600;
+        }
+        .activity-required-level {
+          margin: 10px 20px;
+          padding: 8px 15px;
+          background: #f0f7ff;
+          border-radius: 8px;
+          border-left: 4px solid #2196f3;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .level-label {
+          font-weight: 600;
+          color: #555;
+        }
+        .level-value {
+          font-weight: 600;
+          color: #1976d2;
+          background: #e3f2fd;
+          padding: 2px 10px;
+          border-radius: 16px;
+        }
+        .member-level {
+          font-size: 0.75em;
+          color: #666;
+          margin-top: 2px;
+        }
+        .selected-member-level {
+          font-size: 0.85em;
+          color: #666;
+          margin-left: 8px;
         }
       `}</style>
     </div>

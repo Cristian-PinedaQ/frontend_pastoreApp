@@ -1,6 +1,6 @@
 // ============================================
 // LeadersPage.jsx - Gestión de Líderes (SERVANT, LEADER_144 y LEADER_12)
-// Versión limpia: click en fila abre ModalLeaderDetail
+// Versión con control de permisos por roles usando AuthContext directamente
 // ============================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -11,6 +11,7 @@ import nameHelper from "../services/nameHelper";
 import ModalPromoteLeader from "../components/ModalPromoteLeader";
 import ModalLeaderStatistics from "../components/ModalLeaderStatistics";
 import ModalLeaderDetail from "../components/ModalLeaderDetail";
+import { useAuth } from "../context/AuthContext";
 import "../css/LeadersPage.css";
 
 // Extraer función del helper para transformar nombres
@@ -63,6 +64,15 @@ const LEADER_STATUS_MAP = {
 };
 
 const LeadersPage = () => {
+  // ========== AUTH ==========
+  const auth = useAuth();
+  const { 
+    user, 
+    loading: authLoading, 
+    hasAnyRole,
+    isAuthenticated 
+  } = auth;
+
   // ========== STATE ==========
   const [allLeaders, setAllLeaders] = useState([]);
   const [filteredLeaders, setFilteredLeaders] = useState([]);
@@ -88,6 +98,46 @@ const LeadersPage = () => {
   const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
   const [activeFiltersInfo, setActiveFiltersInfo] = useState({});
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // ========== PERMISOS BASADOS EN ROLES ==========
+  const canPerformCrud = hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE"]);
+  const isPastor = hasAnyRole(["ROLE_PASTORES"]);
+  const isDespliegue = hasAnyRole(["ROLE_DESPLIEGUE"]);
+
+  // Estado para controlar qué acciones están disponibles
+  const [userPermissions, setUserPermissions] = useState({
+    canCreate: false,
+    canEdit: false,
+    canDelete: false,
+    canSuspend: false,
+    canVerify: false,
+    canPromote: false,
+    canExport: true, // Todos pueden exportar
+    canViewStatistics: true, // Todos pueden ver estadísticas
+    canReactivateSuspended: false,
+  });
+
+  // ========== ACTUALIZAR PERMISOS BASADOS EN ROLES ==========
+  useEffect(() => {
+    setUserPermissions({
+      canCreate: canPerformCrud,
+      canEdit: canPerformCrud,
+      canDelete: canPerformCrud,
+      canSuspend: canPerformCrud,
+      canVerify: canPerformCrud,
+      canPromote: canPerformCrud,
+      canReactivateSuspended: canPerformCrud,
+      canExport: true,
+      canViewStatistics: true,
+    });
+
+    log("Permisos actualizados:", { 
+      canPerformCrud, 
+      isPastor,
+      isDespliegue,
+      user: user?.username
+    });
+  }, [canPerformCrud, isPastor, isDespliegue, user]);
 
   // ========== DARK MODE DETECTION ==========
   useEffect(() => {
@@ -311,6 +361,12 @@ const LeadersPage = () => {
 
   // ========== VERIFY ALL LEADERS ==========
   const handleVerifyAll = useCallback(async () => {
+    // Verificar permiso
+    if (!userPermissions.canVerify) {
+      setError("No tienes permiso para verificar líderes");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
@@ -335,10 +391,16 @@ const LeadersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [loadLeaders]);
+  }, [loadLeaders, userPermissions.canVerify]);
 
   // ========== REACTIVATE SUSPENDED ==========
   const handleReactivateSuspended = useCallback(async () => {
+    // Verificar permiso
+    if (!userPermissions.canReactivateSuspended) {
+      setError("No tienes permiso para reactivar líderes");
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
@@ -370,7 +432,7 @@ const LeadersPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [loadLeaders]);
+  }, [loadLeaders, userPermissions.canReactivateSuspended]);
 
   // ========== SHOW STATISTICS ==========
   const handleShowStatistics = useCallback(async () => {
@@ -411,6 +473,12 @@ const LeadersPage = () => {
   // ========== ACCIONES INDIVIDUALES (usadas por ModalLeaderDetail) ==========
   const handleSuspendLeader = useCallback(
     async (leaderId, memberName) => {
+      // Verificar permiso
+      if (!userPermissions.canSuspend) {
+        setError("No tienes permiso para suspender líderes");
+        return;
+      }
+
       try {
         const reason = window.prompt(
           `Ingrese el motivo para suspender a ${memberName}:`,
@@ -438,11 +506,17 @@ const LeadersPage = () => {
         setLoading(false);
       }
     },
-    [loadLeaders],
+    [loadLeaders, userPermissions.canSuspend],
   );
 
   const handleUnsuspendLeader = useCallback(
     async (leaderId, memberName) => {
+      // Verificar permiso
+      if (!userPermissions.canSuspend) {
+        setError("No tienes permiso para reactivar líderes suspendidos");
+        return;
+      }
+
       try {
         if (
           !window.confirm(
@@ -474,11 +548,17 @@ const LeadersPage = () => {
         setLoading(false);
       }
     },
-    [loadLeaders],
+    [loadLeaders, userPermissions.canSuspend],
   );
 
   const handleDeactivateLeader = useCallback(
     async (leaderId, memberName) => {
+      // Verificar permiso
+      if (!userPermissions.canDelete) {
+        setError("No tienes permiso para desactivar líderes");
+        return;
+      }
+
       try {
         const reason = window.prompt(
           `Ingrese el motivo para desactivar a ${memberName} (permanente):`,
@@ -514,11 +594,17 @@ const LeadersPage = () => {
         setLoading(false);
       }
     },
-    [loadLeaders],
+    [loadLeaders, userPermissions.canDelete],
   );
 
   const handleReactivateLeader = useCallback(
     async (leaderId, memberName) => {
+      // Verificar permiso
+      if (!userPermissions.canEdit) {
+        setError("No tienes permiso para reactivar líderes inactivos");
+        return;
+      }
+
       try {
         if (
           !window.confirm(
@@ -543,11 +629,17 @@ const LeadersPage = () => {
         setLoading(false);
       }
     },
-    [loadLeaders],
+    [loadLeaders, userPermissions.canEdit],
   );
 
   const handleVerifyLeader = useCallback(
     async (leaderId, memberName) => {
+      // Verificar permiso
+      if (!userPermissions.canVerify) {
+        setError("No tienes permiso para verificar líderes");
+        return;
+      }
+
       try {
         setLoading(true);
         log("Verificando líder específico", { leaderId });
@@ -573,14 +665,18 @@ const LeadersPage = () => {
         setLoading(false);
       }
     },
-    [loadLeaders],
+    [loadLeaders, userPermissions.canVerify],
   );
 
   // ========== EDITAR LÍDER ==========
-  // Usa la firma existente en apiService:
-  //   updateLeader(leaderId, leaderType, cellGroupCode, notes)
   const handleEditLeader = useCallback(
     async (leaderId, fields) => {
+      // Verificar permiso
+      if (!userPermissions.canEdit) {
+        setError("No tienes permiso para editar líderes");
+        return;
+      }
+
       log("Editando líder", { leaderId, fields });
 
       await apiService.updateLeader(
@@ -600,12 +696,18 @@ const LeadersPage = () => {
         timestamp: new Date().toISOString(),
       });
     },
-    [loadLeaders],
+    [loadLeaders, userPermissions.canEdit],
   );
 
   // ========== ELIMINAR LÍDER ==========
   const handleDeleteLeader = useCallback(
     async (leaderId, memberName) => {
+      // Verificar permiso
+      if (!userPermissions.canDelete) {
+        setError("No tienes permiso para eliminar líderes");
+        return;
+      }
+
       log("Eliminando líder", { leaderId, memberName });
 
       // Lanzar la llamada — si falla, el error burbujea al modal para mostrarlo
@@ -626,7 +728,7 @@ const LeadersPage = () => {
         timestamp: new Date().toISOString(),
       });
     },
-    [loadLeaders],
+    [loadLeaders, userPermissions.canDelete],
   );
 
   // ========== EXPORT PDF ==========
@@ -750,12 +852,54 @@ const LeadersPage = () => {
       }}
     >
       <div className="leaders-page-container">
-        {/* HEADER */}
+        {/* HEADER con información de usuario */}
         <div className="leaders-page__header">
-          <h1>👥 Gestión de Líderes</h1>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <h1>👥 Gestión de Líderes</h1>
+            {user && (
+              <div 
+                className="user-role-badge"
+                style={{
+                  backgroundColor: isDarkMode ? '#2d3748' : '#e2e8f0',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '20px',
+                  fontSize: '0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap'
+                }}
+              >
+                <span>👤 {user.username || user.name}</span>
+                <span style={{
+                  backgroundColor: canPerformCrud ? '#48bb78' : '#4299e1',
+                  color: 'white',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '12px',
+                  fontSize: '0.8rem',
+                  fontWeight: 'bold'
+                }}>
+                  {canPerformCrud ? '🔓 Admin' : '👁️ Visor'}
+                </span>
+                {user.roles && user.roles.length > 0 && (
+                  <span style={{
+                    fontSize: '0.8rem',
+                    color: isDarkMode ? '#a0aec0' : '#4a5568'
+                  }}>
+                    ({user.roles.map(r => typeof r === 'string' ? r : r.name).join(', ')})
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           <p>
-            Promueve, verifica y administra líderes (Servidores, Líderes 144 y
-            Líderes 12)
+            Promueve, verifica y administra líderes (Servidores, Líderes 144 y Líderes 12)
           </p>
         </div>
 
@@ -848,51 +992,61 @@ const LeadersPage = () => {
             </div>
           </div>
 
-          {/* BOTONES DE ACCIÓN */}
+          {/* BOTONES DE ACCIÓN - Condicionales según permisos */}
           <div className="leaders-page__actions">
-            <button
-              className="leaders-page__btn leaders-page__btn--primary"
-              onClick={() => setShowPromoteModal(true)}
-              title="Promover miembro a líder"
-            >
-              🌟 Promover
-            </button>
+            {userPermissions.canPromote && (
+              <button
+                className="leaders-page__btn leaders-page__btn--primary"
+                onClick={() => setShowPromoteModal(true)}
+                title="Promover miembro a líder"
+              >
+                🌟 Promover
+              </button>
+            )}
 
-            <button
-              className="leaders-page__btn leaders-page__btn--secondary"
-              onClick={handleShowStatistics}
-              title="Ver estadísticas de liderazgo"
-              disabled={loading}
-            >
-              📊 Estadísticas {hasFiltersApplied && "🔍"}
-            </button>
+            {userPermissions.canViewStatistics && (
+              <button
+                className="leaders-page__btn leaders-page__btn--secondary"
+                onClick={handleShowStatistics}
+                title="Ver estadísticas de liderazgo"
+                disabled={loading}
+              >
+                📊 Estadísticas {hasFiltersApplied && "🔍"}
+              </button>
+            )}
 
-            <button
-              className="leaders-page__btn leaders-page__btn--export"
-              onClick={handleExportPDF}
-              title="Exportar a PDF"
-              disabled={loading}
-            >
-              📄 PDF {hasFiltersApplied && "🔍"}
-            </button>
+            {userPermissions.canExport && (
+              <button
+                className="leaders-page__btn leaders-page__btn--export"
+                onClick={handleExportPDF}
+                title="Exportar a PDF"
+                disabled={loading}
+              >
+                📄 PDF {hasFiltersApplied && "🔍"}
+              </button>
+            )}
 
-            <button
-              className="leaders-page__btn leaders-page__btn--verify-all"
-              onClick={handleVerifyAll}
-              title="Verificar todos los líderes activos"
-              disabled={loading}
-            >
-              🔄 Verificar Todos
-            </button>
+            {userPermissions.canVerify && (
+              <button
+                className="leaders-page__btn leaders-page__btn--verify-all"
+                onClick={handleVerifyAll}
+                title="Verificar todos los líderes activos"
+                disabled={loading}
+              >
+                🔄 Verificar Todos
+              </button>
+            )}
 
-            <button
-              className="leaders-page__btn leaders-page__btn--reactivate-all"
-              onClick={handleReactivateSuspended}
-              title="Intentar reactivar suspendidos"
-              disabled={loading}
-            >
-              ▶️ Reactivar Suspendidos
-            </button>
+            {userPermissions.canReactivateSuspended && (
+              <button
+                className="leaders-page__btn leaders-page__btn--reactivate-all"
+                onClick={handleReactivateSuspended}
+                title="Intentar reactivar suspendidos"
+                disabled={loading}
+              >
+                ▶️ Reactivar Suspendidos
+              </button>
+            )}
 
             <button
               className="leaders-page__btn leaders-page__btn--refresh"
@@ -904,6 +1058,31 @@ const LeadersPage = () => {
             </button>
           </div>
         </div>
+
+        {/* MENSAJE DE INFORMACIÓN DE PERMISOS */}
+        {!authLoading && !canPerformCrud && isAuthenticated() && (
+          <div 
+            className="permissions-info"
+            style={{
+              backgroundColor: isDarkMode ? '#1e3a8a20' : '#dbeafe',
+              color: isDarkMode ? '#93c5fd' : '#1e40af',
+              border: `1px solid ${isDarkMode ? '#3b82f6' : '#bfdbfe'}`,
+              marginTop: '1rem',
+              padding: '0.75rem',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.9rem'
+            }}
+          >
+            <span>👁️</span>
+            <span>
+              Estás en modo <strong>solo lectura</strong>. 
+              Los roles <strong>PASTORES</strong> y <strong>DESPLIEGUE</strong> tienen permisos completos (crear, editar, eliminar, suspender, verificar).
+            </span>
+          </div>
+        )}
 
         {/* INFORMACIÓN DE FILTROS */}
         <div className="leaders-page__filter-info">
@@ -1047,7 +1226,7 @@ const LeadersPage = () => {
 
       {/* ========== MODALES ========== */}
 
-      {/* Modal Detalle de Líder */}
+      {/* Modal Detalle de Líder - Pasamos permisos */}
       <ModalLeaderDetail
         isOpen={showDetailModal}
         onClose={() => {
@@ -1057,6 +1236,7 @@ const LeadersPage = () => {
         leader={selectedLeader}
         isDarkMode={isDarkMode}
         loading={loading}
+        permissions={userPermissions}
         onVerify={handleVerifyLeader}
         onSuspend={handleSuspendLeader}
         onUnsuspend={handleUnsuspendLeader}
@@ -1066,15 +1246,17 @@ const LeadersPage = () => {
         onDelete={handleDeleteLeader}
       />
 
-      {/* Modal Promover */}
-      <ModalPromoteLeader
-        isOpen={showPromoteModal}
-        onClose={() => setShowPromoteModal(false)}
-        onPromoteSuccess={() => {
-          setShowPromoteModal(false);
-          loadLeaders();
-        }}
-      />
+      {/* Modal Promover - Solo visible si tiene permiso */}
+      {userPermissions.canPromote && (
+        <ModalPromoteLeader
+          isOpen={showPromoteModal}
+          onClose={() => setShowPromoteModal(false)}
+          onPromoteSuccess={() => {
+            setShowPromoteModal(false);
+            loadLeaders();
+          }}
+        />
+      )}
 
       {/* Modal Estadísticas */}
       <ModalLeaderStatistics

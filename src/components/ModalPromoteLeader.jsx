@@ -1,5 +1,5 @@
 // ============================================
-// ModalPromoteLeader.jsx - VERSIÓN FINAL CON 3 TIPOS
+// ModalPromoteLeader.jsx - VERSIÓN ACTUALIZADA CON LEVELENROLLMENT JPA
 // ============================================
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -19,61 +19,33 @@ const logError = (message, error) => {
   console.error(`[ModalPromoteLeader] ${message}`, error);
 };
 
-// ✅ CONSTANTES ACTUALIZADAS CON 3 TIPOS
+// ✅ CONSTANTES ACTUALIZADAS CON 3 TIPOS (estos siguen siendo fijos porque son roles de liderazgo)
 const LEADER_TYPES = [
   { 
     value: 'SERVANT', 
     label: '🛠️ Servidor', 
     description: 'Nivel mínimo: ESENCIA 2 o superior',
-    requiredLevel: 'ESENCIA_2',
-    color: '#3b82f6',
-    requiredLevelOrder: 6
+    requiredLevelCode: 'ESENCIA_2',
+    requiredLevelOrder: 6,
+    color: '#3b82f6'
   },
   { 
     value: 'LEADER_144', 
     label: '👥 Líder 144', 
     description: 'Nivel mínimo: Graduación (Líder de Rama)',
-    requiredLevel: 'GRADUACION',
-    color: '#f59e0b',
-    requiredLevelOrder: 11
+    requiredLevelCode: 'GRADUACION',
+    requiredLevelOrder: 11,
+    color: '#f59e0b'
   },
   { 
     value: 'LEADER_12', 
     label: '🌟 Líder 12', 
     description: 'Nivel mínimo: Graduación (Líder de Red)',
-    requiredLevel: 'GRADUACION',
-    color: '#10b981',
-    requiredLevelOrder: 11
+    requiredLevelCode: 'GRADUACION',
+    requiredLevelOrder: 11,
+    color: '#10b981'
   },
 ];
-
-const LEVEL_ORDER = {
-  'PREENCUENTRO': 1,
-  'ENCUENTRO': 2,
-  'POST_ENCUENTRO': 3,
-  'BAUTIZOS': 4,
-  'ESENCIA_1': 5,
-  'ESENCIA_2': 6,
-  'ESENCIA_3': 7,
-  'SANIDAD_INTEGRAL_RAICES': 8,
-  'ESENCIA_4': 9,
-  'ADIESTRAMIENTO': 10,
-  'GRADUACION': 11
-};
-
-const LEVEL_DISPLAY_NAMES = {
-  'PREENCUENTRO': 'Pre-encuentro',
-  'ENCUENTRO': 'Encuentro',
-  'POST_ENCUENTRO': 'Post-encuentro',
-  'BAUTIZOS': 'Bautizos',
-  'ESENCIA_1': 'ESENCIA 1',
-  'ESENCIA_2': 'ESENCIA 2',
-  'ESENCIA_3': 'ESENCIA 3',
-  'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces',
-  'ESENCIA_4': 'ESENCIA 4',
-  'ADIESTRAMIENTO': 'Adiestramiento',
-  'GRADUACION': 'Graduación'
-};
 
 const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
   // ========== STATE ==========
@@ -83,6 +55,10 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [eligibilityDetails, setEligibilityDetails] = useState(null);
+  
+  // ✅ NUEVO: Estado para niveles dinámicos
+  const [levels, setLevels] = useState([]);
+  const [loadingLevels, setLoadingLevels] = useState(false);
   
   const [selectedMember, setSelectedMember] = useState(null);
   const [selectedType, setSelectedType] = useState('');
@@ -124,22 +100,74 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
     return () => observer.disconnect();
   }, []);
 
+  // ========== CARGAR NIVELES ==========
+  const loadLevels = useCallback(async () => {
+    setLoadingLevels(true);
+    try {
+      const data = await apiService.getActiveLevels();
+      setLevels(data || []);
+      log('Niveles cargados', { count: data?.length });
+    } catch (error) {
+      logError('Error cargando niveles:', error);
+      // Fallback a niveles por defecto
+      setLevels(apiService.getDefaultLevels());
+    } finally {
+      setLoadingLevels(false);
+    }
+  }, []);
+
+  // Cargar niveles al abrir el modal
+  useEffect(() => {
+    if (isOpen) {
+      loadLevels();
+    }
+  }, [isOpen, loadLevels]);
+
+  // ========== FUNCIONES AUXILIARES PARA NIVELES ==========
+  const getLevelDisplayName = (level) => {
+    if (!level) return 'No definido';
+    
+    // Si es un objeto LevelEnrollment
+    if (typeof level === 'object') {
+      return level.displayName || level.code || 'No definido';
+    }
+    
+    // Si es un string (código)
+    const foundLevel = levels.find(l => l.code === level);
+    return foundLevel?.displayName || level;
+  };
+
+  const getLevelOrder = (level) => {
+    if (!level) return 0;
+    
+    // Si es un objeto LevelEnrollment
+    if (typeof level === 'object') {
+      return level.levelOrder || 0;
+    }
+    
+    // Si es un string (código)
+    const foundLevel = levels.find(l => l.code === level);
+    return foundLevel?.levelOrder || 0;
+  };
+
   // ========== VERIFICAR ELEGIBILIDAD BÁSICA ==========
   const checkBasicEligibility = (member, leaderType) => {
     const typeConfig = LEADER_TYPES.find(t => t.value === leaderType);
     if (!typeConfig) return null;
 
     const requiredLevelOrder = typeConfig.requiredLevelOrder;
-    const memberLevel = member.currentLevel || member.levelEnrollment;
-    const memberLevelOrder = LEVEL_ORDER[memberLevel] || 0;
-
+    
+    // Obtener el nivel actual del miembro (puede ser objeto o string)
+    const memberLevelObj = member.currentLevel || member.levelEnrollment;
+    const memberLevelOrder = getLevelOrder(memberLevelObj);
+    
     // ✅ Acepta nivel igual o superior
     const hasRequiredLevel = memberLevelOrder >= requiredLevelOrder;
     
     let levelMessage = '';
     if (!hasRequiredLevel) {
-      const requiredLevelName = LEVEL_DISPLAY_NAMES[typeConfig.requiredLevel] || typeConfig.requiredLevel;
-      const currentLevelName = LEVEL_DISPLAY_NAMES[memberLevel] || memberLevel || 'Nivel no definido';
+      const requiredLevelName = getLevelDisplayName(typeConfig.requiredLevelCode);
+      const currentLevelName = getLevelDisplayName(memberLevelObj);
       
       levelMessage = `❌ Nivel insuficiente: El miembro está en ${currentLevelName}. Se requiere mínimo ${requiredLevelName} o superior.`;
     }
@@ -151,9 +179,9 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
       hasRequiredLevel,
       hasMaritalStatus,
       hasTitheLastThreeMonths,
-      memberLevel: memberLevel,
+      memberLevel: memberLevelObj,
       memberLevelOrder,
-      requiredLevel: typeConfig.requiredLevel,
+      requiredLevelCode: typeConfig.requiredLevelCode,
       requiredLevelOrder,
       levelMessage,
       maritalStatus: member.maritalStatus || 'No registrado',
@@ -185,7 +213,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
       const members = await apiService.searchMembers(term);
       const nonLeaderMembers = members.filter(m => !m.isLeader);
       
-      // ✅ ACTUALIZADO: Incluir LEADER_144
+      // Enriquecer resultados con información de elegibilidad
       const enhancedResults = nonLeaderMembers.map(member => {
         const servantEligibility = checkBasicEligibility(member, 'SERVANT');
         const leader144Eligibility = checkBasicEligibility(member, 'LEADER_144');
@@ -198,8 +226,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
             LEADER_144: leader144Eligibility,
             LEADER_12: leader12Eligibility
           },
-          currentLevelDisplay: LEVEL_DISPLAY_NAMES[member.currentLevel || member.levelEnrollment] || 
-                              member.currentLevel || member.levelEnrollment || 'No definido'
+          currentLevelDisplay: getLevelDisplayName(member.currentLevel || member.levelEnrollment)
         };
       });
       
@@ -223,7 +250,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
       setSearching(false);
       abortControllerRef.current = null;
     }
-  }, []);
+  }, []); // Dependencias vacías porque checkBasicEligibility está definida dentro del componente
 
   // Efecto para búsqueda con debounce
   useEffect(() => {
@@ -381,11 +408,17 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="modal-promote__input"
-          disabled={searching}
+          disabled={searching || loadingLevels}
           autoFocus
         />
-        {searching && <span className="modal-promote__search-spinner">⏳</span>}
+        {(searching || loadingLevels) && <span className="modal-promote__search-spinner">⏳</span>}
       </div>
+
+      {loadingLevels && (
+        <div className="modal-promote__info">
+          Cargando niveles formativos...
+        </div>
+      )}
 
       {searchTerm && searchTerm.trim().length < 2 && (
         <div className="modal-promote__search-hint">
@@ -463,8 +496,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
       <div className="modal-promote__current-level-info">
         <strong>📊 Nivel actual del miembro:</strong>{' '}
         <span style={{ fontWeight: 'bold', color: '#3b82f6' }}>
-          {LEVEL_DISPLAY_NAMES[selectedMember.currentLevel || selectedMember.levelEnrollment] || 
-           selectedMember.currentLevel || selectedMember.levelEnrollment || 'No definido'}
+          {getLevelDisplayName(selectedMember.currentLevel || selectedMember.levelEnrollment)}
         </span>
       </div>
 
@@ -490,7 +522,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
                 <div className="modal-promote__type-label">{type.label}</div>
                 <div className="modal-promote__type-desc">{type.description}</div>
                 <div className="modal-promote__type-req">
-                  Nivel mínimo: {LEVEL_DISPLAY_NAMES[type.requiredLevel] || type.requiredLevel}
+                  Nivel mínimo: {getLevelDisplayName(type.requiredLevelCode)}
                 </div>
                 {!isEligible && levelMessage && (
                   <div className="modal-promote__type-warning">
@@ -602,7 +634,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
           {memberCurrentLevel && (
             <div className="modal-promote__detail-item">
               <span className="modal-promote__detail-label">Nivel actual:</span>
-              <span className="modal-promote__detail-value">{memberCurrentLevel}</span>
+              <span className="modal-promote__detail-value">{getLevelDisplayName(memberCurrentLevel)}</span>
             </div>
           )}
           <div className="modal-promote__detail-item">
@@ -611,7 +643,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
           </div>
           <div className="modal-promote__detail-item">
             <span className="modal-promote__detail-label">Nivel mínimo requerido:</span>
-            <span className="modal-promote__detail-value">{eligibilityResult.requiredLevel}</span>
+            <span className="modal-promote__detail-value">{getLevelDisplayName(eligibilityResult.requiredLevel)}</span>
           </div>
           <div className="modal-promote__detail-item">
             <span className="modal-promote__detail-label">Estado civil:</span>

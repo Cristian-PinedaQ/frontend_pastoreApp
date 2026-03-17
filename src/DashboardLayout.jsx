@@ -107,7 +107,6 @@ export const DashboardLayout = () => {
         "ROLE_PASTORES",
         "ROLE_CONEXION",
         "ROLE_CIMIENTO",
-        "ROLE_ESENCIA",
       ]),
     },
     {
@@ -177,7 +176,6 @@ export const DashboardLayout = () => {
         "ROLE_CONEXION",
         "ROLE_CIMIENTO",
         "ROLE_ESENCIA",
-        "ROLE_DESPLIEGUE",
       ]),
     },
     {
