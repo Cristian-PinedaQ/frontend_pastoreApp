@@ -1,12 +1,34 @@
 // ============================================
-// ModalAddActivity.jsx - CORREGIDO V3
-// Vincula la actividad a una cohorte concreta (enrollmentId)
-// y usa su LevelEnrollment como requiredLevel automáticamente
+// ModalAddActivity.jsx
+// ✅ v4: levelEnrollment llega como entidad JPA {code, displayName, requiresPayment, levelOrder}
+//        Solo muestra cohortes cuyo nivel tiene requiresPayment = true
 // ============================================
 
 import React, { useState, useEffect } from "react";
 import apiService from "../apiService";
 import "../css/ModalAddActivity.css";
+
+// ── Helper: extrae el code del nivel, sea string u objeto ─────────────────────
+const getLevelCode = (level) => {
+  if (!level) return null;
+  if (typeof level === "string") return level;
+  return level.code ?? null;
+};
+
+// ── Helper: extrae el displayName del nivel ───────────────────────────────────
+const getLevelDisplay = (level) => {
+  if (!level) return "Sin nivel";
+  if (typeof level === "string") return level;
+  return level.displayName ?? level.code ?? level;
+};
+
+// ── Helper: ¿el nivel requiere pago? (default true si no se sabe) ─────────────
+const levelRequiresPayment = (level) => {
+  if (!level) return true;
+  if (typeof level === "string") return true; // estructura antigua: asumir sí
+  if (typeof level.requiresPayment === "boolean") return level.requiresPayment;
+  return true; // default conservador
+};
 
 const ModalAddActivity = ({
   isOpen,
@@ -22,33 +44,28 @@ const ModalAddActivity = ({
     quantity: "",
     isActive: true,
     activityType: "STANDALONE",
-    // ✅ Ahora guardamos el ID de la cohorte concreta, NO el enum del nivel
     enrollmentId: null,
-    // requiredLevel se deriva automáticamente de la cohorte seleccionada
     requiredLevel: null,
   });
 
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [errors, setErrors]           = useState({});
+  const [loading, setLoading]         = useState(false);
   const [loadingCohorts, setLoadingCohorts] = useState(false);
-  // Cada elemento: { id, cohortName, levelEnrollment, label }
-  const [cohorts, setCohorts] = useState([]);
+  const [cohorts, setCohorts]         = useState([]);
 
-  // ── Inicializar formulario ────────────────────────────────────────────────
+  // ── Inicializar formulario ──────────────────────────────────────────────────
   useEffect(() => {
     if (!isOpen) return;
 
     if (initialData) {
       setFormData({
         activityName: initialData.activityName || "",
-        price: initialData.price || "",
-        // ✅ FIX: si ya viene como "YYYY-MM-DD" del backend, usarlo directo
-        endDate: initialData.endDate
-          ? String(initialData.endDate).split("T")[0] // toma solo la parte de fecha si viene con hora
-          : "",
-        quantity: initialData.quantity || "",
-        isActive:
-          initialData.isActive !== undefined ? initialData.isActive : true,
+        price:        initialData.price        || "",
+        endDate:      initialData.endDate
+                        ? String(initialData.endDate).split("T")[0]
+                        : "",
+        quantity:     initialData.quantity     || "",
+        isActive:     initialData.isActive !== undefined ? initialData.isActive : true,
         activityType: initialData.activityType || "STANDALONE",
         enrollmentId: initialData.enrollmentId || null,
         requiredLevel: initialData.requiredLevel || null,
@@ -68,62 +85,69 @@ const ModalAddActivity = ({
     }
   }, [isOpen, initialData]);
 
-  // ── Cargar cohortes PENDING cuando se necesitan ───────────────────────────
+  // ── Cargar cohortes PENDING con nivel de pago cuando se necesitan ──────────
   useEffect(() => {
     if (isOpen && formData.activityType === "ENROLLMENT") {
       loadCohortsPending();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, formData.activityType]);
 
-  // ── Función para cargar cohortes PENDING ─────────────────────────────────
-  // ── Función para cargar cohortes PENDING ─────────────────────────────────
   const loadCohortsPending = async () => {
     setLoadingCohorts(true);
     try {
-      // ✅ Usar el método que llama a /enrollment/cohorts/findAll
-      //    NO getEnrollmentsCard() que es paginado
       const data = await apiService.getEnrollments();
 
-      console.log("📊 [loadCohortsPending] Cohortes recibidas:", data);
-
       if (!Array.isArray(data)) {
-        console.warn("⚠️ La respuesta no es un array:", data);
+        console.warn("⚠️ La respuesta de cohortes no es un array:", data);
         setCohorts([]);
         return;
       }
 
-      // ✅ FILTRO: solo las que tienen status === 'PENDING'
-      const pendingCohorts = data
+      const pending = data
         .filter((cohort) => {
-          const status = cohort.status;
-          console.log(
-            `  → ${cohort.cohortName} | status: ${status} | level: ${cohort.levelEnrollment}`,
-          );
-          return status === "PENDING";
+          if (cohort.status !== "PENDING") return false;
+
+          // ✅ Solo cohortes cuyo nivel requiere pago
+          const level = cohort.levelEnrollment;
+          if (!levelRequiresPayment(level)) {
+            console.log(
+              `  → ${cohort.cohortName}: nivel sin pago requerido, omitida`
+            );
+            return false;
+          }
+          return true;
         })
-        .map((cohort) => ({
-          id: cohort.id,
-          cohortName: cohort.cohortName,
-          levelEnrollment: cohort.levelEnrollment,
-          label: `${cohort.cohortName} (${cohort.levelEnrollment})`,
-        }));
+        .map((cohort) => {
+          const level    = cohort.levelEnrollment;
+          const code     = getLevelCode(level);
+          const display  = getLevelDisplay(level);
+          const reqPay   = levelRequiresPayment(level);
+          const levelObj = typeof level === "object" ? level : null;
 
-      console.log(`✅ Cohortes PENDING disponibles: ${pendingCohorts.length}`);
+          return {
+            id:           cohort.id,
+            cohortName:   cohort.cohortName,
+            // Siempre almacenamos el objeto completo si está disponible
+            levelEnrollment: levelObj ?? code,
+            levelCode:    code,
+            levelDisplay: display,
+            requiresPayment: reqPay,
+            label:        `${cohort.cohortName} (${display})`,
+          };
+        });
 
-      if (pendingCohorts.length === 0) {
-        console.warn("⚠️ No hay cohortes con estado PENDING");
-      }
-
-      setCohorts(pendingCohorts);
+      console.log(`✅ Cohortes PENDING con pago: ${pending.length}`);
+      setCohorts(pending);
     } catch (error) {
-      console.error("❌ Error al cargar cohortes PENDING:", error);
+      console.error("❌ Error cargando cohortes PENDING:", error);
       setCohorts([]);
     } finally {
       setLoadingCohorts(false);
     }
   };
 
-  // ── Validación ────────────────────────────────────────────────────────────
+  // ── Validación ──────────────────────────────────────────────────────────────
   const validateForm = () => {
     const newErrors = {};
 
@@ -143,17 +167,14 @@ const ModalAddActivity = ({
       newErrors.price = "El precio es demasiado alto";
     }
 
-    // ✅ Fix: parsear la fecha seleccionada como fecha LOCAL, no UTC
     if (!formData.endDate) {
       newErrors.endDate = "La fecha de finalización es requerida";
     } else {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-
       const [year, month, day] = formData.endDate.split("-").map(Number);
-      const selectedDate = new Date(year, month - 1, day); // local, sin UTC
-
-      if (selectedDate < today) {
+      const selected = new Date(year, month - 1, day);
+      if (selected < today) {
         newErrors.endDate = "La fecha no puede ser anterior a hoy";
       }
     }
@@ -162,37 +183,36 @@ const ModalAddActivity = ({
       newErrors.quantity = "La cantidad no puede ser negativa";
     }
 
-    // ✅ Para ENROLLMENT se exige seleccionar una cohorte concreta
     if (formData.activityType === "ENROLLMENT" && !formData.enrollmentId) {
-      newErrors.enrollmentId = "Debe seleccionar una cohorte PENDING";
+      newErrors.enrollmentId = "Debe seleccionar una cohorte con pago requerido";
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
     if (name === "activityType") {
       setFormData((prev) => ({
         ...prev,
-        activityType: value,
-        // Limpiar datos de cohorte al cambiar a STANDALONE
-        enrollmentId: value === "STANDALONE" ? null : prev.enrollmentId,
+        activityType:  value,
+        enrollmentId:  value === "STANDALONE" ? null : prev.enrollmentId,
         requiredLevel: value === "STANDALONE" ? null : prev.requiredLevel,
       }));
       if (value === "ENROLLMENT") loadCohortsPending();
+
     } else if (name === "enrollmentId") {
-      // ✅ Al seleccionar una cohorte, derivar automáticamente el requiredLevel
-      const selectedCohort = cohorts.find((c) => String(c.id) === value);
+      const selected = cohorts.find((c) => String(c.id) === value);
       setFormData((prev) => ({
         ...prev,
-        enrollmentId: value ? Number(value) : null,
-        // El nivel del enum se toma directamente de la cohorte seleccionada
-        requiredLevel: selectedCohort ? selectedCohort.levelEnrollment : null,
+        enrollmentId:  value ? Number(value) : null,
+        // Guardamos el objeto nivel completo (o el code si solo tenemos string)
+        requiredLevel: selected ? selected.levelEnrollment : null,
       }));
+
     } else {
       setFormData((prev) => ({
         ...prev,
@@ -209,65 +229,25 @@ const ModalAddActivity = ({
 
     setLoading(true);
     try {
-      console.log(
-        "🔍 [Modal] formData completo:",
-        JSON.stringify(formData, null, 2),
-      );
-      console.log("🔍 [Modal] cohorts disponibles:", cohorts);
-
-      // Verificar que para ENROLLMENT, enrollmentId esté presente
-      if (formData.activityType === "ENROLLMENT") {
-        if (!formData.enrollmentId) {
-          throw new Error(
-            "Debe seleccionar una cohorte para actividades ENROLLMENT",
-          );
-        }
-        console.log("🔍 [Modal] enrollmentId existe:", formData.enrollmentId);
-      }
-
-      // Crear el objeto base
       const activityData = {
         activityName: formData.activityName.trim(),
-        price: Number(formData.price),
-        endDate: formData.endDate,
-        quantity: formData.quantity ? Number(formData.quantity) : null,
-        isActive: formData.isActive,
+        price:        Number(formData.price),
+        endDate:      formData.endDate,
+        quantity:     formData.quantity ? Number(formData.quantity) : null,
+        isActive:     formData.isActive,
         activityType: formData.activityType,
       };
 
-      // Para ENROLLMENT, AGREGAR enrollmentId
       if (formData.activityType === "ENROLLMENT") {
         activityData.enrollmentId = Number(formData.enrollmentId);
-
-        // Verificar que se agregó correctamente
-        console.log(
-          "✅ [Modal] enrollmentId agregado:",
-          activityData.enrollmentId,
-        );
       }
 
-      // 🔴 LOG CRÍTICO: Ver el objeto final
-      console.log(
-        "📤 [Modal] OBJETO FINAL a enviar:",
-        JSON.stringify(activityData, null, 2),
-      );
-
-      // Verificar que enrollmentId está en el objeto
-      if (formData.activityType === "ENROLLMENT") {
-        console.log(
-          "🔍 [Modal] Verificación - activityData tiene enrollmentId:",
-          activityData.hasOwnProperty("enrollmentId"),
-        );
-        console.log(
-          "🔍 [Modal] Valor de enrollmentId en activityData:",
-          activityData.enrollmentId,
-        );
-      }
+      console.log("📤 [ModalAddActivity] Enviando:", JSON.stringify(activityData, null, 2));
 
       await onSave(activityData);
       onClose();
     } catch (error) {
-      console.error("❌ [Modal] Error:", error);
+      console.error("❌ [ModalAddActivity] Error:", error);
       setErrors((prev) => ({
         ...prev,
         general: error.message || "Error al guardar la actividad",
@@ -279,7 +259,6 @@ const ModalAddActivity = ({
 
   const getMinDate = () => new Date().toISOString().split("T")[0];
 
-  // Encontrar la cohorte seleccionada para mostrar info adicional
   const selectedCohort = cohorts.find((c) => c.id === formData.enrollmentId);
 
   if (!isOpen) return null;
@@ -322,14 +301,16 @@ const ModalAddActivity = ({
             <div className="form-hint">
               {formData.activityType === "STANDALONE"
                 ? "Actividad libre — cualquier miembro puede inscribirse"
-                : "El pago de esta actividad habilitará al miembro para matricularse en la cohorte seleccionada"}
+                : "El pago habilita la matrícula en la cohorte seleccionada. Solo se muestran cohortes con pago requerido."}
             </div>
           </div>
 
-          {/* ✅ Selector de cohorte PENDING */}
+          {/* Selector de cohorte */}
           {formData.activityType === "ENROLLMENT" && (
             <div className="form-group">
-              <label htmlFor="enrollmentId">📚 Cohortes Pendientes *</label>
+              <label htmlFor="enrollmentId">
+                📚 Cohorte PENDIENTE con pago *
+              </label>
               <select
                 id="enrollmentId"
                 name="enrollmentId"
@@ -351,7 +332,7 @@ const ModalAddActivity = ({
                     ))
                   : !loadingCohorts && (
                       <option disabled>
-                        No hay cohortes con estado PENDIENTE
+                        No hay cohortes PENDIENTES con pago requerido
                       </option>
                     )}
               </select>
@@ -360,7 +341,7 @@ const ModalAddActivity = ({
                 <span className="form-error">{errors.enrollmentId}</span>
               )}
 
-              {/* ✅ Info derivada automáticamente de la cohorte seleccionada */}
+              {/* Info de la cohorte seleccionada */}
               {selectedCohort && (
                 <div
                   className="form-hint"
@@ -372,23 +353,40 @@ const ModalAddActivity = ({
                     marginTop: "6px",
                   }}
                 >
-                  ✅ <strong>Nivel detectado:</strong>{" "}
-                  <code>{selectedCohort.levelEnrollment}</code>
+                  ✅ <strong>Nivel:</strong>{" "}
+                  <code>{selectedCohort.levelCode}</code>
+                  {" — "}
+                  {selectedCohort.levelDisplay}
                   <br />
-                  <small>
-                    El campo <em>requiredLevel</em> se enviará automáticamente
-                    al backend como{" "}
-                    <strong>{selectedCohort.levelEnrollment}</strong>. Los
-                    miembros deben cumplir el nivel previo para inscribirse.
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      marginTop: "4px",
+                      padding: "2px 8px",
+                      background: "#c8e6c9",
+                      borderRadius: "12px",
+                      fontSize: "0.78em",
+                      color: "#1b5e20",
+                      fontWeight: 600,
+                    }}
+                  >
+                    💳 Nivel con pago requerido
+                  </span>
+                  <br />
+                  <small style={{ color: "#555", marginTop: "4px", display: "block" }}>
+                    Al completar el pago de esta actividad, el sistema inscribirá
+                    al miembro automáticamente en la cohorte.
                   </small>
                 </div>
               )}
 
               <div className="form-hint">
-                ℹ️ Solo se muestran cohortes con estado{" "}
-                <strong>PENDIENTE</strong>. Al pagar completamente esta
-                actividad, el miembro quedará habilitado para matricularse en la
-                cohorte.
+                ℹ️ Solo cohortes <strong>PENDIENTES</strong> con nivel de pago
+                activo. Si no ves la cohorte que buscas, verifica que su nivel
+                tenga el pago habilitado en{" "}
+                <em>Configuración &gt; Niveles</em>.
               </div>
             </div>
           )}

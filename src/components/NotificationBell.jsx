@@ -4,8 +4,6 @@ import apiService from "../apiService";
 import "../css/NotificationBell.css";
 
 // ── TYPE_CONFIG — sincronizado 1:1 con NotificationType.java ─────────────────
-// Tipos legacy (no existen en el enum Java pero hay filas históricas en DB)
-// se conservan al final para que no caigan al DEFAULT.
 const TYPE_CONFIG = {
   // ── Liderazgo ──────────────────────────────────────────────────────────────
   LEADER_PROMOTION:    { icon: "🌟", label: "Promoción",    color: "#f59e0b" },
@@ -42,7 +40,7 @@ const TYPE_CONFIG = {
   SYSTEM_MESSAGE: { icon: "⚙️", label: "Sistema",      color: "#6366f1" },
   CUSTOM:         { icon: "📌", label: "Personalizado", color: "#6366f1" },
 
-  // ── Legacy (filas históricas en DB; ya no los emite el backend) ───────────
+  // ── Legacy ───────────────────────────────────────────────────────────
   COUNSELING_NO_SHOW:             { icon: "👻", label: "No asistió",    color: "#6b7280" },
   COUNSELING_REMINDER_DAY_BEFORE: { icon: "⏰", label: "Recordat. D-1", color: "#f59e0b" },
   COUNSELING_REMINDER_DAY_OF:     { icon: "🔔", label: "Recordat. hoy", color: "#f97316" },
@@ -65,7 +63,11 @@ function timeAgo(dateString) {
   });
 }
 
-export default function NotificationBell({ userId, pollInterval = 30_000 }) {
+export default function NotificationBell({ username, pollInterval = 30_000 }) {
+  
+  console.log('🔔 NotificationBell - username recibido:', username);
+  console.log('🔔 NotificationBell - username es válido?', username !== null && username !== undefined);
+  
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
   const [open, setOpen]                   = useState(false);
@@ -92,20 +94,24 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
   }, []);
 
   const fetchUnreadCount = useCallback(async () => {
-    if (!userId) return;
+    if (!username) return;
     try {
-      const data = await apiService.getUnreadNotificationCount(userId);
-      setUnreadCount(data?.unreadCount ?? 0);
-    } catch { /* poll silencioso */ }
-  }, [userId]);
+      // ✅ Usar nuevo endpoint por username
+      const data = await apiService.getUnreadNotificationCountByUsername(username);
+      setUnreadCount(data ?? 0);
+    } catch (err) {
+      console.log('Error fetching unread count:', err);
+    }
+  }, [username]);
 
   const fetchNotifications = useCallback(async () => {
-    if (!userId) return;
+    if (!username) return;
     setLoading(true);
     setError(null);
     try {
-      const data   = await apiService.getActiveNotifications(userId);
-      const list   = Array.isArray(data) ? data : [];
+      // ✅ Usar nuevo endpoint por username
+      const data = await apiService.getActiveNotificationsByUsername(username);
+      const list = Array.isArray(data) ? data : [];
       const sorted = [...list].sort((a, b) => {
         if (a.status === "UNREAD" && b.status !== "UNREAD") return -1;
         if (a.status !== "UNREAD" && b.status === "UNREAD") return 1;
@@ -120,7 +126,7 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [username]);
 
   const markAsRead = useCallback(async (notificationId) => {
     setNotifications((prev) =>
@@ -138,19 +144,31 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
   }, []);
 
   const markAllAsRead = useCallback(async () => {
+    if (!username) return;
+    
     setMarkingAll(true);
     const prev = notifications;
     setNotifications((n) => n.map((x) => ({ ...x, status: "READ" })));
     setUnreadCount(0);
+    
     try {
-      await apiService.markAllNotificationsAsRead(userId);
-    } catch {
+      // ✅ Necesitamos un endpoint para marcar todas por username
+      // Por ahora, necesitamos obtener el ID primero
+      const users = await apiService.getUsers();
+      const user = users.find(u => u.username === username);
+      if (user?.id) {
+        await apiService.markAllNotificationsAsRead(user.id);
+      } else {
+        throw new Error('Usuario no encontrado');
+      }
+    } catch (err) {
+      console.error('Error marking all as read:', err);
       setNotifications(prev);
       setUnreadCount(prev.filter((n) => n.status === "UNREAD").length);
     } finally {
       setMarkingAll(false);
     }
-  }, [userId, notifications]);
+  }, [username, notifications]);
 
   const handleBellClick = useCallback(() => {
     if (!open) calcPanelPosition();
@@ -184,6 +202,20 @@ export default function NotificationBell({ userId, pollInterval = 30_000 }) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Si no hay username, mostrar un botón deshabilitado
+  if (!username) {
+    return (
+      <div className="nb-wrapper">
+        <button className="nb-bell nb-bell--disabled" disabled title="No disponible">
+          <svg className="nb-bell__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+        </button>
+      </div>
+    );
+  }
 
   const panel = open
     ? createPortal(

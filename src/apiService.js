@@ -3403,7 +3403,125 @@ async updateOccasionalExpense(id, dto) {
 // FIN DEL BLOQUE 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
 // ============================================================
 
+// ============================================================
+// AGREGAR en apiService.js, dentro de la clase ApiService,
+// justo antes del cierre de la clase (última línea con solo  }  )
+//
+// Cubre:
+//  - Actividades ENROLLMENT disponibles para un miembro
+//  - Actualizar requiresPayment de un nivel
+// ============================================================
 
+  // ========== 🎓 ACTIVIDADES ENROLLMENT DISPONIBLES ==========
+
+  /**
+   * Devuelve las actividades ENROLLMENT activas y no vencidas para las que
+   * un miembro es elegible según su nivel actual (currentLevel).
+   *
+   * Solo incluye actividades cuyo nivel tiene requiresPayment = true y para
+   * las que el miembro cumple la regla de nivel previo:
+   *   - Primer nivel (isFirst) → acceso abierto
+   *   - Cualquier otro        → currentLevel.levelOrder == requiredLevel.levelOrder - 1
+   *
+   * GET /api/v1/activity/enrollment/available/{memberId}
+   *
+   * Respuesta: AvailableEnrollmentActivityDTO[]
+   * {
+   *   activityId, activityName, price, endDate,
+   *   requiredLevelId, requiredLevelCode, requiredLevelDisplayName, requiredLevelOrder,
+   *   linkedEnrollmentId, cohortName,
+   *   openAccess,        ← true si es el primer nivel (sin requisito previo)
+   *   eligibilityReason  ← mensaje legible para mostrar al miembro
+   * }
+   *
+   * @param {number} memberId - ID del miembro
+   */
+  async getAvailableEnrollmentActivities(memberId) {
+    try {
+      validateId(memberId, "memberId");
+      log("🎓 [getAvailableEnrollmentActivities] Miembro ID:", memberId);
+      const response = await this.request(
+        `/activity/enrollment/available/${memberId}`
+      );
+      log(
+        "✅ [getAvailableEnrollmentActivities] Éxito -",
+        response?.length || 0,
+        "actividades disponibles"
+      );
+      return response || [];
+    } catch (error) {
+      logError("❌ [getAvailableEnrollmentActivities] Error:", error.message);
+      throw error;
+    }
+  }
+
+  // ========== ⚙️ NIVELES — ACTUALIZAR requiresPayment ==========
+
+  /**
+   * Actualiza los campos de un nivel formativo.
+   * Permite cambiar requiresPayment sin tocar código ni migraciones.
+   *
+   * PUT /api/v1/levels/{id}
+   * Body (todos opcionales):
+   *   { displayName, description, levelOrder, isActive, requiresPayment }
+   *
+   * Requiere rol: PASTORES
+   *
+   * @param {number} levelId   - ID del nivel a actualizar
+   * @param {Object} updates   - Campos a cambiar
+   * @param {boolean} [updates.requiresPayment] - true/false
+   * @param {string}  [updates.displayName]
+   * @param {string}  [updates.description]
+   * @param {number}  [updates.levelOrder]
+   * @param {boolean} [updates.isActive]
+   */
+  async updateLevel(levelId, updates) {
+    try {
+      validateId(levelId, "levelId");
+      if (!updates || typeof updates !== "object") {
+        throw new Error("Datos de actualización inválidos");
+      }
+
+      log("⚙️ [updateLevel] Actualizando nivel ID:", levelId, updates);
+      const response = await this.request(`/levels/${levelId}`, {
+        method: "PUT",
+        body: JSON.stringify(updates),
+      });
+      log(
+        "✅ [updateLevel] Nivel actualizado:",
+        response?.code,
+        "requiresPayment:",
+        response?.requiresPayment
+      );
+      return response;
+    } catch (error) {
+      logError("❌ [updateLevel] Error:", error.message);
+      throw error;
+    }
+  }
+
+  // En apiService.js, agrega:
+
+/**
+ * Obtiene notificaciones activas por username (NO requiere ID)
+ */
+// ✅ CORRECTO - Solo la ruta relativa
+getActiveNotificationsByUsername(username) {
+  return this.request(`/notifications/user/by-username/${username}/active`, {  // ← BIEN
+    method: 'GET',
+    requiresAuth: true
+  });
+}
+
+/**
+ * Obtiene conteo de notificaciones sin leer por username
+ */
+getUnreadNotificationCountByUsername(username) {
+  return this.request(`/notifications/user/by-username/${username}/unread-count`, {
+    method: 'GET',
+    requiresAuth: true
+  }).then(data => data.unreadCount);
+}
 
 }
 

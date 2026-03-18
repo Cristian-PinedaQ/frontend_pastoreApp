@@ -124,7 +124,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
   }, [isOpen, loadLevels]);
 
   // ========== FUNCIONES AUXILIARES PARA NIVELES ==========
-  const getLevelDisplayName = (level) => {
+  const getLevelDisplayName = useCallback((level) => {
     if (!level) return 'No definido';
     
     // Si es un objeto LevelEnrollment
@@ -135,9 +135,9 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
     // Si es un string (código)
     const foundLevel = levels.find(l => l.code === level);
     return foundLevel?.displayName || level;
-  };
+  }, [levels]);
 
-  const getLevelOrder = (level) => {
+  const getLevelOrder = useCallback((level) => {
     if (!level) return 0;
     
     // Si es un objeto LevelEnrollment
@@ -148,10 +148,10 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
     // Si es un string (código)
     const foundLevel = levels.find(l => l.code === level);
     return foundLevel?.levelOrder || 0;
-  };
+  }, [levels]);
 
   // ========== VERIFICAR ELEGIBILIDAD BÁSICA ==========
-  const checkBasicEligibility = (member, leaderType) => {
+  const checkBasicEligibility = useCallback((member, leaderType) => {
     const typeConfig = LEADER_TYPES.find(t => t.value === leaderType);
     if (!typeConfig) return null;
 
@@ -189,7 +189,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
     };
 
     return requirements;
-  };
+  }, [getLevelOrder, getLevelDisplayName]);
 
   // ========== BÚSQUEDA EN TIEMPO REAL CON DEBOUNCE ==========
   const performSearch = useCallback(async (term) => {
@@ -250,7 +250,7 @@ const ModalPromoteLeader = ({ isOpen, onClose, onPromoteSuccess }) => {
       setSearching(false);
       abortControllerRef.current = null;
     }
-  }, []); // Dependencias vacías porque checkBasicEligibility está definida dentro del componente
+  }, [checkBasicEligibility, getLevelDisplayName]);
 
   // Efecto para búsqueda con debounce
   useEffect(() => {

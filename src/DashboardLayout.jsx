@@ -7,7 +7,6 @@ import { useAuth } from "./context/AuthContext";
 import "./css/DashboardLayout.css"; // Importar CSS
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
-import apiService from "./apiService";
 
 
 export const DashboardLayout = () => {
@@ -53,25 +52,16 @@ export const DashboardLayout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const [resolvedUserId, setResolvedUserId] = useState(null);
+  // ❌ ELIMINADO: resolvedUserId no se usaba
+  // useEffect para obtener userId eliminado porque no se utilizaba
 
-  useEffect(() => {
-    if (!user?.username) return;
-
-    apiService.getUsers()
-      .then((users) => {
-        if (!Array.isArray(users)) return;
-        const found = users.find(
-          (u) => u.username === user.username
-        );
-        if (found?.id) {
-          setResolvedUserId(found.id);
-        }
-      })
-      .catch(() => {
-        // Fallo silencioso — las notificaciones simplemente no cargan
-      });
-  }, [user?.username]);
+  console.log('👤 Usuario en DashboardLayout:', {
+    id: user?.id,
+    username: user?.username,
+    email: user?.email,
+    roles: user?.roles,
+    raw: user
+  });
 
   // ========== HANDLERS ==========
   const handleLogout = () => {
@@ -266,7 +256,7 @@ export const DashboardLayout = () => {
             <span className="dashboard-layout__topbar-welcome">
               Bienvenido, {user?.username?.split(" ")[0]}
             </span>
-            <NotificationBell userId={resolvedUserId} pollInterval={30000} />
+            <NotificationBell username={user?.username} pollInterval={30000} />
           </div>
         </header>
 

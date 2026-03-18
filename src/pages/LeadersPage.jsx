@@ -94,6 +94,12 @@ const LeadersPage = () => {
   const [verificationResult, setVerificationResult] = useState(null);
   const [statisticsData, setStatisticsData] = useState(null);
 
+  // Estado para modal de confirmación personalizado
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmTitle, setConfirmTitle] = useState("");
+
   // UI State
   const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
   const [activeFiltersInfo, setActiveFiltersInfo] = useState({});
@@ -401,37 +407,57 @@ const LeadersPage = () => {
       return;
     }
 
-    try {
-      setLoading(true);
-      setError("");
-      log("Intentando reactivar líderes suspendidos");
+    // Mostrar modal de confirmación personalizado
+    setConfirmTitle("⚠️ Reactivar Líderes Suspendidos");
+    setConfirmMessage(
+      "¿Estás seguro de que deseas reactivar a TODOS los líderes suspendidos por asistencias?\n\n" +
+      "Esta acción:\n" +
+      "• Reactivará automáticamente a los líderes que cumplan los requisitos\n" +
+      "• Verificará que tengan las asistencias necesarias (mínimo 75% en los últimos 3 meses)\n" +
+      "• Los líderes que no cumplan con el mínimo de asistencias permanecerán suspendidos\n" +
+      "• Se registrará la fecha de reactivación\n\n" +
+      "Esta operación no se puede deshacer automáticamente.\n\n" +
+      "¿Deseas continuar?"
+    );
+    setConfirmAction(() => async () => {
+      try {
+        setLoading(true);
+        setError("");
+        log("Intentando reactivar líderes suspendidos");
 
-      const result = await apiService.reactivateSuspendedLeaders();
+        const result = await apiService.reactivateSuspendedLeaders();
 
-      if (result.reactivated > 0) {
-        setSuccessMessage(
-          `✅ ${result.reactivated} líder(es) reactivado(s) exitosamente`,
-        );
-      } else {
-        setSuccessMessage(
-          "✅ No se encontraron líderes suspendidos que cumplan requisitos",
-        );
+        if (result.reactivated > 0) {
+          const namesList = result.reactivatedLeaves 
+            ? result.reactivatedLeaders.map(l => l.memberName).join(', ')
+            : '';
+          
+          setSuccessMessage(
+            `✅ ${result.reactivated} líder(es) reactivado(s) exitosamente${namesList ? `: ${namesList}` : ''}`
+          );
+        } else {
+          setSuccessMessage(
+            "✅ No se encontraron líderes suspendidos que cumplan requisitos",
+          );
+        }
+
+        await loadLeaders();
+
+        logUserAction("reactivate_suspended", {
+          reactivated: result.reactivated,
+          timestamp: new Date().toISOString(),
+        });
+
+        setTimeout(() => setSuccessMessage(""), 5000);
+      } catch (err) {
+        logError("Error reactivando suspendidos:", err);
+        setError("Error al reactivar líderes");
+      } finally {
+        setLoading(false);
       }
-
-      await loadLeaders();
-
-      logUserAction("reactivate_suspended", {
-        reactivated: result.reactivated,
-        timestamp: new Date().toISOString(),
-      });
-
-      setTimeout(() => setSuccessMessage(""), 5000);
-    } catch (err) {
-      logError("Error reactivando suspendidos:", err);
-      setError("Error al reactivar líderes");
-    } finally {
-      setLoading(false);
-    }
+    });
+    
+    setShowConfirmModal(true);
   }, [loadLeaders, userPermissions.canReactivateSuspended]);
 
   // ========== SHOW STATISTICS ==========
@@ -1265,6 +1291,124 @@ const LeadersPage = () => {
         data={statisticsData}
         isDarkMode={isDarkMode}
       />
+
+      {/* Modal de Confirmación Personalizado */}
+      {showConfirmModal && (
+        <div 
+          className="leaders-page__modal-overlay"
+          onClick={() => setShowConfirmModal(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div 
+            className="leaders-page__modal"
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: theme.bgSecondary,
+              borderRadius: '12px',
+              maxWidth: '500px',
+              width: '90%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              border: `1px solid ${theme.border}`
+            }}
+          >
+            <div 
+              className="leaders-page__modal-header"
+              style={{
+                padding: '1.5rem',
+                borderBottom: `1px solid ${theme.border}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <h2 style={{ margin: 0, color: theme.text }}>
+                {confirmTitle || 'Confirmar Acción'}
+              </h2>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: theme.textSecondary
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div 
+              className="leaders-page__modal-body"
+              style={{
+                padding: '1.5rem',
+                color: theme.text,
+                whiteSpace: 'pre-line',
+                lineHeight: '1.6'
+              }}
+            >
+              {confirmMessage}
+            </div>
+            
+            <div 
+              className="leaders-page__modal-footer"
+              style={{
+                padding: '1.5rem',
+                borderTop: `1px solid ${theme.border}`,
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '1rem'
+              }}
+            >
+              <button
+                className="leaders-page__btn"
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: `1px solid ${theme.border}`,
+                  backgroundColor: 'transparent',
+                  color: theme.text,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="leaders-page__btn leaders-page__btn--primary"
+                onClick={async () => {
+                  setShowConfirmModal(false);
+                  if (confirmAction) {
+                    await confirmAction();
+                  }
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Sí, Reactivar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Verificación Masiva */}
       {showVerifyAllModal && verificationResult && (

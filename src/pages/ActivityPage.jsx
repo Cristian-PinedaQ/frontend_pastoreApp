@@ -186,13 +186,44 @@ const filterActivitiesByRole = (activities, allowedLevels) => {
   return activities.filter((a) => {
     if (a.activityType === "STANDALONE") return false;
 
-    const level = a.levelEnrollment;
+    const level = a.levelCode || a.levelEnrollment;
 
     if (!level) return false;
 
-    // Ahora level es un string (el código)
     return allowedLevels.includes(level);
   });
+};
+
+// ── Helper: extrae el code del nivel (v4) ──────────────────────────────────────────
+const extractLevelCode = (activity) => {
+  // Caso 1: requiredLevel es objeto JPA (v4)
+  if (activity.requiredLevel && typeof activity.requiredLevel === "object") {
+    return activity.requiredLevel.code ?? null;
+  }
+  // Caso 2: requiredLevel es string directo
+  if (typeof activity.requiredLevel === "string") return activity.requiredLevel;
+  // Caso 3: levelEnrollment como objeto
+  if (activity.levelEnrollment && typeof activity.levelEnrollment === "object") {
+    return activity.levelEnrollment.code ?? null;
+  }
+  // Caso 4: levelEnrollment como string
+  if (typeof activity.levelEnrollment === "string") return activity.levelEnrollment;
+  // Caso 5: level como objeto
+  if (activity.level && typeof activity.level === "object") {
+    return activity.level.code ?? null;
+  }
+  // Caso 6: level como string
+  if (typeof activity.level === "string") return activity.level;
+  return null;
+};
+
+// ── Helper: ¿el nivel requiere pago? (v4) ─────────────────────────────────────────
+const extractRequiresPayment = (activity) => {
+  if (activity.requiredLevel && typeof activity.requiredLevel === "object") {
+    if (typeof activity.requiredLevel.requiresPayment === "boolean")
+      return activity.requiredLevel.requiresPayment;
+  }
+  return null; // no sabemos (STANDALONE o estructura antigua)
 };
 
 const ActivityPage = () => {
@@ -274,42 +305,38 @@ const ActivityPage = () => {
         return;
       }
 
-      const processedActivities = activities.map((activity) => ({
-        id: activity.id,
-        activityName: escapeHtml(activity.activityName || "Sin nombre"),
-        price: validateAmount(activity.price),
-        registrationDate: activity.registrationDate,
-        endDate: activity.endDate,
-        quantity: activity.quantity || 0,
-        isActive: activity.isActive === true,
-        status: getStatusLabel(activity.isActive, activity.endDate),
-        levelEnrollment: (() => {
-  // Caso 1: Es un objeto con propiedad 'code' (nueva estructura)
-  if (activity.levelEnrollment && typeof activity.levelEnrollment === 'object' && activity.levelEnrollment.code) {
-    return activity.levelEnrollment.code;
-  }
-  // Caso 2: Es un string directo (estructura antigua)
-  if (typeof activity.levelEnrollment === 'string') {
-    return activity.levelEnrollment;
-  }
-  // Caso 3: Está en requiredLevel (backwards compatibility)
-  if (activity.requiredLevel && typeof activity.requiredLevel === 'object' && activity.requiredLevel.code) {
-    return activity.requiredLevel.code;
-  }
-  if (typeof activity.requiredLevel === 'string') {
-    return activity.requiredLevel;
-  }
-  // Caso 4: Está en activity.level
-  if (activity.level && typeof activity.level === 'object' && activity.level.code) {
-    return activity.level.code;
-  }
-  if (typeof activity.level === 'string') {
-    return activity.level;
-  }
-  return null;
-})(),
-        activityType: activity.activityType ?? null,
-      }));
+      const processedActivities = activities.map((activity) => {
+        const levelCode = extractLevelCode(activity);
+        const requiresPayment = extractRequiresPayment(activity);
+        const levelObj =
+          activity.requiredLevel && typeof activity.requiredLevel === "object"
+            ? activity.requiredLevel
+            : null;
+
+        return {
+          id: activity.id,
+          activityName: escapeHtml(activity.activityName || "Sin nombre"),
+          price: validateAmount(activity.price),
+          registrationDate: activity.registrationDate,
+          endDate: activity.endDate,
+          quantity: activity.quantity || 0,
+          isActive: activity.isActive === true,
+          status: getStatusLabel(activity.isActive, activity.endDate),
+          // Nivel (v4)
+          levelCode,
+          levelEnrollment: levelCode, // compatibilidad con filtros anteriores
+          levelDisplayName:
+            levelObj?.displayName ?? LEVEL_LABELS[levelCode] ?? levelCode ?? null,
+          requiresPayment, // v4: badge de pago
+          // Tipo
+          activityType: activity.activityType ?? null,
+          // Cohorte vinculada
+          enrollmentId: activity.enrollmentId ?? null,
+          enrollmentName: activity.enrollmentName ?? null,
+          // Objeto nivel completo para los modales
+          requiredLevel: levelObj,
+        };
+      });
 
       log("Actividades procesadas", { count: processedActivities.length });
 
@@ -1176,13 +1203,35 @@ const ActivityPage = () => {
                           <span className="activity-page__activity-name">
                             {activity.activityName}
                           </span>
-                          {activity.levelEnrollment && (
+                          
+                          {/* Nivel formativo (v4) */}
+                          {activity.levelCode && (
                             <small className="activity-page__level-tag">
-                              🎓{" "}
-                              {LEVEL_LABELS[activity.levelEnrollment] ||
-                                activity.levelEnrollment}
+                              🎓 {activity.levelDisplayName || LEVEL_LABELS[activity.levelCode] || activity.levelCode}
                             </small>
                           )}
+
+                          {/* ✅ Badge requiresPayment (v4) */}
+                          {activity.activityType === "ENROLLMENT" &&
+                            activity.requiresPayment !== null && (
+                              <small
+                                className="activity-page__payment-tag"
+                                style={{
+                                  display: "block",
+                                  marginTop: "2px",
+                                  fontSize: "0.72em",
+                                  fontWeight: 600,
+                                  color: activity.requiresPayment ? "#155724" : "#856404",
+                                  background: activity.requiresPayment ? "#d4edda" : "#fff3cd",
+                                  padding: "1px 6px",
+                                  borderRadius: "10px",
+                                  width: "fit-content",
+                                }}
+                              >
+                                {activity.requiresPayment ? "💳 Con pago" : "🆓 Sin pago"}
+                              </small>
+                            )}
+
                           {activity.quantity && activity.quantity > 0 && (
                             <small className="activity-page__capacity">
                               Capacidad: {activity.quantity}
@@ -1413,6 +1462,13 @@ const ActivityPage = () => {
           font-size: 0.75em;
           color: #6c757d;
           font-style: italic;
+        }
+        
+        .activity-page__capacity {
+          display: block;
+          margin-top: 1px;
+          font-size: 0.72em;
+          color: #999;
         }
       `}</style>
     </div>
