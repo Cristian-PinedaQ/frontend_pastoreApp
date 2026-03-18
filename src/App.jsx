@@ -26,6 +26,7 @@ import CellGroupsPage from './pages/CellGroupsPage';
 import CellAttendancePage from './pages/CellAttendancePage.jsx';
 import ChurchFinancePage from './pages/ChurchFinancePage.jsx';
 import CounselingPage from './pages/CounselingPage.jsx';
+import ManualRaizViva from './pages/ManualRaizViva.jsx';
 
 function App() {
   return (
@@ -154,6 +155,17 @@ function App() {
                 <ProtectedRoute
                   element={<ActivityPage />}
                   requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
+                />
+              }
+            />
+
+            {/* ManualRaizViva */}
+            <Route
+              path="ManualRaizViva"
+              element={
+                <ProtectedRoute
+                  element={<ManualRaizViva />}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_LIDER']}
                 />
               }
             />

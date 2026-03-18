@@ -161,6 +161,19 @@ export const DashboardLayout = () => {
       ]),
     },
     {
+      label: "Manual Raiz Viva",
+      path: "/dashboard/ManualRaizViva",
+      icon: "📕",
+      visible: hasAnyRole([
+        "ROLE_PASTORES",
+        "ROLE_ECONOMICO",
+        "ROLE_CONEXION",
+        "ROLE_CIMIENTO",
+        "ROLE_ESENCIA",
+        "ROLE_LIDER",
+      ]),
+    },
+    {
       label: "Usuarios",
       path: "/dashboard/users",
       icon: "👤",

@@ -177,9 +177,9 @@ const EnrollmentsPage = () => {
 
   // ✅ useMemo para allowedLevels
   const allowedLevels = useMemo(
-  () => getAllowedLevels(user?.roles ?? [], levels),
-  [user?.roles, levels, getAllowedLevels],  // Cambiar user?.id por user?.roles
-);
+    () => getAllowedLevels(user?.roles ?? [], levels),
+    [user?.roles, levels, getAllowedLevels], // Cambiar user?.id por user?.roles
+  );
 
   // ✅ Estados — formData
   const [formData, setFormData] = useState({
@@ -329,6 +329,7 @@ const EnrollmentsPage = () => {
             : `Cohorte ${enrollment.id}`);
 
         // Calcular estudiantes activos (no cancelados)
+        // DESPUÉS - Ya está bien, pero verifica que se use correctamente
         const activeStudents = (enrollment.studentEnrollments || []).filter(
           (se) => se.status !== "CANCELLED",
         );
@@ -547,69 +548,76 @@ const EnrollmentsPage = () => {
   };
 
   const loadTabData = useCallback(
-    async (tab) => {
-      if (!selectedEnrollment || !selectedEnrollment.id) return;
+  async (tab) => {
+    if (!selectedEnrollment || !selectedEnrollment.id) return;
 
-      try {
-        setError("");
-        log("Cargando tab:", tab);
+    try {
+      setError("");
+      log("Cargando tab:", tab);
 
-        switch (tab) {
-          case "lessons":
-            const lessonsData = await apiService.getLessonsByEnrollment(
+      switch (tab) {
+        case "lessons":
+          const lessonsData = await apiService.getLessonsByEnrollment(
+            selectedEnrollment.id,
+          );
+          const sanitizedLessons = (lessonsData || []).map((l) => ({
+            ...l,
+            lessonName: escapeHtml(l.lessonName),
+            description: escapeHtml(l.description || ""),
+          }));
+          setLessons(sanitizedLessons);
+          break;
+
+        case "students":
+          const studentsData =
+            await apiService.getStudentEnrollmentsByEnrollment(
               selectedEnrollment.id,
             );
-            const sanitizedLessons = (lessonsData || []).map((l) => ({
+          
+          // ✅ FILTRAR estudiantes cancelados y luego sanitizar
+          const activeStudents = (studentsData || []).filter(
+            (s) => s.status !== "CANCELLED"
+          );
+          
+          const sanitizedStudents = activeStudents.map((s) => ({
+            ...s,
+            memberName: escapeHtml(s.memberName),
+          }));
+          
+          setStudents(sanitizedStudents);
+          break;
+
+        case "attendance":
+          const lessonsForAttendance =
+            await apiService.getLessonsByEnrollment(selectedEnrollment.id);
+          const sanitizedAttendance = (lessonsForAttendance || []).map(
+            (l) => ({
               ...l,
               lessonName: escapeHtml(l.lessonName),
-              description: escapeHtml(l.description || ""),
-            }));
-            setLessons(sanitizedLessons);
-            break;
+            }),
+          );
+          setAttendanceSummary(sanitizedAttendance);
+          break;
 
-          case "students":
-            const studentsData =
-              await apiService.getStudentEnrollmentsByEnrollment(
-                selectedEnrollment.id,
-              );
-            const sanitizedStudents = (studentsData || []).map((s) => ({
-              ...s,
-              memberName: escapeHtml(s.memberName),
-            }));
-            setStudents(sanitizedStudents);
-            break;
-
-          case "attendance":
-            const lessonsForAttendance =
-              await apiService.getLessonsByEnrollment(selectedEnrollment.id);
-            const sanitizedAttendance = (lessonsForAttendance || []).map(
-              (l) => ({
-                ...l,
-                lessonName: escapeHtml(l.lessonName),
-              }),
-            );
-            setAttendanceSummary(sanitizedAttendance);
-            break;
-
-          default:
-            break;
-        }
-      } catch (err) {
-        const errorKey =
-          tab === "lessons"
-            ? "FETCH_LESSONS"
-            : tab === "students"
-              ? "FETCH_STUDENTS"
-              : tab === "attendance"
-                ? "FETCH_ATTENDANCE"
-                : "GENERIC";
-
-        handleError(errorKey, `loadTabData:${tab}`);
-        logError(`Error cargando tab ${tab}:`, err);
+        default:
+          break;
       }
-    },
-    [selectedEnrollment, handleError],
-  );
+    } catch (err) {
+      const errorKey =
+        tab === "lessons"
+          ? "FETCH_LESSONS"
+          : tab === "students"
+            ? "FETCH_STUDENTS"
+            : tab === "attendance"
+              ? "FETCH_ATTENDANCE"
+              : "GENERIC";
+
+      handleError(errorKey, `loadTabData:${tab}`);
+      logError(`Error cargando tab ${tab}:`, err);
+    }
+  },
+  [selectedEnrollment, handleError],
+);
 
   useEffect(() => {
     if (showEnrollmentModal && selectedEnrollment) {
