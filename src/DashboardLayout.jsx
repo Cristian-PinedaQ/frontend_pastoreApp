@@ -8,7 +8,6 @@ import "./css/DashboardLayout.css"; // Importar CSS
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
 
-
 export const DashboardLayout = () => {
   // ========== DARK MODE AUTOMÁTICO ==========
   const [, setIsDarkMode] = useState(false);
@@ -50,8 +49,7 @@ export const DashboardLayout = () => {
   const { user, logout, hasRole, hasAnyRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ========== HANDLERS ==========
   const handleLogout = () => {
@@ -63,6 +61,10 @@ export const DashboardLayout = () => {
 
   const handleNavClick = (path) => {
     navigate(path);
+
+    if (window.innerWidth <= 768) {
+      setSidebarOpen(false);
+    }
   };
 
   // ========== MENU CONFIG ==========
@@ -188,20 +190,13 @@ export const DashboardLayout = () => {
     <div className="dashboard-layout">
       {/* ========== SIDEBAR ========== */}
       <aside
-        className={`dashboard-layout__sidebar ${!sidebarOpen ? "dashboard-layout__sidebar--collapsed" : ""}`}
+        className={`dashboard-layout__sidebar ${
+          sidebarOpen ? "dashboard-layout__sidebar--open" : ""
+        }`}
       >
         {/* Sidebar Header */}
         <div className="dashboard-layout__sidebar-header">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="dashboard-layout__sidebar-toggle"
-            title="Toggle Sidebar"
-          >
-            ☰
-          </button>
-          {sidebarOpen && (
             <h1 className="dashboard-layout__sidebar-title">PastoreApp</h1>
-          )}
         </div>
 
         {/* Sidebar Menu */}
@@ -216,11 +211,9 @@ export const DashboardLayout = () => {
                 title={!sidebarOpen ? item.label : ""}
               >
                 <span className="dashboard-layout__menu-icon">{item.icon}</span>
-                {sidebarOpen && (
-                  <span className="dashboard-layout__menu-label">
-                    {item.label}
-                  </span>
-                )}
+                <span className="dashboard-layout__menu-label">
+                  {item.label}
+                </span>
               </button>
             );
           })}
@@ -242,7 +235,7 @@ export const DashboardLayout = () => {
             title="Cerrar Sesión"
           >
             <span className="dashboard-layout__logout-icon">🚪</span>
-            {sidebarOpen && <span>Cerrar Sesión</span>}
+            <span>Cerrar Sesión</span>
           </button>
         </div>
       </aside>
@@ -252,6 +245,14 @@ export const DashboardLayout = () => {
         {/* Top Bar */}
         <header className="dashboard-layout__topbar">
           <div className="dashboard-layout__topbar-left">
+            {/* ✅ BOTÓN HAMBURGUESA MOBILE */}
+            <button
+              className="dashboard-layout__hamburger"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+            >
+              ☰
+            </button>
+
             <DashboardTopbar user={user} />
             <h2 className="dashboard-layout__topbar-title">
               {user?.name || "Iglesia Raiz de David"}

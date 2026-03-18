@@ -137,6 +137,14 @@ body {
   width: 5rem;
 }
 
+/* ⭐ SIDEBAR SIEMPRE EXPANDIDO EN DESKTOP */
+@media (min-width:1025px){
+  .dashboard-layout__sidebar{
+    transform: none !important;
+    width: 18rem;
+  }
+}
+
 /* ========== SIDEBAR HEADER ========== */
 .dashboard-layout__sidebar-header {
   padding: var(--spacing-lg);
@@ -427,44 +435,27 @@ body {
 
 /* TABLET (768px - 1024px) */
 @media (max-width: 1024px) {
+  .dashboard-layout {
+    position: relative;
+  }
+
   .dashboard-layout__sidebar {
-    width: 14rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 16rem;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 999;
   }
 
-  .dashboard-layout__sidebar--collapsed {
-    width: 4.5rem;
+  .dashboard-layout__sidebar.dashboard-layout__sidebar--open {
+    transform: translateX(0);
   }
 
-  .dashboard-layout__sidebar-title {
-    display: none;
-  }
-
-  .dashboard-layout__menu-label {
-    display: none;
-  }
-
-  .dashboard-layout__user-info {
-    display: none;
-  }
-
-  .dashboard-layout__topbar {
-    padding: var(--spacing-md) var(--spacing-lg);
-  }
-
-  .dashboard-layout__topbar-title {
-    font-size: var(--font-size-xl);
-  }
-
-  .dashboard-layout__topbar-welcome {
-    display: none;
-  }
-
-  .dashboard-layout__topbar-right {
-    display: flex; /* siempre visible en tablet */
-  }
-
-  .dashboard-layout__content {
-    padding: var(--spacing-lg);
+  .dashboard-layout__main {
+    width: 100%;
   }
 }
 
@@ -487,6 +478,7 @@ body {
   .dashboard-layout__sidebar-header {
     display: flex;
     padding: var(--spacing-md);
+    justify-content: center;
     border-bottom: 1px solid var(--sidebar-border);
   }
 
@@ -512,10 +504,6 @@ body {
     padding: var(--spacing-sm);
     justify-content: center;
     align-items: center;
-  }
-
-  .dashboard-layout__menu-label {
-    display: none;
   }
 
   .dashboard-layout__sidebar-user {
@@ -617,10 +605,6 @@ body {
     font-size: 1rem;
   }
 
-  .dashboard-layout__menu-label {
-    display: none;
-  }
-
   .dashboard-layout__sidebar-user {
     display: flex;
     flex-direction: column;
@@ -681,6 +665,62 @@ body {
   }
 }
 
+/* ✅ MOBILE SIDEBAR OVERLAY REAL */
+@media (max-width: 768px) {
+
+  .dashboard-layout {
+    position: relative;
+  }
+
+  .dashboard-layout__sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 16rem;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 0 40px rgba(0,0,0,0.4);
+  }
+
+  .dashboard-layout__sidebar--open {
+    transform: translateX(0);
+  }
+
+  .dashboard-layout__main {
+    width: 100%;
+  }
+
+  
+
+}
+
+/* HAMBURGER BUTTON */
+.dashboard-layout__hamburger {
+  display: none;
+  font-size: 1.6rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--topbar-text);
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: background .2s;
+}
+
+.dashboard-layout__hamburger:hover {
+  background: rgba(0,0,0,.08);
+}
+
+/* SOLO MOBILE */
+@media (max-width:768px){
+  .dashboard-layout__hamburger{
+    display:block;
+  }
+}
+
 /* ========== COLLAPSED STATE TABLET FIX ========== */
 @media (max-width: 1024px) {
   .dashboard-layout__sidebar--collapsed .dashboard-layout__menu-icon {
@@ -691,6 +731,8 @@ body {
     justify-content: center;
   }
 }
+
+
 
 /* ========== PRINT STYLES ========== */
 @media print {
