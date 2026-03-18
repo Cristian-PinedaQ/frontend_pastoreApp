@@ -1263,4 +1263,66 @@ textarea:focus-visible {
   .btn {
     padding: var(--spacing-lg) var(--spacing-2xl);
   }
+
+  /* =========================================
+   🔥 SYSTEM STABILITY PATCH
+   Corrige comportamiento responsive real
+   ========================================= */
+
+/* ✅ NO escalar el root font-size */
+html {
+  font-size: 16px !important;
+}
+
+/* ✅ Mobile layout más estable */
+@media (max-width: 768px) {
+
+  body {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* eliminar transforms costosos en mobile */
+  .card:hover,
+  button:hover,
+  .btn:hover {
+    transform: none !important;
+  }
+
+  /* sombras más ligeras */
+  .card {
+    box-shadow: 0 4px 10px rgba(0,0,0,.08);
+  }
+
+  /* spacing más estable */
+  .container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+}
+
+/* ✅ evitar overflow fantasma */
+* {
+  min-width: 0;
+}
+
+/* ✅ mejorar render scroll móvil */
+.card,
+.btn,
+button {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* ✅ grid ultra seguro en mobile */
+@media (max-width: 640px) {
+
+  .grid,
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+}
 }

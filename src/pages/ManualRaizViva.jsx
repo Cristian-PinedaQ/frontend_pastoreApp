@@ -257,7 +257,7 @@ const CSS = `
 
 .mrv {
   font-family: 'DM Sans', sans-serif;
-  background: #F5F4F1;
+  background: #0E1B2E;
   color: #1A1918;
   min-height: 100vh;
 }
@@ -544,6 +544,322 @@ const CSS = `
 .mrv-footer { background: #0E1B2E; padding: 40px; text-align: center; }
 .mrv-footer-title { font-size: 14px; font-weight: 600; color: rgba(245,240,232,0.7); margin-bottom: 6px; }
 .mrv-footer-sub { font-size: 12px; color: rgba(245,240,232,0.3); letter-spacing: 0.5px; }
+
+/* =========================================
+   🚑 MOBILE HARD FIX — RAIZ VIVA
+   Esto SI corrige el layout real
+   ========================================= */
+
+html, body {
+  overflow-x: hidden;
+}
+
+.mrv {
+  overflow-x: hidden;
+}
+
+/* 🔥 NAV SCROLL SAFE */
+@media (max-width: 768px) {
+
+  .mrv-area {
+    scroll-margin-top: 64px;
+  }
+
+  .mrv-nav {
+    height: 50px;
+  }
+
+}
+
+/* 🔥 HERO FIX REAL */
+@media (max-width: 768px) {
+
+  .mrv-hero {
+    padding: 42px 16px 34px;
+  }
+
+  .mrv-hero-h1 {
+    font-size: clamp(30px, 9vw, 44px);
+    line-height: 1.05;
+  }
+
+  .mrv-hero-sub {
+    font-size: 13px;
+    margin-bottom: 26px;
+  }
+
+  .mrv-hero-blob {
+    display: none;
+  }
+
+}
+
+/* 🔥 FLOW STACK REAL */
+@media (max-width: 640px) {
+
+  .mrv-flow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .mrv-flow-node-btn {
+    width: 100%;
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: 12px 14px;
+    background: #FAFAF8;
+    border-radius: 12px;
+  }
+
+  .mrv-flow-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+
+  .mrv-flow-arrow {
+    display: none;
+  }
+
+}
+
+/* 🔥 TRACK PILLS MOBILE */
+@media (max-width: 640px) {
+
+  .mrv-track-pills {
+    justify-content: flex-start;
+  }
+
+  .mrv-track {
+    padding: 16px;
+  }
+
+  .mrv-track-badge {
+    font-size: 10px;
+    padding: 5px 9px;
+  }
+
+}
+
+/* 🔥 AREA HEADER COMPACT */
+@media (max-width: 640px) {
+
+  .mrv-area-hdr-inner {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .mrv-area-h2 {
+    font-size: 20px;
+  }
+
+  .mrv-area-desc-txt {
+    font-size: 12.5px;
+    line-height: 1.6;
+  }
+
+}
+
+/* 🔥 GRID 1 COLUMN REAL */
+@media (max-width: 700px) {
+
+  .mrv-funcs-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+/* 🔥 CARD ULTRA COMPACT */
+@media (max-width: 640px) {
+
+  .mrv-card-btn {
+    padding: 14px 14px 12px;
+  }
+
+  .mrv-card-title-txt {
+    font-size: 13px;
+  }
+
+  .mrv-card-desc-txt {
+    font-size: 12.5px;
+  }
+
+  .mrv-card-body {
+    padding: 0 14px 14px;
+  }
+
+  .mrv-step-txt {
+    font-size: 12.5px;
+  }
+
+}
+
+/* 🔥 FOOTER */
+@media (max-width: 640px) {
+
+  .mrv-footer {
+    padding: 22px 14px;
+  }
+
+}
+/* =========================================
+   📱 NAV MANUAL RAIZ VIVA RESPONSIVE REAL
+   Respeta Dashboard Layout
+   ========================================= */
+
+@media (max-width: 900px) {
+
+  .mrv-nav {
+    position: relative;   /* 🔥 deja de ser sticky */
+    top: auto;
+    height: auto;
+    padding: 8px 12px;
+    border-bottom: none;
+    background: transparent;
+  }
+
+  .mrv-nav-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  /* 🔥 convertir botones en pestaña */
+  .mrv-nav-links {
+    display: none;
+  }
+
+
+}
+
+/* 🔥 MOBILE REAL */
+@media (max-width: 640px) {
+
+  .mrv-nav {
+    margin-bottom: 6px;
+  }
+
+}
+
+/* =========================================
+   🧠 DASHBOARD CONTAINER FIT FIX
+   El manual se adapta al viewport disponible
+   ========================================= */
+
+.mrv {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* TODOS los wrappers deben poder encoger */
+.mrv-overview,
+.mrv-hero,
+.mrv-area-hdr,
+.mrv-funcs-wrap,
+.mrv-track,
+.mrv-flow {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* 🔥 padding fluido real */
+@media (max-width: 1200px) {
+
+  .mrv-hero,
+  .mrv-overview,
+  .mrv-area-hdr,
+  .mrv-funcs-wrap {
+    padding-left: clamp(16px, 4vw, 40px);
+    padding-right: clamp(16px, 4vw, 40px);
+  }
+
+}
+
+/* 🔥 elementos absolutos no deben generar overflow */
+.mrv-area-hdr-num {
+  right: 16px;
+}
+
+/* 🔥 pills deben poder cortar */
+.mrv-track-pills {
+  overflow-x: auto;
+  justify-content: flex-start;
+  padding-bottom: 4px;
+}
+
+/* 🔥 flow nunca debe forzar ancho */
+.mrv-flow-node-btn {
+  min-width: 0;
+}
+
+/* 🔥 grid seguro dentro de dashboard */
+.mrv-funcs-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+/* 🔥 cards pueden encoger */
+.mrv-card {
+  min-width: 0;
+}
+
+/* 🔥 textos largos no deben romper layout */
+.mrv-step-txt,
+.mrv-card-desc-txt,
+.mrv-path-pill {
+  word-break: break-word;
+}
+
+/* 🔥 nav nunca debe expandir layout */
+.mrv-nav {
+  max-width: 100%;
+}
+
+/* 🔥 hero blobs jamás deben afectar layout */
+.mrv-hero-blob {
+  max-width: 100%;
+}
+
+/* =========================================
+   🚨 FIX CRÍTICO OVERFLOW DASHBOARD
+   Permite que las páginas internas encogan
+   ========================================= */
+
+.dashboard-layout {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+.dashboard-layout__main {
+  min-width: 0;        /* 🔥 CLAVE ABSOLUTA */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-layout__content {
+  min-width: 0;        /* 🔥 CLAVE ABSOLUTA */
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* 🔥 cualquier página interna */
+.dashboard-layout__content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 🔥 evita scroll fantasma en móviles */
+body {
+  overflow-x: hidden;
+}
+
 `;
 
 // ── FunctionCard ──────────────────────────────────────────────────────────────
