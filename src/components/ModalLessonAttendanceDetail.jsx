@@ -87,43 +87,47 @@ const ModalLessonAttendanceDetail = ({
 
   // ✅ ARREGLADO: Envolver loadData en useCallback
   const loadData = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    setParticipationScores({});
-    setShowParticipationSelect({});
+  setLoading(true);
+  setError('');
+  setParticipationScores({});
+  setShowParticipationSelect({});
 
+  try {
+    // ── Estudiantes via getEnrollmentById que SÍ trae status ──
+    let studentsData = [];
     try {
-      let studentsData = [];
-      try {
-        studentsData = await apiService.getStudentEnrollmentsByEnrollment(enrollment.id);
-      } catch (err) {
-        try {
-          const enrollmentData = await apiService.getEnrollmentById(enrollment.id);
-          studentsData = enrollmentData?.studentEnrollments || [];
-        } catch (err2) {
-          setError('No se pudo cargar la lista de estudiantes');
-        }
-      }
-
-      let attendancesData = [];
-      try {
-        attendancesData = await apiService.getAttendancesByLesson(lesson.id);
-      } catch (err) {
-        attendancesData = [];
-      }
-
-      setStudents(studentsData || []);
-      setAttendances(attendancesData || []);
-
-      if (studentsData?.length === 0) {
-        setError('No hay estudiantes inscritos en esta cohorte');
-      }
+      const enrollmentData = await apiService.getEnrollmentById(enrollment.id);
+      const allStudents = enrollmentData?.studentEnrollments || [];
+      studentsData = allStudents.filter(s => s.status !== 'CANCELLED'); // ✅ filtro
     } catch (err) {
-      setError('Error al cargar la información de la lección: ' + err.message);
-    } finally {
-      setLoading(false);
+      try {
+        const raw = await apiService.getStudentEnrollmentsByEnrollment(enrollment.id);
+        studentsData = (raw || []).filter(s => s.status !== 'CANCELLED');
+      } catch (err2) {
+        setError('No se pudo cargar la lista de estudiantes');
+      }
     }
-  }, [lesson.id, enrollment.id]);
+
+    // ── Asistencias ──
+    let attendancesData = [];
+    try {
+      attendancesData = await apiService.getAttendancesByLesson(lesson.id);
+    } catch (err) {
+      attendancesData = [];
+    }
+
+    setStudents(studentsData);
+    setAttendances(attendancesData || []);
+
+    if (studentsData.length === 0) {
+      setError('No hay estudiantes inscritos en esta cohorte');
+    }
+  } catch (err) {
+    setError('Error al cargar la información de la lección: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+}, [lesson.id, enrollment.id]);
 
   useEffect(() => {
     if (isOpen && lesson?.id && enrollment?.id) {

@@ -41,7 +41,7 @@ const PARTICIPATION_SCORES = [
 // ─────────────────────────────────────────────
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 640 : false
+    typeof window !== "undefined" ? window.innerWidth < 640 : false,
   );
 
   useEffect(() => {
@@ -65,7 +65,7 @@ function parseJwt(token) {
       atob(base64)
         .split("")
         .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+        .join(""),
     );
     return JSON.parse(jsonPayload);
   } catch (err) {
@@ -133,7 +133,10 @@ const ModalRecordAttendance = ({
           const decoded = parseJwt(token);
           return decoded.sub || decoded.username || decoded.name || "Usuario";
         } catch (jwtErr) {
-          console.warn("⚠️ No se pudo decodificar el token JWT:", jwtErr.message);
+          console.warn(
+            "⚠️ No se pudo decodificar el token JWT:",
+            jwtErr.message,
+          );
         }
       }
 
@@ -147,29 +150,47 @@ const ModalRecordAttendance = ({
   // ─────────────────────────────────────────────
   // Cargar lecciones y estudiantes de la API
   // ─────────────────────────────────────────────
-  const loadData = useCallback(async () => {
-    setLoadingData(true);
-    setError("");
+  // En ModalRecordAttendance.jsx, en la función loadData:
 
-    try {
-      const [lessonsData, studentsData] = await Promise.all([
-        apiService.getLessonsByEnrollment(enrollmentId),
-        apiService.getStudentEnrollmentsByEnrollment(enrollmentId),
-      ]);
+// En ModalRecordAttendance.jsx - Reemplaza la función loadData
 
-      setLessons(lessonsData || []);
-      setStudents(studentsData || []);
+// En ModalRecordAttendance.jsx - Reemplaza la función loadData
 
-      if ((!lessonsData || lessonsData.length === 0) && (!studentsData || studentsData.length === 0)) {
-        setError("No hay lecciones o estudiantes disponibles para esta inscripción.");
-      }
-    } catch (err) {
-      console.error("❌ Error cargando datos:", err);
-      setError(err.message || "Error al cargar los datos. Intenta de nuevo.");
-    } finally {
-      setLoadingData(false);
-    }
-  }, [enrollmentId]);
+// Alternativa: Obtener estudiantes desde el enrollment
+
+// En ModalRecordAttendance.jsx - Reemplaza la función loadData
+
+const loadData = useCallback(async () => {
+  setLoadingData(true);
+  setError("");
+
+  try {
+    const [lessonsData, enrollmentData] = await Promise.all([
+      apiService.getLessonsByEnrollment(enrollmentId),
+      apiService.getEnrollmentById(enrollmentId),
+    ]);
+
+    setLessons(lessonsData || []);
+
+    // ── LOGS TEMPORALES ──
+    console.log("📦 enrollmentData completo:", JSON.stringify(enrollmentData?.studentEnrollments?.slice(0, 2)));
+    console.log("📊 Total estudiantes:", enrollmentData?.studentEnrollments?.length);
+    console.log("🚫 Cancelados:", enrollmentData?.studentEnrollments?.filter(s => s.status === "CANCELLED").length);
+    console.log("✅ Activos:", enrollmentData?.studentEnrollments?.filter(s => s.status !== "CANCELLED").length);
+    // ── FIN LOGS ──
+
+    const allStudents = enrollmentData?.studentEnrollments || [];
+    const activeStudents = allStudents.filter(s => s.status !== "CANCELLED");
+    setStudents(activeStudents);
+
+  } catch (err) {
+    console.error("❌ Error cargando datos:", err);
+    setError(err.message || "Error al cargar los datos");
+  } finally {
+    setLoadingData(false);
+  }
+}, [enrollmentId]);
+
 
   // ─────────────────────────────────────────────
   // Effects
@@ -278,22 +299,32 @@ const ModalRecordAttendance = ({
         }
         loadData();
       }, 2000);
-
     } catch (err) {
       console.error("❌ Error al registrar asistencia:", err);
 
       const errorMsg = err.message || "";
 
       if (errorMsg.includes("409")) {
-        setError("Esta asistencia ya existe. Puedes actualizarla desde la vista de asistencias.");
+        setError(
+          "Esta asistencia ya existe. Puedes actualizarla desde la vista de asistencias.",
+        );
       } else if (errorMsg.includes("400")) {
-        setError("Los datos enviados no son válidos. Verifica que todos los campos sean correctos.");
+        setError(
+          "Los datos enviados no son válidos. Verifica que todos los campos sean correctos.",
+        );
       } else if (errorMsg.includes("404")) {
-        setError("La lección o el estudiante no fueron encontrados. Recarga la página e intenta de nuevo.");
+        setError(
+          "La lección o el estudiante no fueron encontrados. Recarga la página e intenta de nuevo.",
+        );
       } else if (errorMsg.includes("500")) {
-        setError("Error interno del servidor. Contacta al administrador del sistema.");
+        setError(
+          "Error interno del servidor. Contacta al administrador del sistema.",
+        );
       } else {
-        setError(errorMsg || "Ocurrió un error al registrar la asistencia. Intenta de nuevo.");
+        setError(
+          errorMsg ||
+            "Ocurrió un error al registrar la asistencia. Intenta de nuevo.",
+        );
       }
     } finally {
       setLoading(false);
@@ -311,14 +342,12 @@ const ModalRecordAttendance = ({
       : null;
 
   const selectedLessonObj = lessons.find(
-    (l) => String(l.id) === String(selectedLesson)
+    (l) => String(l.id) === String(selectedLesson),
   );
 
   const selectedStudentObj = students.find(
-    (s) => String(s.id) === String(selectedStudent)
+    (s) => String(s.id) === String(selectedStudent),
   );
-
-  
 
   // Campos táctiles más grandes en móvil
   const fieldFontSize = isMobile ? "14px" : "12px";
@@ -1013,13 +1042,8 @@ const ModalRecordAttendance = ({
 
       {/* ── Overlay ── */}
       <div className="mra-overlay" onClick={handleClose}>
-
         {/* ── Modal ── */}
-        <div
-          className="mra-modal"
-          onClick={(e) => e.stopPropagation()}
-        >
-
+        <div className="mra-modal" onClick={(e) => e.stopPropagation()}>
           {/* Handle de arrastre (solo móvil) */}
           <div className="mra-drag-handle" />
 
@@ -1027,55 +1051,77 @@ const ModalRecordAttendance = ({
               HEADER — Opción A
               Una sola línea: ícono · título · pills · cerrar
           ──────────────────────────────── */}
-          <div style={{
-            background: "linear-gradient(135deg, #1a4a6e 0%, #0f7a6e 100%)",
-            padding: isMobile ? "7px 10px" : "9px 12px",
-            display: "flex",
-            alignItems: "center",
-            gap: isMobile ? 6 : 8,
-          }}>
+          <div
+            style={{
+              background: "linear-gradient(135deg, #1a4a6e 0%, #0f7a6e 100%)",
+              padding: isMobile ? "7px 10px" : "9px 12px",
+              display: "flex",
+              alignItems: "center",
+              gap: isMobile ? 6 : 8,
+            }}
+          >
             {/* Ícono */}
-            <span style={{ fontSize: isMobile ? 11 : 13, flexShrink: 0, lineHeight: 1 }}>📖</span>
+            <span
+              style={{
+                fontSize: isMobile ? 11 : 13,
+                flexShrink: 0,
+                lineHeight: 1,
+              }}
+            >
+              📖
+            </span>
 
             {/* Título — ocupa todo el espacio sobrante, se trunca */}
-            <span style={{
-              fontSize: isMobile ? 10 : 12.5,
-              fontWeight: 700,
-              color: "#ffffff",
-              flex: 1,
-              minWidth: 0,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}>
+            <span
+              style={{
+                fontSize: isMobile ? 10 : 12.5,
+                fontWeight: 700,
+                color: "#ffffff",
+                flex: 1,
+                minWidth: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
               {lessonTitle || "Registrar asistencia"}
             </span>
 
             {/* Pills de stats — solo si hay datos */}
             {statsTotal !== null && (
-              <div style={{ display: "flex", gap: isMobile ? 4 : 5, flexShrink: 0 }}>
-                <span style={{
-                  padding: isMobile ? "1px 5px" : "2px 7px",
-                  borderRadius: 99,
-                  fontSize: isMobile ? 8.5 : 10,
-                  fontWeight: 700,
-                  background: "rgba(52,211,153,0.18)",
-                  border: "1px solid rgba(52,211,153,0.30)",
-                  color: "#6ee7b7",
-                  whiteSpace: "nowrap",
-                }}>
+              <div
+                style={{
+                  display: "flex",
+                  gap: isMobile ? 4 : 5,
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    padding: isMobile ? "1px 5px" : "2px 7px",
+                    borderRadius: 99,
+                    fontSize: isMobile ? 8.5 : 10,
+                    fontWeight: 700,
+                    background: "rgba(52,211,153,0.18)",
+                    border: "1px solid rgba(52,211,153,0.30)",
+                    color: "#6ee7b7",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {statsPresent}/{statsTotal}
                 </span>
-                <span style={{
-                  padding: isMobile ? "1px 5px" : "2px 7px",
-                  borderRadius: 99,
-                  fontSize: isMobile ? 8.5 : 10,
-                  fontWeight: 700,
-                  background: "rgba(96,165,250,0.18)",
-                  border: "1px solid rgba(96,165,250,0.30)",
-                  color: "#93c5fd",
-                  whiteSpace: "nowrap",
-                }}>
+                <span
+                  style={{
+                    padding: isMobile ? "1px 5px" : "2px 7px",
+                    borderRadius: 99,
+                    fontSize: isMobile ? 8.5 : 10,
+                    fontWeight: 700,
+                    background: "rgba(96,165,250,0.18)",
+                    border: "1px solid rgba(96,165,250,0.30)",
+                    color: "#93c5fd",
+                    whiteSpace: "nowrap",
+                  }}
+                >
                   {statsPercentage}%
                 </span>
               </div>
@@ -1087,12 +1133,19 @@ const ModalRecordAttendance = ({
               aria-label="Cerrar modal"
               type="button"
               style={{
-                width: 22, height: 22, borderRadius: 6,
-                background: "rgba(255,255,255,0.12)", border: "none",
-                color: "rgba(255,255,255,0.75)", fontSize: 11,
-                cursor: "pointer", display: "flex",
-                alignItems: "center", justifyContent: "center",
-                flexShrink: 0, transition: "background 0.2s",
+                width: 22,
+                height: 22,
+                borderRadius: 6,
+                background: "rgba(255,255,255,0.12)",
+                border: "none",
+                color: "rgba(255,255,255,0.75)",
+                fontSize: 11,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                transition: "background 0.2s",
               }}
             >
               ✕
@@ -1104,10 +1157,10 @@ const ModalRecordAttendance = ({
           ──────────────────────────────── */}
           <div className="mra-steps-bar">
             <div className="mra-step-pills">
-              <div className="mra-step-pill mra-step-pill--active">
-                Paso 1
-              </div>
-              <div className={`mra-step-pill ${step >= 2 ? "mra-step-pill--active" : ""}`}>
+              <div className="mra-step-pill mra-step-pill--active">Paso 1</div>
+              <div
+                className={`mra-step-pill ${step >= 2 ? "mra-step-pill--active" : ""}`}
+              >
                 Paso 2
               </div>
             </div>
@@ -1126,12 +1179,16 @@ const ModalRecordAttendance = ({
           {successMessage && (
             <div
               className="mra-body"
-              style={{ padding: isMobile ? "36px 16px 40px" : "28px 16px 32px" }}
+              style={{
+                padding: isMobile ? "36px 16px 40px" : "28px 16px 32px",
+              }}
             >
               <div className="mra-success-state">
                 <div className="mra-success-ring">✅</div>
                 <p className="mra-success-title">¡Registrado!</p>
-                <p className="mra-success-subtitle">Asistencia guardada correctamente.</p>
+                <p className="mra-success-subtitle">
+                  Asistencia guardada correctamente.
+                </p>
               </div>
             </div>
           )}
@@ -1145,366 +1202,410 @@ const ModalRecordAttendance = ({
                 gap: bodyGap,
               }}
             >
-              <div className="mra-skeleton" style={{ height: isMobile ? "50px" : "42px" }} />
-              <div className="mra-skeleton" style={{ height: isMobile ? "50px" : "42px" }} />
-              <div className="mra-skeleton" style={{ height: isMobile ? "50px" : "42px" }} />
+              <div
+                className="mra-skeleton"
+                style={{ height: isMobile ? "50px" : "42px" }}
+              />
+              <div
+                className="mra-skeleton"
+                style={{ height: isMobile ? "50px" : "42px" }}
+              />
+              <div
+                className="mra-skeleton"
+                style={{ height: isMobile ? "50px" : "42px" }}
+              />
             </div>
           )}
 
           {/* Estado: Sin datos disponibles */}
-          {!successMessage && !loadingData && (lessons.length === 0 || students.length === 0) && (
-            <div
-              className="mra-body"
-              style={{ padding: isMobile ? "40px 16px 48px" : "32px 16px 36px" }}
-            >
-              <div className="mra-empty-state">
-                <span className="mra-empty-icon">📭</span>
-                <p className="mra-empty-title">Sin datos disponibles</p>
-                <p className="mra-empty-subtitle">
-                  Asegúrate de tener lecciones creadas y estudiantes inscritos en esta cohorte.
-                </p>
+          {!successMessage &&
+            !loadingData &&
+            (lessons.length === 0 || students.length === 0) && (
+              <div
+                className="mra-body"
+                style={{
+                  padding: isMobile ? "40px 16px 48px" : "32px 16px 36px",
+                }}
+              >
+                <div className="mra-empty-state">
+                  <span className="mra-empty-icon">📭</span>
+                  <p className="mra-empty-title">Sin datos disponibles</p>
+                  <p className="mra-empty-subtitle">
+                    Asegúrate de tener lecciones creadas y estudiantes inscritos
+                    en esta cohorte.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Estado: Formulario activo */}
-          {!successMessage && !loadingData && lessons.length > 0 && students.length > 0 && (
-            <>
-              {/* ──────────────────────────────
+          {!successMessage &&
+            !loadingData &&
+            lessons.length > 0 &&
+            students.length > 0 && (
+              <>
+                {/* ──────────────────────────────
                   PASO 1: Selección de lección y estudiante
               ────────────────────────────── */}
-              {step === 1 && (
-                <div
-                  className="mra-body"
-                  style={{
-                    padding: bodyPadding,
-                    gap: bodyGap,
-                  }}
-                >
-                  {/* Alerta de error */}
-                  {error && (
-                    <div
-                      className="mra-alert mra-alert--error"
-                      style={{ padding: isMobile ? "12px 14px" : "10px 12px", fontSize: isMobile ? "13.5px" : "12.5px" }}
-                    >
-                      <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
-                      <span>{error}</span>
-                    </div>
-                  )}
-
-                  {/* Campo: Lección */}
-                  <div className="mra-field-group">
-                    <label
-                      className="mra-field-label"
-                      style={{ fontSize: labelFontSize }}
-                    >
-                      Lección *
-                    </label>
-                    <div className="mra-select-wrap">
-                      <select
-                        className={`mra-select ${selectedLesson ? "mra-select--filled" : ""}`}
-                        value={selectedLesson}
-                        onChange={(e) => {
-                          setSelectedLesson(e.target.value);
-                          setTouched((prev) => ({ ...prev, lesson: true }));
-                        }}
-                        disabled={loading}
+                {step === 1 && (
+                  <div
+                    className="mra-body"
+                    style={{
+                      padding: bodyPadding,
+                      gap: bodyGap,
+                    }}
+                  >
+                    {/* Alerta de error */}
+                    {error && (
+                      <div
+                        className="mra-alert mra-alert--error"
                         style={{
-                          padding: isMobile ? "13px 36px 13px 14px" : "9px 32px 9px 12px",
-                          fontSize: fieldFontSize,
+                          padding: isMobile ? "12px 14px" : "10px 12px",
+                          fontSize: isMobile ? "13.5px" : "12.5px",
                         }}
                       >
-                        <option value="">Selecciona una lección…</option>
-                        {lessons.map((lesson) => (
-                          <option key={lesson.id} value={lesson.id}>
-                            {lesson.lessonNumber}. {lesson.lessonName}
-                            {lesson.lessonDate
-                              ? ` — ${new Date(lesson.lessonDate).toLocaleDateString("es-CO")}`
-                              : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {touched.lesson && !selectedLesson && (
-                      <span className="mra-field-error">
-                        <span>⚠</span> Selecciona una lección
-                      </span>
+                        <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
+                        <span>{error}</span>
+                      </div>
                     )}
-                  </div>
 
-                  {/* Campo: Estudiante */}
-                  <div className="mra-field-group">
-                    <label
-                      className="mra-field-label"
-                      style={{ fontSize: labelFontSize }}
-                    >
-                      Estudiante *
-                    </label>
-                    <div className="mra-select-wrap">
-                      <select
-                        className={`mra-select ${selectedStudent ? "mra-select--filled" : ""}`}
-                        value={selectedStudent}
-                        onChange={(e) => {
-                          setSelectedStudent(e.target.value);
-                          setTouched((prev) => ({ ...prev, student: true }));
-                        }}
+                    {/* Campo: Lección */}
+                    <div className="mra-field-group">
+                      <label
+                        className="mra-field-label"
+                        style={{ fontSize: labelFontSize }}
+                      >
+                        Lección *
+                      </label>
+                      <div className="mra-select-wrap">
+                        <select
+                          className={`mra-select ${selectedLesson ? "mra-select--filled" : ""}`}
+                          value={selectedLesson}
+                          onChange={(e) => {
+                            setSelectedLesson(e.target.value);
+                            setTouched((prev) => ({ ...prev, lesson: true }));
+                          }}
+                          disabled={loading}
+                          style={{
+                            padding: isMobile
+                              ? "13px 36px 13px 14px"
+                              : "9px 32px 9px 12px",
+                            fontSize: fieldFontSize,
+                          }}
+                        >
+                          <option value="">Selecciona una lección…</option>
+                          {lessons.map((lesson) => (
+                            <option key={lesson.id} value={lesson.id}>
+                              {lesson.lessonNumber}. {lesson.lessonName}
+                              {lesson.lessonDate
+                                ? ` — ${new Date(lesson.lessonDate).toLocaleDateString("es-CO")}`
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {touched.lesson && !selectedLesson && (
+                        <span className="mra-field-error">
+                          <span>⚠</span> Selecciona una lección
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Campo: Estudiante */}
+                    <div className="mra-field-group">
+                      <label
+                        className="mra-field-label"
+                        style={{ fontSize: labelFontSize }}
+                      >
+                        Estudiante *
+                      </label>
+                      <div className="mra-select-wrap">
+                        <select
+                          className={`mra-select ${selectedStudent ? "mra-select--filled" : ""}`}
+                          value={selectedStudent}
+                          onChange={(e) => {
+                            setSelectedStudent(e.target.value);
+                            setTouched((prev) => ({ ...prev, student: true }));
+                          }}
+                          disabled={loading}
+                          style={{
+                            padding: isMobile
+                              ? "13px 36px 13px 14px"
+                              : "9px 32px 9px 12px",
+                            fontSize: fieldFontSize,
+                          }}
+                        >
+                          <option value="">Selecciona un estudiante…</option>
+                          {students.map((student) => (
+                            <option key={student.id} value={student.id}>
+                              {student.memberName ||
+                                `Estudiante ${student.memberId}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {touched.student && !selectedStudent && (
+                        <span className="mra-field-error">
+                          <span>⚠</span> Selecciona un estudiante
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Acciones paso 1 */}
+                    <div className="mra-actions-row">
+                      <button
+                        type="button"
+                        className="mra-btn mra-btn--ghost"
+                        onClick={handleClose}
                         disabled={loading}
                         style={{
-                          padding: isMobile ? "13px 36px 13px 14px" : "9px 32px 9px 12px",
-                          fontSize: fieldFontSize,
+                          padding: isMobile ? "14px 20px" : "10px 16px",
+                          fontSize: btnFontSize,
+                          borderRadius: isMobile ? "14px" : "12px",
                         }}
                       >
-                        <option value="">Selecciona un estudiante…</option>
-                        {students.map((student) => (
-                          <option key={student.id} value={student.id}>
-                            {student.memberName || `Estudiante ${student.memberId}`}
-                          </option>
-                        ))}
-                      </select>
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        className="mra-btn mra-btn--primary"
+                        onClick={handleGoToStep2}
+                        style={{
+                          padding: btnPadding,
+                          fontSize: btnFontSize,
+                          borderRadius: isMobile ? "14px" : "12px",
+                        }}
+                      >
+                        Continuar →
+                      </button>
                     </div>
-                    {touched.student && !selectedStudent && (
-                      <span className="mra-field-error">
-                        <span>⚠</span> Selecciona un estudiante
-                      </span>
-                    )}
                   </div>
+                )}
 
-                  {/* Acciones paso 1 */}
-                  <div className="mra-actions-row">
-                    <button
-                      type="button"
-                      className="mra-btn mra-btn--ghost"
-                      onClick={handleClose}
-                      disabled={loading}
-                      style={{
-                        padding: isMobile ? "14px 20px" : "10px 16px",
-                        fontSize: btnFontSize,
-                        borderRadius: isMobile ? "14px" : "12px",
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      className="mra-btn mra-btn--primary"
-                      onClick={handleGoToStep2}
-                      style={{
-                        padding: btnPadding,
-                        fontSize: btnFontSize,
-                        borderRadius: isMobile ? "14px" : "12px",
-                      }}
-                    >
-                      Continuar →
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ──────────────────────────────
+                {/* ──────────────────────────────
                   PASO 2: Detalles y confirmación
               ────────────────────────────── */}
-              {step === 2 && (
-                <form
-                  onSubmit={handleSubmit}
-                  className="mra-body"
-                  style={{
-                    padding: bodyPadding,
-                    gap: bodyGap,
-                  }}
-                >
-                  {/* Alerta de error */}
-                  {error && (
-                    <div
-                      className="mra-alert mra-alert--error"
-                      style={{ padding: isMobile ? "12px 14px" : "10px 12px", fontSize: isMobile ? "13.5px" : "12.5px" }}
-                    >
-                      <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
-                      <span>{error}</span>
-                    </div>
-                  )}
+                {step === 2 && (
+                  <form
+                    onSubmit={handleSubmit}
+                    className="mra-body"
+                    style={{
+                      padding: bodyPadding,
+                      gap: bodyGap,
+                    }}
+                  >
+                    {/* Alerta de error */}
+                    {error && (
+                      <div
+                        className="mra-alert mra-alert--error"
+                        style={{
+                          padding: isMobile ? "12px 14px" : "10px 12px",
+                          fontSize: isMobile ? "13.5px" : "12.5px",
+                        }}
+                      >
+                        <span style={{ fontSize: 15, flexShrink: 0 }}>⚠️</span>
+                        <span>{error}</span>
+                      </div>
+                    )}
 
-                  {/* Chips de resumen: lección + estudiante seleccionados */}
-                  <div className="mra-chips-row">
-                    <div
-                      className="mra-chip"
-                      style={{ padding: isMobile ? "7px 10px" : "5px 9px", fontSize: isMobile ? "12.5px" : "11.5px" }}
-                    >
-                      <span className="mra-chip-icon">📖</span>
-                      <span className="mra-chip-text">
-                        {selectedLessonObj
-                          ? `${selectedLessonObj.lessonNumber}. ${selectedLessonObj.lessonName}`
-                          : "—"}
-                      </span>
-                    </div>
-                    <div
-                      className="mra-chip"
-                      style={{ padding: isMobile ? "7px 10px" : "5px 9px", fontSize: isMobile ? "12.5px" : "11.5px" }}
-                    >
-                      <span className="mra-chip-icon">👤</span>
-                      <span className="mra-chip-text">
-                        {selectedStudentObj
-                          ? selectedStudentObj.memberName || `Estudiante ${selectedStudentObj.memberId}`
-                          : "—"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Campo: Participación */}
-                  <div className="mra-field-group">
-                    <label
-                      className="mra-field-label"
-                      style={{ fontSize: labelFontSize }}
-                    >
-                      Participación *
-                    </label>
-                    <div className="mra-score-grid">
-                      {PARTICIPATION_SCORES.map((s) => {
-                        const isSelected = score === s.value;
-                        return (
-                          <div
-                            key={s.value}
-                            className="mra-score-card"
-                            onClick={() => setScore(s.value)}
-                            style={{
-                              padding: isMobile ? "13px 4px" : "10px 4px",
-                              fontSize: isMobile ? "12px" : "10.5px",
-                              background: isSelected ? s.bgActive : "#161622",
-                              borderColor: isSelected ? s.borderActive : "#2a2a3e",
-                              color: isSelected ? s.colorActive : "#4a4a6a",
-                            }}
-                          >
-                            <span className="mra-score-emoji">{s.emoji}</span>
-                            <span>{s.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Campo: Toggle de asistencia */}
-                  <div className="mra-field-group">
-                    <label
-                      className="mra-field-label"
-                      style={{ fontSize: labelFontSize }}
-                    >
-                      Asistencia
-                    </label>
-                    <div
-                      className={`mra-toggle-row ${present ? "mra-toggle-row--present" : "mra-toggle-row--absent"}`}
-                      onClick={() => setPresent((p) => !p)}
-                      style={{ padding: isMobile ? "13px 14px" : "10px 12px" }}
-                    >
-                      <div className="mra-toggle-info">
-                        <span className="mra-toggle-emoji">
-                          {present ? "✅" : "❌"}
+                    {/* Chips de resumen: lección + estudiante seleccionados */}
+                    <div className="mra-chips-row">
+                      <div
+                        className="mra-chip"
+                        style={{
+                          padding: isMobile ? "7px 10px" : "5px 9px",
+                          fontSize: isMobile ? "12.5px" : "11.5px",
+                        }}
+                      >
+                        <span className="mra-chip-icon">📖</span>
+                        <span className="mra-chip-text">
+                          {selectedLessonObj
+                            ? `${selectedLessonObj.lessonNumber}. ${selectedLessonObj.lessonName}`
+                            : "—"}
                         </span>
-                        <div>
-                          <div
-                            className="mra-toggle-label"
-                            style={{
-                              fontSize: isMobile ? "14.5px" : "13px",
-                              color: present ? "#34d399" : "#f87171",
-                            }}
-                          >
-                            {present ? "Presente" : "Ausente"}
-                          </div>
-                          <div
-                            className="mra-toggle-sublabel"
-                            style={{ fontSize: isMobile ? "12px" : "11px" }}
-                          >
-                            {present ? "El estudiante asistió" : "El estudiante no asistió"}
+                      </div>
+                      <div
+                        className="mra-chip"
+                        style={{
+                          padding: isMobile ? "7px 10px" : "5px 9px",
+                          fontSize: isMobile ? "12.5px" : "11.5px",
+                        }}
+                      >
+                        <span className="mra-chip-icon">👤</span>
+                        <span className="mra-chip-text">
+                          {selectedStudentObj
+                            ? selectedStudentObj.memberName ||
+                              `Estudiante ${selectedStudentObj.memberId}`
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Campo: Participación */}
+                    <div className="mra-field-group">
+                      <label
+                        className="mra-field-label"
+                        style={{ fontSize: labelFontSize }}
+                      >
+                        Participación *
+                      </label>
+                      <div className="mra-score-grid">
+                        {PARTICIPATION_SCORES.map((s) => {
+                          const isSelected = score === s.value;
+                          return (
+                            <div
+                              key={s.value}
+                              className="mra-score-card"
+                              onClick={() => setScore(s.value)}
+                              style={{
+                                padding: isMobile ? "13px 4px" : "10px 4px",
+                                fontSize: isMobile ? "12px" : "10.5px",
+                                background: isSelected ? s.bgActive : "#161622",
+                                borderColor: isSelected
+                                  ? s.borderActive
+                                  : "#2a2a3e",
+                                color: isSelected ? s.colorActive : "#4a4a6a",
+                              }}
+                            >
+                              <span className="mra-score-emoji">{s.emoji}</span>
+                              <span>{s.label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Campo: Toggle de asistencia */}
+                    <div className="mra-field-group">
+                      <label
+                        className="mra-field-label"
+                        style={{ fontSize: labelFontSize }}
+                      >
+                        Asistencia
+                      </label>
+                      <div
+                        className={`mra-toggle-row ${present ? "mra-toggle-row--present" : "mra-toggle-row--absent"}`}
+                        onClick={() => setPresent((p) => !p)}
+                        style={{
+                          padding: isMobile ? "13px 14px" : "10px 12px",
+                        }}
+                      >
+                        <div className="mra-toggle-info">
+                          <span className="mra-toggle-emoji">
+                            {present ? "✅" : "❌"}
+                          </span>
+                          <div>
+                            <div
+                              className="mra-toggle-label"
+                              style={{
+                                fontSize: isMobile ? "14.5px" : "13px",
+                                color: present ? "#34d399" : "#f87171",
+                              }}
+                            >
+                              {present ? "Presente" : "Ausente"}
+                            </div>
+                            <div
+                              className="mra-toggle-sublabel"
+                              style={{ fontSize: isMobile ? "12px" : "11px" }}
+                            >
+                              {present
+                                ? "El estudiante asistió"
+                                : "El estudiante no asistió"}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className={`mra-switch ${present ? "mra-switch--on" : "mra-switch--off"}`}>
-                        <div className="mra-switch-thumb" />
+                        <div
+                          className={`mra-switch ${present ? "mra-switch--on" : "mra-switch--off"}`}
+                        >
+                          <div className="mra-switch-thumb" />
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Campo: Registrado por */}
-                  <div className="mra-field-group">
-                    <label
-                      className="mra-field-label"
-                      style={{ fontSize: labelFontSize }}
-                    >
-                      Registrado por *
-                    </label>
-                    <div className="mra-input-wrap">
-                      <input
-                        type="text"
-                        className="mra-input"
-                        value={recordedBy}
-                        onChange={(e) => setRecordedBy(e.target.value)}
-                        placeholder="Tu nombre completo"
+                    {/* Campo: Registrado por */}
+                    <div className="mra-field-group">
+                      <label
+                        className="mra-field-label"
+                        style={{ fontSize: labelFontSize }}
+                      >
+                        Registrado por *
+                      </label>
+                      <div className="mra-input-wrap">
+                        <input
+                          type="text"
+                          className="mra-input"
+                          value={recordedBy}
+                          onChange={(e) => setRecordedBy(e.target.value)}
+                          placeholder="Tu nombre completo"
+                          disabled={loading}
+                          style={{
+                            padding: isMobile
+                              ? "13px 100px 13px 14px"
+                              : "9px 94px 9px 12px",
+                            fontSize: fieldFontSize,
+                          }}
+                        />
+                        <span className="mra-input-badge">🔐 Sesión</span>
+                      </div>
+                      <span
+                        className="mra-field-hint"
+                        style={{ fontSize: isMobile ? "11.5px" : "10.5px" }}
+                      >
+                        Cargado automáticamente desde tu sesión activa.
+                      </span>
+                      {touched.recordedBy && !recordedBy?.trim() && (
+                        <span className="mra-field-error">
+                          <span>⚠</span> Ingresa el nombre de quien registra
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Acciones paso 2 */}
+                    <div className="mra-actions-row">
+                      <button
+                        type="button"
+                        className="mra-btn mra-btn--ghost"
+                        onClick={handleGoToStep1}
                         disabled={loading}
                         style={{
-                          padding: isMobile ? "13px 100px 13px 14px" : "9px 94px 9px 12px",
-                          fontSize: fieldFontSize,
+                          padding: isMobile ? "14px 20px" : "10px 16px",
+                          fontSize: btnFontSize,
+                          borderRadius: isMobile ? "14px" : "12px",
                         }}
-                      />
-                      <span className="mra-input-badge">🔐 Sesión</span>
+                      >
+                        ← Atrás
+                      </button>
+                      <button
+                        type="submit"
+                        className="mra-btn mra-btn--primary"
+                        disabled={loading}
+                        style={{
+                          padding: btnPadding,
+                          fontSize: btnFontSize,
+                          borderRadius: isMobile ? "14px" : "12px",
+                        }}
+                      >
+                        {loading ? (
+                          <>
+                            <span
+                              className="mra-spinner"
+                              style={{
+                                width: isMobile ? 16 : 13,
+                                height: isMobile ? 16 : 13,
+                                borderWidth: 2,
+                              }}
+                            />
+                            Guardando…
+                          </>
+                        ) : (
+                          "Registrar ✓"
+                        )}
+                      </button>
                     </div>
-                    <span
-                      className="mra-field-hint"
-                      style={{ fontSize: isMobile ? "11.5px" : "10.5px" }}
-                    >
-                      Cargado automáticamente desde tu sesión activa.
-                    </span>
-                    {touched.recordedBy && !recordedBy?.trim() && (
-                      <span className="mra-field-error">
-                        <span>⚠</span> Ingresa el nombre de quien registra
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Acciones paso 2 */}
-                  <div className="mra-actions-row">
-                    <button
-                      type="button"
-                      className="mra-btn mra-btn--ghost"
-                      onClick={handleGoToStep1}
-                      disabled={loading}
-                      style={{
-                        padding: isMobile ? "14px 20px" : "10px 16px",
-                        fontSize: btnFontSize,
-                        borderRadius: isMobile ? "14px" : "12px",
-                      }}
-                    >
-                      ← Atrás
-                    </button>
-                    <button
-                      type="submit"
-                      className="mra-btn mra-btn--primary"
-                      disabled={loading}
-                      style={{
-                        padding: btnPadding,
-                        fontSize: btnFontSize,
-                        borderRadius: isMobile ? "14px" : "12px",
-                      }}
-                    >
-                      {loading ? (
-                        <>
-                          <span
-                            className="mra-spinner"
-                            style={{
-                              width: isMobile ? 16 : 13,
-                              height: isMobile ? 16 : 13,
-                              borderWidth: 2,
-                            }}
-                          />
-                          Guardando…
-                        </>
-                      ) : (
-                        "Registrar ✓"
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </>
-          )}
-
+                  </form>
+                )}
+              </>
+            )}
         </div>
       </div>
     </>
