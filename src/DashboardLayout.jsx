@@ -52,16 +52,6 @@ export const DashboardLayout = () => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // ❌ ELIMINADO: resolvedUserId no se usaba
-  // useEffect para obtener userId eliminado porque no se utilizaba
-
-  console.log('👤 Usuario en DashboardLayout:', {
-    id: user?.id,
-    username: user?.username,
-    email: user?.email,
-    roles: user?.roles,
-    raw: user
-  });
 
   // ========== HANDLERS ==========
   const handleLogout = () => {
@@ -97,6 +87,7 @@ export const DashboardLayout = () => {
         "ROLE_PASTORES",
         "ROLE_CONEXION",
         "ROLE_CIMIENTO",
+        "ROLE_PROFESORES",
       ]),
     },
     {
