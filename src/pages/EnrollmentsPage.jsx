@@ -42,6 +42,16 @@ const escapeHtml = (text) => {
   return text.replace(/[&<>"']/g, (m) => map[m]);
 };
 
+// ── CAMBIO v5: helper para obtener el nombre del maestro desde Leader o Member ──
+// CAMBIO v5b: soporta tanto DTO plano { memberName } como objeto anidado { member.name }
+const getTeacherName = (teacher) => {
+  if (!teacher) return null;
+  if (teacher.member?.name) return teacher.member.name;  // objeto anidado
+  if (teacher.memberName)   return teacher.memberName;   // DTO plano del backend
+  if (teacher.name)         return teacher.name;          // fallback transitorio
+  return null;
+};
+
 // ✅ Validaciones
 const isValidLevel = (level, LEVELS) => LEVELS.some((l) => l.code === level);
 const isValidStatus = (status, STATUSES) =>
@@ -247,8 +257,9 @@ const EnrollmentsPage = () => {
 
   const loadTeachers = useCallback(async () => {
     try {
-      log("Cargando maestros");
-      const members = await apiService.getAllMembers();
+      // CAMBIO v5: carga líderes activos en lugar de todos los miembros
+      log("Cargando maestros (líderes activos)");
+      const members = await apiService.getActiveLeaders();
       setAvailableTeachers(members || []);
     } catch (err) {
       handleError("FETCH_TEACHERS", "loadTeachers");
@@ -454,11 +465,13 @@ const EnrollmentsPage = () => {
       }
 
       const sanitizedValue = value.toLowerCase().trim();
-      const filtered = availableTeachers.filter(
-        (teacher) =>
-          teacher.name?.toLowerCase().includes(sanitizedValue) ||
-          teacher.email?.toLowerCase().includes(sanitizedValue),
-      );
+      // CAMBIO v5b: soporta DTO plano { memberName } y objeto anidado { member.name }
+      const filtered = availableTeachers.filter((teacher) => {
+        const name  = teacher.member?.name  || teacher.memberName  || '';
+        const email = teacher.member?.email || teacher.memberEmail || '';
+        return name.toLowerCase().includes(sanitizedValue) ||
+               email.toLowerCase().includes(sanitizedValue);
+      });
       setFilteredTeachers(filtered.slice(0, 5));
     } catch (error) {
       logError("Error en búsqueda de maestro:", error);
@@ -472,12 +485,13 @@ const EnrollmentsPage = () => {
         return;
       }
 
+      // CAMBIO v5: guarda el objeto Leader completo
       setFormData((prev) => ({
         ...prev,
-        teacher: { id: teacher.id, name: teacher.name },
+        teacher: teacher,
       }));
 
-      setTeacherSearchTerm(getDisplayName(teacher.name));
+      setTeacherSearchTerm(getDisplayName(getTeacherName(teacher)));
       setShowTeacherDropdown(false);
       setFilteredTeachers([]);
 
@@ -509,11 +523,13 @@ const EnrollmentsPage = () => {
       }
 
       const sanitizedValue = value.toLowerCase().trim();
-      const filtered = availableTeachers.filter(
-        (teacher) =>
-          teacher.name?.toLowerCase().includes(sanitizedValue) ||
-          teacher.email?.toLowerCase().includes(sanitizedValue),
-      );
+      // CAMBIO v5b: soporta DTO plano { memberName } y objeto anidado { member.name }
+      const filtered = availableTeachers.filter((teacher) => {
+        const name  = teacher.member?.name  || teacher.memberName  || '';
+        const email = teacher.member?.email || teacher.memberEmail || '';
+        return name.toLowerCase().includes(sanitizedValue) ||
+               email.toLowerCase().includes(sanitizedValue);
+      });
       setEditFilteredTeachers(filtered.slice(0, 5));
     } catch (error) {
       logError("Error en búsqueda de maestro (editar):", error);
@@ -527,12 +543,13 @@ const EnrollmentsPage = () => {
         return;
       }
 
+      // CAMBIO v5: guarda el objeto Leader completo
       setEditFormData((prev) => ({
         ...prev,
-        teacher: { id: teacher.id, name: teacher.name },
+        teacher: teacher,
       }));
 
-      setEditTeacherSearchTerm(getDisplayName(teacher.name));
+      setEditTeacherSearchTerm(getDisplayName(getTeacherName(teacher)));
       setEditShowTeacherDropdown(false);
       setEditFilteredTeachers([]);
     } catch (error) {
@@ -732,10 +749,10 @@ const EnrollmentsPage = () => {
         teacher: selectedEnrollment.teacher || null,
       });
 
-      if (selectedEnrollment.teacher?.name) {
-        setEditTeacherSearchTerm(
-          getDisplayName(selectedEnrollment.teacher.name),
-        );
+      // CAMBIO v5: pre-llena con leader.member.name
+      const _teacherName = getTeacherName(selectedEnrollment.teacher);
+      if (_teacherName) {
+        setEditTeacherSearchTerm(getDisplayName(_teacherName));
       }
 
       setShowEditModal(true);
@@ -979,7 +996,8 @@ const EnrollmentsPage = () => {
         maxStudents: parseInt(formData.maxStudents),
         minAttendancePercentage: parseFloat(formData.minAttendancePercentage),
         minAverageScore: parseFloat(formData.minAverageScore),
-        teacher: formData.teacher,
+        // CAMBIO v5: envía { id: <lider_id> }
+        teacher: formData.teacher ? { id: formData.teacher.id } : null,
       };
 
       log("Creando cohorte", enrollmentData);
@@ -1043,11 +1061,12 @@ const EnrollmentsPage = () => {
       if (editFormData.minAverageScore !== "") {
         updateData.minAverageScore = parseFloat(editFormData.minAverageScore);
       }
+      // CAMBIO v5: envía { id: <lider_id> }
       if (
         editFormData.teacher?.id &&
         typeof editFormData.teacher.id === "number"
       ) {
-        updateData.teacher = editFormData.teacher;
+        updateData.teacher = { id: editFormData.teacher.id };
       }
 
       if (Object.keys(updateData).length === 0) {
@@ -1223,6 +1242,7 @@ const EnrollmentsPage = () => {
 
                   {showTeacherDropdown && filteredTeachers.length > 0 && (
                     <div className="teacher-dropdown">
+                      {/* CAMBIO v5: muestra leader.member.name */}
                       {filteredTeachers.map((teacher) => (
                         <button
                           key={teacher.id}
@@ -1231,17 +1251,19 @@ const EnrollmentsPage = () => {
                           className="teacher-option"
                         >
                           <div className="teacher-name">
-                            {getDisplayName(teacher.name)}
+                            {/* CAMBIO v5b: usa helper para ambas formas */}
+                            {getDisplayName(getTeacherName(teacher))}
                           </div>
                         </button>
                       ))}
                     </div>
                   )}
 
+                  {/* CAMBIO v5: usa helper para nombre del líder seleccionado */}
                   {formData.teacher && (
                     <div className="teacher-selected">
                       <p className="teacher-selected-name">
-                        ✅ {getDisplayName(formData.teacher.name)}
+                        ✅ {getDisplayName(getTeacherName(formData.teacher))}
                       </p>
                     </div>
                   )}
@@ -1405,10 +1427,11 @@ const EnrollmentsPage = () => {
                     ).length || 0}{" "}
                     / {enrollment.maxStudents} cupos
                   </p>
-                  {enrollment.teacher?.name && (
+                  {/* CAMBIO v5: usa helper para obtener nombre desde Leader */}
+                  {getTeacherName(enrollment.teacher) && (
                     <p>
                       <strong>👨‍🏫 Maestro:</strong>{" "}
-                      {getDisplayName(enrollment.teacher.name)}
+                      {getDisplayName(getTeacherName(enrollment.teacher))}
                     </p>
                   )}
                 </div>
@@ -1483,11 +1506,12 @@ const EnrollmentsPage = () => {
                         </span>
                       </p>
                     </div>
-                    {selectedEnrollment.teacher?.name && (
+                    {/* CAMBIO v5: usa helper para obtener nombre desde Leader */}
+                    {getTeacherName(selectedEnrollment.teacher) && (
                       <div>
                         <p className="detail-label">👨‍🏫 Maestro</p>
                         <p className="detail-value">
-                          {getDisplayName(selectedEnrollment.teacher.name)}
+                          {getDisplayName(getTeacherName(selectedEnrollment.teacher))}
                         </p>
                       </div>
                     )}
@@ -1883,6 +1907,7 @@ const EnrollmentsPage = () => {
                     {editShowTeacherDropdown &&
                       editFilteredTeachers.length > 0 && (
                         <div className="teacher-dropdown">
+                          {/* CAMBIO v5: muestra leader.member.name */}
                           {editFilteredTeachers.map((teacher) => (
                             <button
                               key={teacher.id}
@@ -1891,17 +1916,19 @@ const EnrollmentsPage = () => {
                               className="teacher-option"
                             >
                               <div className="teacher-name">
-                                {getDisplayName(teacher.name)}
+                                {/* CAMBIO v5b: usa helper para ambas formas */}
+                                {getDisplayName(getTeacherName(teacher))}
                               </div>
                             </button>
                           ))}
                         </div>
                       )}
 
+                    {/* CAMBIO v5: usa helper para nombre del líder seleccionado */}
                     {editFormData.teacher && (
                       <div className="teacher-selected">
                         <p className="teacher-selected-name">
-                          ✅ {getDisplayName(editFormData.teacher.name)}
+                          ✅ {getDisplayName(getTeacherName(editFormData.teacher))}
                         </p>
                       </div>
                     )}
