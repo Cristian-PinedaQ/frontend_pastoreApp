@@ -27,6 +27,7 @@ import CellAttendancePage from './pages/CellAttendancePage.jsx';
 import ChurchFinancePage from './pages/ChurchFinancePage.jsx';
 import CounselingPage from './pages/CounselingPage.jsx';
 import ManualRaizViva from './pages/ManualRaizViva.jsx';
+import LevelsConfigPage from './pages/LevelsConfigPage.jsx';
 
 function App() {
   return (
@@ -155,6 +156,17 @@ function App() {
                 <ProtectedRoute
                   element={<ActivityPage />}
                   requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
+                />
+              }
+            />
+
+            {/* Configuracion niveles y lecciones */}
+            <Route
+              path="LevelsConfig"
+              element={
+                <ProtectedRoute
+                  element={<LevelsConfigPage />}
+                  requiredRoles={['ROLE_PASTORES']}
                 />
               }
             />

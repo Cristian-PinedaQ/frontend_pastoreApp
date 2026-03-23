@@ -20,13 +20,13 @@ const ERROR_MESSAGES = {
 
 // ✅ ROLES ACTUALIZADOS según RoleName.java del backend
 const ROLE_OPTIONS = [
-  { value: "PASTORES", label: "👨‍🌾 Pastores", icon: "🐑", color: "#4f46e5" },
-  { value: "CONEXION", label: "🔗 Conexión", icon: "🤝", color: "#06b6d4" },
+  { value: "PASTORES", label: "🐑 Pastores", icon: "🐑", color: "#4f46e5" },
+  { value: "CONEXION", label: "🔗 Conexión", icon: "🔗", color: "#06b6d4" },
   { value: "CIMIENTO", label: "🏗️ Cimiento", icon: "🪨", color: "#854d0e" },
-  { value: "ESENCIA", label: "✨ Esencia", icon: "💫", color: "#a21caf" },
-  { value: "DESPLIEGUE", label: "🚀 Despliegue", icon: "📡", color: "#059669" },
-  { value: "ECONOMICO", label: "💰 Económico", icon: "💵", color: "#b45309" },
-  { value: "LIDER", label: "👑 Líder", icon: "⭐", color: "#b91c1c" },
+  { value: "ESENCIA", label: "✨ Esencia", icon: "🪴", color: "#a21caf" },
+  { value: "DESPLIEGUE", label: "🚀 Despliegue", icon: "🚀", color: "#059669" },
+  { value: "ECONOMICO", label: "💰 Económico", icon: "💰", color: "#b45309" },
+  { value: "LIDER", label: "⚔️ Líder", icon: "⭐", color: "#b91c1c" },
   { value: "PROFESORES", label: "📚 Profesores", icon: "✏️", color: "#1e40af" },
 ];
 
@@ -48,6 +48,15 @@ const UsersPage = () => {
 
   // ========== ESTADO PARA MOSTRAR/OCULTAR CONTRASEÑA ==========
   const [showPassword, setShowPassword] = useState(false);
+
+  // ========== RESPONSIVE: detectar mobile ==========
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     const prefersDark = window.matchMedia(
@@ -114,6 +123,8 @@ const UsersPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
+  const [selectedRole, setSelectedRole] = useState(null); // null = mostrar todos
+
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -143,6 +154,22 @@ const UsersPage = () => {
     if (!formData.password) return null;
     return validatePassword(formData.password);
   }, [formData.password]);
+
+  // ✅ Lista filtrada por rol
+  const filteredUsers = useMemo(() => {
+    if (!selectedRole) return users;
+    return users.filter((usr) => usr.roles?.some((r) => r === selectedRole));
+  }, [users, selectedRole]);
+
+  // ✅ Contador de usuarios por rol (para las badges)
+  const roleCount = useMemo(() => {
+    return ROLE_OPTIONS.reduce((acc, role) => {
+      acc[role.value] = users.filter((usr) =>
+        usr.roles?.includes(role.value),
+      ).length;
+      return acc;
+    }, {});
+  }, [users]);
 
   // ✅ SEGURIDAD: Logger seguro sin exponer detalles
   const handleError = useCallback(
@@ -437,6 +464,7 @@ const UsersPage = () => {
   };
 
   // ✅ SEGURIDAD: Verificar permisos
+  // ⚠️ Este bloque SOLO muestra el error de acceso — nada más aquí
   if (!hasRole("PASTORES")) {
     return (
       <div
@@ -921,12 +949,13 @@ const UsersPage = () => {
               boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
             }}
           >
+            {/* ── HEADER ── */}
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: "1.5rem",
+                marginBottom: "1rem",
               }}
             >
               <h2
@@ -937,7 +966,8 @@ const UsersPage = () => {
                   color: theme.text,
                 }}
               >
-                📋 Lista de Usuarios ({users.length})
+                📋 Lista de Usuarios ({filteredUsers.length}
+                {selectedRole ? ` de ${users.length}` : ""})
               </h2>
               <button
                 onClick={loadUsers}
@@ -958,6 +988,188 @@ const UsersPage = () => {
               </button>
             </div>
 
+            {/* ── BARRA DE FILTROS POR ROL ── */}
+            {isMobile ? (
+              /* ── MOBILE: select ── */
+              <div
+                style={{
+                  marginBottom: "1.25rem",
+                  padding: "0.75rem",
+                  backgroundColor: theme.bgSecondary,
+                  borderRadius: "0.5rem",
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "0.75rem",
+                    fontWeight: "600",
+                    color: theme.textSecondary,
+                    marginBottom: "0.4rem",
+                  }}
+                >
+                  Filtrar por rol
+                </label>
+                <select
+                  value={selectedRole || ""}
+                  onChange={(e) =>
+                    setSelectedRole(e.target.value || null)
+                  }
+                  style={{
+                    width: "100%",
+                    padding: "0.5rem 1rem",
+                    border: `2px solid ${selectedRole ? ROLE_COLORS[selectedRole] : theme.border}`,
+                    borderRadius: "0.5rem",
+                    backgroundColor: theme.input,
+                    color: theme.text,
+                    fontSize: "0.875rem",
+                    fontWeight: "600",
+                    boxSizing: "border-box",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="">👥 Todos ({users.length})</option>
+                  {ROLE_OPTIONS.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.icon} {role.value} ({roleCount[role.value] || 0})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              /* ── DESKTOP: pills ── */
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "0.5rem",
+                  marginBottom: "1.25rem",
+                  padding: "0.75rem",
+                  backgroundColor: theme.bgSecondary,
+                  borderRadius: "0.5rem",
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
+                {/* Botón "Todos" */}
+                <button
+                  onClick={() => setSelectedRole(null)}
+                  style={{
+                    padding: "0.35rem 0.85rem",
+                    borderRadius: "999px",
+                    border: `2px solid ${!selectedRole ? theme.primary : theme.border}`,
+                    backgroundColor: !selectedRole
+                      ? theme.primary
+                      : "transparent",
+                    color: !selectedRole ? "white" : theme.textSecondary,
+                    fontWeight: "600",
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                    transition: "all 200ms",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                  }}
+                >
+                  👥 Todos
+                  <span
+                    style={{
+                      backgroundColor: !selectedRole
+                        ? "rgba(255,255,255,0.3)"
+                        : theme.border,
+                      color: !selectedRole ? "white" : theme.textSecondary,
+                      borderRadius: "999px",
+                      padding: "0 0.45rem",
+                      fontSize: "0.7rem",
+                      fontWeight: "700",
+                    }}
+                  >
+                    {users.length}
+                  </span>
+                </button>
+
+                {/* Botones por cada rol */}
+                {ROLE_OPTIONS.map((role) => {
+                  const isActive = selectedRole === role.value;
+                  const count = roleCount[role.value] || 0;
+                  return (
+                    <button
+                      key={role.value}
+                      onClick={() =>
+                        setSelectedRole(isActive ? null : role.value)
+                      }
+                      style={{
+                        padding: "0.35rem 0.85rem",
+                        borderRadius: "999px",
+                        border: `2px solid ${isActive ? role.color : theme.border}`,
+                        backgroundColor: isActive ? role.color : "transparent",
+                        color: isActive ? "white" : theme.textSecondary,
+                        fontWeight: "600",
+                        fontSize: "0.8rem",
+                        cursor: "pointer",
+                        transition: "all 200ms",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        opacity: count === 0 ? 0.45 : 1,
+                      }}
+                      title={`Filtrar por ${role.label}`}
+                    >
+                      {role.icon} {role.value}
+                      <span
+                        style={{
+                          backgroundColor: isActive
+                            ? "rgba(255,255,255,0.3)"
+                            : theme.border,
+                          color: isActive ? "white" : theme.textSecondary,
+                          borderRadius: "999px",
+                          padding: "0 0.45rem",
+                          fontSize: "0.7rem",
+                          fontWeight: "700",
+                        }}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Indicador de filtro activo */}
+            {selectedRole && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  marginBottom: "1rem",
+                  fontSize: "0.8rem",
+                  color: ROLE_COLORS[selectedRole],
+                }}
+              >
+                <span>
+                  {ROLE_OPTIONS.find((r) => r.value === selectedRole)?.icon}{" "}
+                  Mostrando usuarios con rol <strong>{selectedRole}</strong> —{" "}
+                  {filteredUsers.length} resultado(s)
+                </span>
+                <button
+                  onClick={() => setSelectedRole(null)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: theme.textSecondary,
+                    fontSize: "0.75rem",
+                    textDecoration: "underline",
+                    padding: 0,
+                  }}
+                >
+                  ✕ Limpiar filtro
+                </button>
+              </div>
+            )}
+
             {loading ? (
               <div
                 style={{
@@ -968,7 +1180,7 @@ const UsersPage = () => {
               >
                 <p>⏳ Cargando usuarios...</p>
               </div>
-            ) : users.length > 0 ? (
+            ) : filteredUsers.length > 0 ? (
               <div style={{ overflowX: "auto" }}>
                 <table
                   style={{
@@ -1041,7 +1253,7 @@ const UsersPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((usr) => (
+                    {filteredUsers.map((usr) => (
                       <tr
                         key={usr.id}
                         style={{
@@ -1203,22 +1415,41 @@ const UsersPage = () => {
                 }}
               >
                 <p style={{ fontSize: "1rem", marginBottom: "1rem" }}>
-                  👤 No hay usuarios registrados aún.
+                  {selectedRole
+                    ? `${ROLE_OPTIONS.find((r) => r.value === selectedRole)?.icon} No hay usuarios con rol "${selectedRole}".`
+                    : "👤 No hay usuarios registrados aún."}
                 </p>
-                <button
-                  onClick={() => setShowForm(true)}
-                  style={{
-                    backgroundColor: theme.primary,
-                    color: "white",
-                    padding: "0.5rem 1.5rem",
-                    borderRadius: "0.5rem",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: "600",
-                  }}
-                >
-                  ➕ Crear el primer usuario
-                </button>
+                {selectedRole ? (
+                  <button
+                    onClick={() => setSelectedRole(null)}
+                    style={{
+                      backgroundColor: "transparent",
+                      color: theme.primary,
+                      border: `1px solid ${theme.primary}`,
+                      padding: "0.5rem 1.5rem",
+                      borderRadius: "0.5rem",
+                      cursor: "pointer",
+                      fontWeight: "600",
+                    }}
+                  >
+                    👥 Ver todos los usuarios
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowForm(true)}
+                    style={{
+                      backgroundColor: theme.primary,
+                      color: "white",
+                      padding: "0.5rem 1.5rem",
+                      borderRadius: "0.5rem",
+                      border: "none",
+                      cursor: "pointer",
+                      fontWeight: "600",
+                    }}
+                  >
+                    ➕ Crear el primer usuario
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1257,7 +1488,7 @@ const UsersPage = () => {
           >
             <li style={{ color: theme.textSecondary }}>
               <strong style={{ color: theme.text }}>Usuarios mostrados:</strong>{" "}
-              <span>{users.length}</span>
+              <span>{filteredUsers.length}</span>
             </li>
             <li style={{ color: theme.textSecondary }}>
               <strong style={{ color: theme.text }}>Rol actual:</strong>{" "}

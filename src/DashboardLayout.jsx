@@ -72,14 +72,20 @@ export const DashboardLayout = () => {
     {
       label: "Inicio",
       path: "/dashboard",
-      icon: "🏠",
+      icon: "🏁",
       visible: true,
     },
     {
       label: "Membresia",
       path: "/dashboard/members",
-      icon: "👥",
+      icon: "⛪️",
       visible: true,
+    },
+    {
+      label: "Consejeria",
+      path: "/dashboard/Counseling",
+      icon: "❤️‍🩹",
+      visible: hasAnyRole(["ROLE_PASTORES"]),
     },
     {
       label: "Formaciones",
@@ -133,10 +139,16 @@ export const DashboardLayout = () => {
       visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]),
     },
     {
-      label: "Consejeria",
-      path: "/dashboard/Counseling",
-      icon: "❤️‍🩹",
-      visible: hasAnyRole(["ROLE_PASTORES"]),
+      label: "Actividades",
+      path: "/dashboard/activity",
+      icon: "📆",
+      visible: hasAnyRole([
+        "ROLE_PASTORES",
+        "ROLE_ECONOMICO",
+        "ROLE_CONEXION",
+        "ROLE_CIMIENTO",
+        "ROLE_ESENCIA",
+      ]),
     },
     {
       label: "Finanzas",
@@ -145,22 +157,16 @@ export const DashboardLayout = () => {
       visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]),
     },
     {
-      label: "Contable",
+      label: "Contablilidad",
       path: "/dashboard/financesChurch",
       icon: "📊",
       visible: hasAnyRole(["ROLE_PASTORES"]),
     },
     {
-      label: "Actividades",
-      path: "/dashboard/activity",
-      icon: "📅",
-      visible: hasAnyRole([
-        "ROLE_PASTORES",
-        "ROLE_ECONOMICO",
-        "ROLE_CONEXION",
-        "ROLE_CIMIENTO",
-        "ROLE_ESENCIA",
-      ]),
+      label: "Configuracion",
+      path: "/dashboard/LevelsConfig",
+      icon: "⚙️",
+      visible: hasRole("ROLE_PASTORES"),
     },
     {
       label: "Manual Raiz Viva",

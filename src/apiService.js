@@ -3523,6 +3523,154 @@ getUnreadNotificationCountByUsername(username) {
   }).then(data => data.unreadCount);
 }
 
+// ============================================================
+// Cubre:
+//  - CRUD completo de LevelEnrollment
+//  - CRUD completo de LessonTemplate
+// ============================================================
+
+  // ========== ⚙️ NIVELES FORMATIVOS — CRUD COMPLETO ==========
+
+  /**
+   * Crear nuevo nivel formativo.
+   * POST /api/v1/levels
+   * Requiere rol: PASTORES
+   * @param {Object} levelData - { code, displayName, description, levelOrder, isActive, requiresPayment }
+   */
+  async createLevel(levelData) {
+    try {
+      if (!levelData || typeof levelData !== 'object') {
+        throw new Error('Datos de nivel inválidos');
+      }
+      log('✅ [createLevel] Creando nivel:', levelData.code);
+      const response = await this.request('/levels', {
+        method: 'POST',
+        body: JSON.stringify(levelData),
+      });
+      log('✅ [createLevel] Éxito - ID:', response?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [createLevel] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Desactivar nivel (borrado lógico).
+   * DELETE /api/v1/levels/{id}
+   * Requiere rol: PASTORES
+   * @param {number} id
+   */
+  async deactivateLevel(id) {
+    try {
+      validateId(id, 'levelId');
+      log('🚫 [deactivateLevel] Desactivando nivel ID:', id);
+      const response = await this.request(`/levels/${id}`, {
+        method: 'DELETE',
+      });
+      log('✅ [deactivateLevel] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [deactivateLevel] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 📖 LECCIONES PLANTILLA — CRUD COMPLETO ==========
+
+  /**
+   * Listar todas las plantillas de lección de un nivel (activas e inactivas).
+   * GET /api/v1/lesson-templates/level/{levelCode}
+   * @param {string} levelCode - Código del nivel (ej: ESENCIA_1)
+   */
+  async getLessonTemplatesByLevel(levelCode) {
+    try {
+      validateString(levelCode, 'levelCode', 1, 50);
+      log('📖 [getLessonTemplatesByLevel] Nivel:', levelCode);
+      const response = await this.request(`/lesson-templates/level/${levelCode.toUpperCase()}`);
+      log('✅ [getLessonTemplatesByLevel] Éxito -', response?.length || 0, 'plantillas');
+      return response;
+    } catch (error) {
+      logError('❌ [getLessonTemplatesByLevel] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear nueva plantilla de lección.
+   * POST /api/v1/lesson-templates
+   * Requiere rol: PASTORES
+   * Body: { level: { id }, lessonName, lessonOrder, defaultDurationMinutes }
+   */
+  async createLessonTemplate(templateData) {
+    try {
+      if (!templateData || typeof templateData !== 'object') {
+        throw new Error('Datos de plantilla inválidos');
+      }
+      log('✅ [createLessonTemplate] Creando:', templateData.lessonName);
+      const response = await this.request('/lesson-templates', {
+        method: 'POST',
+        body: JSON.stringify(templateData),
+      });
+      log('✅ [createLessonTemplate] Éxito - ID:', response?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [createLessonTemplate] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar plantilla de lección.
+   * PUT /api/v1/lesson-templates/{id}
+   * Requiere rol: PASTORES
+   * @param {number} id
+   * @param {Object} updates - { lessonName, lessonOrder, defaultDurationMinutes, isActive }
+   */
+  async updateLessonTemplate(id, updates) {
+    try {
+      validateId(id, 'lessonTemplateId');
+      if (!updates || typeof updates !== 'object') {
+        throw new Error('Datos de actualización inválidos');
+      }
+      log('📝 [updateLessonTemplate] Actualizando ID:', id);
+      const response = await this.request(`/lesson-templates/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+      log('✅ [updateLessonTemplate] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateLessonTemplate] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Desactivar plantilla de lección (borrado lógico).
+   * DELETE /api/v1/lesson-templates/{id}
+   * Requiere rol: PASTORES
+   * @param {number} id
+   */
+  async deactivateLessonTemplate(id) {
+    try {
+      validateId(id, 'lessonTemplateId');
+      log('🚫 [deactivateLessonTemplate] Desactivando ID:', id);
+      const response = await this.request(`/lesson-templates/${id}`, {
+        method: 'DELETE',
+      });
+      log('✅ [deactivateLessonTemplate] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [deactivateLessonTemplate] Error:', error.message);
+      throw error;
+    }
+  }
+
+// ============================================================
+// FIN DEL BLOQUE — CRUD Niveles y Plantillas de Lección
+// ============================================================
+
 }
 
 const apiService = new ApiService();
