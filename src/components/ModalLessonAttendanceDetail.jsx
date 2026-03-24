@@ -157,8 +157,9 @@ const ModalLessonAttendanceDetail = ({
     try {
       setRecordingId(studentEnrollmentId);
 
-      const userData = JSON.parse(localStorage.getItem('user') || '{}');
-      const recordedBy = userData.name || userData.username || 'Admin';
+      // ✅ Después — usa sessionStorage (igual que apiService) y prioriza .username
+const userData = apiService.getCurrentUser() || {};
+const recordedBy = userData.username || userData.name || 'Admin';
 
       const selectedScore = participationScores[studentEnrollmentId] || 'POCA_PARTICIPACION';
 

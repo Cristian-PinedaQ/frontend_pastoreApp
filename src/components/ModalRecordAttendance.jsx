@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import apiService from "../apiService";
+import { useAuth } from '../context/AuthContext';
 
 // ─────────────────────────────────────────────
 // Constantes
@@ -55,25 +56,6 @@ function useIsMobile() {
 }
 
 // ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
-function parseJwt(token) {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(""),
-    );
-    return JSON.parse(jsonPayload);
-  } catch (err) {
-    throw new Error("Token inválido");
-  }
-}
-
-// ─────────────────────────────────────────────
 // Componente principal
 // ─────────────────────────────────────────────
 const ModalRecordAttendance = ({
@@ -99,6 +81,8 @@ const ModalRecordAttendance = ({
   const [present, setPresent] = useState(true);
   const [score, setScore] = useState("POCA_PARTICIPACION");
 
+  const { user } = useAuth();
+
   // ── Estado UI ──
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -106,46 +90,6 @@ const ModalRecordAttendance = ({
   const [successMessage, setSuccessMessage] = useState("");
   const [step, setStep] = useState(1);
   const [touched, setTouched] = useState({});
-
-  // ─────────────────────────────────────────────
-  // Obtener usuario autenticado desde storage/JWT
-  // ─────────────────────────────────────────────
-  const getUserAuthenticated = useCallback(() => {
-    try {
-      // 1. Intentar desde localStorage "user"
-      const userData = localStorage.getItem("user");
-      if (userData) {
-        const user = JSON.parse(userData);
-        return user.name || user.username || user.email || "Usuario";
-      }
-
-      // 2. Intentar desde sessionStorage "currentUser"
-      const sessionUser = sessionStorage.getItem("currentUser");
-      if (sessionUser) {
-        const user = JSON.parse(sessionUser);
-        return user.name || user.username || user.email || "Usuario";
-      }
-
-      // 3. Intentar desde JWT token
-      const token = localStorage.getItem("token");
-      if (token) {
-        try {
-          const decoded = parseJwt(token);
-          return decoded.sub || decoded.username || decoded.name || "Usuario";
-        } catch (jwtErr) {
-          console.warn(
-            "⚠️ No se pudo decodificar el token JWT:",
-            jwtErr.message,
-          );
-        }
-      }
-
-      return "Usuario";
-    } catch (err) {
-      console.error("❌ Error obteniendo usuario autenticado:", err);
-      return "Usuario";
-    }
-  }, []);
 
   // ─────────────────────────────────────────────
   // Cargar lecciones y estudiantes de la API
@@ -197,10 +141,12 @@ const loadData = useCallback(async () => {
   // ─────────────────────────────────────────────
 
   // Cargar nombre del usuario al montar
-  useEffect(() => {
-    const userName = getUserAuthenticated();
-    setRecordedBy(userName);
-  }, [getUserAuthenticated]);
+// ✅ Reemplazar el useEffect que carga el nombre:
+useEffect(() => {
+  if (user?.username || user?.name) {
+    setRecordedBy(user.username || user.name);
+  }
+}, [user]);
 
   // Cargar datos cuando el modal se abre
   useEffect(() => {
@@ -228,7 +174,7 @@ const loadData = useCallback(async () => {
   const resetForm = () => {
     setSelectedLesson("");
     setSelectedStudent("");
-    setRecordedBy(getUserAuthenticated());
+    setRecordedBy(user?.username || user?.name || '');
     setPresent(true);
     setScore("POCA_PARTICIPACION");
     setError("");
