@@ -32,7 +32,7 @@ const validateId = (id, fieldName = 'ID') => {
 const validatePageParams = (page, limit) => {
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
-  
+
   if (isNaN(pageNum) || pageNum < 0 || isNaN(limitNum) || limitNum <= 0) {
     throw new Error('Parámetros de paginación inválidos');
   }
@@ -89,89 +89,89 @@ class ApiService {
   }
 
   // ✅ Método genérico para requests CON SEGURIDAD MEJORADA
- async request(endpoint, options = {}, extraHeaders = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const config = {
-    ...options,
-    headers: {
-      ...this.getHeaders(),
-      ...extraHeaders,  // ← permite inyectar headers adicionales por llamada
-    },
-  };
+  async request(endpoint, options = {}, extraHeaders = {}) {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const config = {
+      ...options,
+      headers: {
+        ...this.getHeaders(),
+        ...extraHeaders,  // ← permite inyectar headers adicionales por llamada
+      },
+    };
 
-  try {
-    log('📡 [request] Iniciando:', { method: config.method || 'GET', endpoint });
+    try {
+      log('📡 [request] Iniciando:', { method: config.method || 'GET', endpoint });
 
-    const response = await fetch(url, config);
+      const response = await fetch(url, config);
 
-    if (response.status === 401) {
-      log('⚠️ [request] Token expirado (401)');
-      sessionStorage.removeItem('token');
-      sessionStorage.removeItem('user');
-      window.dispatchEvent(new CustomEvent('authTokenExpired'));
-      throw new Error('Sesión expirada');
+      if (response.status === 401) {
+        log('⚠️ [request] Token expirado (401)');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.dispatchEvent(new CustomEvent('authTokenExpired'));
+        throw new Error('Sesión expirada');
+      }
+
+      if (!response.ok) {
+        let errorData = {};
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { message: `Error ${response.status}` };
+        }
+
+        logError('❌ [request] Error del servidor:', JSON.stringify(errorData));
+
+        // ✅ CREAR UN OBJETO DE ERROR ENRIQUECIDO
+        const enhancedError = new Error();
+        enhancedError.status = response.status;
+        enhancedError.statusText = response.statusText;
+        enhancedError.data = errorData; // Guardar los datos completos del error
+        enhancedError.response = {
+          status: response.status,
+          statusText: response.statusText,
+          data: errorData,
+          headers: Object.fromEntries(response.headers.entries())
+        };
+
+        // Extraer mensaje para el error estándar
+        let errorMessage = '';
+        if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
+          const fieldErrors = Object.entries(errorData.fieldErrors)
+            .map(([field, message]) => `${field}: ${message}`)
+            .join(' | ');
+          errorMessage = fieldErrors;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.message) {
+          errorMessage = typeof errorData.message === 'string'
+            ? errorData.message
+            : JSON.stringify(errorData.message);
+        } else if (errorData.error) {
+          errorMessage = typeof errorData.error === 'string'
+            ? errorData.error
+            : JSON.stringify(errorData.error);
+        } else {
+          errorMessage = DEBUG ? JSON.stringify(errorData) : 'Error en la solicitud';
+        }
+
+        enhancedError.message = errorMessage;
+        logError('❌ [request] Mensaje:', errorMessage);
+
+        throw enhancedError; // Lanzar el error enriquecido
+      }
+
+      const contentType = response.headers.get('content-type');
+      const hasBody = contentType && contentType.includes('application/json');
+      const data = hasBody ? await response.json() : null;
+      log('✅ [request] Exitoso');
+      return data;
+
+    } catch (error) {
+      logError('🔴 [request] Error:', error.message);
+      throw error;
     }
-
-    if (!response.ok) {
-  let errorData = {};
-  try {
-    errorData = await response.json();
-  } catch (e) {
-    errorData = { message: `Error ${response.status}` };
   }
-
-  logError('❌ [request] Error del servidor:', JSON.stringify(errorData));
-
-  // ✅ CREAR UN OBJETO DE ERROR ENRIQUECIDO
-  const enhancedError = new Error();
-  enhancedError.status = response.status;
-  enhancedError.statusText = response.statusText;
-  enhancedError.data = errorData; // Guardar los datos completos del error
-  enhancedError.response = {
-    status: response.status,
-    statusText: response.statusText,
-    data: errorData,
-    headers: Object.fromEntries(response.headers.entries())
-  };
-
-  // Extraer mensaje para el error estándar
-  let errorMessage = '';
-  if (errorData.fieldErrors && typeof errorData.fieldErrors === 'object') {
-    const fieldErrors = Object.entries(errorData.fieldErrors)
-      .map(([field, message]) => `${field}: ${message}`)
-      .join(' | ');
-    errorMessage = fieldErrors;
-  } else if (typeof errorData === 'string') {
-    errorMessage = errorData;
-  } else if (errorData.message) {
-    errorMessage = typeof errorData.message === 'string'
-      ? errorData.message
-      : JSON.stringify(errorData.message);
-  } else if (errorData.error) {
-    errorMessage = typeof errorData.error === 'string'
-      ? errorData.error
-      : JSON.stringify(errorData.error);
-  } else {
-    errorMessage = DEBUG ? JSON.stringify(errorData) : 'Error en la solicitud';
-  }
-  
-  enhancedError.message = errorMessage;
-  logError('❌ [request] Mensaje:', errorMessage);
-  
-  throw enhancedError; // Lanzar el error enriquecido
-}
-
-    const contentType = response.headers.get('content-type');
-    const hasBody = contentType && contentType.includes('application/json');
-    const data = hasBody ? await response.json() : null;
-    log('✅ [request] Exitoso');
-    return data;
-
-  } catch (error) {
-    logError('🔴 [request] Error:', error.message);
-    throw error;
-  }
-}
 
   // ========== 🔐 AUTENTICACIÓN ==========
   async login(username, password) {
@@ -454,73 +454,73 @@ class ApiService {
 
   // ========== 📚 NIVELES FORMATIVOS ==========
 
-/**
- * Obtener todos los niveles activos
- * GET /api/v1/levels
- */
-async getActiveLevels() {
-  try {
-    log('📚 [getActiveLevels] Obteniendo niveles activos');
-    const response = await this.request('/levels');
-    log('✅ [getActiveLevels] Éxito -', response?.length || 0, 'niveles');
-    return response;
-  } catch (error) {
-    logError('❌ [getActiveLevels] Error:', error.message);
-    // Fallback a niveles por defecto si el endpoint falla
-    return this.getDefaultLevels();
+  /**
+   * Obtener todos los niveles activos
+   * GET /api/v1/levels
+   */
+  async getActiveLevels() {
+    try {
+      log('📚 [getActiveLevels] Obteniendo niveles activos');
+      const response = await this.request('/levels');
+      log('✅ [getActiveLevels] Éxito -', response?.length || 0, 'niveles');
+      return response;
+    } catch (error) {
+      logError('❌ [getActiveLevels] Error:', error.message);
+      // Fallback a niveles por defecto si el endpoint falla
+      return this.getDefaultLevels();
+    }
   }
-}
 
-/**
- * Obtener todos los niveles (incluye inactivos)
- * GET /api/v1/levels/all
- */
-async getAllLevels() {
-  try {
-    log('📚 [getAllLevels] Obteniendo todos los niveles');
-    const response = await this.request('/levels/all');
-    log('✅ [getAllLevels] Éxito -', response?.length || 0, 'niveles');
-    return response;
-  } catch (error) {
-    logError('❌ [getAllLevels] Error:', error.message);
-    return this.getDefaultLevels();
+  /**
+   * Obtener todos los niveles (incluye inactivos)
+   * GET /api/v1/levels/all
+   */
+  async getAllLevels() {
+    try {
+      log('📚 [getAllLevels] Obteniendo todos los niveles');
+      const response = await this.request('/levels/all');
+      log('✅ [getAllLevels] Éxito -', response?.length || 0, 'niveles');
+      return response;
+    } catch (error) {
+      logError('❌ [getAllLevels] Error:', error.message);
+      return this.getDefaultLevels();
+    }
   }
-}
 
-/**
- * Obtener nivel por código
- * GET /api/v1/levels/code/{code}
- */
-async getLevelByCode(code) {
-  try {
-    validateString(code, 'code', 1, 50);
-    log('🔍 [getLevelByCode] Buscando nivel:', code);
-    const response = await this.request(`/levels/code/${code}`);
-    return response;
-  } catch (error) {
-    logError('❌ [getLevelByCode] Error:', error.message);
-    throw error;
+  /**
+   * Obtener nivel por código
+   * GET /api/v1/levels/code/{code}
+   */
+  async getLevelByCode(code) {
+    try {
+      validateString(code, 'code', 1, 50);
+      log('🔍 [getLevelByCode] Buscando nivel:', code);
+      const response = await this.request(`/levels/code/${code}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getLevelByCode] Error:', error.message);
+      throw error;
+    }
   }
-}
 
-/**
- * Niveles por defecto (fallback)
- */
-getDefaultLevels() {
-  return [
-    { id: 1, code: 'PREENCUENTRO', displayName: 'Pre-encuentro', levelOrder: 1, isActive: true },
-    { id: 2, code: 'ENCUENTRO', displayName: 'Encuentro', levelOrder: 2, isActive: true },
-    { id: 3, code: 'POST_ENCUENTRO', displayName: 'Post-encuentro', levelOrder: 3, isActive: true },
-    { id: 4, code: 'BAUTIZOS', displayName: 'Bautizos', levelOrder: 4, isActive: true },
-    { id: 5, code: 'ESENCIA_1', displayName: 'ESENCIA 1', levelOrder: 5, isActive: true },
-    { id: 6, code: 'ESENCIA_2', displayName: 'ESENCIA 2', levelOrder: 6, isActive: true },
-    { id: 7, code: 'ESENCIA_3', displayName: 'ESENCIA 3', levelOrder: 7, isActive: true },
-    { id: 8, code: 'SANIDAD_INTEGRAL_RAICES', displayName: 'Sanidad Integral Raíces', levelOrder: 8, isActive: true },
-    { id: 9, code: 'ESENCIA_4', displayName: 'ESENCIA 4', levelOrder: 9, isActive: true },
-    { id: 10, code: 'ADIESTRAMIENTO', displayName: 'Adiestramiento', levelOrder: 10, isActive: true },
-    { id: 11, code: 'GRADUACION', displayName: 'Graduación', levelOrder: 11, isActive: true }
-  ];
-}
+  /**
+   * Niveles por defecto (fallback)
+   */
+  getDefaultLevels() {
+    return [
+      { id: 1, code: 'PREENCUENTRO', displayName: 'Pre-encuentro', levelOrder: 1, isActive: true },
+      { id: 2, code: 'ENCUENTRO', displayName: 'Encuentro', levelOrder: 2, isActive: true },
+      { id: 3, code: 'POST_ENCUENTRO', displayName: 'Post-encuentro', levelOrder: 3, isActive: true },
+      { id: 4, code: 'BAUTIZOS', displayName: 'Bautizos', levelOrder: 4, isActive: true },
+      { id: 5, code: 'ESENCIA_1', displayName: 'ESENCIA 1', levelOrder: 5, isActive: true },
+      { id: 6, code: 'ESENCIA_2', displayName: 'ESENCIA 2', levelOrder: 6, isActive: true },
+      { id: 7, code: 'ESENCIA_3', displayName: 'ESENCIA 3', levelOrder: 7, isActive: true },
+      { id: 8, code: 'SANIDAD_INTEGRAL_RAICES', displayName: 'Sanidad Integral Raíces', levelOrder: 8, isActive: true },
+      { id: 9, code: 'ESENCIA_4', displayName: 'ESENCIA 4', levelOrder: 9, isActive: true },
+      { id: 10, code: 'ADIESTRAMIENTO', displayName: 'Adiestramiento', levelOrder: 10, isActive: true },
+      { id: 11, code: 'GRADUACION', displayName: 'Graduación', levelOrder: 11, isActive: true }
+    ];
+  }
 
   // ========== 🎓 INSCRIPCIONES DE ESTUDIANTES ==========
 
@@ -614,7 +614,7 @@ getDefaultLevels() {
 
       let url = `/student-enrollment/${id}?`;
       const params = [];
-      
+
       if (updateData.status) params.push(`status=${encodeURIComponent(updateData.status)}`);
       if (updateData.finalAttendancePercentage !== undefined) {
         validateNumber(updateData.finalAttendancePercentage, 'finalAttendancePercentage', 0, 100);
@@ -669,33 +669,33 @@ getDefaultLevels() {
 
   // ========== NUEVO MÉTODO PARA REPORTE POR NIVEL ==========
 
-/**
- * Obtener reporte detallado de estudiantes por nivel específico
- * GET /student-enrollment/by-level/{level}
- * @param {string} level - Nivel (PREENCUENTRO, ENCUENTRO, etc.)
- * @param {string|null} status - Filtrar por estado (ACTIVE, COMPLETED, FAILED)
- */
-async getLevelStudents(level, status = null) {
-  try {
-    validateString(level, 'level', 1, 50);
-    
-    // Construir URL - EL ENDPOINT CORRECTO ES /by-level/{level}
-    let url = `/student-enrollment/by-level/${level}`;
-    if (status) {
-      url += `?status=${status}`;
+  /**
+   * Obtener reporte detallado de estudiantes por nivel específico
+   * GET /student-enrollment/by-level/{level}
+   * @param {string} level - Nivel (PREENCUENTRO, ENCUENTRO, etc.)
+   * @param {string|null} status - Filtrar por estado (ACTIVE, COMPLETED, FAILED)
+   */
+  async getLevelStudents(level, status = null) {
+    try {
+      validateString(level, 'level', 1, 50);
+
+      // Construir URL - EL ENDPOINT CORRECTO ES /by-level/{level}
+      let url = `/student-enrollment/by-level/${level}`;
+      if (status) {
+        url += `?status=${status}`;
+      }
+
+      log(`📊 [getLevelStudents] Obteniendo estudiantes del nivel: ${level}`);
+      const response = await this.request(url);
+
+      // La respuesta es un StudentsByLevelReportDTO.LevelDetail
+      return response;
+
+    } catch (error) {
+      logError('❌ [getLevelStudents] Error:', error.message);
+      throw error;
     }
-    
-    log(`📊 [getLevelStudents] Obteniendo estudiantes del nivel: ${level}`);
-    const response = await this.request(url);
-    
-    // La respuesta es un StudentsByLevelReportDTO.LevelDetail
-    return response;
-    
-  } catch (error) {
-    logError('❌ [getLevelStudents] Error:', error.message);
-    throw error;
   }
-}
 
   // ========== 📖 LECCIONES ==========
 
@@ -935,53 +935,53 @@ async getLevelStudents(level, status = null) {
     }
   }
 
-async createFinance(financeData) {
-  try {
-    if (!financeData || typeof financeData !== 'object') {
-      throw new Error('Datos de finanza inválidos');
-    }
-
-    let recordedBy = financeData.recordedBy;
-    if (!recordedBy) {
-      const currentUser = this.getCurrentUser();
-      recordedBy = currentUser?.username || 'Sistema';
-      log('📝 [createFinance] recordedBy auto-llenado con:', recordedBy);
-    }
-
-    const body = {
-      memberId: validateNumber(financeData.memberId, 'memberId'),
-      memberName: financeData.memberName,
-      amount: validateNumber(financeData.amount, 'amount', 0),
-      incomeConcept: financeData.incomeConcept,
-      incomeMethod: financeData.incomeMethod,
-      description: financeData.description || '',
-      recordedBy: recordedBy,
-      registrationDate: financeData.registrationDate,
-      isVerified: financeData.isVerified || false,
-    };
-
-    const idempotencyKey = `finance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    log('📤 [createFinance] Enviando con idempotencyKey:', idempotencyKey);
-
-    const response = await this.request(
-      '/finances',
-      {
-        method: 'POST',
-        body: JSON.stringify(body),
-      },
-      {
-        'X-Idempotency-Key': idempotencyKey,
+  async createFinance(financeData) {
+    try {
+      if (!financeData || typeof financeData !== 'object') {
+        throw new Error('Datos de finanza inválidos');
       }
-    );
 
-    log('✅ [createFinance] Éxito - ID:', response?.id);
-    return response;
+      let recordedBy = financeData.recordedBy;
+      if (!recordedBy) {
+        const currentUser = this.getCurrentUser();
+        recordedBy = currentUser?.username || 'Sistema';
+        log('📝 [createFinance] recordedBy auto-llenado con:', recordedBy);
+      }
 
-  } catch (error) {
-    logError('❌ [createFinance] Error:', error.message);
-    throw error;
+      const body = {
+        memberId: validateNumber(financeData.memberId, 'memberId'),
+        memberName: financeData.memberName,
+        amount: validateNumber(financeData.amount, 'amount', 0),
+        incomeConcept: financeData.incomeConcept,
+        incomeMethod: financeData.incomeMethod,
+        description: financeData.description || '',
+        recordedBy: recordedBy,
+        registrationDate: financeData.registrationDate,
+        isVerified: financeData.isVerified || false,
+      };
+
+      const idempotencyKey = `finance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      log('📤 [createFinance] Enviando con idempotencyKey:', idempotencyKey);
+
+      const response = await this.request(
+        '/finances',
+        {
+          method: 'POST',
+          body: JSON.stringify(body),
+        },
+        {
+          'X-Idempotency-Key': idempotencyKey,
+        }
+      );
+
+      log('✅ [createFinance] Éxito - ID:', response?.id);
+      return response;
+
+    } catch (error) {
+      logError('❌ [createFinance] Error:', error.message);
+      throw error;
+    }
   }
-}
 
 
   async updateFinance(id, financeData) {
@@ -1417,8 +1417,10 @@ async createFinance(financeData) {
       if (!term || term.trim().length < 2) return [];
       validateString(term, 'searchTerm', 2, 100);
       log('🔍 [searchMembers] Buscando:', term);
-      const allMembers = await this.getAllMembers();
-      const leaders = await this.getLeaders();
+      const [allMembers, leaders] = await Promise.all([
+        this.getAllMembers(),
+        this.getLeaders(),
+      ]);
       const leaderMemberIds = new Set(leaders.map(l => l.memberId));
       const searchTerm = term.toLowerCase().trim();
       const results = allMembers
@@ -1936,59 +1938,109 @@ async createFinance(financeData) {
   // ========== 📊 ESTADÍSTICAS ==========
 
   async getStatisticsByLevelAndYear() {
-    try {
-      log('📊 [getStatisticsByLevelAndYear] Iniciando');
-      const enrollments = await this.getEnrollments();
-      log(`📋 Cohortes obtenidas: ${enrollments.length}`);
-      const levelYearData = {};
-      for (const enrollment of enrollments) {
-        const enrollmentId = enrollment.id;
-        const cohortName = enrollment.cohortName || enrollment.name;
-        try {
-          const students = await this.getStudentEnrollmentsByEnrollment(enrollmentId);
-          if (!students || students.length === 0) { log(`⚠️ ${cohortName} - Sin estudiantes`); continue; }
-          log(`✅ ${cohortName} - ${students.length} estudiantes`);
-          students.forEach(student => {
-            let year = 'SIN_AÑO';
-            if (student.enrollmentDate || student.enrollment_date) {
-              try {
-                const date = new Date(student.enrollmentDate || student.enrollment_date);
-                const extractedYear = date.getFullYear();
-                if (!isNaN(extractedYear) && extractedYear > 1900) year = extractedYear.toString();
-              } catch (e) {}
-            }
-            let level = student.levelEnrollment || student.level || 'SIN_NIVEL';
-            if (!levelYearData[year]) levelYearData[year] = {};
-            if (!levelYearData[year][level]) {
-              levelYearData[year][level] = { label: this.getLevelLabel(level), levelEnrollment: level, total: 0, passed: 0, failed: 0, pending: 0, students: [] };
-            }
-            levelYearData[year][level].total += 1;
-            levelYearData[year][level].students.push(student);
-            if (student.passed === true) levelYearData[year][level].passed += 1;
-            else if (student.passed === false) levelYearData[year][level].failed += 1;
-            else levelYearData[year][level].pending += 1;
-          });
-        } catch (error) { console.warn(`⚠️ ${cohortName} - Error:`, error.message); }
+  try {
+    log('📊 [getStatisticsByLevelAndYear] Iniciando');
+    const enrollments = await this.getEnrollments();
+    log(`📋 Cohortes obtenidas: ${enrollments.length}`);
+
+    if (!enrollments.length) return {};
+
+    // ✅ TODAS las cohortes en paralelo en lugar de secuencial
+    const results = await Promise.allSettled(
+      enrollments.map(enrollment =>
+        this.getStudentEnrollmentsByEnrollment(enrollment.id)
+          .then(students => ({ enrollment, students: students || [] }))
+      )
+    );
+
+    const levelYearData = {};
+
+    results.forEach(result => {
+      if (result.status === 'rejected') {
+        console.warn('⚠️ Cohorte falló:', result.reason?.message);
+        return;
       }
-      const result = {};
-      Object.keys(levelYearData).sort((a, b) => { if (a === 'SIN_AÑO') return 1; if (b === 'SIN_AÑO') return -1; return b - a; }).forEach(year => {
-        result[year] = {};
-        const levelOrder = ['PREENCUENTRO','ENCUENTRO','POST_ENCUENTRO','BAUTIZOS','ESENCIA_1','ESENCIA_2','ESENCIA_3','SANIDAD_INTEGRAL_RAICES','ESENCIA_4','ADIESTRAMIENTO','GRADUACION'];
-        levelOrder.forEach(levelKey => {
-          if (levelYearData[year][levelKey]) {
-            const levelData = levelYearData[year][levelKey];
-            const passPercentage = levelData.total > 0 ? ((levelData.passed / levelData.total) * 100).toFixed(1) : 0;
-            result[year][levelKey] = { label: levelData.label, total: levelData.total, passed: levelData.passed, failed: levelData.failed, pending: levelData.pending, passPercentage: parseFloat(passPercentage) };
+
+      const { enrollment, students } = result.value;
+      const cohortName = enrollment.cohortName || enrollment.name;
+
+      if (!students.length) {
+        log(`⚠️ ${cohortName} - Sin estudiantes`);
+        return;
+      }
+
+      log(`✅ ${cohortName} - ${students.length} estudiantes`);
+
+      students.forEach(student => {
+        // Extraer año
+        let year = 'SIN_AÑO';
+        const rawDate = student.enrollmentDate || student.enrollment_date;
+        if (rawDate) {
+          const extractedYear = new Date(rawDate).getFullYear();
+          if (!isNaN(extractedYear) && extractedYear > 1900) {
+            year = extractedYear.toString();
           }
+        }
+
+        const level = student.levelEnrollment || student.level || 'SIN_NIVEL';
+
+        if (!levelYearData[year]) levelYearData[year] = {};
+        if (!levelYearData[year][level]) {
+          levelYearData[year][level] = {
+            label: this.getLevelLabel(level),
+            levelEnrollment: level,
+            total: 0, passed: 0, failed: 0, pending: 0,
+          };
+        }
+
+        const entry = levelYearData[year][level];
+        entry.total += 1;
+        if (student.passed === true)       entry.passed  += 1;
+        else if (student.passed === false) entry.failed  += 1;
+        else                               entry.pending += 1;
+      });
+    });
+
+    // Construir resultado ordenado
+    const LEVEL_ORDER = [
+      'PREENCUENTRO', 'ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS',
+      'ESENCIA_1', 'ESENCIA_2', 'ESENCIA_3', 'SANIDAD_INTEGRAL_RAICES',
+      'ESENCIA_4', 'ADIESTRAMIENTO', 'GRADUACION',
+    ];
+
+    const result = {};
+    Object.keys(levelYearData)
+      .sort((a, b) => {
+        if (a === 'SIN_AÑO') return 1;
+        if (b === 'SIN_AÑO') return -1;
+        return b - a; // años descendente
+      })
+      .forEach(year => {
+        result[year] = {};
+        LEVEL_ORDER.forEach(levelKey => {
+          const levelData = levelYearData[year][levelKey];
+          if (!levelData) return;
+          result[year][levelKey] = {
+            label:         levelData.label,
+            total:         levelData.total,
+            passed:        levelData.passed,
+            failed:        levelData.failed,
+            pending:       levelData.pending,
+            passPercentage: levelData.total > 0
+              ? parseFloat(((levelData.passed / levelData.total) * 100).toFixed(1))
+              : 0,
+          };
         });
       });
-      log('✅ [getStatisticsByLevelAndYear] Completado');
-      return result;
-    } catch (error) {
-      logError('❌ [getStatisticsByLevelAndYear] Error:', error);
-      throw error;
-    }
+
+    log('✅ [getStatisticsByLevelAndYear] Completado');
+    return result;
+
+  } catch (error) {
+    logError('❌ [getStatisticsByLevelAndYear] Error:', error);
+    throw error;
   }
+}
 
   getLevelLabel(levelEnrollment) {
     const levelMap = { 'PREENCUENTRO': 'Pre-encuentro', 'ENCUENTRO': 'Encuentro', 'POST_ENCUENTRO': 'Post-encuentro', 'BAUTIZOS': 'Bautizos', 'ESENCIA_1': 'ESENCIA 1', 'ESENCIA_2': 'ESENCIA 2', 'ESENCIA_3': 'ESENCIA 3', 'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces', 'ESENCIA_4': 'ESENCIA 4', 'ADIESTRAMIENTO': 'Adiestramiento', 'GRADUACION': 'Graduación' };
@@ -2213,33 +2265,33 @@ async createFinance(financeData) {
       if (!eventData || typeof eventData !== 'object') {
         throw new Error('Datos del evento inválidos');
       }
-      
+
       validateString(eventData.name, 'name', 1, 200);
-      
+
       if (!eventData.eventDates || !Array.isArray(eventData.eventDates) || eventData.eventDates.length === 0) {
         throw new Error('Debe especificar al menos una fecha para el evento');
       }
-      
+
       // Validar que todas las fechas tengan formato correcto
       eventData.eventDates.forEach(date => {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           throw new Error(`Formato de fecha inválido: ${date}. Use YYYY-MM-DD`);
         }
       });
-      
+
       log('📅 [createAttendanceEvent] Creando evento:', { name: eventData.name, fechas: eventData.eventDates.length });
-      
+
       const payload = {
         name: eventData.name.trim(),
         description: eventData.description?.trim() || null,
         eventDates: eventData.eventDates
       };
-      
+
       const response = await this.request('/attendance-cell-group/events', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      
+
       log('✅ [createAttendanceEvent] Éxito - ID:', response?.event?.id);
       return response;
     } catch (error) {
@@ -2301,11 +2353,11 @@ async createFinance(financeData) {
     try {
       validateId(cellId, 'cellId');
       validateString(date, 'date', 10, 10);
-      
+
       if (!payload || typeof payload !== 'object') {
         throw new Error('Datos de sesión inválidos');
       }
-      
+
       // Validar newParticipants
       if (payload.newParticipants !== undefined && payload.newParticipants !== null && payload.newParticipants !== '') {
         const newParts = parseInt(payload.newParticipants, 10);
@@ -2313,7 +2365,7 @@ async createFinance(financeData) {
           throw new Error('newParticipants debe ser un número no negativo');
         }
       }
-      
+
       // Validar totalAttendees
       if (payload.totalAttendees !== undefined && payload.totalAttendees !== null && payload.totalAttendees !== '') {
         const total = parseInt(payload.totalAttendees, 10);
@@ -2321,19 +2373,19 @@ async createFinance(financeData) {
           throw new Error('totalAttendees debe ser un número no negativo');
         }
       }
-      
+
       // Validar notes
       if (payload.notes && payload.notes.length > 500) {
         throw new Error('Las notas no pueden superar 500 caracteres');
       }
-      
-      log('📝 [saveSessionData] Guardando datos de sesión:', { 
-        cellId, 
-        date, 
+
+      log('📝 [saveSessionData] Guardando datos de sesión:', {
+        cellId,
+        date,
         newParticipants: payload.newParticipants,
         totalAttendees: payload.totalAttendees
       });
-      
+
       const response = await this.request(`/attendance-cell-group/cell/${cellId}/date/${date}/session-data`, {
         method: 'PUT',
         body: JSON.stringify({
@@ -2342,7 +2394,7 @@ async createFinance(financeData) {
           notes: payload.notes || null
         })
       });
-      
+
       log('✅ [saveSessionData] Datos guardados');
       return response;
     } catch (error) {
@@ -2364,9 +2416,9 @@ async createFinance(financeData) {
   }
 
   // ============================================================
-// PEGA ESTE BLOQUE DENTRO DE LA CLASE ApiService,
-// justo antes de la línea:  }  (cierre de la clase)
-// ============================================================
+  // PEGA ESTE BLOQUE DENTRO DE LA CLASE ApiService,
+  // justo antes de la línea:  }  (cierre de la clase)
+  // ============================================================
 
   // ========== 🔔 NOTIFICACIONES ==========
 
@@ -2513,11 +2565,11 @@ async createFinance(financeData) {
   }
 
   // ============================================================
-// ⛪ MÓDULO FINANCIERO IGLESIA
-// Pega este bloque dentro de la clase ApiService,
-// justo antes del cierre de la clase  }
-// Base URL del módulo: /api/v1/finance
-// ============================================================
+  // ⛪ MÓDULO FINANCIERO IGLESIA
+  // Pega este bloque dentro de la clase ApiService,
+  // justo antes del cierre de la clase  }
+  // Base URL del módulo: /api/v1/finance
+  // ============================================================
 
   // ========== 📌 GASTOS FIJOS ==========
 
@@ -2717,39 +2769,39 @@ async createFinance(financeData) {
  * Registrar un gasto no recurrente.
  * POST /finance/occasional-expenses
  */
-async createOccasionalExpense(dto) {
-  try {
-    if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
-    validateString(dto.name, 'name', 3, 150);
-    
-    // ✅ CORREGIDO: Validar y procesar el monto
-    const numAmount = Number(dto.amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      throw new Error('El monto debe ser un número válido mayor a 0');
+  async createOccasionalExpense(dto) {
+    try {
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
+      validateString(dto.name, 'name', 3, 150);
+
+      // ✅ CORREGIDO: Validar y procesar el monto
+      const numAmount = Number(dto.amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        throw new Error('El monto debe ser un número válido mayor a 0');
+      }
+      const validatedAmount = Math.round(numAmount * 100) / 100;
+
+      validateString(dto.category, 'category', 1, 60);
+      validateString(dto.expenseDate, 'expenseDate', 10, 10);
+      validateString(dto.recordedBy, 'recordedBy', 1, 100);
+
+      const processedDto = {
+        ...dto,
+        amount: validatedAmount
+      };
+
+      log('⚡ [createOccasionalExpense] Creando:', dto.name, 'monto:', validatedAmount);
+      const response = await this.request('/finance/occasional-expenses', {
+        method: 'POST',
+        body: JSON.stringify(processedDto),
+      });
+      log('✅ [createOccasionalExpense] Éxito - ID:', response?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [createOccasionalExpense] Error:', error.message);
+      throw error;
     }
-    const validatedAmount = Math.round(numAmount * 100) / 100;
-    
-    validateString(dto.category, 'category', 1, 60);
-    validateString(dto.expenseDate, 'expenseDate', 10, 10);
-    validateString(dto.recordedBy, 'recordedBy', 1, 100);
-
-    const processedDto = {
-      ...dto,
-      amount: validatedAmount
-    };
-
-    log('⚡ [createOccasionalExpense] Creando:', dto.name, 'monto:', validatedAmount);
-    const response = await this.request('/finance/occasional-expenses', {
-      method: 'POST',
-      body: JSON.stringify(processedDto),
-    });
-    log('✅ [createOccasionalExpense] Éxito - ID:', response?.id);
-    return response;
-  } catch (error) {
-    logError('❌ [createOccasionalExpense] Error:', error.message);
-    throw error;
   }
-}
 
   /**
  * Actualizar gasto ocasional.
@@ -2757,36 +2809,36 @@ async createOccasionalExpense(dto) {
  * @param {number} id
  * @param {Object} dto - OccasionalExpenseDTO
  */
-async updateOccasionalExpense(id, dto) {
-  try {
-    validateId(id, 'occasionalExpenseId');
-    if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
+  async updateOccasionalExpense(id, dto) {
+    try {
+      validateId(id, 'occasionalExpenseId');
+      if (!dto || typeof dto !== 'object') throw new Error('Datos de gasto ocasional inválidos');
 
-    // ✅ CORREGIDO: Procesar el monto correctamente
-    const processedDto = { ...dto };
-    
-    // Asegurar que el monto sea un número con 2 decimales
-    if (processedDto.amount !== undefined && processedDto.amount !== null) {
-      const numAmount = Number(processedDto.amount);
-      if (isNaN(numAmount)) {
-        throw new Error('El monto debe ser un número válido');
+      // ✅ CORREGIDO: Procesar el monto correctamente
+      const processedDto = { ...dto };
+
+      // Asegurar que el monto sea un número con 2 decimales
+      if (processedDto.amount !== undefined && processedDto.amount !== null) {
+        const numAmount = Number(processedDto.amount);
+        if (isNaN(numAmount)) {
+          throw new Error('El monto debe ser un número válido');
+        }
+        // Redondear a 2 decimales para evitar problemas de precisión
+        processedDto.amount = Math.round(numAmount * 100) / 100;
       }
-      // Redondear a 2 decimales para evitar problemas de precisión
-      processedDto.amount = Math.round(numAmount * 100) / 100;
-    }
 
-    log('📝 [updateOccasionalExpense] Actualizando ID:', id, 'monto:', processedDto.amount);
-    const response = await this.request(`/finance/occasional-expenses/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(processedDto),
-    });
-    log('✅ [updateOccasionalExpense] Éxito');
-    return response;
-  } catch (error) {
-    logError('❌ [updateOccasionalExpense] Error:', error.message);
-    throw error;
+      log('📝 [updateOccasionalExpense] Actualizando ID:', id, 'monto:', processedDto.amount);
+      const response = await this.request(`/finance/occasional-expenses/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(processedDto),
+      });
+      log('✅ [updateOccasionalExpense] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateOccasionalExpense] Error:', error.message);
+      throw error;
+    }
   }
-}
 
   /**
    * Eliminar gasto ocasional.
@@ -3032,15 +3084,15 @@ async updateOccasionalExpense(id, dto) {
     }
   }
 
-// ============================================================
-// FIN DEL BLOQUE ⛪ MÓDULO FINANCIERO IGLESIA
-// ============================================================
-// ============================================================
-// 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
-// Pega este bloque dentro de la clase ApiService,
-// justo antes del cierre de la clase  }
-// Base URL del módulo: /api/v1/counseling
-// ============================================================
+  // ============================================================
+  // FIN DEL BLOQUE ⛪ MÓDULO FINANCIERO IGLESIA
+  // ============================================================
+  // ============================================================
+  // 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
+  // Pega este bloque dentro de la clase ApiService,
+  // justo antes del cierre de la clase  }
+  // Base URL del módulo: /api/v1/counseling
+  // ============================================================
 
   // ========== 🕊️ CONSEJERÍAS ==========
 
@@ -3399,18 +3451,18 @@ async updateOccasionalExpense(id, dto) {
     }
   }
 
-// ============================================================
-// FIN DEL BLOQUE 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
-// ============================================================
+  // ============================================================
+  // FIN DEL BLOQUE 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
+  // ============================================================
 
-// ============================================================
-// AGREGAR en apiService.js, dentro de la clase ApiService,
-// justo antes del cierre de la clase (última línea con solo  }  )
-//
-// Cubre:
-//  - Actividades ENROLLMENT disponibles para un miembro
-//  - Actualizar requiresPayment de un nivel
-// ============================================================
+  // ============================================================
+  // AGREGAR en apiService.js, dentro de la clase ApiService,
+  // justo antes del cierre de la clase (última línea con solo  }  )
+  //
+  // Cubre:
+  //  - Actividades ENROLLMENT disponibles para un miembro
+  //  - Actualizar requiresPayment de un nivel
+  // ============================================================
 
   // ========== 🎓 ACTIVIDADES ENROLLMENT DISPONIBLES ==========
 
@@ -3502,32 +3554,32 @@ async updateOccasionalExpense(id, dto) {
 
   // En apiService.js, agrega:
 
-/**
- * Obtiene notificaciones activas por username (NO requiere ID)
- */
-// ✅ CORRECTO - Solo la ruta relativa
-getActiveNotificationsByUsername(username) {
-  return this.request(`/notifications/user/by-username/${username}/active`, {  // ← BIEN
-    method: 'GET',
-    requiresAuth: true
-  });
-}
+  /**
+   * Obtiene notificaciones activas por username (NO requiere ID)
+   */
+  // ✅ CORRECTO - Solo la ruta relativa
+  getActiveNotificationsByUsername(username) {
+    return this.request(`/notifications/user/by-username/${username}/active`, {  // ← BIEN
+      method: 'GET',
+      requiresAuth: true
+    });
+  }
 
-/**
- * Obtiene conteo de notificaciones sin leer por username
- */
-getUnreadNotificationCountByUsername(username) {
-  return this.request(`/notifications/user/by-username/${username}/unread-count`, {
-    method: 'GET',
-    requiresAuth: true
-  }).then(data => data.unreadCount);
-}
+  /**
+   * Obtiene conteo de notificaciones sin leer por username
+   */
+  getUnreadNotificationCountByUsername(username) {
+    return this.request(`/notifications/user/by-username/${username}/unread-count`, {
+      method: 'GET',
+      requiresAuth: true
+    }).then(data => data.unreadCount);
+  }
 
-// ============================================================
-// Cubre:
-//  - CRUD completo de LevelEnrollment
-//  - CRUD completo de LessonTemplate
-// ============================================================
+  // ============================================================
+  // Cubre:
+  //  - CRUD completo de LevelEnrollment
+  //  - CRUD completo de LessonTemplate
+  // ============================================================
 
   // ========== ⚙️ NIVELES FORMATIVOS — CRUD COMPLETO ==========
 
@@ -3667,9 +3719,9 @@ getUnreadNotificationCountByUsername(username) {
     }
   }
 
-// ============================================================
-// FIN DEL BLOQUE — CRUD Niveles y Plantillas de Lección
-// ============================================================
+  // ============================================================
+  // FIN DEL BLOQUE — CRUD Niveles y Plantillas de Lección
+  // ============================================================
 
 }
 
