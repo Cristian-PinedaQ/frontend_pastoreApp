@@ -12,7 +12,6 @@ import { generateActivityPDF } from "../services/activityPdfGenerator";
 import { logSecurityEvent, logUserAction } from "../utils/securityLogger";
 import "../css/ActivityPage.css";
 
-
 // 🔐 Debug condicional
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
 
@@ -203,11 +202,15 @@ const extractLevelCode = (activity) => {
   // Caso 2: requiredLevel es string directo
   if (typeof activity.requiredLevel === "string") return activity.requiredLevel;
   // Caso 3: levelEnrollment como objeto
-  if (activity.levelEnrollment && typeof activity.levelEnrollment === "object") {
+  if (
+    activity.levelEnrollment &&
+    typeof activity.levelEnrollment === "object"
+  ) {
     return activity.levelEnrollment.code ?? null;
   }
   // Caso 4: levelEnrollment como string
-  if (typeof activity.levelEnrollment === "string") return activity.levelEnrollment;
+  if (typeof activity.levelEnrollment === "string")
+    return activity.levelEnrollment;
   // Caso 5: level como objeto
   if (activity.level && typeof activity.level === "object") {
     return activity.level.code ?? null;
@@ -227,7 +230,6 @@ const extractRequiresPayment = (activity) => {
 };
 
 const ActivityPage = () => {
-
   // ========== ROLES DEL USUARIO (memoizados — sin loops) ==========
   // ✅ useMemo garantiza referencia estable: sessionStorage no cambia en la sesión
   const userRoles = useMemo(() => getCurrentUserRoles(), []);
@@ -326,7 +328,10 @@ const ActivityPage = () => {
           levelCode,
           levelEnrollment: levelCode, // compatibilidad con filtros anteriores
           levelDisplayName:
-            levelObj?.displayName ?? LEVEL_LABELS[levelCode] ?? levelCode ?? null,
+            levelObj?.displayName ??
+            LEVEL_LABELS[levelCode] ??
+            levelCode ??
+            null,
           requiresPayment, // v4: badge de pago
           // Tipo
           activityType: activity.activityType ?? null,
@@ -375,7 +380,7 @@ const ActivityPage = () => {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowedLevels]); // allowedLevels es estable gracias a useMemo
 
   // ========== CARGAR BALANCE DE ACTIVIDAD ==========
@@ -446,8 +451,23 @@ const ActivityPage = () => {
     try {
       let filtered = [...allActivities];
 
+      // DESPUÉS
+      const STATUS_ORDER = {
+        warning: 0, // 🟠 Por finalizar
+        success: 1, // 🟢 Activa
+        dark: 2, // ⚫ Finalizada
+        danger: 3, // 🔴 Inactiva
+        secondary: 4, // ⚪ Desconocido
+      };
+
       filtered.sort((a, b) => {
         try {
+          const orderA = STATUS_ORDER[a.status.color] ?? 4;
+          const orderB = STATUS_ORDER[b.status.color] ?? 4;
+
+          if (orderA !== orderB) return orderA - orderB;
+
+          // Desempate por fecha fin (ascendente dentro del mismo grupo)
           const dateA = new Date(a.endDate || 0).getTime();
           const dateB = new Date(b.endDate || 0).getTime();
           return dateA - dateB;
@@ -458,7 +478,18 @@ const ActivityPage = () => {
 
       if (selectedStatus !== "ALL") {
         filtered = filtered.filter((activity) => {
-          if (selectedStatus === "ACTIVE") return activity.isActive === true;
+          // DESPUÉS
+          if (selectedStatus === "ACTIVE") {
+            if (!activity.isActive) return false;
+            const [y, m, d] = String(activity.endDate)
+              .split("T")[0]
+              .split("-")
+              .map(Number);
+            const end = new Date(y, m - 1, d);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return end >= today; // excluir finalizadas
+          }
           if (selectedStatus === "INACTIVE") return activity.isActive === false;
           if (selectedStatus === "ENDING_SOON") {
             const [y, m, d] = String(activity.endDate)
@@ -1030,10 +1061,10 @@ const ActivityPage = () => {
                 onChange={(e) => setSelectedStatus(e.target.value)}
               >
                 <option value="ALL">Todos los Estados</option>
-                <option value="ACTIVE">🟢 Activas</option>
-                <option value="INACTIVE">🔴 Inactivas</option>
                 <option value="ENDING_SOON">🟠 Por finalizar</option>
+                <option value="ACTIVE">🟢 Activas</option>
                 <option value="FINISHED">⚫ Finalizadas</option>
+                <option value="INACTIVE">🔴 Inactivas</option>
               </select>
             </div>
 
@@ -1203,11 +1234,14 @@ const ActivityPage = () => {
                           <span className="activity-page__activity-name">
                             {activity.activityName}
                           </span>
-                          
+
                           {/* Nivel formativo (v4) */}
                           {activity.levelCode && (
                             <small className="activity-page__level-tag">
-                              🎓 {activity.levelDisplayName || LEVEL_LABELS[activity.levelCode] || activity.levelCode}
+                              🎓{" "}
+                              {activity.levelDisplayName ||
+                                LEVEL_LABELS[activity.levelCode] ||
+                                activity.levelCode}
                             </small>
                           )}
 
@@ -1221,14 +1255,20 @@ const ActivityPage = () => {
                                   marginTop: "2px",
                                   fontSize: "0.72em",
                                   fontWeight: 600,
-                                  color: activity.requiresPayment ? "#155724" : "#856404",
-                                  background: activity.requiresPayment ? "#d4edda" : "#fff3cd",
+                                  color: activity.requiresPayment
+                                    ? "#155724"
+                                    : "#856404",
+                                  background: activity.requiresPayment
+                                    ? "#d4edda"
+                                    : "#fff3cd",
                                   padding: "1px 6px",
                                   borderRadius: "10px",
                                   width: "fit-content",
                                 }}
                               >
-                                {activity.requiresPayment ? "💳 Con pago" : "🆓 Sin pago"}
+                                {activity.requiresPayment
+                                  ? "💳 Con pago"
+                                  : "🆓 Sin pago"}
                               </small>
                             )}
 
