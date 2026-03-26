@@ -12,6 +12,7 @@ import ModalLessonAttendanceDetail from "../components/ModalLessonAttendanceDeta
 import nameHelper from "../services/nameHelper";
 import "../css/EnrollmentsPage.css";
 import { useAuth } from "../context/AuthContext";
+import { generateCohortPDF } from "../services/generateCohortPDF";
 
 // Extraer funciones del helper
 const { getDisplayName } = nameHelper;
@@ -46,9 +47,9 @@ const escapeHtml = (text) => {
 // CAMBIO v5b: soporta tanto DTO plano { memberName } como objeto anidado { member.name }
 const getTeacherName = (teacher) => {
   if (!teacher) return null;
-  if (teacher.member?.name) return teacher.member.name;  // objeto anidado
-  if (teacher.memberName)   return teacher.memberName;   // DTO plano del backend
-  if (teacher.name)         return teacher.name;          // fallback transitorio
+  if (teacher.member?.name) return teacher.member.name; // objeto anidado
+  if (teacher.memberName) return teacher.memberName; // DTO plano del backend
+  if (teacher.name) return teacher.name; // fallback transitorio
   return null;
 };
 
@@ -244,6 +245,7 @@ const EnrollmentsPage = () => {
   const [filteredTeachers, setFilteredTeachers] = useState([]);
   const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
   const [teacherSearchTerm, setTeacherSearchTerm] = useState("");
+  const [exportingPDF, setExportingPDF] = useState(false);
 
   const handleError = useCallback((errorKey, context = "") => {
     const errorMessage = ERROR_MESSAGES[errorKey] || ERROR_MESSAGES.GENERIC;
@@ -266,6 +268,66 @@ const EnrollmentsPage = () => {
       logError("Error cargando maestros:", err);
     }
   }, [handleError]);
+
+  const exportCohortPDF = async () => {
+    if (!selectedEnrollment) return;
+    setExportingPDF(true);
+    setError("");
+
+    try {
+      // 1. Obtener estudiantes activos (usa los ya cargados o los pide)
+      let exportStudents = students.filter((s) => s.status !== "CANCELLED");
+
+      if (exportStudents.length === 0) {
+        const raw = await apiService.getStudentEnrollmentsByEnrollment(
+          selectedEnrollment.id,
+        );
+        exportStudents = (raw || []).filter((s) => s.status !== "CANCELLED");
+      }
+
+      // 2. Enriquecer con datos del miembro (género, líder, distrito) — paralelo
+      const memberResults = await Promise.allSettled(
+        exportStudents.map((s) => apiService.getMemberById(s.memberId)),
+      );
+
+      const enriched = exportStudents.map((student, i) => {
+        const m =
+          memberResults[i].status === "fulfilled"
+            ? memberResults[i].value || {}
+            : {};
+
+        return {
+          ...student,
+          memberName:
+            student.memberName || m.name || `Miembro ${student.memberId}`,
+          gender: m.gender ?? m.sex ?? m.genero ?? m.sexo ?? "",
+          leader:
+            m.leaderName ??
+            m.leader?.name ??
+            m.cell?.groupLeader?.memberName ??
+            m.cell?.groupLeader?.name ??
+            m.cell?.groupLeaderName ??
+            m.groupLeaderName ??
+            "—",
+          district:
+            m.district ?? m.distrito ?? m.cell?.district ?? m.barrio ?? "—",
+        };
+      });
+
+      // 3. Llamar al generador pasando los helpers del componente
+      generateCohortPDF(selectedEnrollment, enriched, {
+        getLevelLabel,
+        getStatusLabel,
+        getTeacherName,
+        getDisplayName,
+      });
+    } catch (err) {
+      logError("Error exportando PDF:", err);
+      setError("Error al generar el PDF. Inténtalo de nuevo.");
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   const fetchEnrollments = useCallback(async () => {
     try {
@@ -467,10 +529,12 @@ const EnrollmentsPage = () => {
       const sanitizedValue = value.toLowerCase().trim();
       // CAMBIO v5b: soporta DTO plano { memberName } y objeto anidado { member.name }
       const filtered = availableTeachers.filter((teacher) => {
-        const name  = teacher.member?.name  || teacher.memberName  || '';
-        const email = teacher.member?.email || teacher.memberEmail || '';
-        return name.toLowerCase().includes(sanitizedValue) ||
-               email.toLowerCase().includes(sanitizedValue);
+        const name = teacher.member?.name || teacher.memberName || "";
+        const email = teacher.member?.email || teacher.memberEmail || "";
+        return (
+          name.toLowerCase().includes(sanitizedValue) ||
+          email.toLowerCase().includes(sanitizedValue)
+        );
       });
       setFilteredTeachers(filtered.slice(0, 5));
     } catch (error) {
@@ -525,10 +589,12 @@ const EnrollmentsPage = () => {
       const sanitizedValue = value.toLowerCase().trim();
       // CAMBIO v5b: soporta DTO plano { memberName } y objeto anidado { member.name }
       const filtered = availableTeachers.filter((teacher) => {
-        const name  = teacher.member?.name  || teacher.memberName  || '';
-        const email = teacher.member?.email || teacher.memberEmail || '';
-        return name.toLowerCase().includes(sanitizedValue) ||
-               email.toLowerCase().includes(sanitizedValue);
+        const name = teacher.member?.name || teacher.memberName || "";
+        const email = teacher.member?.email || teacher.memberEmail || "";
+        return (
+          name.toLowerCase().includes(sanitizedValue) ||
+          email.toLowerCase().includes(sanitizedValue)
+        );
       });
       setEditFilteredTeachers(filtered.slice(0, 5));
     } catch (error) {
@@ -565,76 +631,76 @@ const EnrollmentsPage = () => {
   };
 
   const loadTabData = useCallback(
-  async (tab) => {
-    if (!selectedEnrollment || !selectedEnrollment.id) return;
+    async (tab) => {
+      if (!selectedEnrollment || !selectedEnrollment.id) return;
 
-    try {
-      setError("");
-      log("Cargando tab:", tab);
+      try {
+        setError("");
+        log("Cargando tab:", tab);
 
-      switch (tab) {
-        case "lessons":
-          const lessonsData = await apiService.getLessonsByEnrollment(
-            selectedEnrollment.id,
-          );
-          const sanitizedLessons = (lessonsData || []).map((l) => ({
-            ...l,
-            lessonName: escapeHtml(l.lessonName),
-            description: escapeHtml(l.description || ""),
-          }));
-          setLessons(sanitizedLessons);
-          break;
-
-        case "students":
-          const studentsData =
-            await apiService.getStudentEnrollmentsByEnrollment(
+        switch (tab) {
+          case "lessons":
+            const lessonsData = await apiService.getLessonsByEnrollment(
               selectedEnrollment.id,
             );
-          
-          // ✅ FILTRAR estudiantes cancelados y luego sanitizar
-          const activeStudents = (studentsData || []).filter(
-            (s) => s.status !== "CANCELLED"
-          );
-          
-          const sanitizedStudents = activeStudents.map((s) => ({
-            ...s,
-            memberName: escapeHtml(s.memberName),
-          }));
-          
-          setStudents(sanitizedStudents);
-          break;
-
-        case "attendance":
-          const lessonsForAttendance =
-            await apiService.getLessonsByEnrollment(selectedEnrollment.id);
-          const sanitizedAttendance = (lessonsForAttendance || []).map(
-            (l) => ({
+            const sanitizedLessons = (lessonsData || []).map((l) => ({
               ...l,
               lessonName: escapeHtml(l.lessonName),
-            }),
-          );
-          setAttendanceSummary(sanitizedAttendance);
-          break;
+              description: escapeHtml(l.description || ""),
+            }));
+            setLessons(sanitizedLessons);
+            break;
 
-        default:
-          break;
+          case "students":
+            const studentsData =
+              await apiService.getStudentEnrollmentsByEnrollment(
+                selectedEnrollment.id,
+              );
+
+            // ✅ FILTRAR estudiantes cancelados y luego sanitizar
+            const activeStudents = (studentsData || []).filter(
+              (s) => s.status !== "CANCELLED",
+            );
+
+            const sanitizedStudents = activeStudents.map((s) => ({
+              ...s,
+              memberName: escapeHtml(s.memberName),
+            }));
+
+            setStudents(sanitizedStudents);
+            break;
+
+          case "attendance":
+            const lessonsForAttendance =
+              await apiService.getLessonsByEnrollment(selectedEnrollment.id);
+            const sanitizedAttendance = (lessonsForAttendance || []).map(
+              (l) => ({
+                ...l,
+                lessonName: escapeHtml(l.lessonName),
+              }),
+            );
+            setAttendanceSummary(sanitizedAttendance);
+            break;
+
+          default:
+            break;
+        }
+      } catch (err) {
+        const errorKey =
+          tab === "lessons"
+            ? "FETCH_LESSONS"
+            : tab === "students"
+              ? "FETCH_STUDENTS"
+              : tab === "attendance"
+                ? "FETCH_ATTENDANCE"
+                : "GENERIC";
+
+        handleError(errorKey, `loadTabData:${tab}`);
+        logError(`Error cargando tab ${tab}:`, err);
       }
-    } catch (err) {
-      const errorKey =
-        tab === "lessons"
-          ? "FETCH_LESSONS"
-          : tab === "students"
-            ? "FETCH_STUDENTS"
-            : tab === "attendance"
-              ? "FETCH_ATTENDANCE"
-              : "GENERIC";
-
-      handleError(errorKey, `loadTabData:${tab}`);
-      logError(`Error cargando tab ${tab}:`, err);
-    }
-  },
-  [selectedEnrollment, handleError],
-);
+    },
+    [selectedEnrollment, handleError],
+  );
 
   useEffect(() => {
     if (showEnrollmentModal && selectedEnrollment) {
@@ -1511,7 +1577,9 @@ const EnrollmentsPage = () => {
                       <div>
                         <p className="detail-label">👨‍🏫 Maestro</p>
                         <p className="detail-value">
-                          {getDisplayName(getTeacherName(selectedEnrollment.teacher))}
+                          {getDisplayName(
+                            getTeacherName(selectedEnrollment.teacher),
+                          )}
                         </p>
                       </div>
                     )}
@@ -1655,6 +1723,9 @@ const EnrollmentsPage = () => {
                       marginTop: "20px",
                       paddingTop: "20px",
                       borderTop: "1px solid #e5e7eb",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
                     }}
                   >
                     <button
@@ -1663,6 +1734,45 @@ const EnrollmentsPage = () => {
                       style={{ width: "100%" }}
                     >
                       ✏️ Editar Cohorte
+                    </button>
+                    <button
+                      onClick={exportCohortPDF}
+                      disabled={exportingPDF}
+                      style={{
+                        width: "100%",
+                        padding: "10px 16px",
+                        borderRadius: "6px",
+                        border: "none",
+                        fontWeight: 700,
+                        fontSize: "14px",
+                        cursor: exportingPDF ? "not-allowed" : "pointer",
+                        background: exportingPDF
+                          ? "#93c5fd"
+                          : "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        transition: "opacity 0.2s",
+                        opacity: exportingPDF ? 0.7 : 1,
+                      }}
+                    >
+                      {exportingPDF ? (
+                        <>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              animation: "spin 1s linear infinite",
+                            }}
+                          >
+                            ⏳
+                          </span>
+                          Preparando informe...
+                        </>
+                      ) : (
+                        <>📄 Exportar PDF de Cohorte</>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1928,7 +2038,8 @@ const EnrollmentsPage = () => {
                     {editFormData.teacher && (
                       <div className="teacher-selected">
                         <p className="teacher-selected-name">
-                          ✅ {getDisplayName(getTeacherName(editFormData.teacher))}
+                          ✅{" "}
+                          {getDisplayName(getTeacherName(editFormData.teacher))}
                         </p>
                       </div>
                     )}
@@ -2151,6 +2262,12 @@ const EnrollmentsPage = () => {
           font-size: 1.2rem;
           color: #666;
         }
+
+        @keyframes spin {
+        from { transform: rotate(0deg); }
+        to   { transform: rotate(360deg); }
+        }
+
       `}</style>
     </div>
   );
