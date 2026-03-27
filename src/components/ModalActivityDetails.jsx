@@ -8,11 +8,15 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import apiService from "../apiService";
 import "../css/ModalActivityDetails.css";
+import ActivityDeliveryStats from "./ActivityDeliveryStats";
 
 // ✅ FIX timezone
 const parseLocalDate = (dateString) => {
   if (!dateString) return null;
-  const [year, month, day] = String(dateString).split("T")[0].split("-").map(Number);
+  const [year, month, day] = String(dateString)
+    .split("T")[0]
+    .split("-")
+    .map(Number);
   return new Date(year, month - 1, day);
 };
 
@@ -28,7 +32,7 @@ const ModalActivityDetails = ({
   activity,
   balance,
   onEnrollParticipant,
-  readOnly = false,   // 🔐 true para ROLE_CONEXION, ROLE_CIMIENTO, ROLE_ESENCIA, ROLE_DESPLIEGUE
+  readOnly = false, // 🔐 true para ROLE_CONEXION, ROLE_CIMIENTO, ROLE_ESENCIA, ROLE_DESPLIEGUE
 }) => {
   // Estados para pestañas
   const [activeTab, setActiveTab] = useState("info");
@@ -69,8 +73,26 @@ const ModalActivityDetails = ({
     incomeMethod: "CASH",
   });
 
+  // ✅ NUEVO: Participantes para estadísticas de entrega
+  const [participants, setParticipants] = useState([]);
+
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  // ✅ NUEVO: Cargar participantes con info de entrega
+  useEffect(() => {
+    if (isOpen && activity?.id) {
+      apiService
+        .request(
+          `/activity-contribution/activity/${activity.id}/with-leader-info`,
+        )
+        .then((data) => setParticipants(data || []))
+        .catch((error) => {
+          console.error("Error cargando participantes:", error);
+          setParticipants([]);
+        });
+    }
+  }, [isOpen, activity?.id]);
 
   // 🔐 Resetear a pestaña "info" cuando se abre el modal
   useEffect(() => {
@@ -108,48 +130,54 @@ const ModalActivityDetails = ({
   }, [readOnly]);
 
   // ✅ NUEVO: Función para determinar si un miembro es elegible según el nivel de la actividad
-  const isMemberEligible = useCallback((member) => {
-    // Excluir pastores específicos
-    if (EXCLUDED_MEMBER_IDS.current.includes(member.id)) {
-      return false;
-    }
+  const isMemberEligible = useCallback(
+    (member) => {
+      // Excluir pastores específicos
+      if (EXCLUDED_MEMBER_IDS.current.includes(member.id)) {
+        return false;
+      }
 
-    // Si la actividad no requiere nivel, todos son elegibles
-    if (!activity?.requiredLevel) {
-      return true;
-    }
+      // Si la actividad no requiere nivel, todos son elegibles
+      if (!activity?.requiredLevel) {
+        return true;
+      }
 
-    // PREENCUENTRO es el nivel inicial, todos son elegibles
-    if (activity.requiredLevel.code === 'PREENCUENTRO') {
-      return true;
-    }
+      // PREENCUENTRO es el nivel inicial, todos son elegibles
+      if (activity.requiredLevel.code === "PREENCUENTRO") {
+        return true;
+      }
 
-    // Si el miembro no tiene nivel actual, no es elegible
-    if (!member.currentLevel) {
-      return false;
-    }
+      // Si el miembro no tiene nivel actual, no es elegible
+      if (!member.currentLevel) {
+        return false;
+      }
 
-    // Encontrar el nivel requerido y el nivel del miembro en la lista de niveles
-    const requiredLevelObj = levels.find(l => l.code === activity.requiredLevel.code);
-    const memberLevelObj = levels.find(l => l.code === member.currentLevel.code);
+      // Encontrar el nivel requerido y el nivel del miembro en la lista de niveles
+      const requiredLevelObj = levels.find(
+        (l) => l.code === activity.requiredLevel.code,
+      );
+      const memberLevelObj = levels.find(
+        (l) => l.code === member.currentLevel.code,
+      );
 
-    if (!requiredLevelObj || !memberLevelObj) {
-      return false;
-    }
+      if (!requiredLevelObj || !memberLevelObj) {
+        return false;
+      }
 
-    // Para ser elegible, el miembro debe tener el nivel inmediatamente anterior
-    // al nivel requerido (usando levelOrder)
-    const requiredPreviousOrder = requiredLevelObj.levelOrder - 1;
-    
-    // Si el nivel requerido es el primero (order 1), todos son elegibles
-    if (requiredPreviousOrder < 1) {
-      return true;
-    }
+      // Para ser elegible, el miembro debe tener el nivel inmediatamente anterior
+      // al nivel requerido (usando levelOrder)
+      const requiredPreviousOrder = requiredLevelObj.levelOrder - 1;
 
-    // El miembro es elegible si su nivel tiene el order inmediatamente anterior
-    return memberLevelObj.levelOrder === requiredPreviousOrder;
-    
-  }, [activity, levels]);
+      // Si el nivel requerido es el primero (order 1), todos son elegibles
+      if (requiredPreviousOrder < 1) {
+        return true;
+      }
+
+      // El miembro es elegible si su nivel tiene el order inmediatamente anterior
+      return memberLevelObj.levelOrder === requiredPreviousOrder;
+    },
+    [activity, levels],
+  );
 
   // Cargar lista de miembros
   const loadMembers = useCallback(async () => {
@@ -194,17 +222,27 @@ const ModalActivityDetails = ({
         loadCosts();
       }
     }
-  }, [isOpen, activity, loadMembers, loadLevels, activeTab, loadCosts, readOnly]);
+  }, [
+    isOpen,
+    activity,
+    loadMembers,
+    loadLevels,
+    activeTab,
+    loadCosts,
+    readOnly,
+  ]);
 
   // ✅ NUEVO: Efecto para calcular miembros elegibles cuando cambian los miembros, niveles o actividad
   useEffect(() => {
     if (members.length > 0 && activity && levels.length > 0) {
-      const eligible = members.filter(member => isMemberEligible(member));
+      const eligible = members.filter((member) => isMemberEligible(member));
       setEligibleMembers(eligible);
-      
+
       // Resetear selección si el miembro seleccionado ya no es elegible
       if (selectedMemberId) {
-        const selectedIsEligible = eligible.some(m => m.id === selectedMemberId);
+        const selectedIsEligible = eligible.some(
+          (m) => m.id === selectedMemberId,
+        );
         if (!selectedIsEligible) {
           setSelectedMemberId("");
           setSelectedMemberName("");
@@ -221,7 +259,7 @@ const ModalActivityDetails = ({
       setFilteredMembers(eligibleMembers);
     } else {
       const filtered = eligibleMembers.filter((member) =>
-        member.name?.toLowerCase().includes(searchTerm.toLowerCase())
+        member.name?.toLowerCase().includes(searchTerm.toLowerCase()),
       );
       setFilteredMembers(filtered);
     }
@@ -253,7 +291,7 @@ const ModalActivityDetails = ({
   // ✅ NUEVO: Obtener nombre de visualización del nivel
   const getLevelDisplayName = (level) => {
     if (!level) return "Sin nivel";
-    if (typeof level === 'string') return level;
+    if (typeof level === "string") return level;
     return level.displayName || level.code || "Sin nivel";
   };
 
@@ -306,7 +344,7 @@ const ModalActivityDetails = ({
       }
 
       const paymentAmount = parseFloat(initialPayment);
-      
+
       if (paymentAmount <= 0) {
         setEnrollError("El pago inicial debe ser mayor a cero");
         return;
@@ -334,14 +372,14 @@ const ModalActivityDetails = ({
         activity.id,
         selectedMemberId,
         showPaymentSection ? parseFloat(initialPayment) : 0,
-        incomeMethod
+        incomeMethod,
       );
 
       if (success) {
-        const successMessage = showPaymentSection 
+        const successMessage = showPaymentSection
           ? `✅ Participante inscrito con pago inicial de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
           : "✅ Participante inscrito exitosamente (pago pendiente)";
-        
+
         setEnrollSuccess(successMessage);
 
         // Resetear formulario después de éxito
@@ -356,19 +394,26 @@ const ModalActivityDetails = ({
         // Recargar miembros después de 1.5 segundos
         setTimeout(() => {
           loadMembers();
+          // ✅ refrescar participantes
+          apiService
+            .request(
+              `/activity-contribution/activity/${activity.id}/with-leader-info`,
+            )
+            .then((data) => setParticipants(data || []))
+            .catch(() => setParticipants([]));
           setEnrollSuccess("");
         }, 1500);
       }
     } catch (error) {
       console.error("❌ Error completo:", error);
-      
+
       let errorMessage = "Error al inscribir participante";
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       setEnrollError(errorMessage);
     } finally {
       setEnrolling(false);
@@ -476,7 +521,7 @@ const ModalActivityDetails = ({
     ? Math.ceil(
         (parseLocalDate(activity.endDate) - new Date()) / (1000 * 60 * 60 * 24),
       )
-  : null;
+    : null;
 
   // Calcular miembros disponibles
   const enrolledCount = balance?.participantCount || 0;
@@ -484,7 +529,7 @@ const ModalActivityDetails = ({
   const hasCapacity = !activity.quantity || enrolledCount < activity.quantity;
 
   // ✅ Obtener nombre de visualización del nivel requerido
-  const requiredLevelDisplay = activity.requiredLevel 
+  const requiredLevelDisplay = activity.requiredLevel
     ? getLevelDisplayName(activity.requiredLevel)
     : "Sin nivel requerido";
 
@@ -501,7 +546,10 @@ const ModalActivityDetails = ({
             </div>
             {/* 🔐 Badge solo lectura */}
             {readOnly && (
-              <div className="details-readonly-badge" title="Solo tienes permiso de consulta">
+              <div
+                className="details-readonly-badge"
+                title="Solo tienes permiso de consulta"
+              >
                 🔒 Solo lectura
               </div>
             )}
@@ -662,6 +710,14 @@ const ModalActivityDetails = ({
             </>
           )}
 
+          {/* 📦 Estadísticas de entrega */}
+          <div className="details-section">
+            <ActivityDeliveryStats
+              participants={participants}
+              activityName={activity?.activityName}
+            />
+          </div>
+
           {/* PESTAÑA 2: INSCRIBIR PARTICIPANTE */}
           {activeTab === "enroll" && !readOnly && (
             <div className="details-section enroll-section">
@@ -669,9 +725,7 @@ const ModalActivityDetails = ({
 
               {/* Información de disponibilidad */}
               {loadingMembers || loadingLevels ? (
-                <div className="info-message">
-                  ⏳ Cargando datos...
-                </div>
+                <div className="info-message">⏳ Cargando datos...</div>
               ) : (
                 <div className="info-message">
                   <strong>ℹ️ {members.length} miembros en el sistema</strong>
@@ -752,7 +806,7 @@ const ModalActivityDetails = ({
                                     {member.name}
                                   </div>
                                   <div className="member-level">
-                                    {member.currentLevel 
+                                    {member.currentLevel
                                       ? getLevelDisplayName(member.currentLevel)
                                       : "Sin nivel"}
                                   </div>
@@ -767,7 +821,8 @@ const ModalActivityDetails = ({
                           filteredMembers.length === 0 && (
                             <div className="member-dropdown">
                               <div className="dropdown-empty">
-                                No se encontraron miembros elegibles con "{searchTerm}"
+                                No se encontraron miembros elegibles con "
+                                {searchTerm}"
                               </div>
                             </div>
                           )}
@@ -781,9 +836,11 @@ const ModalActivityDetails = ({
                             ✅ Seleccionado: {selectedMemberName}
                           </span>
                           <span className="selected-member-level">
-                            (Nivel actual: {selectedMemberLevel 
+                            (Nivel actual:{" "}
+                            {selectedMemberLevel
                               ? getLevelDisplayName(selectedMemberLevel)
-                              : "Sin nivel"})
+                              : "Sin nivel"}
+                            )
                           </span>
                         </div>
                       </div>
@@ -802,7 +859,9 @@ const ModalActivityDetails = ({
                         {showPaymentSection ? "▼" : "▶"}
                       </span>
                       <span className="toggle-text">
-                        {showPaymentSection ? "Ocultar pago inicial" : "Agregar pago inicial (opcional)"}
+                        {showPaymentSection
+                          ? "Ocultar pago inicial"
+                          : "Agregar pago inicial (opcional)"}
                       </span>
                       <span className="toggle-badge">
                         {showPaymentSection ? "Pago activo" : "Opcional"}
@@ -812,7 +871,9 @@ const ModalActivityDetails = ({
                     {showPaymentSection && (
                       <div className="payment-section">
                         <div className="form-group">
-                          <label htmlFor="initialPayment">Monto del Pago *</label>
+                          <label htmlFor="initialPayment">
+                            Monto del Pago *
+                          </label>
                           <div className="input-with-prefix">
                             <span className="input-prefix">$</span>
                             <input
@@ -820,7 +881,9 @@ const ModalActivityDetails = ({
                               type="number"
                               placeholder="Ej: 50000"
                               value={initialPayment}
-                              onChange={(e) => setInitialPayment(e.target.value)}
+                              onChange={(e) =>
+                                setInitialPayment(e.target.value)
+                              }
                               disabled={enrolling}
                               min="1"
                               max={activity.price}
@@ -828,12 +891,15 @@ const ModalActivityDetails = ({
                             />
                           </div>
                           <div className="form-hint">
-                            Máximo: ${activity.price?.toLocaleString("es-CO") || "0"}
+                            Máximo: $
+                            {activity.price?.toLocaleString("es-CO") || "0"}
                           </div>
                         </div>
 
                         <div className="form-group">
-                          <label htmlFor="enrollIncomeMethod">💳 Método de Pago *</label>
+                          <label htmlFor="enrollIncomeMethod">
+                            💳 Método de Pago *
+                          </label>
                           <select
                             id="enrollIncomeMethod"
                             name="incomeMethod"
@@ -843,7 +909,9 @@ const ModalActivityDetails = ({
                             className="method-select"
                           >
                             <option value="CASH">💵 Efectivo</option>
-                            <option value="BANK_TRANSFER">🏦 Transferencia Bancaria</option>
+                            <option value="BANK_TRANSFER">
+                              🏦 Transferencia Bancaria
+                            </option>
                           </select>
                           <div className="form-hint">
                             Selecciona cómo se realizó el pago
@@ -853,21 +921,34 @@ const ModalActivityDetails = ({
                         {initialPayment && parseFloat(initialPayment) > 0 && (
                           <div className="payment-summary">
                             <div className="summary-item">
-                              <span className="summary-label">Precio actividad:</span>
+                              <span className="summary-label">
+                                Precio actividad:
+                              </span>
                               <span className="summary-value">
-                                ${activity.price?.toLocaleString("es-CO") || "0"}
+                                $
+                                {activity.price?.toLocaleString("es-CO") || "0"}
                               </span>
                             </div>
                             <div className="summary-item">
-                              <span className="summary-label">Pago inicial:</span>
+                              <span className="summary-label">
+                                Pago inicial:
+                              </span>
                               <span className="summary-value payment-amount">
-                                ${parseFloat(initialPayment).toLocaleString("es-CO")}
+                                $
+                                {parseFloat(initialPayment).toLocaleString(
+                                  "es-CO",
+                                )}
                               </span>
                             </div>
                             <div className="summary-item total">
-                              <span className="summary-label">Saldo pendiente:</span>
+                              <span className="summary-label">
+                                Saldo pendiente:
+                              </span>
                               <span className="summary-value pending-amount">
-                                ${(activity.price - parseFloat(initialPayment)).toLocaleString("es-CO")}
+                                $
+                                {(
+                                  activity.price - parseFloat(initialPayment)
+                                ).toLocaleString("es-CO")}
                               </span>
                             </div>
                           </div>
@@ -886,7 +967,9 @@ const ModalActivityDetails = ({
                         <span className="spinner"></span>
                         Inscribiendo...
                       </>
-                    ) : showPaymentSection && initialPayment && parseFloat(initialPayment) > 0 ? (
+                    ) : showPaymentSection &&
+                      initialPayment &&
+                      parseFloat(initialPayment) > 0 ? (
                       `✅ Inscribir con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
                     ) : (
                       "✅ Inscribir Participante (sin pago)"
@@ -904,7 +987,8 @@ const ModalActivityDetails = ({
 
               {hasCapacity && eligibleCount === 0 && members.length > 0 && (
                 <div className="info-message">
-                  ℹ️ No hay miembros elegibles para esta actividad según el nivel requerido.
+                  ℹ️ No hay miembros elegibles para esta actividad según el
+                  nivel requerido.
                 </div>
               )}
             </div>

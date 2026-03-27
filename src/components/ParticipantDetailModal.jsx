@@ -12,6 +12,7 @@ import {
   transformArrayForDisplay,
 } from "../services/nameHelper";
 import "../css/ParticipantDetailModal.css";
+import ItemDeliveryToggle from "./ItemDeliveryToggle";
 
 // ─── Helper: ¿la actividad sigue abierta para editar? ─────────────────────────
 const isActivityEditable = (endDate) => {
@@ -38,6 +39,7 @@ const ParticipantDetailModal = ({
   activity,
   contribution,
   onAddPaymentSuccess,
+  readOnly = false,
 }) => {
   const { user } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState("details");
@@ -55,6 +57,10 @@ const ParticipantDetailModal = ({
   // ✅ Estado para los datos actualizados de la contribución
   const [contributionData, setContributionData] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Estado local del toggle de entrega
+  const [itemDelivered, setItemDelivered] = useState(
+    contribution?.itemDelivered ?? participant?.itemDelivered ?? false,
+  );
 
   // ✅ Estado para el historial de pagos
   const [paymentHistory, setPaymentHistory] = useState([]);
@@ -210,16 +216,13 @@ const ParticipantDetailModal = ({
     }
   }, [contribution?.id, participant.contributionId, activity?.price]);
 
-  // ✅ Efecto para cargar datos iniciales
+  const participantItemDelivered = participant?.itemDelivered;
+
   useEffect(() => {
-    if (isOpen && contribution) {
-      const transformedContribution = transformForDisplay(contribution, [
-        "memberName",
-      ]);
-      setContributionData(transformedContribution);
-      fetchPaymentHistory();
-    }
-  }, [isOpen, contribution, fetchPaymentHistory]);
+    setItemDelivered(
+      contribution?.itemDelivered ?? participantItemDelivered ?? false,
+    );
+  }, [isOpen, contribution, participantItemDelivered, fetchPaymentHistory]);
 
   // ─── Inicializar formulario de edición cuando se abre la pestaña ──────────
   useEffect(() => {
@@ -373,6 +376,25 @@ const ParticipantDetailModal = ({
       setGeneratingPDF(false);
     }
   };
+
+  const handleDeliveryChange = useCallback(
+  (contributionId, newValue) => {
+    setItemDelivered(newValue);
+    // Propagar al padre para actualizar la lista de participantes
+    if (onAddPaymentSuccess) {
+      onAddPaymentSuccess({
+        type: "deliveryChange",
+        contributionId,
+        itemDelivered: newValue,
+        // ✅ Asegurar que se actualiza con el valor correcto
+        delivered: newValue,
+        isDelivered: newValue,
+        item_delivered: newValue
+      });
+    }
+  },
+  [onAddPaymentSuccess],
+);
 
   if (!isOpen || !participant || !activity) return null;
 
@@ -765,6 +787,23 @@ const ParticipantDetailModal = ({
                         </span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* ── Entrega del artículo ──────────────────────────────────── */}
+                  <div className="detail-section">
+                    <h4>
+                      <span className="section-icon">📦</span>Entrega del
+                      Artículo
+                    </h4>
+                    <ItemDeliveryToggle
+                      contributionId={
+                        contribution?.id || participant?.contributionId
+                      }
+                      initialDelivered={itemDelivered}
+                      memberName={participant?.memberName}
+                      onDeliveryChange={handleDeliveryChange}
+                      disabled={readOnly}
+                    />
                   </div>
 
                   <div className="detail-section">

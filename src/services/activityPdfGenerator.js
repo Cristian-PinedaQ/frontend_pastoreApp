@@ -48,11 +48,47 @@ const formatDate = (dateString) => {
   }
 };
 
-// Obtener información financiera de cada actividad (MANTENIDO)
+// ============================================
+// NUEVA FUNCIÓN: Obtener estadísticas de entregas
+// ============================================
+const fetchActivityDeliveryStats = async (activity) => {
+  try {
+    const apiService = await import('../apiService').then(module => module.default);
+    
+    // Obtener participantes con información de entregas
+    const participants = await apiService.request(
+      `/activity-contribution/activity/${activity.id}/with-leader-info`
+    );
+    
+    if (!participants || !Array.isArray(participants)) {
+      return { deliveredCount: 0, totalParticipants: 0, deliveryPercentage: 0 };
+    }
+    
+    const deliveredCount = participants.filter(p => p.itemDelivered === true).length;
+    const totalParticipants = participants.length;
+    const deliveryPercentage = totalParticipants > 0 
+      ? (deliveredCount / totalParticipants) * 100 
+      : 0;
+    
+    return {
+      deliveredCount,
+      totalParticipants,
+      deliveryPercentage: deliveryPercentage.toFixed(1)
+    };
+  } catch (error) {
+    console.warn(`⚠️ No se pudo obtener estadísticas de entregas para actividad ${activity.id}:`, error);
+    return { deliveredCount: 0, totalParticipants: 0, deliveryPercentage: 0 };
+  }
+};
+
+// Obtener información financiera de cada actividad (MODIFICADO - ahora incluye entregas)
 const fetchActivityFinancialData = async (activity) => {
   try {
     const apiService = await import('../apiService').then(module => module.default);
     const balance = await apiService.request(`/activity/balance/${activity.id}`);
+    
+    // Obtener estadísticas de entregas
+    const deliveryStats = await fetchActivityDeliveryStats(activity);
     
     return {
       totalCollected: balance?.totalPaid || 0,
@@ -61,7 +97,11 @@ const fetchActivityFinancialData = async (activity) => {
       totalCommitted: balance?.totalCommitted || 0,
       participantCount: balance?.participantCount || 0,
       compliancePercentage: balance?.compliancePercentage || 0,
-      createdAt: activity.registrationDate
+      createdAt: activity.registrationDate,
+      // NUEVOS: Datos de entregas
+      deliveredCount: deliveryStats.deliveredCount,
+      totalParticipants: deliveryStats.totalParticipants,
+      deliveryPercentage: deliveryStats.deliveryPercentage
     };
   } catch (error) {
     console.warn(`⚠️ No se pudo obtener información financiera para la actividad ${activity.id}:`, error);
@@ -72,7 +112,11 @@ const fetchActivityFinancialData = async (activity) => {
       totalCommitted: 0,
       participantCount: 0,
       compliancePercentage: 0,
-      createdAt: activity.registrationDate
+      createdAt: activity.registrationDate,
+      // NUEVOS: Datos de entregas en caso de error
+      deliveredCount: 0,
+      totalParticipants: 0,
+      deliveryPercentage: 0
     };
   }
 };
@@ -131,7 +175,7 @@ const getBalanceColor = (balance) => {
 };
 
 // ────────────────────────────────────────────
-// GENERADOR PRINCIPAL DE PDF (CON NUEVO FORMATO)
+// GENERADOR PRINCIPAL DE PDF (CON NUEVO FORMATO Y ENTREGADOS)
 // ────────────────────────────────────────────
 
 /**
@@ -143,7 +187,7 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
   try {
     console.log('🔧 [generateActivityPDF] Iniciando generación de PDF...');
     
-    // Obtener información financiera completa
+    // Obtener información financiera completa (ahora incluye entregas)
     const activitiesWithFinance = await Promise.all(
       (data.activities || []).map(async (activity) => {
         const financeData = await fetchActivityFinancialData(activity);
@@ -171,10 +215,12 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
     const totalParticipants = activitiesWithFinance.reduce((sum, a) => sum + a.financeData.participantCount, 0);
     const totalValue = activitiesWithFinance.reduce((sum, a) => sum + a.totalValue, 0);
     
-    // Constantes de página
-    //const PAGE = { W: 297, H: 210, marginX: 18, marginY: 20 }; // landscape
-    //const contentW = PAGE.W - PAGE.marginX * 2;
-
+    // 🆕 NUEVOS TOTALES DE ENTREGAS
+    const totalDelivered = activitiesWithFinance.reduce((sum, a) => sum + a.financeData.deliveredCount, 0);
+    const totalDeliveryPercentage = totalParticipants > 0 
+      ? (totalDelivered / totalParticipants * 100).toFixed(1) 
+      : 0;
+    
     // ────────────────────────────────────────────
     // Construir el HTML del documento
     // ────────────────────────────────────────────
@@ -289,6 +335,7 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
       margin-top: 15px;
       font-size: 8px;
       color: ${COLORS.textSub};
+      flex-wrap: wrap;
     }
     .legend-item {
       display: flex;
@@ -299,6 +346,24 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
       width: 12px;
       height: 12px;
       border-radius: 3px;
+    }
+    /* 🆕 Estilo para el badge de entregas */
+    .delivery-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 9px;
+      font-weight: 600;
+      background: #e6f7e6;
+      color: #2e7d32;
+    }
+    .delivery-badge.low {
+      background: #fff3e0;
+      color: #ed6c02;
+    }
+    .delivery-badge.critical {
+      background: #ffebee;
+      color: #c62828;
     }
   </style>
 </head>
@@ -319,7 +384,7 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
     </div>
   </div>
 
-  <!-- ══ KPIs GLOBALES ══ -->
+  <!-- ══ KPIs GLOBALES (CON ENTREGADOS) ══ -->
   <div class="kpi-grid">
     <div class="kpi-card" style="border-top-color: ${COLORS.primary}">
       <div class="kpi-label">Total Actividades</div>
@@ -328,6 +393,11 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
     <div class="kpi-card" style="border-top-color: ${COLORS.success}">
       <div class="kpi-label">Participantes</div>
       <div class="kpi-value" style="color: ${COLORS.success}">${totalParticipants}</div>
+    </div>
+    <div class="kpi-card" style="border-top-color: #4caf50">
+      <div class="kpi-label">📦 Entregados</div>
+      <div class="kpi-value" style="color: #4caf50">${totalDelivered}</div>
+      <div class="kpi-sub">${totalDeliveryPercentage}% del total</div>
     </div>
     <div class="kpi-card" style="border-top-color: ${COLORS.primary}">
       <div class="kpi-label">Valor Total</div>
@@ -351,19 +421,20 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
     </div>
   </div>
 
-  <!-- ══ TABLA PRINCIPAL DE ACTIVIDADES ══ -->
+  <!-- ══ TABLA PRINCIPAL DE ACTIVIDADES (CON COLUMNA ENTREGADOS) ══ -->
   <div style="background:${COLORS.white};border:1px solid ${COLORS.border};border-radius:10px;overflow:hidden;margin-bottom:20px">
     <div style="background:${COLORS.primary};padding:12px 16px">
       <span style="color:${COLORS.white};font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px">📋 DETALLE DE ACTIVIDADES</span>
     </div>
     
-    <table>
+     <table>
       <thead>
-        <tr>
+         <tr>
           <th>ACTIVIDAD</th>
           <th>ESTADO</th>
           <th>PRECIO</th>
           <th>CAPACIDAD</th>
+          <th>📦 ENTREGADOS</th>
           <th>CREACIÓN</th>
           <th>FINALIZACIÓN</th>
           <th>VALOR TOTAL</th>
@@ -373,7 +444,7 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
           <th>GASTOS</th>
           <th>BALANCE</th>
           <th>CUMPLIMIENTO</th>
-        </tr>
+         </tr>
       </thead>
       <tbody>
         ${activitiesWithFinance.map(activity => {
@@ -389,9 +460,15 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
           const compliance = activity.financeData.compliancePercentage || 0;
           const complianceColor = compliance >= 80 ? COLORS.success : compliance >= 50 ? COLORS.warning : COLORS.danger;
           
+          // 🆕 Estadísticas de entregas para esta actividad
+          const deliveredCount = activity.financeData.deliveredCount || 0;
+          const totalParts = activity.financeData.totalParticipants || 0;
+          const deliveryPercent = activity.financeData.deliveryPercentage || 0;
+          const deliveryBadgeClass = deliveryPercent >= 80 ? '' : (deliveryPercent >= 50 ? 'low' : 'critical');
+          
           return `
             <tr>
-              <td class="font-bold">${activity.activityName || 'Sin nombre'}</td>
+              <td class="font-bold">${activity.activityName || 'Sin nombre'}${activity.levelCode ? `<br><small style="font-size:8px;color:#666">🎓 ${activity.levelDisplayName || activity.levelCode}</small>` : ''}</td>
               <td class="text-center">
                 <span class="status-badge" style="background:${statusColor}20; color:${statusColor}">${activity.statusText}</span>
               </td>
@@ -400,6 +477,11 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
                 ${activity.capacityUsage.total === "Ilimitada" 
                   ? `${activity.capacityUsage.used} / Ilimitada`
                   : `${activity.capacityUsage.used} / ${activity.capacityUsage.total} (${activity.capacityUsage.percentage}%)`}
+              </td>
+              <td class="text-center">
+                <span class="delivery-badge ${deliveryBadgeClass}">
+                  ${deliveredCount} / ${totalParts} (${deliveryPercent}%)
+                </span>
               </td>
               <td class="text-center">${formatDate(activity.registrationDate)}</td>
               <td class="text-center">${formatDate(activity.endDate)}${daysLeftText}</td>
@@ -475,13 +557,18 @@ export const generateActivityPDF = async (data, filename = 'activity-report') =>
         <div class="legend-color" style="background:${COLORS.primary}"></div>
         <span>Comprometido</span>
       </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background:#4caf50"></div>
+        <span>📦 Artículo entregado</span>
+      </div>
     </div>
     
-    <!-- Notas explicativas -->
+    <!-- Notas explicativas (ACTUALIZADAS) -->
     <div style="margin-top:15px; padding:10px; background:${COLORS.light}; border-radius:8px; font-size:9px; color:${COLORS.textSub}">
       <div style="font-weight:700; margin-bottom:5px">📝 Notas:</div>
       <div>• Balance = Pagado - Gastos (utilidad de la actividad)</div>
       <div>• Cumplimiento = (Pagado / Comprometido) × 100</div>
+      <div>• 📦 Entregados = Participantes que recibieron el artículo/kit de la actividad</div>
     </div>
   </div>
 

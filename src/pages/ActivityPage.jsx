@@ -779,7 +779,7 @@ const ActivityPage = () => {
     [loadActivityBalance],
   );
 
-  // ========== EXPORTAR PDF ==========
+  // ========== EXPORTAR PDF (MODIFICADO CON ENTREGADOS) ==========
   const handleExportPDF = useCallback(async () => {
     try {
       setError("");
@@ -816,11 +816,65 @@ const ActivityPage = () => {
 
       subtitle = filterLabels.join(" • ");
 
+      // 🆕 OBTENER DATOS DE ENTREGAS PARA CADA ACTIVIDAD FILTRADA
+      log("Obteniendo estadísticas de entregas para", filteredActivities.length, "actividades");
+      
+      const activitiesWithDelivery = await Promise.all(
+        filteredActivities.map(async (activity) => {
+          try {
+            // Obtener participantes de esta actividad
+            const participants = await apiService.request(
+              `/activity-contribution/activity/${activity.id}/with-leader-info`
+            );
+
+            const deliveredCount = participants?.filter(p => p.itemDelivered === true).length || 0;
+            const totalParticipants = participants?.length || 0;
+            const deliveryPercentage = totalParticipants > 0
+              ? (deliveredCount / totalParticipants * 100).toFixed(1)
+              : 0;
+
+            log(`📦 Actividad ${activity.id} - Entregados: ${deliveredCount}/${totalParticipants} (${deliveryPercentage}%)`);
+
+            return {
+              ...activity,
+              deliveryStats: {
+                deliveredCount,
+                totalParticipants,
+                deliveryPercentage
+              }
+            };
+          } catch (err) {
+            logError(`Error obteniendo entregas para actividad ${activity.id}:`, err);
+            return {
+              ...activity,
+              deliveryStats: {
+                deliveredCount: 0,
+                totalParticipants: 0,
+                deliveryPercentage: 0
+              }
+            };
+          }
+        })
+      );
+
+      // Calcular totales globales de entregas
+      const totalDeliveredGlobal = activitiesWithDelivery.reduce(
+        (sum, a) => sum + (a.deliveryStats?.deliveredCount || 0), 0
+      );
+      const totalParticipantsGlobal = activitiesWithDelivery.reduce(
+        (sum, a) => sum + (a.deliveryStats?.totalParticipants || 0), 0
+      );
+      const globalDeliveryPercentage = totalParticipantsGlobal > 0
+        ? (totalDeliveredGlobal / totalParticipantsGlobal * 100).toFixed(1)
+        : 0;
+
+      log(`📊 Totales globales entregas: ${totalDeliveredGlobal}/${totalParticipantsGlobal} (${globalDeliveryPercentage}%)`);
+
       const data = {
         title,
         subtitle: subtitle || "Todos los registros",
         date: new Date().toLocaleDateString("es-CO"),
-        activities: filteredActivities,
+        activities: activitiesWithDelivery,
         statistics: {
           totalActivities: filteredActivities.length,
           totalActive: filteredActivities.filter((a) => a.isActive).length,
@@ -832,6 +886,10 @@ const ActivityPage = () => {
             (sum, a) => sum + (a.price || 0) * (a.quantity || 0),
             0,
           ),
+          // 🆕 Datos globales de entregas
+          totalDelivered: totalDeliveredGlobal,
+          totalParticipantsCount: totalParticipantsGlobal,
+          deliveryPercentage: globalDeliveryPercentage
         },
       };
 
@@ -843,11 +901,12 @@ const ActivityPage = () => {
         logUserAction("export_activity_pdf", {
           activityCount: filteredActivities.length,
           filtersApplied: filtersApplied,
+          totalDelivered: totalDeliveredGlobal,
           timestamp: new Date().toISOString(),
         });
 
         alert(
-          `✅ PDF generado exitosamente\n📄 Se descargó el archivo: reporte-actividades-${new Date().toISOString().split("T")[0]}.pdf`,
+          `✅ PDF generado exitosamente\n📄 Se descargó el archivo: reporte-actividades-${new Date().toISOString().split("T")[0]}.pdf\n📦 Total entregados: ${totalDeliveredGlobal} de ${totalParticipantsGlobal} participantes (${globalDeliveryPercentage}%)`,
         );
       } else {
         throw new Error("No se pudo generar el PDF");

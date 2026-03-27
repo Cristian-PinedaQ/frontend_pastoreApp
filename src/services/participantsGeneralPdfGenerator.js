@@ -16,6 +16,50 @@ const PAYMENT_STATUS_LABELS = {
   PENDING: 'PENDIENTE',
 };
 
+const DELIVERY_COLORS = {
+  DELIVERED: '#10b981',     // Verde
+  NOT_DELIVERED: '#f59e0b', // Naranja
+};
+
+const DELIVERY_LABELS = {
+  DELIVERED: 'ENTREGADO',
+  NOT_DELIVERED: 'PENDIENTE',
+};
+
+/**
+ * Helper para obtener el estado de entrega de un participante
+ * Soporta diferentes nombres de campo: itemDelivered, delivered, isDelivered
+ */
+const getItemDelivered = (participant) => {
+  // Debug: mostrar qué campos tiene el participante
+  if (participant && !participant._debugLogged) {
+    console.log('🔍 [PDF] Campos del participante:', Object.keys(participant));
+    console.log('🔍 [PDF] itemDelivered:', participant.itemDelivered);
+    console.log('🔍 [PDF] delivered:', participant.delivered);
+    console.log('🔍 [PDF] isDelivered:', participant.isDelivered);
+    console.log('🔍 [PDF] item_delivered:', participant.item_delivered);
+    participant._debugLogged = true; // Marcar para no loguear múltiples veces
+  }
+  
+  // Intentar con diferentes nombres de campo
+  if (participant.itemDelivered !== undefined && participant.itemDelivered !== null) {
+    return participant.itemDelivered === true;
+  }
+  if (participant.delivered !== undefined && participant.delivered !== null) {
+    return participant.delivered === true;
+  }
+  if (participant.isDelivered !== undefined && participant.isDelivered !== null) {
+    return participant.isDelivered === true;
+  }
+  if (participant.item_delivered !== undefined && participant.item_delivered !== null) {
+    return participant.item_delivered === true;
+  }
+  
+  // Si no hay campo, asumir false
+  console.warn('⚠️ [PDF] No se encontró campo de entrega para participante:', participant.memberName);
+  return false;
+};
+
 /**
  * Genera un PDF con el listado general de participantes (filtrado o completo).
  * @param {Object} data - Datos para el reporte general
@@ -36,6 +80,8 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     textSub: '#64748b',
     white: '#ffffff',
     info: '#0891b2',
+    delivered: '#10b981',
+    notDelivered: '#f59e0b',
   };
 
   const { activity, participants = [], filters = {}, statistics: providedStats } = data;
@@ -49,6 +95,15 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   // Calcular estadísticas
   // ────────────────────────────────────────────
   const calculateStatistics = (participants) => {
+    // Debug: mostrar los primeros participantes para ver qué campos tienen
+    if (participants.length > 0) {
+      console.log('🔍 [PDF] Primer participante:', JSON.stringify(participants[0], null, 2));
+      console.log('🔍 [PDF] itemDelivered value:', participants[0].itemDelivered);
+    }
+    
+    const deliveredCount = participants.filter(p => getItemDelivered(p) === true).length;
+    const notDeliveredCount = participants.length - deliveredCount;
+    
     const stats = {
       total: participants.length,
       fullyPaid: participants.filter(p => p.isFullyPaid).length,
@@ -56,12 +111,26 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
       pending: participants.filter(p => (p.totalPaid || 0) === 0).length,
       totalPaid: participants.reduce((sum, p) => sum + (p.totalPaid || 0), 0),
       totalPending: participants.reduce((sum, p) => sum + (p.pendingBalance || 0), 0),
+      // 🆕 Estadísticas de entregas
+      delivered: deliveredCount,
+      notDelivered: notDeliveredCount,
     };
     
     stats.percentagePaid = stats.totalPaid + stats.totalPending > 0 
       ? ((stats.totalPaid / (stats.totalPaid + stats.totalPending)) * 100).toFixed(1)
       : 0;
-      
+    
+    stats.deliveryPercentage = stats.total > 0
+      ? ((stats.delivered / stats.total) * 100).toFixed(1)
+      : 0;
+    
+    console.log('📊 [PDF] Estadísticas calculadas:', {
+      total: stats.total,
+      delivered: stats.delivered,
+      notDelivered: stats.notDelivered,
+      deliveryPercentage: stats.deliveryPercentage
+    });
+    
     return stats;
   };
 
@@ -114,19 +183,21 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   const hasFilters = appliedFilters.length > 0;
 
   // ────────────────────────────────────────────
-  // KPI boxes
+  // KPI boxes (ACTUALIZADOS con ENTREGADOS)
   // ────────────────────────────────────────────
   const kpis = [
     { label: 'Total Participantes', value: stats.total, color: COLORS.primary },
     { label: 'Completamente Pagado', value: stats.fullyPaid, color: COLORS.success },
     { label: 'Pago Parcial', value: stats.partiallyPaid, color: COLORS.warning },
     { label: 'Pendiente', value: stats.pending, color: COLORS.danger },
+    { label: '📦 Entregados', value: stats.delivered, color: COLORS.delivered, subtext: `${stats.deliveryPercentage}%` },
   ];
 
   const kpiBoxes = kpis.map(k => `
     <div style="flex:1;background:${COLORS.white};border:1px solid ${COLORS.border};border-radius:10px;padding:14px;border-top:3px solid ${k.color};text-align:center">
       <div style="font-size:26px;font-weight:800;color:${k.color};line-height:1">${k.value}</div>
       <div style="font-size:10px;color:${COLORS.textSub};margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">${k.label}</div>
+      ${k.subtext ? `<div style="font-size:8px;color:${COLORS.textSub};margin-top:2px">${k.subtext} del total</div>` : ''}
     </div>
   `).join('');
 
@@ -150,6 +221,22 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     </div>
   `).join('');
 
+  // 🆕 Distribución por estado de entrega
+  const deliveryDist = [
+    { key: 'DELIVERED', count: stats.delivered, label: 'Entregados', color: COLORS.delivered },
+    { key: 'NOT_DELIVERED', count: stats.notDelivered, label: 'Pendientes de entrega', color: COLORS.notDelivered },
+  ].filter(s => s.count > 0);
+
+  const deliveryBars = deliveryDist.map(s => `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+      <span style="font-size:10px;color:${COLORS.textSub};min-width:140px">${s.label}</span>
+      <div style="flex:1;background:${COLORS.border};border-radius:4px;height:8px">
+        <div style="width:${Math.round((s.count/total)*100)}%;height:100%;background:${s.color};border-radius:4px"></div>
+      </div>
+      <span style="font-size:10px;font-weight:700;color:${s.color};min-width:30px;text-align:right">${s.count}</span>
+    </div>
+  `).join('');
+
   // ────────────────────────────────────────────
   // Resumen financiero
   // ────────────────────────────────────────────
@@ -165,6 +252,22 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px">
       <span style="color:${COLORS.textSub}">Porcentaje recaudado</span>
       <span style="font-weight:700;color:${COLORS.primary}">${stats.percentagePaid}%</span>
+    </div>
+  `;
+
+  // 🆕 Resumen de entregas
+  const deliverySummary = `
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
+      <span style="color:${COLORS.textSub}">📦 Entregados</span>
+      <span style="font-weight:700;color:${COLORS.delivered}">${stats.delivered}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
+      <span style="color:${COLORS.textSub}">⏳ Pendientes de entrega</span>
+      <span style="font-weight:700;color:${COLORS.notDelivered}">${stats.notDelivered}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px">
+      <span style="color:${COLORS.textSub}">Tasa de entrega</span>
+      <span style="font-weight:700;color:${COLORS.primary}">${stats.deliveryPercentage}%</span>
     </div>
   `;
 
@@ -195,12 +298,19 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   ` : '';
 
   // ────────────────────────────────────────────
-  // Tabla de participantes
+  // Tabla de participantes (CON COLUMNA ENTREGA)
   // ────────────────────────────────────────────
   const tableRows = participants.map((p, i) => {
     const status = p.isFullyPaid ? 'FULLY_PAID' : (p.totalPaid || 0) > 0 ? 'PARTIALLY_PAID' : 'PENDING';
     const statusColor = PAYMENT_STATUS_COLORS[status];
     const statusLabel = PAYMENT_STATUS_LABELS[status];
+    
+    // 🆕 Estado de entrega - usar helper robusto
+    const isDelivered = getItemDelivered(p);
+    const deliveryStatus = isDelivered ? 'DELIVERED' : 'NOT_DELIVERED';
+    const deliveryColor = DELIVERY_COLORS[deliveryStatus];
+    const deliveryLabel = DELIVERY_LABELS[deliveryStatus];
+    const deliveryIcon = isDelivered ? '✅' : '⏳';
     
     return `
       <tr style="background:${i % 2 === 0 ? COLORS.white : COLORS.light}">
@@ -213,8 +323,11 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
         <td style="padding:7px 10px;border-bottom:1px solid ${COLORS.border};text-align:center">
           <span style="background:${statusColor}22;color:${statusColor};font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap">${statusLabel}</span>
         </td>
+        <td style="padding:7px 10px;border-bottom:1px solid ${COLORS.border};text-align:center">
+          <span style="background:${deliveryColor}22;color:${deliveryColor};font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap">${deliveryIcon} ${deliveryLabel}</span>
+        </td>
         <td style="padding:7px 10px;font-size:9px;color:${COLORS.textSub};border-bottom:1px solid ${COLORS.border};text-align:center">${p.registrationDate ? formatDate(p.registrationDate) : '-'}</td>
-      </tr>
+       </tr>
     `;
   }).join('');
 
@@ -263,12 +376,12 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   ${activityInfo}
 
   <!-- KPIs -->
-  <div style="display:flex;gap:12px;margin-bottom:16px" class="no-break">
+  <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap" class="no-break">
     ${kpiBoxes}
   </div>
 
-  <!-- DISTRIBUCIONES Y FINANZAS -->
-  <div style="display:flex;gap:14px;margin-bottom:18px" class="no-break">
+  <!-- DISTRIBUCIONES Y FINANZAS (3 columnas) -->
+  <div style="display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap" class="no-break">
     <div style="flex:1;background:#fff;border:1px solid ${COLORS.border};border-radius:10px;padding:14px">
       <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3b82f6">
         Distribución por Estado de Pago
@@ -277,9 +390,25 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     </div>
     <div style="flex:1;background:#fff;border:1px solid ${COLORS.border};border-radius:10px;padding:14px">
       <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3b82f6">
+        📦 Distribución por Entrega
+      </div>
+      ${deliveryBars || '<p style="font-size:11px;color:#94a3b8">Sin datos</p>'}
+    </div>
+    <div style="flex:1;background:#fff;border:1px solid ${COLORS.border};border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3b82f6">
         Resumen Financiero
       </div>
       ${financialSummary}
+    </div>
+  </div>
+
+  <!-- SEGUNDA FILA: RESUMEN DE ENTREGAS Y RESUMEN DE ACTIVIDAD -->
+  <div style="display:flex;gap:14px;margin-bottom:18px" class="no-break">
+    <div style="flex:1;background:#fff;border:1px solid ${COLORS.border};border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3b82f6">
+        📦 Resumen de Entregas
+      </div>
+      ${deliverySummary}
     </div>
     <div style="flex:1;background:#fff;border:1px solid ${COLORS.border};border-radius:10px;padding:14px">
       <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3b82f6">
@@ -297,6 +426,10 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
         <div style="display:flex;justify-content:space-between">
           <span style="color:${COLORS.textSub};font-size:10px">Eficiencia de pago:</span>
           <span style="font-weight:700;color:${stats.percentagePaid > 70 ? COLORS.success : COLORS.warning}">${stats.percentagePaid}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:${COLORS.textSub};font-size:10px">📦 Tasa de entrega:</span>
+          <span style="font-weight:700;color:${stats.deliveryPercentage > 70 ? COLORS.success : COLORS.warning}">${stats.deliveryPercentage}%</span>
         </div>
       </div>
     </div>
@@ -316,7 +449,7 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="background:#f1f5f9">
-          ${['#','Nombre','Líder','Distrito','Pagado','Pendiente','Estado','Inscripción'].map(h =>
+          ${['#','Nombre','Líder','Distrito','Pagado','Pendiente','Estado','📦 Entrega','Inscripción'].map(h =>
             `<th style="padding:8px 10px;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;text-align:${h === '#' || h === 'Pagado' || h === 'Pendiente' ? 'center' : 'left'};font-weight:700;border-bottom:1px solid ${COLORS.border}">${h}</th>`
           ).join('')}
         </tr>
@@ -332,11 +465,16 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     <span style="font-size:9px;color:#94a3b8">${new Date().toLocaleString('es-CO')}</span>
   </div>
 
-  <!-- RESUMEN FINAL -->
+  <!-- RESUMEN FINAL (ACTUALIZADO CON ENTREGAS) -->
   <div style="margin-top:12px;padding:10px;background:${COLORS.light};border-radius:8px;text-align:center">
     <span style="font-size:11px;font-weight:600;color:${COLORS.primary}">
-      Total recaudado: ${formatCurrency(stats.totalPaid)} (${stats.percentagePaid}%) • Por cobrar: ${formatCurrency(stats.totalPending)}
+      📦 Entregados: ${stats.delivered}/${stats.total} (${stats.deliveryPercentage}%) • Total recaudado: ${formatCurrency(stats.totalPaid)} (${stats.percentagePaid}%) • Por cobrar: ${formatCurrency(stats.totalPending)}
     </span>
+  </div>
+
+  <!-- NOTAS EXPLICATIVAS -->
+  <div style="margin-top:10px;padding:8px;background:${COLORS.light};border-radius:6px;text-align:center;font-size:8px;color:${COLORS.textSub}">
+    📦 Entregado = Participante que ha recibido el artículo/kit de la actividad
   </div>
 
 </body>
