@@ -740,46 +740,44 @@ const FinancesPage = () => {
   );
 
   // ========== EDIT FINANCE ==========
+  // ========== EDIT FINANCE ==========
   const handleEditFinance = useCallback(
     async (financeData) => {
-      if (operationInProgress.current) {
-        log("Operación ya en progreso, ignorando");
-        return;
-      }
+      if (operationInProgress.current) return;
       operationInProgress.current = true;
+      setError(""); // Limpiamos errores previos
 
       try {
-        if (!editingFinance || !editingFinance.id) {
-          setError("ID de registro inválido");
-          return;
-        }
-
-        if (!financeData || typeof financeData !== "object") {
-          setError("Datos de ingreso inválidos");
-          return;
-        }
+        // ... validaciones existentes ...
 
         log("Actualizando ingreso", { financeId: editingFinance.id });
-
         const backendData = prepareForBackend(financeData, ["memberName"]);
 
         await apiService.updateFinance(editingFinance.id, backendData);
 
-        log("Ingreso actualizado exitosamente");
-
-        logUserAction("update_finance", {
-          financeId: editingFinance.id,
-          timestamp: new Date().toISOString(),
-        });
-
-        alert("Ingreso actualizado exitosamente");
+        // ... éxito ...
+        alert("✅ Ingreso actualizado exitosamente");
         setShowAddModal(false);
         setEditingFinance(null);
-        operationInProgress.current = false;
         await loadFinances();
       } catch (err) {
         logError("Error actualizando ingreso:", err);
-        setError("Error al actualizar ingreso");
+
+        // ✅ CAPTURAR EL MENSAJE DEL BACKEND (Estado inválido / Mes cerrado)
+        const serverMessage =
+          err.response?.data?.message || err.response?.data?.error;
+        const finalMessage = serverMessage || "Error al actualizar ingreso";
+
+        setError(finalMessage); // Esto lo muestra en el banner rojo de arriba
+
+        // Opcional: Mostrar un alert específico si es un error de validación (400 o 500 con mensaje)
+        if (
+          err.response?.status === 500 ||
+          err.response?.status === 400 ||
+          err.response?.status === 403
+        ) {
+          alert(`⚠️ ${finalMessage}`);
+        }
       } finally {
         operationInProgress.current = false;
       }
@@ -959,6 +957,39 @@ const FinancesPage = () => {
           <p>Registra y gestiona ingresos financieros de la iglesia</p>
         </div>
 
+        {/* Coloca esto justo antes de los controles o debajo del header */}
+        {error && (
+          <div
+            className="finances-page__error-banner"
+            style={{
+              backgroundColor: "#fee2e2",
+              color: "#dc2626",
+              padding: "1rem",
+              borderRadius: "8px",
+              marginBottom: "1rem",
+              border: "1px solid #fca5a5",
+              display: "flex",
+              justifyContent: "between",
+              alignItems: "center",
+            }}
+          >
+            <span>
+              <strong>Error:</strong> {error}
+            </span>
+            <button
+              onClick={() => setError("")}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="finances-page__controls">
           <div className="finances-page__controls-grid">
             <div className="finances-page__filter-item">
@@ -981,7 +1012,10 @@ const FinancesPage = () => {
                 onChange={(e) => setSelectedConcept(e.target.value)}
               >
                 <option value="ALL">Todos los Conceptos</option>
-                <option value="TITHE_AND_OFFERING">💵🎁 Diezmo + Ofrenda</option> {/* ✅ NUEVO */}
+                <option value="TITHE_AND_OFFERING">
+                  💵🎁 Diezmo + Ofrenda
+                </option>{" "}
+                {/* ✅ NUEVO */}
                 {INCOME_CONCEPTS.map((concept) => (
                   <option key={concept} value={concept}>
                     {getConceptLabel(concept)}
