@@ -378,23 +378,23 @@ const ParticipantDetailModal = ({
   };
 
   const handleDeliveryChange = useCallback(
-  (contributionId, newValue) => {
-    setItemDelivered(newValue);
-    // Propagar al padre para actualizar la lista de participantes
-    if (onAddPaymentSuccess) {
-      onAddPaymentSuccess({
-        type: "deliveryChange",
-        contributionId,
-        itemDelivered: newValue,
-        // ✅ Asegurar que se actualiza con el valor correcto
-        delivered: newValue,
-        isDelivered: newValue,
-        item_delivered: newValue
-      });
-    }
-  },
-  [onAddPaymentSuccess],
-);
+    (contributionId, newValue) => {
+      setItemDelivered(newValue);
+      // Propagar al padre para actualizar la lista de participantes
+      if (onAddPaymentSuccess) {
+        onAddPaymentSuccess({
+          type: "deliveryChange",
+          contributionId,
+          itemDelivered: newValue,
+          // ✅ Asegurar que se actualiza con el valor correcto
+          delivered: newValue,
+          isDelivered: newValue,
+          item_delivered: newValue,
+        });
+      }
+    },
+    [onAddPaymentSuccess],
+  );
 
   if (!isOpen || !participant || !activity) return null;
 
@@ -423,7 +423,11 @@ const ParticipantDetailModal = ({
     currentData?.pendingBalance || participant.pendingBalance || 0;
   const isFullyPaid =
     currentData?.isFullyPaid || participant.isFullyPaid || false;
-  const activityPrice = activity?.price || 0;
+  // 📦 quantity: viene del backend en la contribución o participante
+  const quantity = currentData?.quantity || participant?.quantity || 1;
+  const unitPrice = activity?.price || 0;
+  // totalPrice = unitPrice × quantity (para ENROLLMENT siempre quantity=1)
+  const activityPrice = participant?.totalPrice || unitPrice * quantity;
   const compliancePercentage =
     activityPrice > 0 ? (totalPaid / activityPrice) * 100 : 0;
 
@@ -819,9 +823,27 @@ const ParticipantDetailModal = ({
                         </span>
                       </div>
                       <div className="detail-item">
-                        <span className="detail-label">Precio Total:</span>
+                        <span className="detail-label">
+                          {quantity > 1 ? "Precio unitario:" : "Precio Total:"}
+                        </span>
                         <span className="detail-value">
-                          ${activityPrice.toLocaleString("es-CO")}
+                          ${unitPrice.toLocaleString("es-CO")}
+                          {quantity > 1 && (
+                            <span
+                              style={{
+                                marginLeft: "8px",
+                                fontSize: "0.82em",
+                                color: "#1e40af",
+                                fontWeight: 600,
+                                background: "#e8f4fd",
+                                padding: "1px 8px",
+                                borderRadius: "10px",
+                              }}
+                            >
+                              ×{quantity} = $
+                              {activityPrice.toLocaleString("es-CO")}
+                            </span>
+                          )}
                         </span>
                       </div>
                       <div className="detail-item">
@@ -855,52 +877,22 @@ const ParticipantDetailModal = ({
                     <h4>
                       <span className="section-icon">💰</span>Resumen de Pagos
                     </h4>
-                    <div className="payment-summary-cards">
-                      <div className="payment-summary-card total">
-                        <div className="payment-summary-icon">📊</div>
-                        <div className="payment-summary-content">
-                          <div className="payment-summary-label">
-                            Total a Pagar
-                          </div>
-                          <div className="payment-summary-value">
-                            ${activityPrice.toLocaleString("es-CO")}
-                          </div>
-                        </div>
+                    <div className="payment-summary-card total">
+                    <div className="payment-summary-icon">📊</div>
+                    <div className="payment-summary-content">
+                      <div className="payment-summary-label">
+                        Total a Pagar
+                        {quantity > 1 && (
+                          <span style={{ display: "block", fontSize: "0.75em", color: "#6c757d", fontWeight: 400 }}>
+                            {quantity} unidades
+                          </span>
+                        )}
                       </div>
-                      <div className="payment-summary-card paid">
-                        <div className="payment-summary-icon">✅</div>
-                        <div className="payment-summary-content">
-                          <div className="payment-summary-label">
-                            Total Pagado
-                          </div>
-                          <div className="payment-summary-value">
-                            ${totalPaid.toLocaleString("es-CO")}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="payment-summary-card pending">
-                        <div className="payment-summary-icon">📝</div>
-                        <div className="payment-summary-content">
-                          <div className="payment-summary-label">
-                            Saldo Pendiente
-                          </div>
-                          <div className="payment-summary-value">
-                            ${pendingBalance.toLocaleString("es-CO")}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="payment-summary-card percentage">
-                        <div className="payment-summary-icon">📈</div>
-                        <div className="payment-summary-content">
-                          <div className="payment-summary-label">
-                            Porcentaje Pagado
-                          </div>
-                          <div className="payment-summary-value">
-                            {compliancePercentage.toFixed(1)}%
-                          </div>
-                        </div>
+                      <div className="payment-summary-value">
+                        ${activityPrice.toLocaleString("es-CO")}
                       </div>
                     </div>
+                  </div>
                     <div className="compliance-section">
                       <div className="compliance-header">
                         <span className="compliance-label">

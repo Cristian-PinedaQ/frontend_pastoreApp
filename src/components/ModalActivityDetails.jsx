@@ -3,6 +3,7 @@
 // Modal para ver detalles de actividad y agregar participantes
 // 🔐 AÑADIDO: prop readOnly para roles con solo GET (oculta pestañas de escritura)
 // ✅ ACTUALIZADO: LevelEnrollment ahora es clase JPA (no enum)
+// 📦 ACTUALIZADO: quantity para actividades STANDALONE
 // ============================================
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
@@ -32,7 +33,7 @@ const ModalActivityDetails = ({
   activity,
   balance,
   onEnrollParticipant,
-  readOnly = false, // 🔐 true para ROLE_CONEXION, ROLE_CIMIENTO, ROLE_ESENCIA, ROLE_DESPLIEGUE
+  readOnly = false,
 }) => {
   // Estados para pestañas
   const [activeTab, setActiveTab] = useState("info");
@@ -57,7 +58,7 @@ const ModalActivityDetails = ({
   const [enrollSuccess, setEnrollSuccess] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // ✅ NUEVO: Estados para niveles
+  // ✅ NUEVO: States para niveles
   const [levels, setLevels] = useState([]);
   const [loadingLevels, setLoadingLevels] = useState(false);
 
@@ -75,6 +76,9 @@ const ModalActivityDetails = ({
 
   // ✅ NUEVO: Participantes para estadísticas de entrega
   const [participants, setParticipants] = useState([]);
+
+  // 📦 NUEVO: cantidad (solo STANDALONE)
+  const [quantity, setQuantity] = useState(1);
 
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -98,6 +102,7 @@ const ModalActivityDetails = ({
   useEffect(() => {
     if (isOpen) {
       setActiveTab("info");
+      setQuantity(1); // 📦 Resetear cantidad al abrir
     }
   }, [isOpen]);
 
@@ -121,7 +126,6 @@ const ModalActivityDetails = ({
         setLevels(data || []);
       } catch (error) {
         console.error("Error cargando niveles:", error);
-        // Fallback a niveles por defecto
         setLevels(apiService.getDefaultLevels());
       } finally {
         setLoadingLevels(false);
@@ -129,51 +133,34 @@ const ModalActivityDetails = ({
     }
   }, [readOnly]);
 
-  // ✅ NUEVO: Función para determinar si un miembro es elegible según el nivel de la actividad
+  // ✅ NUEVO: Función para determinar si un miembro es elegible
   const isMemberEligible = useCallback(
     (member) => {
-      // Excluir pastores específicos
       if (EXCLUDED_MEMBER_IDS.current.includes(member.id)) {
         return false;
       }
-
-      // Si la actividad no requiere nivel, todos son elegibles
       if (!activity?.requiredLevel) {
         return true;
       }
-
-      // PREENCUENTRO es el nivel inicial, todos son elegibles
       if (activity.requiredLevel.code === "PREENCUENTRO") {
         return true;
       }
-
-      // Si el miembro no tiene nivel actual, no es elegible
       if (!member.currentLevel) {
         return false;
       }
-
-      // Encontrar el nivel requerido y el nivel del miembro en la lista de niveles
       const requiredLevelObj = levels.find(
         (l) => l.code === activity.requiredLevel.code,
       );
       const memberLevelObj = levels.find(
         (l) => l.code === member.currentLevel.code,
       );
-
       if (!requiredLevelObj || !memberLevelObj) {
         return false;
       }
-
-      // Para ser elegible, el miembro debe tener el nivel inmediatamente anterior
-      // al nivel requerido (usando levelOrder)
       const requiredPreviousOrder = requiredLevelObj.levelOrder - 1;
-
-      // Si el nivel requerido es el primero (order 1), todos son elegibles
       if (requiredPreviousOrder < 1) {
         return true;
       }
-
-      // El miembro es elegible si su nivel tiene el order inmediatamente anterior
       return memberLevelObj.levelOrder === requiredPreviousOrder;
     },
     [activity, levels],
@@ -195,7 +182,6 @@ const ModalActivityDetails = ({
   // Cargar costos de la actividad
   const loadCosts = useCallback(async () => {
     if (!activity?.id) return;
-
     setLoadingCosts(true);
     try {
       const response = await apiService.request(
@@ -210,35 +196,22 @@ const ModalActivityDetails = ({
     }
   }, [activity?.id]);
 
-  // Efecto para cargar datos cuando se abre el modal
   useEffect(() => {
     if (isOpen && activity) {
-      // 🔐 Solo cargar datos si tiene acceso de escritura
       if (!readOnly) {
         loadMembers();
-        loadLevels(); // ✅ Cargar niveles
+        loadLevels();
       }
       if (activeTab === "costs" && !readOnly) {
         loadCosts();
       }
     }
-  }, [
-    isOpen,
-    activity,
-    loadMembers,
-    loadLevels,
-    activeTab,
-    loadCosts,
-    readOnly,
-  ]);
+  }, [isOpen, activity, loadMembers, loadLevels, activeTab, loadCosts, readOnly]);
 
-  // ✅ NUEVO: Efecto para calcular miembros elegibles cuando cambian los miembros, niveles o actividad
   useEffect(() => {
     if (members.length > 0 && activity && levels.length > 0) {
       const eligible = members.filter((member) => isMemberEligible(member));
       setEligibleMembers(eligible);
-
-      // Resetear selección si el miembro seleccionado ya no es elegible
       if (selectedMemberId) {
         const selectedIsEligible = eligible.some(
           (m) => m.id === selectedMemberId,
@@ -253,7 +226,6 @@ const ModalActivityDetails = ({
     }
   }, [members, activity, levels, isMemberEligible, selectedMemberId]);
 
-  // Efecto para filtrar miembros elegibles según el término de búsqueda
   useEffect(() => {
     if (searchTerm.trim() === "") {
       setFilteredMembers(eligibleMembers);
@@ -265,21 +237,18 @@ const ModalActivityDetails = ({
     }
   }, [searchTerm, eligibleMembers]);
 
-  // Efecto para cerrar dropdown al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
     };
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
 
-  // Métodos para pestaña de inscripción
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setShowDropdown(true);
@@ -288,7 +257,6 @@ const ModalActivityDetails = ({
     setSelectedMemberLevel(null);
   };
 
-  // ✅ NUEVO: Obtener nombre de visualización del nivel
   const getLevelDisplayName = (level) => {
     if (!level) return "Sin nivel";
     if (typeof level === "string") return level;
@@ -311,6 +279,7 @@ const ModalActivityDetails = ({
     setShowPaymentSection(false);
     setInitialPayment("");
     setIncomeMethod("CASH");
+    setQuantity(1); // 📦 Resetear cantidad
     setShowDropdown(true);
     if (searchInputRef.current) {
       searchInputRef.current.focus();
@@ -323,12 +292,17 @@ const ModalActivityDetails = ({
 
   const handleTogglePaymentSection = () => {
     setShowPaymentSection(!showPaymentSection);
-    // Si se cierra la sección de pago, resetear valores
     if (showPaymentSection) {
       setInitialPayment("");
       setIncomeMethod("CASH");
     }
   };
+
+  // 📦 ¿Es actividad STANDALONE (puede tener quantity > 1)?
+  const isStandalone = activity?.activityType === "STANDALONE";
+
+  // 📦 Precio total considerando quantity
+  const totalPriceForQuantity = (activity?.price || 0) * quantity;
 
   const handleEnroll = async () => {
     if (!selectedMemberId) {
@@ -336,27 +310,23 @@ const ModalActivityDetails = ({
       return;
     }
 
-    // Validaciones solo si hay pago inicial
     if (showPaymentSection) {
       if (!initialPayment || initialPayment.trim() === "") {
         setEnrollError("Debes ingresar un monto para el pago inicial");
         return;
       }
-
       const paymentAmount = parseFloat(initialPayment);
-
       if (paymentAmount <= 0) {
         setEnrollError("El pago inicial debe ser mayor a cero");
         return;
       }
-
-      if (paymentAmount > activity.price) {
+      // 📦 Validar contra precio total (unitPrice × quantity)
+      if (paymentAmount > totalPriceForQuantity) {
         setEnrollError(
-          `El pago inicial no puede exceder el precio de la actividad ($${activity.price?.toLocaleString("es-CO")})`,
+          `El pago inicial no puede exceder el precio total ($${totalPriceForQuantity.toLocaleString("es-CO")})`,
         );
         return;
       }
-
       if (!incomeMethod) {
         setEnrollError("Debes seleccionar un método de pago");
         return;
@@ -373,16 +343,15 @@ const ModalActivityDetails = ({
         selectedMemberId,
         showPaymentSection ? parseFloat(initialPayment) : 0,
         incomeMethod,
+        quantity, // 📦 Pasar quantity
       );
 
       if (success) {
         const successMessage = showPaymentSection
-          ? `✅ Participante inscrito con pago inicial de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
-          : "✅ Participante inscrito exitosamente (pago pendiente)";
+          ? `✅ Participante inscrito${quantity > 1 ? ` (x${quantity})` : ""} con pago inicial de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
+          : `✅ Participante inscrito exitosamente${quantity > 1 ? ` (x${quantity} unidades)` : ""} (pago pendiente)`;
 
         setEnrollSuccess(successMessage);
-
-        // Resetear formulario después de éxito
         setSelectedMemberId("");
         setSelectedMemberName("");
         setSelectedMemberLevel(null);
@@ -390,11 +359,10 @@ const ModalActivityDetails = ({
         setShowPaymentSection(false);
         setInitialPayment("");
         setIncomeMethod("CASH");
+        setQuantity(1); // 📦 Resetear
 
-        // Recargar miembros después de 1.5 segundos
         setTimeout(() => {
           loadMembers();
-          // ✅ refrescar participantes
           apiService
             .request(
               `/activity-contribution/activity/${activity.id}/with-leader-info`,
@@ -406,49 +374,38 @@ const ModalActivityDetails = ({
       }
     } catch (error) {
       console.error("❌ Error completo:", error);
-
       let errorMessage = "Error al inscribir participante";
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.message) {
         errorMessage = error.message;
       }
-
       setEnrollError(errorMessage);
     } finally {
       setEnrolling(false);
     }
   };
 
-  // Métodos para pestaña de costos (sin cambios)
   const handleCostInputChange = (e) => {
     const { name, value } = e.target;
-    setCostForm({
-      ...costForm,
-      [name]: value,
-    });
+    setCostForm({ ...costForm, [name]: value });
   };
 
   const handleSaveCost = async () => {
-    // Validaciones
     if (!costForm.detail.trim()) {
       setCostError("Describe el motivo o razón del costo");
       return;
     }
-
     if (!costForm.price || parseFloat(costForm.price) <= 0) {
       setCostError("El valor debe ser un número positivo");
       return;
     }
-
     setSavingCost(true);
     setCostError("");
     setCostSuccess("");
-
     try {
       const currentUser = getCurrentUser();
       const recordedBy = currentUser?.username || "Sistema";
-
       const costData = {
         detail: costForm.detail.trim(),
         price: parseFloat(costForm.price),
@@ -457,25 +414,15 @@ const ModalActivityDetails = ({
         activityId: activity.id,
         fecha: new Date().toISOString(),
       };
-
       console.log("📤 Enviando datos de costo:", costData);
-
       const response = await apiService.request("/cost/save", {
         method: "POST",
         body: JSON.stringify(costData),
       });
-
       console.log("✅ Respuesta del servidor:", response);
-
       if (response.id || response.message) {
         setCostSuccess("✅ Costo registrado correctamente");
-
-        setCostForm({
-          detail: "",
-          price: "",
-          incomeMethod: "CASH",
-        });
-
+        setCostForm({ detail: "", price: "", incomeMethod: "CASH" });
         setTimeout(() => {
           loadCosts();
           setCostSuccess("");
@@ -485,8 +432,7 @@ const ModalActivityDetails = ({
       console.error("❌ Error registrando costo:", error);
       let errorMsg = "Error al registrar el costo";
       if (error.message && error.message.includes("JSON")) {
-        errorMsg =
-          "Error en el formato de datos. Por favor, verifica los campos.";
+        errorMsg = "Error en el formato de datos. Por favor, verifica los campos.";
       }
       setCostError(errorMsg);
     } finally {
@@ -495,14 +441,9 @@ const ModalActivityDetails = ({
   };
 
   const handleDeleteCost = async (costId) => {
-    if (!window.confirm("¿Estás seguro de eliminar este costo?")) {
-      return;
-    }
-
+    if (!window.confirm("¿Estás seguro de eliminar este costo?")) return;
     try {
-      await apiService.request(`/cost/delete/${costId}`, {
-        method: "DELETE",
-      });
+      await apiService.request(`/cost/delete/${costId}`, { method: "DELETE" });
       loadCosts();
     } catch (error) {
       console.error("❌ Error eliminando costo:", error);
@@ -510,25 +451,19 @@ const ModalActivityDetails = ({
     }
   };
 
-  // Calcular total de costos
   const totalCosts = costs.reduce((sum, cost) => sum + (cost.price || 0), 0);
 
   if (!isOpen || !activity) return null;
 
-  // Calcular estadísticas
   const totalValue = (activity.price || 0) * (activity.quantity || 0);
   const daysLeft = activity.endDate
     ? Math.ceil(
         (parseLocalDate(activity.endDate) - new Date()) / (1000 * 60 * 60 * 24),
       )
     : null;
-
-  // Calcular miembros disponibles
   const enrolledCount = balance?.participantCount || 0;
   const eligibleCount = eligibleMembers.length;
   const hasCapacity = !activity.quantity || enrolledCount < activity.quantity;
-
-  // ✅ Obtener nombre de visualización del nivel requerido
   const requiredLevelDisplay = activity.requiredLevel
     ? getLevelDisplayName(activity.requiredLevel)
     : "Sin nivel requerido";
@@ -544,7 +479,6 @@ const ModalActivityDetails = ({
             >
               {activity.status?.text || "Desconocido"}
             </div>
-            {/* 🔐 Badge solo lectura */}
             {readOnly && (
               <div
                 className="details-readonly-badge"
@@ -559,7 +493,6 @@ const ModalActivityDetails = ({
           </button>
         </div>
 
-        {/* ✅ Mostrar nivel requerido */}
         <div className="activity-required-level">
           <span className="level-label">🎓 Nivel requerido:</span>
           <span className="level-value">{requiredLevelDisplay}</span>
@@ -604,7 +537,7 @@ const ModalActivityDetails = ({
                   <div className="detail-item">
                     <span className="detail-label">💰 Precio:</span>
                     <span className="detail-value price">
-                      ${activity.price?.toLocaleString("es-CO") || "0"}
+                      {activity.price?.toLocaleString("es-CO") || "0"}
                     </span>
                   </div>
                   <div className="detail-item">
@@ -620,9 +553,7 @@ const ModalActivityDetails = ({
                     </span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">
-                      📅 Fecha de finalización:
-                    </span>
+                    <span className="detail-label">📅 Fecha de finalización:</span>
                     <span className="detail-value">
                       {formatLocalDate(activity.endDate)}
                       {daysLeft > 0 && (
@@ -633,26 +564,17 @@ const ModalActivityDetails = ({
                   <div className="detail-item">
                     <span className="detail-label">💵 Valor total:</span>
                     <span className="detail-value price-total">
-                      ${totalValue.toLocaleString("es-CO")}
+                      {totalValue.toLocaleString("es-CO")}
                     </span>
                   </div>
-
-                  {/* Mostrar capacidad utilizada */}
                   {activity.quantity && (
                     <div className="detail-item">
-                      <span className="detail-label">
-                        🎯 Capacidad utilizada:
-                      </span>
+                      <span className="detail-label">🎯 Capacidad utilizada:</span>
                       <span className="detail-value">
                         {enrolledCount} / {activity.quantity}
                         {activity.quantity > 0 && (
                           <span className="percentage">
-                            (
-                            {(
-                              (enrolledCount / activity.quantity) *
-                              100
-                            ).toFixed(1)}
-                            %)
+                            ({((enrolledCount / activity.quantity) * 100).toFixed(1)}%)
                           </span>
                         )}
                       </span>
@@ -661,7 +583,6 @@ const ModalActivityDetails = ({
                 </div>
               </div>
 
-              {/* INFORMACIÓN FINANCIERA */}
               {balance && (
                 <div className="details-section">
                   <h3>💰 Estado Financiero</h3>
@@ -671,9 +592,7 @@ const ModalActivityDetails = ({
                       <div className="finance-content">
                         <div className="finance-label">Comprometido</div>
                         <div className="finance-value">
-                          $
-                          {balance.totalCommitted?.toLocaleString("es-CO") ||
-                            "0"}
+                          {balance.totalCommitted?.toLocaleString("es-CO") || "0"}
                         </div>
                       </div>
                     </div>
@@ -723,7 +642,6 @@ const ModalActivityDetails = ({
             <div className="details-section enroll-section">
               <h3>👥 Inscribir Nuevo Participante</h3>
 
-              {/* Información de disponibilidad */}
               {loadingMembers || loadingLevels ? (
                 <div className="info-message">⏳ Cargando datos...</div>
               ) : (
@@ -744,22 +662,17 @@ const ModalActivityDetails = ({
               {enrollSuccess && (
                 <div className="enroll-success">{enrollSuccess}</div>
               )}
-
               {enrollError && <div className="enroll-error">{enrollError}</div>}
 
               {hasCapacity && eligibleCount > 0 && (
                 <div className="enroll-form">
+                  {/* Selector de miembro */}
                   <div className="form-group">
                     <label>Buscar Miembro *</label>
                     {loadingMembers ? (
-                      <div className="loading-members">
-                        Cargando miembros...
-                      </div>
+                      <div className="loading-members">Cargando miembros...</div>
                     ) : (
-                      <div
-                        className="member-search-container"
-                        ref={dropdownRef}
-                      >
+                      <div className="member-search-container" ref={dropdownRef}>
                         <div className="search-input-wrapper">
                           <input
                             ref={searchInputRef}
@@ -783,7 +696,6 @@ const ModalActivityDetails = ({
                             </button>
                           )}
                         </div>
-
                         {showDropdown && filteredMembers.length > 0 && (
                           <div className="member-dropdown">
                             <div className="dropdown-header">
@@ -795,16 +707,10 @@ const ModalActivityDetails = ({
                               {filteredMembers.map((member) => (
                                 <div
                                   key={member.id}
-                                  className={`dropdown-item ${
-                                    selectedMemberId === member.id
-                                      ? "selected"
-                                      : ""
-                                  }`}
+                                  className={`dropdown-item ${selectedMemberId === member.id ? "selected" : ""}`}
                                   onClick={() => handleSelectMember(member)}
                                 >
-                                  <div className="member-name">
-                                    {member.name}
-                                  </div>
+                                  <div className="member-name">{member.name}</div>
                                   <div className="member-level">
                                     {member.currentLevel
                                       ? getLevelDisplayName(member.currentLevel)
@@ -815,20 +721,15 @@ const ModalActivityDetails = ({
                             </div>
                           </div>
                         )}
-
-                        {showDropdown &&
-                          searchTerm.trim() !== "" &&
-                          filteredMembers.length === 0 && (
-                            <div className="member-dropdown">
-                              <div className="dropdown-empty">
-                                No se encontraron miembros elegibles con "
-                                {searchTerm}"
-                              </div>
+                        {showDropdown && searchTerm.trim() !== "" && filteredMembers.length === 0 && (
+                          <div className="member-dropdown">
+                            <div className="dropdown-empty">
+                              No se encontraron miembros elegibles con "{searchTerm}"
                             </div>
-                          )}
+                          </div>
+                        )}
                       </div>
                     )}
-
                     {selectedMemberId && (
                       <div className="selected-member-info">
                         <div className="selected-member-badge">
@@ -847,7 +748,54 @@ const ModalActivityDetails = ({
                     )}
                   </div>
 
-                  {/* SECCIÓN DESPLEGABLE PARA PAGO INICIAL */}
+                  {/* 📦 CANTIDAD — solo para actividades STANDALONE */}
+                  {isStandalone && (
+                    <div className="form-group">
+                      <label htmlFor="enrollQuantity">
+                        <span style={{ marginRight: "4px" }}>📦</span>
+                        Cantidad de unidades *
+                      </label>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <input
+                          id="enrollQuantity"
+                          type="number"
+                          min="1"
+                          value={quantity}
+                          onChange={(e) =>
+                            setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                          }
+                          disabled={enrolling}
+                          style={{
+                            width: "100px",
+                            padding: "8px 10px",
+                            border: "1px solid #ccc",
+                            borderRadius: "6px",
+                            fontSize: "14px",
+                          }}
+                        />
+                        {quantity > 1 && (
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              color: "#1e40af",
+                              fontWeight: 600,
+                              background: "#e8f4fd",
+                              padding: "3px 10px",
+                              borderRadius: "12px",
+                            }}
+                          >
+                            Total: ${totalPriceForQuantity.toLocaleString("es-CO")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="form-hint">
+                        Precio unitario: ${activity.price?.toLocaleString("es-CO") || "0"}
+                        {quantity > 1 && ` · Total: $${totalPriceForQuantity.toLocaleString("es-CO")}`}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* PAGO INICIAL */}
                   <div className="payment-toggle-section">
                     <button
                       type="button"
@@ -871,9 +819,7 @@ const ModalActivityDetails = ({
                     {showPaymentSection && (
                       <div className="payment-section">
                         <div className="form-group">
-                          <label htmlFor="initialPayment">
-                            Monto del Pago *
-                          </label>
+                          <label htmlFor="initialPayment">Monto del Pago *</label>
                           <div className="input-with-prefix">
                             <span className="input-prefix">$</span>
                             <input
@@ -881,18 +827,16 @@ const ModalActivityDetails = ({
                               type="number"
                               placeholder="Ej: 50000"
                               value={initialPayment}
-                              onChange={(e) =>
-                                setInitialPayment(e.target.value)
-                              }
+                              onChange={(e) => setInitialPayment(e.target.value)}
                               disabled={enrolling}
                               min="1"
-                              max={activity.price}
+                              max={totalPriceForQuantity}
                               step="1"
                             />
                           </div>
                           <div className="form-hint">
-                            Máximo: $
-                            {activity.price?.toLocaleString("es-CO") || "0"}
+                            Máximo: ${totalPriceForQuantity.toLocaleString("es-CO")}
+                            {quantity > 1 && ` (${quantity} × $${activity.price?.toLocaleString("es-CO")})`}
                           </div>
                         </div>
 
@@ -909,9 +853,7 @@ const ModalActivityDetails = ({
                             className="method-select"
                           >
                             <option value="CASH">💵 Efectivo</option>
-                            <option value="BANK_TRANSFER">
-                              🏦 Transferencia Bancaria
-                            </option>
+                            <option value="BANK_TRANSFER">🏦 Transferencia Bancaria</option>
                           </select>
                           <div className="form-hint">
                             Selecciona cómo se realizó el pago
@@ -922,33 +864,22 @@ const ModalActivityDetails = ({
                           <div className="payment-summary">
                             <div className="summary-item">
                               <span className="summary-label">
-                                Precio actividad:
+                                Precio{quantity > 1 ? ` total (×${quantity})` : " actividad"}:
                               </span>
                               <span className="summary-value">
-                                $
-                                {activity.price?.toLocaleString("es-CO") || "0"}
+                                ${totalPriceForQuantity.toLocaleString("es-CO")}
                               </span>
                             </div>
                             <div className="summary-item">
-                              <span className="summary-label">
-                                Pago inicial:
-                              </span>
+                              <span className="summary-label">Pago inicial:</span>
                               <span className="summary-value payment-amount">
-                                $
-                                {parseFloat(initialPayment).toLocaleString(
-                                  "es-CO",
-                                )}
+                                ${parseFloat(initialPayment).toLocaleString("es-CO")}
                               </span>
                             </div>
                             <div className="summary-item total">
-                              <span className="summary-label">
-                                Saldo pendiente:
-                              </span>
+                              <span className="summary-label">Saldo pendiente:</span>
                               <span className="summary-value pending-amount">
-                                $
-                                {(
-                                  activity.price - parseFloat(initialPayment)
-                                ).toLocaleString("es-CO")}
+                                ${(totalPriceForQuantity - parseFloat(initialPayment)).toLocaleString("es-CO")}
                               </span>
                             </div>
                           </div>
@@ -967,12 +898,10 @@ const ModalActivityDetails = ({
                         <span className="spinner"></span>
                         Inscribiendo...
                       </>
-                    ) : showPaymentSection &&
-                      initialPayment &&
-                      parseFloat(initialPayment) > 0 ? (
-                      `✅ Inscribir con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
+                    ) : showPaymentSection && initialPayment && parseFloat(initialPayment) > 0 ? (
+                      `✅ Inscribir${quantity > 1 ? ` ×${quantity}` : ""} con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
                     ) : (
-                      "✅ Inscribir Participante (sin pago)"
+                      `✅ Inscribir Participante${quantity > 1 ? ` (×${quantity} unidades)` : ""} (sin pago)`
                     )}
                   </button>
                 </div>
@@ -984,7 +913,6 @@ const ModalActivityDetails = ({
                   alcanzada ({activity.quantity}).
                 </div>
               )}
-
               {hasCapacity && eligibleCount === 0 && members.length > 0 && (
                 <div className="info-message">
                   ℹ️ No hay miembros elegibles para esta actividad según el
@@ -994,7 +922,7 @@ const ModalActivityDetails = ({
             </div>
           )}
 
-          {/* PESTAÑA 3: GASTOS DE ACTIVIDAD (sin cambios) */}
+          {/* PESTAÑA 3: GASTOS DE ACTIVIDAD */}
           {activeTab === "costs" && !readOnly && (
             <div className="details-section costs-section">
               <div className="costs-header">
@@ -1007,16 +935,10 @@ const ModalActivityDetails = ({
                 </div>
               </div>
 
-              {/* Formulario para agregar costo */}
               <div className="cost-form">
                 <h4>➕ Registrar Nuevo Gasto</h4>
-
-                {costSuccess && (
-                  <div className="cost-success">{costSuccess}</div>
-                )}
-
+                {costSuccess && <div className="cost-success">{costSuccess}</div>}
                 {costError && <div className="cost-error">{costError}</div>}
-
                 <div className="form-grid">
                   <div className="form-group">
                     <label>Motivo / Descripción *</label>
@@ -1029,7 +951,6 @@ const ModalActivityDetails = ({
                       disabled={savingCost}
                     />
                   </div>
-
                   <div className="form-group">
                     <label>Valor ($) *</label>
                     <div className="input-with-prefix">
@@ -1046,7 +967,6 @@ const ModalActivityDetails = ({
                       />
                     </div>
                   </div>
-
                   <div className="form-group">
                     <label>Método de Pago *</label>
                     <select
@@ -1060,27 +980,21 @@ const ModalActivityDetails = ({
                     </select>
                   </div>
                 </div>
-
                 <button
                   className="save-cost-btn"
                   onClick={handleSaveCost}
                   disabled={savingCost}
                 >
                   {savingCost ? (
-                    <>
-                      <span className="spinner"></span>
-                      Guardando...
-                    </>
+                    <><span className="spinner"></span>Guardando...</>
                   ) : (
                     "💾 Guardar Gasto"
                   )}
                 </button>
               </div>
 
-              {/* Lista de costos registrados */}
               <div className="costs-list">
                 <h4>📋 Gastos Registrados</h4>
-
                 {loadingCosts ? (
                   <div className="loading-costs">Cargando gastos...</div>
                 ) : costs.length === 0 ? (
@@ -1103,17 +1017,13 @@ const ModalActivityDetails = ({
                       <tbody>
                         {costs.map((cost) => (
                           <tr key={cost.id}>
-                            <td>
-                              {new Date(cost.fecha).toLocaleDateString("es-CO")}
-                            </td>
+                            <td>{new Date(cost.fecha).toLocaleDateString("es-CO")}</td>
                             <td>{cost.detail}</td>
                             <td className="cost-price">
                               ${cost.price?.toLocaleString("es-CO")}
                             </td>
                             <td>
-                              <span
-                                className={`method-badge ${cost.incomeMethod?.toLowerCase()}`}
-                              >
+                              <span className={`method-badge ${cost.incomeMethod?.toLowerCase()}`}>
                                 {cost.incomeMethod}
                               </span>
                             </td>

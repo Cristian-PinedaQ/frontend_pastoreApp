@@ -61,38 +61,38 @@ const ModalActivityParticipants = ({
 
   // ✅ DEFINIR loadParticipants CON useCallback ANTES del useEffect
   const loadParticipants = useCallback(async () => {
-  if (!activity?.id) return;
+    if (!activity?.id) return;
 
-  setLoading(true);
-  try {
-    const url = `/activity-contribution/activity/${activity.id}/with-leader-info`;
-    const response = await apiService.request(url, { method: "GET" });
+    setLoading(true);
+    try {
+      const url = `/activity-contribution/activity/${activity.id}/with-leader-info`;
+      const response = await apiService.request(url, { method: "GET" });
 
-    // ✅ USANDO nameHelper: Transformar nombres de participantes para mostrar
-    const transformedParticipants = transformArrayForDisplay(response, [
-      "memberName",
-      "leaderName",
-    ]);
+      // ✅ USANDO nameHelper: Transformar nombres de participantes para mostrar
+      const transformedParticipants = transformArrayForDisplay(response, [
+        "memberName",
+        "leaderName",
+      ]);
 
-    // ✅ Asegurarse de que itemDelivered está presente y es booleano
-    const participantsWithDelivery = transformedParticipants.map(p => ({
-      ...p,
-      itemDelivered: p.itemDelivered === true, // Normalizar a booleano
-      // También agregar otros campos para compatibilidad
-      delivered: p.itemDelivered === true,
-      isDelivered: p.itemDelivered === true,
-      item_delivered: p.itemDelivered === true
-    }));
+      // ✅ Asegurarse de que itemDelivered está presente y es booleano
+      const participantsWithDelivery = transformedParticipants.map((p) => ({
+        ...p,
+        itemDelivered: p.itemDelivered === true,
+        delivered: p.itemDelivered === true,
+        isDelivered: p.itemDelivered === true,
+        item_delivered: p.itemDelivered === true,
+        quantity: p.quantity || 1, // 📦 Asegurar quantity
+      }));
 
-    setParticipants(participantsWithDelivery);
+      setParticipants(participantsWithDelivery);
 
-    // Resto del código...
-  } catch (error) {
-    console.error("❌ Error cargando participantes:", error);
-  } finally {
-    setLoading(false);
-  }
-}, [activity?.id]);
+      // Resto del código...
+    } catch (error) {
+      console.error("❌ Error cargando participantes:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [activity?.id]);
 
   // ✅ useEffect CON DEPENDENCIAS CORRECTAS
   useEffect(() => {
@@ -167,58 +167,73 @@ const ModalActivityParticipants = ({
   // =====================================================
 
   const handleGeneratePDF = () => {
-  try {
-    // Asegurarse de que cada participante tenga itemDelivered
-    const participantsWithDelivery = filteredParticipants.map(p => ({
-      ...p,
-      // Asegurar que itemDelivered está presente
-      itemDelivered: p.itemDelivered === true,
-      // También incluir otros nombres alternativos por si acaso
-      delivered: p.itemDelivered === true,
-      isDelivered: p.itemDelivered === true,
-      item_delivered: p.itemDelivered === true
-    }));
+    try {
+      // Asegurarse de que cada participante tenga itemDelivered
+      const participantsWithDelivery = filteredParticipants.map((p) => ({
+        ...p,
+        // Asegurar que itemDelivered está presente
+        itemDelivered: p.itemDelivered === true,
+        // También incluir otros nombres alternativos por si acaso
+        delivered: p.itemDelivered === true,
+        isDelivered: p.itemDelivered === true,
+        item_delivered: p.itemDelivered === true,
+      }));
 
-    const pdfData = {
-      activity: {
-        id: activity.id,
-        name: activity.activityName,
-        price: activity.price,
-        endDate: activity.endDate,
-        quantity: activity.quantity,
-        isActive: activity.isActive,
-      },
-      participants: participantsWithDelivery, // ✅ Usar la versión con datos asegurados
-      filters: {
-        searchText: filterText,
-        leaderFilter,
-        districtFilter,
-      },
-      statistics: {
-        total: stats.total,
-        fullyPaid: stats.fullyPaid,
-        partiallyPaid: stats.partiallyPaid,
-        pending: stats.pending,
-        totalPaid: stats.totalPaid,
-        totalPending: stats.totalPending,
-        delivered: participantsWithDelivery.filter(p => p.itemDelivered === true).length, // ✅ Calcular aquí
-        notDelivered: participantsWithDelivery.filter(p => p.itemDelivered !== true).length,
-        percentagePaid: stats.total > 0
-          ? ((stats.totalPaid / (stats.totalPaid + stats.totalPending)) * 100).toFixed(1)
-          : 0,
-        deliveryPercentage: participantsWithDelivery.length > 0
-          ? ((participantsWithDelivery.filter(p => p.itemDelivered === true).length / participantsWithDelivery.length) * 100).toFixed(1)
-          : 0,
-      },
-    };
+      const pdfData = {
+        activity: {
+          id: activity.id,
+          name: activity.activityName,
+          price: activity.price,
+          endDate: activity.endDate,
+          quantity: activity.quantity,
+          isActive: activity.isActive,
+        },
+        participants: participantsWithDelivery, // ✅ Usar la versión con datos asegurados
+        filters: {
+          searchText: filterText,
+          leaderFilter,
+          districtFilter,
+        },
+        statistics: {
+          total: stats.total,
+          fullyPaid: stats.fullyPaid,
+          partiallyPaid: stats.partiallyPaid,
+          pending: stats.pending,
+          totalPaid: stats.totalPaid,
+          totalPending: stats.totalPending,
+          delivered: participantsWithDelivery.filter(
+            (p) => p.itemDelivered === true,
+          ).length, // ✅ Calcular aquí
+          notDelivered: participantsWithDelivery.filter(
+            (p) => p.itemDelivered !== true,
+          ).length,
+          percentagePaid:
+            stats.total > 0
+              ? (
+                  (stats.totalPaid / (stats.totalPaid + stats.totalPending)) *
+                  100
+                ).toFixed(1)
+              : 0,
+          deliveryPercentage:
+            participantsWithDelivery.length > 0
+              ? (
+                  (participantsWithDelivery.filter(
+                    (p) => p.itemDelivered === true,
+                  ).length /
+                    participantsWithDelivery.length) *
+                  100
+                ).toFixed(1)
+              : 0,
+        },
+      };
 
-    const filename = `participantes-general-${activity.activityName.toLowerCase().replace(/\s+/g, "-")}`;
-    generateGeneralParticipantsPDF(pdfData, filename);
-  } catch (error) {
-    console.error("❌ Error generando PDF general:", error);
-    alert("Error al generar el PDF. Por favor, intente nuevamente.");
-  }
-};
+      const filename = `participantes-general-${activity.activityName.toLowerCase().replace(/\s+/g, "-")}`;
+      generateGeneralParticipantsPDF(pdfData, filename);
+    } catch (error) {
+      console.error("❌ Error generando PDF general:", error);
+      alert("Error al generar el PDF. Por favor, intente nuevamente.");
+    }
+  };
 
   const stats = {
     total: participants.length,

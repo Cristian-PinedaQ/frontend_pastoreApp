@@ -928,7 +928,7 @@ const ActivityPage = () => {
 
   // ========== INSCRIBIR PARTICIPANTE ==========
   const handleEnrollParticipant = useCallback(
-    async (activityId, memberId, initialPayment) => {
+    async (activityId, memberId, initialPayment, incomeMethod, quantity = 1) => {
       if (!canWrite) return false;
 
       try {
@@ -996,6 +996,7 @@ const ActivityPage = () => {
             incomeMethod: "CASH",
             recordedBy,
             initialPaymentAmount: parseFloat(initialPayment),
+            quantity: quantity || 1,
           };
         } else {
           endpoint = "/activity-contribution/save";
@@ -1003,6 +1004,7 @@ const ActivityPage = () => {
             memberId,
             activityId,
             recordedBy,
+            quantity: quantity || 1,
           };
         }
 

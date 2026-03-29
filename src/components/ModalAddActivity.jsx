@@ -416,7 +416,7 @@ const ModalAddActivity = ({
             <div className="form-group">
               <label htmlFor="price">💰 Precio (COP) *</label>
               <div className="input-with-prefix">
-                <span className="input-prefix">$</span>
+                <span className="input-prefix"></span>
                 <input
                   type="number"
                   id="price"
