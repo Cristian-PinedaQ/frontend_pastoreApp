@@ -74,6 +74,11 @@ const ParticipantDetailModal = ({
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState("");
   const [editSuccess, setEditSuccess] = useState("");
+  const [editingQty, setEditingQty] = useState(false);
+  const [newQty, setNewQty] = useState(1);
+  const [savingQty, setSavingQty] = useState(false);
+  const [qtyError, setQtyError] = useState("");
+  const [qtySuccess, setQtySuccess] = useState("");
 
   // ─── getRecordedBy con useCallback (antes de los useEffects que la usan) ──
   const getRecordedBy = useCallback(() => {
@@ -200,21 +205,33 @@ const ParticipantDetailModal = ({
         (sum, payment) => sum + (payment.amount || 0),
         0,
       );
-      const activityPrice = activity?.price || 0;
-      const pendingBalance = Math.max(0, activityPrice - totalPaid);
+      // ✅ FIX: usar totalPrice (qty-aware) si está disponible, sino unitPrice × qty
+      const qty = contribution?.quantity || participant?.quantity || 1;
+      const unitPrice = activity?.price || 0;
+      const totalPrice = participant?.totalPrice || unitPrice * qty;
+      const pendingBalance = Math.max(0, totalPrice - totalPaid);
       const isFullyPaid = pendingBalance <= 0;
       setContributionData((prev) => ({
         ...prev,
         totalPaid,
         pendingBalance,
         isFullyPaid,
+        quantity: qty,
+        totalPrice,
         paymentHistory: transformedPayments,
       }));
     } catch (err) {
       console.error("❌ Error cargando historial de pagos:", err);
       setPaymentHistory([]);
     }
-  }, [contribution?.id, participant.contributionId, activity?.price]);
+  }, [
+    contribution?.id,
+    participant.contributionId,
+    activity?.price,
+    contribution?.quantity,
+    participant?.quantity,
+    participant?.totalPrice,
+  ]);
 
   const participantItemDelivered = participant?.itemDelivered;
 
@@ -396,6 +413,57 @@ const ParticipantDetailModal = ({
     [onAddPaymentSuccess],
   );
 
+  // ─── Guardar nueva cantidad ────────────────────────────────────────────────
+  const handleSaveQuantity = async () => {
+    const qty = parseInt(newQty);
+    if (!qty || qty < 1) {
+      setQtyError("La cantidad mínima es 1.");
+      return;
+    }
+    const contributionId = contribution?.id || participant?.contributionId;
+    if (!contributionId) {
+      setQtyError("No se encontró el ID de la contribución.");
+      return;
+    }
+    setSavingQty(true);
+    setQtyError("");
+    setQtySuccess("");
+    try {
+      await apiService.request(
+        `/activity-contribution/update/${contributionId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ quantity: qty }),
+        },
+      );
+      setQtySuccess(
+        `✅ Cantidad actualizada a ${qty} unidad${qty !== 1 ? "es" : ""}.`,
+      );
+      setEditingQty(false);
+      // Refrescar datos para que los saldos se recalculen
+      await refreshContributionData();
+      if (onAddPaymentSuccess) {
+        onAddPaymentSuccess({ type: "quantityChange", quantity: qty });
+      }
+      setTimeout(() => setQtySuccess(""), 3500);
+    } catch (err) {
+      if (err.status === 400) {
+        setQtyError(
+          err.data?.error ||
+            "No se puede cambiar la cantidad en actividades ENROLLMENT.",
+        );
+      } else if (err.status === 403) {
+        setQtyError("La actividad ya cerró. No se puede cambiar la cantidad.");
+      } else {
+        setQtyError(
+          err.data?.error || err.message || "Error al actualizar la cantidad.",
+        );
+      }
+    } finally {
+      setSavingQty(false);
+    }
+  };
+
   if (!isOpen || !participant || !activity) return null;
 
   // ✅ Obtener datos de líder y distrito
@@ -423,13 +491,19 @@ const ParticipantDetailModal = ({
     currentData?.pendingBalance || participant.pendingBalance || 0;
   const isFullyPaid =
     currentData?.isFullyPaid || participant.isFullyPaid || false;
-  // 📦 quantity: viene del backend en la contribución o participante
-  const quantity = currentData?.quantity || participant?.quantity || 1;
+  // ✅ FIX: quantity y totalPrice conscientes de unidades
+  const quantity =
+    currentData?.quantity ||
+    contribution?.quantity ||
+    participant?.quantity ||
+    1;
   const unitPrice = activity?.price || 0;
-  // totalPrice = unitPrice × quantity (para ENROLLMENT siempre quantity=1)
-  const activityPrice = participant?.totalPrice || unitPrice * quantity;
+  const activityPrice =
+    currentData?.totalPrice || participant?.totalPrice || unitPrice * quantity;
   const compliancePercentage =
     activityPrice > 0 ? (totalPaid / activityPrice) * 100 : 0;
+  // Solo STANDALONE puede cambiar quantity
+  const isStandalone = activity?.activityType === "STANDALONE";
 
   const currentPaymentHistory =
     paymentHistory.length > 0
@@ -476,6 +550,7 @@ const ParticipantDetailModal = ({
       );
       return;
     }
+    // (sin cambio, pendingBalance ya es qty-aware gracias al BLOQUE 2)
     const recordedByName = getRecordedBy();
     if (!recordedByName || recordedByName === "Usuario Sistema") {
       setError(
@@ -791,6 +866,223 @@ const ParticipantDetailModal = ({
                         </span>
                       </div>
                     </div>
+                    <div>
+                      {/* ── Cantidad de unidades (solo STANDALONE) ───────────────── */}
+                      {isStandalone && (
+                        <div className="detail-section">
+                          <h4>
+                            <span className="section-icon">🔢</span>Cantidad de
+                            Unidades
+                            {qtySuccess && (
+                              <span
+                                style={{
+                                  marginLeft: "10px",
+                                  fontSize: "0.8em",
+                                  color: "#10b981",
+                                  fontWeight: 400,
+                                }}
+                              >
+                                {qtySuccess}
+                              </span>
+                            )}
+                          </h4>
+
+                          {!editingQty ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "14px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  background: "#e8f4fd",
+                                  border: "1px solid #bee3f8",
+                                  borderRadius: "10px",
+                                  padding: "8px 16px",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "1.5em",
+                                    fontWeight: 800,
+                                    color: "#1e40af",
+                                  }}
+                                >
+                                  {quantity}
+                                </span>
+                                <span
+                                  style={{
+                                    fontSize: "0.85em",
+                                    color: "#3182ce",
+                                  }}
+                                >
+                                  {quantity === 1 ? "unidad" : "unidades"}
+                                </span>
+                              </div>
+                              {quantity > 1 && (
+                                <span
+                                  style={{
+                                    fontSize: "0.82em",
+                                    color: "#6c757d",
+                                  }}
+                                >
+                                  ${unitPrice.toLocaleString("es-CO")} ×{" "}
+                                  {quantity} ={" "}
+                                  <strong style={{ color: "#1e40af" }}>
+                                    ${activityPrice.toLocaleString("es-CO")}
+                                  </strong>
+                                </span>
+                              )}
+                              {!readOnly && canEdit && (
+                                <button
+                                  onClick={() => {
+                                    setNewQty(quantity);
+                                    setEditingQty(true);
+                                    setQtyError("");
+                                  }}
+                                  style={{
+                                    background: "none",
+                                    border: "1px solid #cbd5e0",
+                                    borderRadius: "6px",
+                                    padding: "5px 12px",
+                                    cursor: "pointer",
+                                    fontSize: "0.82em",
+                                    color: "#4a5568",
+                                  }}
+                                >
+                                  ✏️ Editar cantidad
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "8px",
+                                maxWidth: "320px",
+                              }}
+                            >
+                              {qtyError && (
+                                <div
+                                  style={{
+                                    color: "#c62828",
+                                    fontSize: "0.82em",
+                                    background: "#ffebee",
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                  }}
+                                >
+                                  ⚠️ {qtyError}
+                                </div>
+                              )}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                }}
+                              >
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={newQty}
+                                  onChange={(e) =>
+                                    setNewQty(
+                                      Math.max(
+                                        1,
+                                        parseInt(e.target.value) || 1,
+                                      ),
+                                    )
+                                  }
+                                  disabled={savingQty}
+                                  style={{
+                                    width: "80px",
+                                    padding: "7px 10px",
+                                    border: "1px solid #a0aec0",
+                                    borderRadius: "6px",
+                                    fontSize: "14px",
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: "0.82em",
+                                    color: "#6c757d",
+                                  }}
+                                >
+                                  × ${unitPrice.toLocaleString("es-CO")} ={" "}
+                                  <strong style={{ color: "#1e40af" }}>
+                                    $
+                                    {(
+                                      unitPrice * (parseInt(newQty) || 1)
+                                    ).toLocaleString("es-CO")}
+                                  </strong>
+                                </span>
+                              </div>
+                              {(parseInt(newQty) || 1) < quantity &&
+                                totalPaid >
+                                  unitPrice * (parseInt(newQty) || 1) && (
+                                  <div
+                                    style={{
+                                      color: "#ed6c02",
+                                      fontSize: "0.78em",
+                                      background: "#fff7e6",
+                                      padding: "6px 10px",
+                                      borderRadius: "6px",
+                                    }}
+                                  >
+                                    ⚠️ Los pagos registrados ($
+                                    {totalPaid.toLocaleString("es-CO")}) superan
+                                    el nuevo precio total. Revisa los pagos
+                                    antes de confirmar.
+                                  </div>
+                                )}
+                              <div style={{ display: "flex", gap: "8px" }}>
+                                <button
+                                  onClick={handleSaveQuantity}
+                                  disabled={savingQty}
+                                  style={{
+                                    background: "#1e40af",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    padding: "7px 16px",
+                                    cursor: "pointer",
+                                    fontSize: "0.85em",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {savingQty ? "Guardando..." : "💾 Guardar"}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingQty(false);
+                                    setQtyError("");
+                                  }}
+                                  disabled={savingQty}
+                                  style={{
+                                    background: "none",
+                                    border: "1px solid #cbd5e0",
+                                    borderRadius: "6px",
+                                    padding: "7px 14px",
+                                    cursor: "pointer",
+                                    fontSize: "0.85em",
+                                    color: "#4a5568",
+                                  }}
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* ── Entrega del artículo ──────────────────────────────────── */}
@@ -824,7 +1116,7 @@ const ParticipantDetailModal = ({
                       </div>
                       <div className="detail-item">
                         <span className="detail-label">
-                          {quantity > 1 ? "Precio unitario:" : "Precio Total:"}
+                          {quantity > 1 ? "Precio unitario:" : "Precio:"}
                         </span>
                         <span className="detail-value">
                           ${unitPrice.toLocaleString("es-CO")}
@@ -832,7 +1124,7 @@ const ParticipantDetailModal = ({
                             <span
                               style={{
                                 marginLeft: "8px",
-                                fontSize: "0.82em",
+                                fontSize: "0.8em",
                                 color: "#1e40af",
                                 fontWeight: 600,
                                 background: "#e8f4fd",
@@ -878,21 +1170,28 @@ const ParticipantDetailModal = ({
                       <span className="section-icon">💰</span>Resumen de Pagos
                     </h4>
                     <div className="payment-summary-card total">
-                    <div className="payment-summary-icon">📊</div>
-                    <div className="payment-summary-content">
-                      <div className="payment-summary-label">
-                        Total a Pagar
-                        {quantity > 1 && (
-                          <span style={{ display: "block", fontSize: "0.75em", color: "#6c757d", fontWeight: 400 }}>
-                            {quantity} unidades
-                          </span>
-                        )}
-                      </div>
-                      <div className="payment-summary-value">
-                        ${activityPrice.toLocaleString("es-CO")}
+                      <div className="payment-summary-icon">📊</div>
+                      <div className="payment-summary-content">
+                        <div className="payment-summary-label">
+                          Total a Pagar
+                          {quantity > 1 && (
+                            <span
+                              style={{
+                                display: "block",
+                                fontSize: "0.72em",
+                                color: "#6c757d",
+                                fontWeight: 400,
+                              }}
+                            >
+                              {quantity} unidades
+                            </span>
+                          )}
+                        </div>
+                        <div className="payment-summary-value">
+                          ${activityPrice.toLocaleString("es-CO")}
+                        </div>
                       </div>
                     </div>
-                  </div>
                     <div className="compliance-section">
                       <div className="compliance-header">
                         <span className="compliance-label">

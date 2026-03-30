@@ -206,7 +206,15 @@ const ModalActivityDetails = ({
         loadCosts();
       }
     }
-  }, [isOpen, activity, loadMembers, loadLevels, activeTab, loadCosts, readOnly]);
+  }, [
+    isOpen,
+    activity,
+    loadMembers,
+    loadLevels,
+    activeTab,
+    loadCosts,
+    readOnly,
+  ]);
 
   useEffect(() => {
     if (members.length > 0 && activity && levels.length > 0) {
@@ -432,7 +440,8 @@ const ModalActivityDetails = ({
       console.error("❌ Error registrando costo:", error);
       let errorMsg = "Error al registrar el costo";
       if (error.message && error.message.includes("JSON")) {
-        errorMsg = "Error en el formato de datos. Por favor, verifica los campos.";
+        errorMsg =
+          "Error en el formato de datos. Por favor, verifica los campos.";
       }
       setCostError(errorMsg);
     } finally {
@@ -553,7 +562,9 @@ const ModalActivityDetails = ({
                     </span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">📅 Fecha de finalización:</span>
+                    <span className="detail-label">
+                      📅 Fecha de finalización:
+                    </span>
                     <span className="detail-value">
                       {formatLocalDate(activity.endDate)}
                       {daysLeft > 0 && (
@@ -569,12 +580,19 @@ const ModalActivityDetails = ({
                   </div>
                   {activity.quantity && (
                     <div className="detail-item">
-                      <span className="detail-label">🎯 Capacidad utilizada:</span>
+                      <span className="detail-label">
+                        🎯 Capacidad utilizada:
+                      </span>
                       <span className="detail-value">
                         {enrolledCount} / {activity.quantity}
                         {activity.quantity > 0 && (
                           <span className="percentage">
-                            ({((enrolledCount / activity.quantity) * 100).toFixed(1)}%)
+                            (
+                            {(
+                              (enrolledCount / activity.quantity) *
+                              100
+                            ).toFixed(1)}
+                            %)
                           </span>
                         )}
                       </span>
@@ -592,7 +610,8 @@ const ModalActivityDetails = ({
                       <div className="finance-content">
                         <div className="finance-label">Comprometido</div>
                         <div className="finance-value">
-                          {balance.totalCommitted?.toLocaleString("es-CO") || "0"}
+                          {balance.totalCommitted?.toLocaleString("es-CO") ||
+                            "0"}
                         </div>
                       </div>
                     </div>
@@ -670,9 +689,14 @@ const ModalActivityDetails = ({
                   <div className="form-group">
                     <label>Buscar Miembro *</label>
                     {loadingMembers ? (
-                      <div className="loading-members">Cargando miembros...</div>
+                      <div className="loading-members">
+                        Cargando miembros...
+                      </div>
                     ) : (
-                      <div className="member-search-container" ref={dropdownRef}>
+                      <div
+                        className="member-search-container"
+                        ref={dropdownRef}
+                      >
                         <div className="search-input-wrapper">
                           <input
                             ref={searchInputRef}
@@ -710,7 +734,9 @@ const ModalActivityDetails = ({
                                   className={`dropdown-item ${selectedMemberId === member.id ? "selected" : ""}`}
                                   onClick={() => handleSelectMember(member)}
                                 >
-                                  <div className="member-name">{member.name}</div>
+                                  <div className="member-name">
+                                    {member.name}
+                                  </div>
                                   <div className="member-level">
                                     {member.currentLevel
                                       ? getLevelDisplayName(member.currentLevel)
@@ -721,13 +747,16 @@ const ModalActivityDetails = ({
                             </div>
                           </div>
                         )}
-                        {showDropdown && searchTerm.trim() !== "" && filteredMembers.length === 0 && (
-                          <div className="member-dropdown">
-                            <div className="dropdown-empty">
-                              No se encontraron miembros elegibles con "{searchTerm}"
+                        {showDropdown &&
+                          searchTerm.trim() !== "" &&
+                          filteredMembers.length === 0 && (
+                            <div className="member-dropdown">
+                              <div className="dropdown-empty">
+                                No se encontraron miembros elegibles con "
+                                {searchTerm}"
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
                       </div>
                     )}
                     {selectedMemberId && (
@@ -755,14 +784,22 @@ const ModalActivityDetails = ({
                         <span style={{ marginRight: "4px" }}>📦</span>
                         Cantidad de unidades *
                       </label>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
+                      >
                         <input
                           id="enrollQuantity"
                           type="number"
                           min="1"
                           value={quantity}
                           onChange={(e) =>
-                            setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                            setQuantity(
+                              Math.max(1, parseInt(e.target.value) || 1),
+                            )
                           }
                           disabled={enrolling}
                           style={{
@@ -784,13 +821,16 @@ const ModalActivityDetails = ({
                               borderRadius: "12px",
                             }}
                           >
-                            Total: ${totalPriceForQuantity.toLocaleString("es-CO")}
+                            Total: $
+                            {totalPriceForQuantity.toLocaleString("es-CO")}
                           </span>
                         )}
                       </div>
                       <div className="form-hint">
-                        Precio unitario: ${activity.price?.toLocaleString("es-CO") || "0"}
-                        {quantity > 1 && ` · Total: $${totalPriceForQuantity.toLocaleString("es-CO")}`}
+                        Precio unitario: $
+                        {activity.price?.toLocaleString("es-CO") || "0"}
+                        {quantity > 1 &&
+                          ` · Total: $${totalPriceForQuantity.toLocaleString("es-CO")}`}
                       </div>
                     </div>
                   )}
@@ -819,7 +859,9 @@ const ModalActivityDetails = ({
                     {showPaymentSection && (
                       <div className="payment-section">
                         <div className="form-group">
-                          <label htmlFor="initialPayment">Monto del Pago *</label>
+                          <label htmlFor="initialPayment">
+                            Monto del Pago *
+                          </label>
                           <div className="input-with-prefix">
                             <span className="input-prefix">$</span>
                             <input
@@ -827,7 +869,9 @@ const ModalActivityDetails = ({
                               type="number"
                               placeholder="Ej: 50000"
                               value={initialPayment}
-                              onChange={(e) => setInitialPayment(e.target.value)}
+                              onChange={(e) =>
+                                setInitialPayment(e.target.value)
+                              }
                               disabled={enrolling}
                               min="1"
                               max={totalPriceForQuantity}
@@ -835,8 +879,10 @@ const ModalActivityDetails = ({
                             />
                           </div>
                           <div className="form-hint">
-                            Máximo: ${totalPriceForQuantity.toLocaleString("es-CO")}
-                            {quantity > 1 && ` (${quantity} × $${activity.price?.toLocaleString("es-CO")})`}
+                            Máximo: $
+                            {totalPriceForQuantity.toLocaleString("es-CO")}
+                            {quantity > 1 &&
+                              ` (${quantity} × $${activity.price?.toLocaleString("es-CO")})`}
                           </div>
                         </div>
 
@@ -853,7 +899,9 @@ const ModalActivityDetails = ({
                             className="method-select"
                           >
                             <option value="CASH">💵 Efectivo</option>
-                            <option value="BANK_TRANSFER">🏦 Transferencia Bancaria</option>
+                            <option value="BANK_TRANSFER">
+                              🏦 Transferencia Bancaria
+                            </option>
                           </select>
                           <div className="form-hint">
                             Selecciona cómo se realizó el pago
@@ -864,22 +912,37 @@ const ModalActivityDetails = ({
                           <div className="payment-summary">
                             <div className="summary-item">
                               <span className="summary-label">
-                                Precio{quantity > 1 ? ` total (×${quantity})` : " actividad"}:
+                                Precio
+                                {quantity > 1
+                                  ? ` total (×${quantity})`
+                                  : " actividad"}
+                                :
                               </span>
                               <span className="summary-value">
                                 ${totalPriceForQuantity.toLocaleString("es-CO")}
                               </span>
                             </div>
                             <div className="summary-item">
-                              <span className="summary-label">Pago inicial:</span>
+                              <span className="summary-label">
+                                Pago inicial:
+                              </span>
                               <span className="summary-value payment-amount">
-                                ${parseFloat(initialPayment).toLocaleString("es-CO")}
+                                $
+                                {parseFloat(initialPayment).toLocaleString(
+                                  "es-CO",
+                                )}
                               </span>
                             </div>
                             <div className="summary-item total">
-                              <span className="summary-label">Saldo pendiente:</span>
+                              <span className="summary-label">
+                                Saldo pendiente:
+                              </span>
                               <span className="summary-value pending-amount">
-                                ${(totalPriceForQuantity - parseFloat(initialPayment)).toLocaleString("es-CO")}
+                                $
+                                {(
+                                  totalPriceForQuantity -
+                                  parseFloat(initialPayment)
+                                ).toLocaleString("es-CO")}
                               </span>
                             </div>
                           </div>
@@ -891,14 +954,21 @@ const ModalActivityDetails = ({
                   <button
                     className="enroll-btn"
                     onClick={handleEnroll}
-                    disabled={!selectedMemberId || enrolling}
+                    disabled={
+                      !selectedMemberId ||
+                      enrolling ||
+                      (activity?.status?.color !== "success" &&
+                        activity?.status?.color !== "warning")
+                    }
                   >
                     {enrolling ? (
                       <>
                         <span className="spinner"></span>
                         Inscribiendo...
                       </>
-                    ) : showPaymentSection && initialPayment && parseFloat(initialPayment) > 0 ? (
+                    ) : showPaymentSection &&
+                      initialPayment &&
+                      parseFloat(initialPayment) > 0 ? (
                       `✅ Inscribir${quantity > 1 ? ` ×${quantity}` : ""} con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
                     ) : (
                       `✅ Inscribir Participante${quantity > 1 ? ` (×${quantity} unidades)` : ""} (sin pago)`
@@ -937,7 +1007,9 @@ const ModalActivityDetails = ({
 
               <div className="cost-form">
                 <h4>➕ Registrar Nuevo Gasto</h4>
-                {costSuccess && <div className="cost-success">{costSuccess}</div>}
+                {costSuccess && (
+                  <div className="cost-success">{costSuccess}</div>
+                )}
                 {costError && <div className="cost-error">{costError}</div>}
                 <div className="form-grid">
                   <div className="form-group">
@@ -986,7 +1058,9 @@ const ModalActivityDetails = ({
                   disabled={savingCost}
                 >
                   {savingCost ? (
-                    <><span className="spinner"></span>Guardando...</>
+                    <>
+                      <span className="spinner"></span>Guardando...
+                    </>
                   ) : (
                     "💾 Guardar Gasto"
                   )}
@@ -1017,13 +1091,17 @@ const ModalActivityDetails = ({
                       <tbody>
                         {costs.map((cost) => (
                           <tr key={cost.id}>
-                            <td>{new Date(cost.fecha).toLocaleDateString("es-CO")}</td>
+                            <td>
+                              {new Date(cost.fecha).toLocaleDateString("es-CO")}
+                            </td>
                             <td>{cost.detail}</td>
                             <td className="cost-price">
                               ${cost.price?.toLocaleString("es-CO")}
                             </td>
                             <td>
-                              <span className={`method-badge ${cost.incomeMethod?.toLowerCase()}`}>
+                              <span
+                                className={`method-badge ${cost.incomeMethod?.toLowerCase()}`}
+                              >
                                 {cost.incomeMethod}
                               </span>
                             </td>

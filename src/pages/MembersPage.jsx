@@ -288,7 +288,7 @@ export const MembersPage = () => {
       ...prev,
       leader: { id: leader.id, name: leader.name }, // Guardar nombre ORIGINAL para backend
     }));
-    
+
     // Mostrar nombre transformado en el input
     setLeaderSearchTerm(getDisplayName(leader.name));
     setShowLeaderDropdown(false);
@@ -307,53 +307,52 @@ export const MembersPage = () => {
 
   // ✅ IMPORTANTE: El formulario envía nombres ORIGINALES al backend
   // ========== FORM SUBMIT HANDLER (Versión mejorada) ==========
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setFormError(null);
-  
-  try {
-    const memberData = {
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      address: formData.address,
-      documentType: formData.documentType,
-      document: formData.document,
-      gender: formData.gender,
-      maritalStatus: formData.maritalStatus,
-      city: formData.city,
-      profession: formData.profession,
-      birthdate: formData.birthdate,
-      employmentStatus: formData.employmentStatus,
-      leader: formData.leader,
-      district: formData.district,
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setFormError(null);
 
-    if (editingId) {
-      await apiService.updateMember(editingId, memberData);
-      
-      // Mostrar alert inmediatamente
-      alert("✅ Miembro actualizado");
-      
-      // Luego actualizar datos
-      await fetchAllMembers();
-    } else {
-      await apiService.createMember(memberData);
-      
-      // Mostrar alert inmediatamente
-      alert("✅ Miembro creado exitosamente");
-      
-      // Luego actualizar datos
-      await fetchAllMembers();
+    try {
+      const memberData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        documentType: formData.documentType,
+        document: formData.document,
+        gender: formData.gender,
+        maritalStatus: formData.maritalStatus,
+        city: formData.city,
+        profession: formData.profession,
+        birthdate: formData.birthdate,
+        employmentStatus: formData.employmentStatus,
+        leader: formData.leader,
+        district: formData.district,
+      };
+
+      if (editingId) {
+        await apiService.updateMember(editingId, memberData);
+
+        // Mostrar alert inmediatamente
+        alert("✅ Miembro actualizado");
+
+        // Luego actualizar datos
+        await fetchAllMembers();
+      } else {
+        await apiService.createMember(memberData);
+
+        // Mostrar alert inmediatamente
+        alert("✅ Miembro creado exitosamente");
+
+        // Luego actualizar datos
+        await fetchAllMembers();
+      }
+
+      resetForm();
+    } catch (err) {
+      setFormError(err.message);
+      alert("❌ Error: " + err.message);
     }
-    
-    resetForm();
-    
-  } catch (err) {
-    setFormError(err.message);
-    alert("❌ Error: " + err.message);
-  }
-};
+  };
 
   const handleEdit = (member) => {
     setFormData({
@@ -475,11 +474,11 @@ const handleSubmit = async (e) => {
   // ========== LÓGICA DE FILTRADO ==========
   const applyFilters = (membersArray) => {
     return membersArray.filter((member) => {
-      // Filtro por búsqueda de texto (nombre/email) - usando nombres ORIGINALES
+      // Filtro por búsqueda de texto (nombre/documento) ← CAMBIA EL COMENTARIO
       const matchesSearch =
         !searchTerm.trim() ||
         member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        member.document?.toLowerCase().includes(searchTerm.toLowerCase()); // ← CAMBIA email por document
 
       // Filtro por género
       const matchesGender = !filters.gender || member.gender === filters.gender;
@@ -538,15 +537,16 @@ const handleSubmit = async (e) => {
       if (filters.gender) filterSummary.push(`Género: ${filters.gender}`);
       if (filters.district) filterSummary.push(`Distrito: ${filters.district}`);
       if (filters.leader) {
-        const leader = allMembers.find(
-          (m) => m.id === Number(filters.leader),
-        );
+        const leader = allMembers.find((m) => m.id === Number(filters.leader));
         filterSummary.push(`Líder: ${getDisplayName(leader?.name)}`); // ✅ Usar helper
       }
 
       // Crear copia de los miembros con nombres transformados para el PDF
-      const membersForPDF = transformArrayForDisplay(displayMembers, ['name', 'leader.name']);
-      
+      const membersForPDF = transformArrayForDisplay(displayMembers, [
+        "name",
+        "leader.name",
+      ]);
+
       generateMembersPDF(membersForPDF, filterSummary);
     } catch (err) {
       alert("❌ Error al generar PDF: " + err.message);
@@ -664,7 +664,8 @@ const handleSubmit = async (e) => {
                           onClick={() => handleSelectLeader(leader)}
                         >
                           <div className="members-page__leader-option-name">
-                            {getDisplayName(leader.name)} {/* ✅ Mostrar nombre transformado */}
+                            {getDisplayName(leader.name)}{" "}
+                            {/* ✅ Mostrar nombre transformado */}
                           </div>
                           <div className="members-page__leader-option-email">
                             {leader.email}
@@ -677,7 +678,8 @@ const handleSubmit = async (e) => {
 
                 {selectedLeader && (
                   <div className="members-page__leader-selected">
-                    <p>✅ {getDisplayName(selectedLeader.name)}</p> {/* ✅ Mostrar nombre transformado */}
+                    <p>✅ {getDisplayName(selectedLeader.name)}</p>{" "}
+                    {/* ✅ Mostrar nombre transformado */}
                   </div>
                 )}
               </div>
@@ -812,7 +814,7 @@ const handleSubmit = async (e) => {
           <input
             type="text"
             className="members-page__search-input"
-            placeholder="🔍 Buscar por nombre o email..."
+            placeholder="🔍 Buscar por nombre o documento..." // ← CAMBIA ESTO
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -859,14 +861,15 @@ const handleSubmit = async (e) => {
               </thead>
               <tbody>
                 {displayMembers.map((member) => (
-                  <tr 
-                    key={member.id} 
-                    onClick={() => handleViewDetails(member)} 
+                  <tr
+                    key={member.id}
+                    onClick={() => handleViewDetails(member)}
                     style={{ cursor: "pointer" }}
                   >
                     <td>
                       <strong className="members-page__member-name-clickable">
-                        {getDisplayName(member.name)} {/* ✅ Usar helper aquí */}
+                        {getDisplayName(member.name)}{" "}
+                        {/* ✅ Usar helper aquí */}
                       </strong>
                     </td>
                     <td>{member.phone || "-"}</td>
@@ -884,13 +887,16 @@ const handleSubmit = async (e) => {
                     <td>
                       {member.leader ? (
                         <span className="members-page__leader-badge">
-                          {getDisplayName(member.leader.name)} {/* ✅ Usar helper aquí */}
+                          {getDisplayName(member.leader.name)}{" "}
+                          {/* ✅ Usar helper aquí */}
                         </span>
                       ) : (
                         <span className="members-page__no-leader">—</span>
                       )}
                     </td>
-                    <td className="members-page__email-column">{member.email}</td>
+                    <td className="members-page__email-column">
+                      {member.email}
+                    </td>
                   </tr>
                 ))}
               </tbody>

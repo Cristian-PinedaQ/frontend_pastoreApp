@@ -817,58 +817,74 @@ const ActivityPage = () => {
       subtitle = filterLabels.join(" • ");
 
       // 🆕 OBTENER DATOS DE ENTREGAS PARA CADA ACTIVIDAD FILTRADA
-      log("Obteniendo estadísticas de entregas para", filteredActivities.length, "actividades");
-      
+      log(
+        "Obteniendo estadísticas de entregas para",
+        filteredActivities.length,
+        "actividades",
+      );
+
       const activitiesWithDelivery = await Promise.all(
         filteredActivities.map(async (activity) => {
           try {
             // Obtener participantes de esta actividad
             const participants = await apiService.request(
-              `/activity-contribution/activity/${activity.id}/with-leader-info`
+              `/activity-contribution/activity/${activity.id}/with-leader-info`,
             );
 
-            const deliveredCount = participants?.filter(p => p.itemDelivered === true).length || 0;
+            const deliveredCount =
+              participants?.filter((p) => p.itemDelivered === true).length || 0;
             const totalParticipants = participants?.length || 0;
-            const deliveryPercentage = totalParticipants > 0
-              ? (deliveredCount / totalParticipants * 100).toFixed(1)
-              : 0;
+            const deliveryPercentage =
+              totalParticipants > 0
+                ? ((deliveredCount / totalParticipants) * 100).toFixed(1)
+                : 0;
 
-            log(`📦 Actividad ${activity.id} - Entregados: ${deliveredCount}/${totalParticipants} (${deliveryPercentage}%)`);
+            log(
+              `📦 Actividad ${activity.id} - Entregados: ${deliveredCount}/${totalParticipants} (${deliveryPercentage}%)`,
+            );
 
             return {
               ...activity,
               deliveryStats: {
                 deliveredCount,
                 totalParticipants,
-                deliveryPercentage
-              }
+                deliveryPercentage,
+              },
             };
           } catch (err) {
-            logError(`Error obteniendo entregas para actividad ${activity.id}:`, err);
+            logError(
+              `Error obteniendo entregas para actividad ${activity.id}:`,
+              err,
+            );
             return {
               ...activity,
               deliveryStats: {
                 deliveredCount: 0,
                 totalParticipants: 0,
-                deliveryPercentage: 0
-              }
+                deliveryPercentage: 0,
+              },
             };
           }
-        })
+        }),
       );
 
       // Calcular totales globales de entregas
       const totalDeliveredGlobal = activitiesWithDelivery.reduce(
-        (sum, a) => sum + (a.deliveryStats?.deliveredCount || 0), 0
+        (sum, a) => sum + (a.deliveryStats?.deliveredCount || 0),
+        0,
       );
       const totalParticipantsGlobal = activitiesWithDelivery.reduce(
-        (sum, a) => sum + (a.deliveryStats?.totalParticipants || 0), 0
+        (sum, a) => sum + (a.deliveryStats?.totalParticipants || 0),
+        0,
       );
-      const globalDeliveryPercentage = totalParticipantsGlobal > 0
-        ? (totalDeliveredGlobal / totalParticipantsGlobal * 100).toFixed(1)
-        : 0;
+      const globalDeliveryPercentage =
+        totalParticipantsGlobal > 0
+          ? ((totalDeliveredGlobal / totalParticipantsGlobal) * 100).toFixed(1)
+          : 0;
 
-      log(`📊 Totales globales entregas: ${totalDeliveredGlobal}/${totalParticipantsGlobal} (${globalDeliveryPercentage}%)`);
+      log(
+        `📊 Totales globales entregas: ${totalDeliveredGlobal}/${totalParticipantsGlobal} (${globalDeliveryPercentage}%)`,
+      );
 
       const data = {
         title,
@@ -889,7 +905,7 @@ const ActivityPage = () => {
           // 🆕 Datos globales de entregas
           totalDelivered: totalDeliveredGlobal,
           totalParticipantsCount: totalParticipantsGlobal,
-          deliveryPercentage: globalDeliveryPercentage
+          deliveryPercentage: globalDeliveryPercentage,
         },
       };
 
@@ -928,7 +944,13 @@ const ActivityPage = () => {
 
   // ========== INSCRIBIR PARTICIPANTE ==========
   const handleEnrollParticipant = useCallback(
-    async (activityId, memberId, initialPayment, incomeMethod, quantity = 1) => {
+    async (
+      activityId,
+      memberId,
+      initialPayment,
+      incomeMethod,
+      quantity = 1,
+    ) => {
       if (!canWrite) return false;
 
       try {
@@ -937,6 +959,35 @@ const ActivityPage = () => {
           memberId,
           initialPayment,
         });
+
+        // 🚨 VALIDACIÓN DE ESTADO DE ACTIVIDAD
+        const activity = allActivities.find((a) => a.id === activityId);
+
+        if (!activity) {
+          setError("❌ Actividad no encontrada");
+          return false;
+        }
+
+        const statusColor = activity.status?.color;
+
+        const isAllowed =
+          statusColor === "success" || // 🟢 ACTIVE
+          statusColor === "warning"; // 🟠 ENDING_SOON
+
+        if (!isAllowed) {
+          const errorMsg =
+            "❌ No se pueden agregar participantes a esta actividad (solo activas o por finalizar)";
+          setError(errorMsg);
+          log("Intento de inscripción bloqueado por estado", {
+            activityId,
+            status: activity.status,
+          });
+          return false;
+        }
+
+        // =========================
+        // 🔽 LÓGICA ORIGINAL
+        // =========================
 
         const currentUser = apiService.getCurrentUser();
         const recordedBy = currentUser?.username || "Sistema";
@@ -947,6 +998,7 @@ const ActivityPage = () => {
         log("Verificando si el miembro ya está inscrito...");
 
         let alreadyEnrolled = false;
+
         try {
           const currentParticipants = await apiService.request(
             `/activity-contribution/activity/${activityId}/with-leader-info`,
@@ -955,13 +1007,8 @@ const ActivityPage = () => {
           if (Array.isArray(currentParticipants)) {
             alreadyEnrolled = currentParticipants.some((participant) => {
               if (participant.memberId === memberId) return true;
-              if (participant.member && participant.member.id === memberId)
-                return true;
-              if (
-                participant.member &&
-                participant.member.memberId === memberId
-              )
-                return true;
+              if (participant.member?.id === memberId) return true;
+              if (participant.member?.memberId === memberId) return true;
               return false;
             });
 
@@ -980,11 +1027,8 @@ const ActivityPage = () => {
           );
         }
 
-        if (alreadyEnrolled) {
-          return false;
-        }
+        if (alreadyEnrolled) return false;
 
-        let response;
         let endpoint;
         let enrollmentData;
 
@@ -1010,7 +1054,7 @@ const ActivityPage = () => {
 
         log(`Enviando a ${endpoint}`, enrollmentData);
 
-        response = await apiService.request(endpoint, {
+        const response = await apiService.request(endpoint, {
           method: "POST",
           body: JSON.stringify(enrollmentData),
         });
@@ -1025,12 +1069,17 @@ const ActivityPage = () => {
         });
 
         alert(
-          `✅ Participante inscrito ${hasInitialPayment ? `con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}` : "sin pago inicial"}`,
+          `✅ Participante inscrito ${
+            hasInitialPayment
+              ? `con pago de $${parseFloat(initialPayment).toLocaleString("es-CO")}`
+              : "sin pago inicial"
+          }`,
         );
 
         if (showParticipantsModal) {
           await loadActivityParticipants(activityId);
         }
+
         if (showDetailsModal || showFinanceModal) {
           await loadActivityBalance(activityId);
         }
@@ -1040,6 +1089,7 @@ const ActivityPage = () => {
         logError("Error inscribiendo participante:", err);
 
         let errorMessage = "Error al inscribir participante";
+
         if (err.response?.data?.error) {
           errorMessage = err.response.data.error;
         } else if (err.message) {
@@ -1055,6 +1105,7 @@ const ActivityPage = () => {
     },
     [
       canWrite,
+      allActivities, // 🔥 IMPORTANTE (lo agregué)
       showParticipantsModal,
       showDetailsModal,
       showFinanceModal,

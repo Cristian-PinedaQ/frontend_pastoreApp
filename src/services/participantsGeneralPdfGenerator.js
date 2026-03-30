@@ -1,7 +1,7 @@
 // ============================================
 // participantsGeneralPdfGenerator.js
 // Generador de PDF para el listado general de participantes (con soporte de filtros)
-// Uso: import { generateGeneralParticipantsPDF } from './participantsGeneralPdfGenerator';
+// ✅ ACTUALIZADO: Incluye cantidad de unidades y entrega de artículo
 // ============================================
 
 const PAYMENT_STATUS_COLORS = {
@@ -31,17 +31,6 @@ const DELIVERY_LABELS = {
  * Soporta diferentes nombres de campo: itemDelivered, delivered, isDelivered
  */
 const getItemDelivered = (participant) => {
-  // Debug: mostrar qué campos tiene el participante
-  if (participant && !participant._debugLogged) {
-    console.log('🔍 [PDF] Campos del participante:', Object.keys(participant));
-    console.log('🔍 [PDF] itemDelivered:', participant.itemDelivered);
-    console.log('🔍 [PDF] delivered:', participant.delivered);
-    console.log('🔍 [PDF] isDelivered:', participant.isDelivered);
-    console.log('🔍 [PDF] item_delivered:', participant.item_delivered);
-    participant._debugLogged = true; // Marcar para no loguear múltiples veces
-  }
-  
-  // Intentar con diferentes nombres de campo
   if (participant.itemDelivered !== undefined && participant.itemDelivered !== null) {
     return participant.itemDelivered === true;
   }
@@ -54,10 +43,23 @@ const getItemDelivered = (participant) => {
   if (participant.item_delivered !== undefined && participant.item_delivered !== null) {
     return participant.item_delivered === true;
   }
-  
-  // Si no hay campo, asumir false
-  console.warn('⚠️ [PDF] No se encontró campo de entrega para participante:', participant.memberName);
   return false;
+};
+
+/**
+ * Helper para obtener la cantidad de unidades de un participante
+ */
+const getQuantity = (participant) => {
+  return participant.quantity || 1;
+};
+
+/**
+ * Helper para obtener el precio total considerando cantidad
+ */
+const getTotalPrice = (participant, unitPrice) => {
+  if (participant.totalPrice) return participant.totalPrice;
+  const qty = getQuantity(participant);
+  return (unitPrice || 0) * qty;
 };
 
 /**
@@ -92,44 +94,40 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   }
 
   // ────────────────────────────────────────────
-  // Calcular estadísticas
+  // Calcular estadísticas (ACTUALIZADO con cantidad y entregas)
   // ────────────────────────────────────────────
   const calculateStatistics = (participants) => {
-    // Debug: mostrar los primeros participantes para ver qué campos tienen
-    if (participants.length > 0) {
-      console.log('🔍 [PDF] Primer participante:', JSON.stringify(participants[0], null, 2));
-      console.log('🔍 [PDF] itemDelivered value:', participants[0].itemDelivered);
-    }
+    const unitPrice = activity?.price || 0;
     
     const deliveredCount = participants.filter(p => getItemDelivered(p) === true).length;
     const notDeliveredCount = participants.length - deliveredCount;
     
+    // ✅ Nueva estadística: total de unidades
+    const totalUnits = participants.reduce((sum, p) => sum + getQuantity(p), 0);
+    
+    // ✅ Nueva estadística: total a pagar considerando cantidad
+    const totalToPay = participants.reduce((sum, p) => sum + getTotalPrice(p, unitPrice), 0);
+    
     const stats = {
       total: participants.length,
+      totalUnits: totalUnits, // 🆕 Total de unidades (para actividades con cantidad)
+      totalToPay: totalToPay, // 🆕 Total a pagar (considerando cantidad)
       fullyPaid: participants.filter(p => p.isFullyPaid).length,
       partiallyPaid: participants.filter(p => (p.totalPaid || 0) > 0 && !p.isFullyPaid).length,
       pending: participants.filter(p => (p.totalPaid || 0) === 0).length,
       totalPaid: participants.reduce((sum, p) => sum + (p.totalPaid || 0), 0),
       totalPending: participants.reduce((sum, p) => sum + (p.pendingBalance || 0), 0),
-      // 🆕 Estadísticas de entregas
       delivered: deliveredCount,
       notDelivered: notDeliveredCount,
     };
     
-    stats.percentagePaid = stats.totalPaid + stats.totalPending > 0 
-      ? ((stats.totalPaid / (stats.totalPaid + stats.totalPending)) * 100).toFixed(1)
+    stats.percentagePaid = totalToPay > 0 
+      ? ((stats.totalPaid / totalToPay) * 100).toFixed(1)
       : 0;
     
     stats.deliveryPercentage = stats.total > 0
       ? ((stats.delivered / stats.total) * 100).toFixed(1)
       : 0;
-    
-    console.log('📊 [PDF] Estadísticas calculadas:', {
-      total: stats.total,
-      delivered: stats.delivered,
-      notDelivered: stats.notDelivered,
-      deliveryPercentage: stats.deliveryPercentage
-    });
     
     return stats;
   };
@@ -183,10 +181,14 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   const hasFilters = appliedFilters.length > 0;
 
   // ────────────────────────────────────────────
-  // KPI boxes (ACTUALIZADOS con ENTREGADOS)
+  // KPI boxes (ACTUALIZADOS con UNIDADES y ENTREGAS)
   // ────────────────────────────────────────────
+  const unitPrice = activity?.price || 0;
+  const hasQuantity = participants.some(p => getQuantity(p) > 1);
+  
   const kpis = [
     { label: 'Total Participantes', value: stats.total, color: COLORS.primary },
+    ...(hasQuantity ? [{ label: 'Total Unidades', value: stats.totalUnits, color: COLORS.info }] : []),
     { label: 'Completamente Pagado', value: stats.fullyPaid, color: COLORS.success },
     { label: 'Pago Parcial', value: stats.partiallyPaid, color: COLORS.warning },
     { label: 'Pendiente', value: stats.pending, color: COLORS.danger },
@@ -238,9 +240,13 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   `).join('');
 
   // ────────────────────────────────────────────
-  // Resumen financiero
+  // Resumen financiero (ACTUALIZADO con total a pagar)
   // ────────────────────────────────────────────
   const financialSummary = `
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
+      <span style="color:${COLORS.textSub}">Total a pagar</span>
+      <span style="font-weight:700;color:${COLORS.primary}">${formatCurrency(stats.totalToPay)}</span>
+    </div>
     <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
       <span style="color:${COLORS.textSub}">Total recaudado</span>
       <span style="font-weight:700;color:${COLORS.success}">${formatCurrency(stats.totalPaid)}</span>
@@ -271,8 +277,20 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     </div>
   `;
 
+  // 🆕 Resumen de unidades (si aplica)
+  const unitsSummary = hasQuantity ? `
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
+      <span style="color:${COLORS.textSub}">🔢 Total unidades</span>
+      <span style="font-weight:700;color:${COLORS.info}">${stats.totalUnits}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px">
+      <span style="color:${COLORS.textSub}">📊 Promedio por participante</span>
+      <span style="font-weight:700;color:${COLORS.textMain}">${(stats.totalUnits / stats.total).toFixed(1)}</span>
+    </div>
+  ` : '';
+
   // ────────────────────────────────────────────
-  // Información de la actividad
+  // Información de la actividad (ACTUALIZADA con cantidad)
   // ────────────────────────────────────────────
   const activityInfo = activity ? `
     <div style="background:${COLORS.light};border-radius:8px;padding:12px;margin-bottom:16px">
@@ -282,9 +300,19 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
           <div style="font-size:11px;font-weight:600;color:${COLORS.textMain}">${activity.name || 'Sin nombre'}</div>
         </div>
         <div>
-          <div style="font-size:9px;color:${COLORS.textSub};text-transform:uppercase">Precio</div>
+          <div style="font-size:9px;color:${COLORS.textSub};text-transform:uppercase">${hasQuantity ? 'Precio Unitario' : 'Precio'}</div>
           <div style="font-size:11px;font-weight:600;color:${COLORS.textMain}">${formatCurrency(activity.price || 0)}</div>
         </div>
+        ${hasQuantity ? `
+        <div>
+          <div style="font-size:9px;color:${COLORS.textSub};text-transform:uppercase">Total Unidades</div>
+          <div style="font-size:11px;font-weight:600;color:${COLORS.textMain}">${stats.totalUnits}</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:${COLORS.textSub};text-transform:uppercase">Total a Pagar</div>
+          <div style="font-size:11px;font-weight:600;color:${COLORS.success}">${formatCurrency(stats.totalToPay)}</div>
+        </div>
+        ` : `
         <div>
           <div style="font-size:9px;color:${COLORS.textSub};text-transform:uppercase">Cupo máximo</div>
           <div style="font-size:11px;font-weight:600;color:${COLORS.textMain}">${activity.quantity || 'Sin límite'}</div>
@@ -293,24 +321,27 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
           <div style="font-size:9px;color:${COLORS.textSub};text-transform:uppercase">Fecha fin</div>
           <div style="font-size:11px;font-weight:600;color:${COLORS.textMain}">${activity.endDate ? formatDate(activity.endDate) : 'No definida'}</div>
         </div>
+        `}
       </div>
     </div>
   ` : '';
 
   // ────────────────────────────────────────────
-  // Tabla de participantes (CON COLUMNA ENTREGA)
+  // Tabla de participantes (CON COLUMNAS ACTUALIZADAS)
   // ────────────────────────────────────────────
   const tableRows = participants.map((p, i) => {
     const status = p.isFullyPaid ? 'FULLY_PAID' : (p.totalPaid || 0) > 0 ? 'PARTIALLY_PAID' : 'PENDING';
     const statusColor = PAYMENT_STATUS_COLORS[status];
     const statusLabel = PAYMENT_STATUS_LABELS[status];
     
-    // 🆕 Estado de entrega - usar helper robusto
     const isDelivered = getItemDelivered(p);
     const deliveryStatus = isDelivered ? 'DELIVERED' : 'NOT_DELIVERED';
     const deliveryColor = DELIVERY_COLORS[deliveryStatus];
     const deliveryLabel = DELIVERY_LABELS[deliveryStatus];
     const deliveryIcon = isDelivered ? '✅' : '⏳';
+    
+    const quantity = getQuantity(p);
+    const totalPrice = getTotalPrice(p, unitPrice);
     
     return `
       <tr style="background:${i % 2 === 0 ? COLORS.white : COLORS.light}">
@@ -318,6 +349,10 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
         <td style="padding:7px 10px;font-size:11px;font-weight:600;color:${COLORS.textMain};border-bottom:1px solid ${COLORS.border}">${p.memberName || 'Sin nombre'}</td>
         <td style="padding:7px 10px;font-size:10px;color:${COLORS.textSub};border-bottom:1px solid ${COLORS.border}">${p.leaderName || 'Sin líder'}</td>
         <td style="padding:7px 10px;font-size:10px;color:${COLORS.textSub};border-bottom:1px solid ${COLORS.border}">${p.districtDescription || 'Sin distrito'}</td>
+        ${hasQuantity ? `
+        <td style="padding:7px 10px;font-size:10px;color:${COLORS.textMain};border-bottom:1px solid ${COLORS.border};text-align:center;font-weight:600">${quantity}</td>
+        <td style="padding:7px 10px;font-size:10px;color:${COLORS.primary};border-bottom:1px solid ${COLORS.border};text-align:right">${formatCurrency(totalPrice)}</td>
+        ` : ''}
         <td style="padding:7px 10px;font-size:10px;color:${COLORS.success};font-weight:600;border-bottom:1px solid ${COLORS.border};text-align:right">${formatCurrency(p.totalPaid || 0)}</td>
         <td style="padding:7px 10px;font-size:10px;color:${COLORS.danger};font-weight:600;border-bottom:1px solid ${COLORS.border};text-align:right">${formatCurrency(p.pendingBalance || 0)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid ${COLORS.border};text-align:center">
@@ -327,9 +362,18 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
           <span style="background:${deliveryColor}22;color:${deliveryColor};font-size:9px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap">${deliveryIcon} ${deliveryLabel}</span>
         </td>
         <td style="padding:7px 10px;font-size:9px;color:${COLORS.textSub};border-bottom:1px solid ${COLORS.border};text-align:center">${p.registrationDate ? formatDate(p.registrationDate) : '-'}</td>
-       </tr>
+      </tr>
     `;
   }).join('');
+
+  // ────────────────────────────────────────────
+  // Definir columnas de la tabla dinámicamente
+  // ────────────────────────────────────────────
+  const tableColumns = [
+    '#', 'Nombre', 'Líder', 'Distrito',
+    ...(hasQuantity ? ['Unidades', 'Total'] : []),
+    'Pagado', 'Pendiente', 'Estado', '📦 Entrega', 'Inscripción'
+  ];
 
   // ────────────────────────────────────────────
   // HTML completo
@@ -402,7 +446,7 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     </div>
   </div>
 
-  <!-- SEGUNDA FILA: RESUMEN DE ENTREGAS Y RESUMEN DE ACTIVIDAD -->
+  <!-- SEGUNDA FILA: RESUMEN DE ENTREGAS Y RESUMEN DE UNIDADES -->
   <div style="display:flex;gap:14px;margin-bottom:18px" class="no-break">
     <div style="flex:1;background:#fff;border:1px solid ${COLORS.border};border-radius:10px;padding:14px">
       <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3b82f6">
@@ -419,6 +463,16 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
           <span style="color:${COLORS.textSub};font-size:10px">Total participantes:</span>
           <span style="font-weight:700;color:${COLORS.primary}">${stats.total}</span>
         </div>
+        ${hasQuantity ? `
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:${COLORS.textSub};font-size:10px">🔢 Total unidades:</span>
+          <span style="font-weight:700;color:${COLORS.info}">${stats.totalUnits}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:${COLORS.textSub};font-size:10px">📊 Promedio por participante:</span>
+          <span style="font-weight:700;color:${COLORS.textMain}">${(stats.totalUnits / stats.total).toFixed(1)}</span>
+        </div>
+        ` : ''}
         <div style="display:flex;justify-content:space-between">
           <span style="color:${COLORS.textSub};font-size:10px">Promedio por líder:</span>
           <span style="font-weight:700;color:${COLORS.textMain}">${(stats.total / Math.max(1, new Set(participants.map(p => p.leaderName)).size)).toFixed(1)}</span>
@@ -433,6 +487,14 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
         </div>
       </div>
     </div>
+    ${hasQuantity ? `
+    <div style="flex:1;background:#fff;border:1px solid ${COLORS.border};border-radius:10px;padding:14px">
+      <div style="font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #3b82f6">
+        🔢 Resumen de Unidades
+      </div>
+      ${unitsSummary}
+    </div>
+    ` : ''}
   </div>
 
   <!-- TABLA -->
@@ -449,9 +511,9 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr style="background:#f1f5f9">
-          ${['#','Nombre','Líder','Distrito','Pagado','Pendiente','Estado','📦 Entrega','Inscripción'].map(h =>
-            `<th style="padding:8px 10px;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;text-align:${h === '#' || h === 'Pagado' || h === 'Pendiente' ? 'center' : 'left'};font-weight:700;border-bottom:1px solid ${COLORS.border}">${h}</th>`
-          ).join('')}
+          ${tableColumns.map(h => `
+            <th style="padding:8px 10px;font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.8px;text-align:${h === '#' || h === 'Pagado' || h === 'Pendiente' || h === 'Unidades' || h === 'Total' ? 'center' : 'left'};font-weight:700;border-bottom:1px solid ${COLORS.border}">${h}</th>
+          `).join('')}
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -465,16 +527,21 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
     <span style="font-size:9px;color:#94a3b8">${new Date().toLocaleString('es-CO')}</span>
   </div>
 
-  <!-- RESUMEN FINAL (ACTUALIZADO CON ENTREGAS) -->
+  <!-- RESUMEN FINAL (ACTUALIZADO CON UNIDADES Y ENTREGAS) -->
   <div style="margin-top:12px;padding:10px;background:${COLORS.light};border-radius:8px;text-align:center">
     <span style="font-size:11px;font-weight:600;color:${COLORS.primary}">
-      📦 Entregados: ${stats.delivered}/${stats.total} (${stats.deliveryPercentage}%) • Total recaudado: ${formatCurrency(stats.totalPaid)} (${stats.percentagePaid}%) • Por cobrar: ${formatCurrency(stats.totalPending)}
+      📊 ${stats.total} participante${stats.total !== 1 ? 's' : ''} • 
+      ${hasQuantity ? `🔢 ${stats.totalUnits} unidad${stats.totalUnits !== 1 ? 'es' : ''} • ` : ''}
+      📦 ${stats.delivered}/${stats.total} entregados (${stats.deliveryPercentage}%) • 
+      💰 Total recaudado: ${formatCurrency(stats.totalPaid)} (${stats.percentagePaid}%) • 
+      ⏳ Por cobrar: ${formatCurrency(stats.totalPending)}
     </span>
   </div>
 
   <!-- NOTAS EXPLICATIVAS -->
   <div style="margin-top:10px;padding:8px;background:${COLORS.light};border-radius:6px;text-align:center;font-size:8px;color:${COLORS.textSub}">
-    📦 Entregado = Participante que ha recibido el artículo/kit de la actividad
+    📦 Entregado = Participante que ha recibido el artículo/kit de la actividad<br/>
+    ${hasQuantity ? '🔢 Unidades = Cantidad de artículos/inscripciones por participante' : ''}
   </div>
 
 </body>
@@ -489,7 +556,6 @@ export const generateGeneralParticipantsPDF = (data, filename = 'participantes-g
   win.document.write(html);
   win.document.close();
   
-  // Pequeño retraso para asegurar que el CSS se aplique antes de imprimir
   win.onload = () => {
     setTimeout(() => {
       win.print();

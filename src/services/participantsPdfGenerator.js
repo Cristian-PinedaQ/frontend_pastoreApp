@@ -1,8 +1,7 @@
 // services/participantsPdfGenerator.js
 // ============================================
-// participantsPdfGenerator.js
-// Generador de PDF para detalle de participante (con el mismo formato que cellGroupsPdfGenerator)
-// Uso: import { generateParticipantsPDF } from './participantsPdfGenerator';
+// participantsPdfGenerator.js - ACTUALIZADO CON NUEVOS CAMPOS
+// Incluye: cantidad de unidades, entrega de artículo, precio total con cantidad
 // ============================================
 
 const PAYMENT_STATUS_COLORS = {
@@ -116,11 +115,24 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
   };
 
   // ────────────────────────────────────────────
-  // Calcular valores financieros
+  // OBTENER DATOS CON LOS NUEVOS CAMPOS
   // ────────────────────────────────────────────
-  const totalPrice = data.activity?.price || 0;
+  
+  // ✅ Cantidad de unidades (nuevo campo)
+  const quantity = participant.quantity || data.activity?.quantity || 1;
+  
+  // ✅ Precio unitario
+  const unitPrice = data.activity?.price || 0;
+  
+  // ✅ Precio total considerando cantidad (nuevo cálculo)
+  const totalPrice = participant.totalPrice || (unitPrice * quantity);
+  
+  // ✅ Estado de entrega del artículo (nuevo campo)
+  const itemDelivered = participant.itemDelivered ?? false;
+  
+  // Otros valores financieros
   const totalPaid = participant.totalPaid || 0;
-  const pendingBalance = participant.pendingBalance || 0;
+  const pendingBalance = participant.pendingBalance || (totalPrice - totalPaid);
   const compliancePercentage = totalPrice > 0 ? (totalPaid / totalPrice) * 100 : 0;
   const isFullyPaid = participant.isFullyPaid || pendingBalance <= 0;
   const paymentStatus = isFullyPaid ? 'COMPLETED' : pendingBalance < totalPrice ? 'PARTIAL' : 'PENDING';
@@ -130,14 +142,14 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
   const paymentHistory = participant.paymentHistory || [];
 
   // ────────────────────────────────────────────
-  // KPI boxes
+  // KPI boxes con nueva información
   // ────────────────────────────────────────────
   const kpis = [
     { 
-      label: 'Precio Total', 
+      label: quantity > 1 ? 'Precio Total' : 'Valor Actividad', 
       value: formatCurrency(totalPrice), 
       color: COLORS.primary,
-      subtext: 'Valor actividad'
+      subtext: quantity > 1 ? `${quantity} unidad(es) × ${formatCurrency(unitPrice)}` : 'Valor único'
     },
     { 
       label: 'Total Pagado', 
@@ -156,7 +168,7 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
       value: `${compliancePercentage.toFixed(1)}%`, 
       color: compliancePercentage >= 100 ? COLORS.success : 
              compliancePercentage >= 50 ? COLORS.warning : COLORS.danger,
-      subtext: `${paymentHistory.length} de ${totalPrice > 0 ? Math.ceil(totalPrice / 50000) : 0} cuotas estimadas`
+      subtext: `${paymentHistory.length} pago(s) registrados`
     },
   ];
 
@@ -177,9 +189,19 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
       <span style="font-weight:700;color:${COLORS.textMain}">${data.activity?.name || 'No disponible'}</span>
     </div>
     <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
-      <span style="color:${COLORS.textSub}">Precio</span>
-      <span style="font-weight:700;color:${COLORS.primary}">${formatCurrency(totalPrice)}</span>
+      <span style="color:${COLORS.textSub}">${quantity > 1 ? 'Precio Unitario' : 'Precio'}</span>
+      <span style="font-weight:700;color:${COLORS.primary}">${formatCurrency(unitPrice)}</span>
     </div>
+    ${quantity > 1 ? `
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
+      <span style="color:${COLORS.textSub}">Cantidad de Unidades</span>
+      <span style="font-weight:700;color:${COLORS.primary}">${quantity} ${quantity === 1 ? 'unidad' : 'unidades'}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
+      <span style="color:${COLORS.textSub}">Precio Total</span>
+      <span style="font-weight:700;color:${COLORS.success}">${formatCurrency(totalPrice)}</span>
+    </div>
+    ` : ''}
     <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
       <span style="color:${COLORS.textSub}">Estado actividad</span>
       <span style="font-weight:700;color:${data.activity?.isActive ? COLORS.success : COLORS.inactive}">${data.activity?.isActive ? 'Activa' : 'Inactiva'}</span>
@@ -191,7 +213,7 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
   `;
 
   // ────────────────────────────────────────────
-  // Información del participante (cards)
+  // Información del participante (cards) - CON NUEVOS CAMPOS
   // ────────────────────────────────────────────
   const participantInfoRows = `
     <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
@@ -209,6 +231,13 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
     <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
       <span style="color:${COLORS.textSub}">Fecha inscripción</span>
       <span style="font-weight:700;color:${COLORS.textMain}">${participant.registrationDate ? formatDateTime(participant.registrationDate) : 'No disponible'}</span>
+    </div>
+    <!-- ✅ NUEVO: Estado de entrega del artículo -->
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid ${COLORS.border};font-size:11px">
+      <span style="color:${COLORS.textSub}">Entrega de artículo</span>
+      <span style="display:inline-block;background:${itemDelivered ? COLORS.success + '22' : COLORS.warning + '22'};color:${itemDelivered ? COLORS.success : COLORS.warning};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700">
+        ${itemDelivered ? '✓ Entregado' : '⏳ Pendiente de entrega'}
+      </span>
     </div>
     <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:11px">
       <span style="color:${COLORS.textSub}">Estado inscripción</span>
@@ -306,6 +335,11 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
         <div style="font-size:16px;font-weight:600;opacity:0.9">
           ${participant.memberName || 'Participante sin nombre'}
         </div>
+        ${quantity > 1 ? `
+        <div style="font-size:12px;margin-top:6px;opacity:0.85">
+          📦 ${quantity} ${quantity === 1 ? 'unidad' : 'unidades'} × ${formatCurrency(unitPrice)} = ${formatCurrency(totalPrice)}
+        </div>
+        ` : ''}
       </div>
       <div style="text-align:right;opacity:0.85">
         <div style="font-size:11px">Generado</div>
@@ -314,9 +348,13 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
       </div>
     </div>
     <!-- Badge de estado de pago -->
-    <div style="margin-top:12px">
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <span style="display:inline-block;background:${PAYMENT_STATUS_COLORS[paymentStatus] || COLORS.inactive}22;color:#fff;font-size:11px;padding:4px 16px;border-radius:20px;font-weight:700;border:1px solid rgba(255,255,255,0.3)">
         ${isFullyPaid ? '✓ CUENTA CANCELADA' : pendingBalance < totalPrice ? '⚠ PAGO PARCIAL' : '● PENDIENTE DE PAGO'}
+      </span>
+      <!-- ✅ NUEVO: Badge de entrega de artículo -->
+      <span style="display:inline-block;background:${itemDelivered ? COLORS.success + '22' : COLORS.warning + '22'};color:#fff;font-size:11px;padding:4px 16px;border-radius:20px;font-weight:700;border:1px solid rgba(255,255,255,0.3)">
+        ${itemDelivered ? '📦 ARTÍCULO ENTREGADO' : '⏳ ARTÍCULO PENDIENTE'}
       </span>
     </div>
   </div>
@@ -390,15 +428,23 @@ export const generateParticipantsPDF = (data, filename = 'detalle-participante')
     `}
   </div>
 
-  <!-- RESUMEN FINAL -->
+  <!-- RESUMEN FINAL CON INFORMACIÓN DE CANTIDAD Y ENTREGA -->
   <div style="background:${isFullyPaid ? COLORS.success + '11' : COLORS.danger + '11'};border:1px solid ${isFullyPaid ? COLORS.success : COLORS.danger};border-radius:10px;padding:16px;margin-bottom:16px;text-align:center" class="no-break">
     <div style="font-size:14px;font-weight:800;color:${isFullyPaid ? COLORS.success : COLORS.danger};margin-bottom:4px">
       ${isFullyPaid ? '✓ CUENTA COMPLETA - Sin saldo pendiente' : `⚠ CUENTA PENDIENTE - Saldo: ${formatCurrency(pendingBalance)}`}
     </div>
-    <div style="font-size:10px;color:${COLORS.textSub}">
+    <div style="font-size:10px;color:${COLORS.textSub};margin-top:8px">
       ${isFullyPaid 
-        ? 'El participante ha cancelado la totalidad del valor de la actividad.' 
-        : `El participante tiene un saldo pendiente de ${formatCurrency(pendingBalance)} por cancelar.`}
+        ? `✅ El participante ha cancelado la totalidad del valor (${formatCurrency(totalPrice)}) de la actividad.` 
+        : `⚠️ El participante tiene un saldo pendiente de ${formatCurrency(pendingBalance)} por cancelar.`}
+    </div>
+    ${quantity > 1 ? `
+    <div style="font-size:10px;color:${COLORS.textSub};margin-top:6px">
+      📦 Cantidad total: ${quantity} ${quantity === 1 ? 'unidad' : 'unidades'} × ${formatCurrency(unitPrice)} = ${formatCurrency(totalPrice)}
+    </div>
+    ` : ''}
+    <div style="font-size:10px;color:${COLORS.textSub};margin-top:6px">
+      ${itemDelivered ? '✓ Artículo entregado al participante' : '⏳ Pendiente de entrega del artículo'}
     </div>
   </div>
 
