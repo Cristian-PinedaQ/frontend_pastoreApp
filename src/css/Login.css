@@ -7,10 +7,16 @@
 .login-container {
   min-height: 100vh;
   display: flex;
-  align-items: center;
+
+  align-items: flex-start;
   justify-content: center;
+
+  padding: 20px 0;
   position: relative;
-  overflow: hidden;
+
+  overflow-y: auto;   /* ✅ scroll vertical */
+  overflow-x: hidden; /* ✅ evita lateral */
+
   background: #f9fafb;
 }
 
@@ -57,6 +63,7 @@
   padding: 1.5rem;
   width: 100%;
   max-width: 500px;
+  margin: auto; /* 🔥 centrado limpio */
   z-index: 10;
   animation: slideInUp 0.6s ease-out;
 }
@@ -76,9 +83,11 @@
   background: white;
   border-radius: 1.5rem;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  max-height: 95vh;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* ========== HEADER ========== */
@@ -710,4 +719,17 @@ html.dark-mode .login-input:focus {
 .login-toggle-password:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
+}
+
+.login-alert--floating {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+
+  width: calc(100% - 40px);
+  max-width: 500px;
+
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }

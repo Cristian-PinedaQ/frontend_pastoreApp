@@ -1648,7 +1648,7 @@ const CellAttendancePage = () => {
   return (
     <div
       className="ca-page"
-      style={{ backgroundColor: theme.bg, color: theme.text }}
+      style={{ backgroundColor: theme.bg, overflow: 'visible', color: theme.text }}
     >
       <div className="ca-page-container">
         {/* Header */}

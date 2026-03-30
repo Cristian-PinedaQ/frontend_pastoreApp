@@ -10,6 +10,7 @@
    ✅ Feedback visual en botones
    ✅ Toast notifications
    ✅ Sticky stats en móvil
+   ✅ FIX: Scroll completo en móvil sin cortes
 */
 
 /* ========== VARIABLES ========== */
@@ -63,6 +64,12 @@
   transition: background 0.3s ease, color 0.3s ease;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* FIX: Asegurar scroll correcto */
+  height: auto !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  position: relative;
+  padding-bottom: calc(var(--ca-sp-xl) + 80px) !important;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -76,6 +83,7 @@ html.dark .ca-page {
 .ca-page-container {
   max-width: 960px;
   margin: 0 auto;
+  overflow: visible !important;
 }
 
 /* ========== HEADER ========== */
@@ -637,6 +645,11 @@ html.dark .ca-page__stat-bar { background: #334155; }
 /* ========== SECTIONS ========== */
 .ca-page__section {
   margin-bottom: var(--ca-sp-xl);
+  overflow: visible !important;
+}
+
+.ca-page__section:last-of-type {
+  margin-bottom: 80px !important;
 }
 
 .ca-page__section-header {
@@ -662,6 +675,8 @@ html.dark .ca-page__stat-bar { background: #334155; }
   display: flex;
   flex-direction: column;
   gap: 8px;
+  overflow: visible !important;
+  max-height: none !important;
 }
 
 .ca-page__participant-card {
@@ -876,6 +891,8 @@ html.dark .ca-page__stat-bar { background: #334155; }
   padding: 12px 16px;
   border-top: 1px solid;
   animation: caSlideIn 0.2s ease;
+  overflow: visible !important;
+  max-height: none !important;
 }
 
 @keyframes caSlideIn {
@@ -921,19 +938,22 @@ html.dark .ca-page__stat-bar { background: #334155; }
 
 /* ========== STICKY SAVE ========== */
 .ca-page__sticky-save {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 14px var(--ca-sp-lg);
-  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  justify-content: center;
-  z-index: 50;
-  background: linear-gradient(to top, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.6) 70%, transparent 100%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  animation: caStickIn 0.3s ease;
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  padding: 14px var(--ca-sp-lg) !important;
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+  display: flex !important;
+  justify-content: center !important;
+  z-index: 100 !important;
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.8) 70%, transparent 100%) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  animation: caStickIn 0.3s ease !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  pointer-events: auto !important;
 }
 
 @keyframes caStickIn {
@@ -1115,6 +1135,8 @@ html.dark .ca-page__summary-percentage-bar { background: #334155; }
   z-index: 1000;
   background-color: rgba(0,0,0,0.6);
   backdrop-filter: blur(4px);
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 /* ========== SESSION CARDS COMPACTAS CON SCROLL ========== */
@@ -1125,6 +1147,7 @@ html.dark .ca-page__summary-percentage-bar { background: #334155; }
   border: 1px solid var(--ca-border);
   background: var(--ca-bg-tertiary);
   scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch !important;
 }
 
 .ca-page__session-detail-scroll::-webkit-scrollbar {
@@ -1224,7 +1247,10 @@ html.dark .ca-page__session-detail-scroll::-webkit-scrollbar-thumb:hover {
    ═══════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
-  .ca-page { padding: var(--ca-sp-sm); }
+  .ca-page { 
+    padding: var(--ca-sp-sm);
+    padding-bottom: calc(var(--ca-sp-xl) + 90px) !important;
+  }
 
   .ca-page__header {
     flex-direction: column;
@@ -1307,10 +1333,30 @@ html.dark .ca-page__session-detail-scroll::-webkit-scrollbar-thumb:hover {
     background: inherit;
     padding-top: 4px;
   }
+
+  .ca-page__section:last-of-type {
+    margin-bottom: 90px !important;
+  }
+
+  /* Ajustar sticky stats en móvil */
+  .ca-page__live-stats-sticky {
+    position: relative !important;
+    top: auto !important;
+    z-index: 1 !important;
+  }
+  
+  .ca-page__live-stats-sticky > div {
+    position: relative !important;
+    top: auto !important;
+    transform: none !important;
+  }
 }
 
 @media (max-width: 480px) {
-  .ca-page { padding: 8px; }
+  .ca-page { 
+    padding: 8px;
+    padding-bottom: calc(var(--ca-sp-md) + 100px) !important;
+  }
 
   .ca-page__header {
     padding: var(--ca-sp-md);
@@ -1388,8 +1434,8 @@ html.dark .ca-page__session-detail-scroll::-webkit-scrollbar-thumb:hover {
   }
 
   .ca-page__sticky-save {
-    padding: 10px 12px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 12px !important;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .ca-page__btn--save-sticky {
@@ -1407,6 +1453,25 @@ html.dark .ca-page__session-detail-scroll::-webkit-scrollbar-thumb:hover {
     width: 22px;
     height: 22px;
   }
+
+  .ca-page__section:last-of-type {
+    margin-bottom: 100px !important;
+  }
+
+  /* Scroll suave en iOS */
+  .ca-page,
+  .ca-stats-modal-overlay,
+  .ca-stats-modal-scroll {
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+/* ========== MODAL SCROLL FIX ========== */
+.ca-stats-modal-scroll {
+  max-height: calc(100vh - 120px) !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding-bottom: 20px !important;
 }
 
 /* ========== ACCESSIBILITY ========== */
@@ -1435,7 +1500,7 @@ html.dark .ca-page__session-detail-scroll::-webkit-scrollbar-thumb:hover {
 /* ========== SAFE AREA ========== */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   @media (max-width: 480px) {
-    .ca-page { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+    .ca-page { padding-bottom: calc(8px + env(safe-area-inset-bottom) + 90px) !important; }
   }
 }
 
@@ -1471,122 +1536,27 @@ html.dark .ca-page__session-detail-scroll::-webkit-scrollbar-thumb:hover {
     border-color: #e5e7eb !important;
     box-shadow: none;
   }
-  /* ========== MEJORAS ESPECÍFICAS PARA MÓVIL ========== */
-@media (max-width: 480px) {
-  /* Asegurar que el scroll funcione en móvil */
-  .ca-stats-modal-scroll {
-    max-height: calc(92vh - 100px) !important;
-    -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
-    overflow-y: auto !important;
-  }
-  
-  /* Header del modal como botón */
-  .ca-stats-modal-header {
-    cursor: pointer !important;
-    background-color: var(--ca-bg-secondary);
-    border-bottom: 1px solid var(--ca-border);
-    min-height: 56px;
-  }
-  
-  .ca-stats-modal-header:active {
-    background-color: rgba(128, 128, 128, 0.1);
-  }
-  
-  /* Botones del header más grandes para facilitar el tacto */
-  .ca-stats-modal-header-buttons button {
-    min-width: 40px !important;
-    height: 40px !important;
-    border-radius: 10px !important;
-    font-size: 1.1rem !important;
-  }
-  
-  /* Scroll en detalle por sesión */
-  .ca-page__session-detail-scroll {
-    max-height: 200px !important;
-    -webkit-overflow-scrolling: touch;
-    overflow-y: auto !important;
-  }
-  
-  /* Forzar scroll visible en móvil */
-  .ca-stats-modal-scroll::-webkit-scrollbar,
-  .ca-page__session-detail-scroll::-webkit-scrollbar {
-    width: 4px !important;
-    display: block !important;
-  }
-  
-  .ca-stats-modal-scroll::-webkit-scrollbar-thumb,
-  .ca-page__session-detail-scroll::-webkit-scrollbar-thumb {
-    background: #888 !important;
-    border-radius: 4px !important;
-  }
-}
-/* ========== FIX: SCROLL COMPLETO EN MÓVIL ========== */
-@media (max-width: 768px) {
-  /* Asegurar que el contenedor principal tenga scroll */
-  .ca-page {
-    min-height: 100vh;
-    height: auto !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    padding-bottom: calc(var(--ca-sp-lg) + 80px) !important; /* Espacio para el botón sticky */
-  }
-
-  /* Eliminar posicionamiento fijo de las stats */
-  .ca-page__live-stats-sticky {
-    position: relative !important;
-    top: auto !important;
-    z-index: 1 !important;
-    margin-bottom: var(--ca-sp-md) !important;
-  }
-
-  /* Ajustar el contenedor de stats para que no sea sticky */
-  .ca-page__live-stats-sticky > div {
-    position: relative !important;
-    top: auto !important;
-    transform: none !important;
-  }
-
-  /* Asegurar que el botón sticky no bloquee el scroll */
-  .ca-page__sticky-save {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 100 !important;
-    pointer-events: auto !important;
-    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
-  }
-
-  /* Asegurar que el contenido sea scrolleable */
-  .ca-page__register-content {
-    padding-bottom: 20px !important;
-  }
 }
 
-/* Fix específico para móviles muy pequeños */
-@media (max-width: 480px) {
-  .ca-page {
-    padding-bottom: calc(var(--ca-sp-sm) + 100px) !important;
-  }
-
-  /* Forzar scroll en todo el contenido */
-  .ca-page__participants-list {
-    max-height: none !important;
-    overflow-y: visible !important;
-  }
-
-  /* Eliminar cualquier overflow hidden */
-  .ca-page__register-content,
-  .ca-page__section,
-  .ca-page__participants-list {
-    overflow: visible !important;
-  }
-
-  /* Asegurar que el modal de estadísticas también tenga scroll */
-  .ca-stats-modal-scroll {
-    max-height: calc(100vh - 120px) !important;
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
+/* ========== FIX: ELIMINAR OVERFLOW HIDDEN GLOBAL ========== */
+html, body {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  height: auto !important;
+  min-height: 100vh !important;
 }
+
+/* ========== FIX: CONTENEDORES CON OVERFLOW VISIBLE ========== */
+.ca-page__register-content,
+.ca-page__register-content > * {
+  overflow: visible !important;
+}
+
+/* ========== FIX: MODAL SCROLL ========== */
+.modal-content,
+[class*="modal"],
+[class*="Modal"] {
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
 }
