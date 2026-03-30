@@ -1333,7 +1333,7 @@ const ParticipantDetailModal = ({
                       <span className="form-label-icon">💰</span>Monto a Pagar *
                     </label>
                     <div className="amount-input-group">
-                      <span className="amount-prefix">$</span>
+                      <span className="amount-prefix"></span>
                       <input
                         id="paymentAmount"
                         type="number"
@@ -1601,7 +1601,7 @@ const ParticipantDetailModal = ({
                                 Monto *
                               </label>
                               <div className="amount-input-group">
-                                <span className="amount-prefix">$</span>
+                                <span className="amount-prefix"></span>
                                 <input
                                   id="editAmount"
                                   type="number"
