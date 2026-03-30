@@ -167,103 +167,108 @@ const ModalActivityParticipants = ({
   // =====================================================
 
   const handleGeneratePDF = () => {
-  try {
-    const unitPrice = activity?.price || 0;
-    
-    // Calcular estadísticas de unidades CORRECTAMENTE
-    const totalUnits = participants.reduce((sum, p) => sum + (p.quantity || 1), 0);
-    const totalToPay = participants.reduce((sum, p) => {
-      const qty = p.quantity || 1;
-      const price = p.totalPrice || (unitPrice * qty);
-      return sum + price;
-    }, 0);
-    
-    // Calcular entregas
-    const deliveredCount = participants.filter(p => p.itemDelivered === true).length;
-    const notDeliveredCount = participants.length - deliveredCount;
-    
-    // Calcular porcentaje de pago correcto usando totalToPay
-    const percentagePaid = totalToPay > 0 
-      ? ((stats.totalPaid / totalToPay) * 100).toFixed(1)
-      : 0;
-    
-    // Calcular porcentaje de entrega
-    const deliveryPercentage = participants.length > 0
-      ? ((deliveredCount / participants.length) * 100).toFixed(1)
-      : 0;
-    
-    // Asegurarse de que cada participante tenga todos los campos necesarios
-    const participantsWithDelivery = filteredParticipants.map((p) => ({
-      ...p,
-      // Asegurar campos de entrega
-      itemDelivered: p.itemDelivered === true,
-      delivered: p.itemDelivered === true,
-      isDelivered: p.itemDelivered === true,
-      item_delivered: p.itemDelivered === true,
-      // ✅ Asegurar campos de cantidad
-      quantity: p.quantity || 1,
-      totalPrice: p.totalPrice || (unitPrice * (p.quantity || 1)),
-      // Asegurar campos de pago
-      totalPaid: p.totalPaid || 0,
-      pendingBalance: p.pendingBalance || 0,
-      isFullyPaid: p.isFullyPaid || false,
-      compliancePercentage: p.compliancePercentage || 0,
-    }));
+    try {
+      const unitPrice = activity?.price || 0;
 
-    const pdfData = {
-      activity: {
-        id: activity.id,
-        name: activity.activityName,
-        price: unitPrice,
-        endDate: activity.endDate,
-        quantity: activity.quantity,
-        isActive: activity.isActive,
-      },
-      participants: participantsWithDelivery,
-      filters: {
-        searchText: filterText,
-        leaderFilter,
-        districtFilter,
-      },
-      statistics: {
-        // Estadísticas básicas
-        total: stats.total,
-        fullyPaid: stats.fullyPaid,
-        partiallyPaid: stats.partiallyPaid,
-        pending: stats.pending,
-        totalPaid: stats.totalPaid,
-        totalPending: stats.totalPending,
-        
-        // ✅ NUEVAS: Estadísticas de unidades
-        totalUnits: totalUnits,
-        totalToPay: totalToPay,
-        
-        // Estadísticas de entregas
-        delivered: deliveredCount,
-        notDelivered: notDeliveredCount,
-        
-        // Porcentajes
-        percentagePaid: percentagePaid,
-        deliveryPercentage: deliveryPercentage,
-      },
-    };
+      // Calcular estadísticas de unidades CORRECTAMENTE
+      const totalUnits = participants.reduce(
+        (sum, p) => sum + (p.quantity || 1),
+        0,
+      );
+      const totalToPay = participants.reduce((sum, p) => {
+        const qty = p.quantity || 1;
+        const price = p.totalPrice || unitPrice * qty;
+        return sum + price;
+      }, 0);
 
-    // Debug: verificar datos antes de enviar
-    console.log('📊 [PDF] Datos enviados:', {
-      totalUnits,
-      totalToPay,
-      deliveredCount,
-      participantsCount: participants.length,
-      sampleParticipant: participantsWithDelivery[0]
-    });
+      // Calcular entregas
+      const deliveredCount = participants.filter(
+        (p) => p.itemDelivered === true,
+      ).length;
+      const notDeliveredCount = participants.length - deliveredCount;
 
-    const filename = `participantes-general-${activity.activityName.toLowerCase().replace(/\s+/g, "-")}`;
-    generateGeneralParticipantsPDF(pdfData, filename);
-  } catch (error) {
-    console.error("❌ Error generando PDF general:", error);
-    alert("Error al generar el PDF. Por favor, intente nuevamente.");
-  }
-};
+      // Calcular porcentaje de pago correcto usando totalToPay
+      const percentagePaid =
+        totalToPay > 0 ? ((stats.totalPaid / totalToPay) * 100).toFixed(1) : 0;
+
+      // Calcular porcentaje de entrega
+      const deliveryPercentage =
+        participants.length > 0
+          ? ((deliveredCount / participants.length) * 100).toFixed(1)
+          : 0;
+
+      // Asegurarse de que cada participante tenga todos los campos necesarios
+      const participantsWithDelivery = filteredParticipants.map((p) => ({
+        ...p,
+        // Asegurar campos de entrega
+        itemDelivered: p.itemDelivered === true,
+        delivered: p.itemDelivered === true,
+        isDelivered: p.itemDelivered === true,
+        item_delivered: p.itemDelivered === true,
+        // ✅ Asegurar campos de cantidad
+        quantity: p.quantity || 1,
+        totalPrice: p.totalPrice || unitPrice * (p.quantity || 1),
+        // Asegurar campos de pago
+        totalPaid: p.totalPaid || 0,
+        pendingBalance: p.pendingBalance || 0,
+        isFullyPaid: p.isFullyPaid || false,
+        compliancePercentage: p.compliancePercentage || 0,
+      }));
+
+      const pdfData = {
+        activity: {
+          id: activity.id,
+          name: activity.activityName,
+          price: unitPrice,
+          endDate: activity.endDate,
+          quantity: activity.quantity,
+          isActive: activity.isActive,
+        },
+        participants: participantsWithDelivery,
+        filters: {
+          searchText: filterText,
+          leaderFilter,
+          districtFilter,
+        },
+        statistics: {
+          // Estadísticas básicas
+          total: stats.total,
+          fullyPaid: stats.fullyPaid,
+          partiallyPaid: stats.partiallyPaid,
+          pending: stats.pending,
+          totalPaid: stats.totalPaid,
+          totalPending: stats.totalPending,
+
+          // ✅ NUEVAS: Estadísticas de unidades
+          totalUnits: totalUnits,
+          totalToPay: totalToPay,
+
+          // Estadísticas de entregas
+          delivered: deliveredCount,
+          notDelivered: notDeliveredCount,
+
+          // Porcentajes
+          percentagePaid: percentagePaid,
+          deliveryPercentage: deliveryPercentage,
+        },
+      };
+
+      // Debug: verificar datos antes de enviar
+      console.log("📊 [PDF] Datos enviados:", {
+        totalUnits,
+        totalToPay,
+        deliveredCount,
+        participantsCount: participants.length,
+        sampleParticipant: participantsWithDelivery[0],
+      });
+
+      const filename = `participantes-general-${activity.activityName.toLowerCase().replace(/\s+/g, "-")}`;
+      generateGeneralParticipantsPDF(pdfData, filename);
+    } catch (error) {
+      console.error("❌ Error generando PDF general:", error);
+      alert("Error al generar el PDF. Por favor, intente nuevamente.");
+    }
+  };
 
   const stats = {
     total: participants.length,
@@ -340,19 +345,19 @@ const ModalActivityParticipants = ({
   };
 
   const handlePaymentOrDeliverySuccess = useCallback(
-async (eventData) => {
-// Caso: cambio de entrega (optimistic update, NO recarga todo)
-if (eventData?.type === "deliveryChange") {
-setParticipants((prev) =>
-prev.map((p) => {
-const cid = p.id || p.contributionId;
-return cid === eventData.contributionId
-? { ...p, itemDelivered: eventData.itemDelivered }
-: p;
-}),
-);
-return;
-}
+    async (eventData) => {
+      // Caso: cambio de entrega (optimistic update, NO recarga todo)
+      if (eventData?.type === "deliveryChange") {
+        setParticipants((prev) =>
+          prev.map((p) => {
+            const cid = p.id || p.contributionId;
+            return cid === eventData.contributionId
+              ? { ...p, itemDelivered: eventData.itemDelivered }
+              : p;
+          }),
+        );
+        return;
+      }
 
       // ✅ Caso normal: pago → recargar desde backend
       await loadParticipants();
@@ -1004,6 +1009,11 @@ return;
         .participant-row.delivered {
           background: #f0fff4;
         }
+        /* Modo oscuro */
+        @media (prefers-color-scheme: dark) {
+          .participant-row.delivered {
+           background: rgba(34, 197, 94, 0.15); /* verde suave oscuro */
+  }  
       `}</style>
     </>
   );
