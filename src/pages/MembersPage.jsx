@@ -472,6 +472,26 @@ export const MembersPage = () => {
   };
 
   // ========== LÓGICA DE FILTRADO ==========
+
+  // Devuelve true si `memberId` está en la subjerarquía de `leaderId`
+  const isDescendantOf = (memberId, leaderId, membersArray) => {
+    // Construye un mapa id → member para lookup O(1)
+    const byId = new Map(membersArray.map((m) => [m.id, m]));
+
+    // Sube por la cadena de líderes del miembro hasta llegar al líder buscado
+    const visited = new Set(); // evita loops infinitos si hay datos corruptos
+    let current = byId.get(memberId);
+
+    while (current?.leader) {
+      if (visited.has(current.id)) break; // protección contra ciclos
+      visited.add(current.id);
+
+      if (current.leader.id === leaderId) return true;
+      current = byId.get(current.leader.id);
+    }
+    return false;
+  };
+
   const applyFilters = (membersArray) => {
     return membersArray.filter((member) => {
       // Filtro por búsqueda de texto (nombre/documento) ← CAMBIA EL COMENTARIO
@@ -488,8 +508,11 @@ export const MembersPage = () => {
         !filters.district || member.district === filters.district;
 
       // Filtro por líder
+      // (jerarquía completa):
       const matchesLeader =
-        !filters.leader || member.leader?.id === Number(filters.leader);
+        !filters.leader ||
+        member.leader?.id === Number(filters.leader) ||
+        isDescendantOf(member.id, Number(filters.leader), allMembers);
 
       return matchesSearch && matchesGender && matchesDistrict && matchesLeader;
     });
