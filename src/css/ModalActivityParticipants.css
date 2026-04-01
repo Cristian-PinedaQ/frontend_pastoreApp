@@ -1,4 +1,5 @@
-/* ========== MODAL ACTIVITY PARTICIPANTS CSS - VERSIÓN OPTIMIZADA ========== */
+/* ========== MODAL ACTIVITY PARTICIPANTS CSS - HEADER FIJO, SOLO TABLA SCROLL ========== */
+
 .modal-participants-overlay {
   position: fixed;
   top: 0;
@@ -14,29 +15,29 @@
   animation: fadeIn 0.3s ease;
 }
 
+/* Modal con altura fija y estructura flex */
 .modal-participants {
   background: var(--activity-bg-primary);
   border-radius: var(--activity-radius-xl);
   width: 100%;
   max-width: 1200px;
+  height: 90vh;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--activity-shadow-2xl);
   animation: slideUp 0.3s ease;
   border: 1px solid var(--activity-border-color);
-  display: flex;
-  flex-direction: column;
+  overflow: hidden;
 }
 
-/* ========== HEADER COMPACTO ========== */
+/* ========== HEADER FIJO - NO HACE SCROLL ========== */
 .modal-participants__header.compact {
   padding: var(--activity-spacing-md) var(--activity-spacing-lg);
   border-bottom: 1px solid var(--activity-border-color);
   background: var(--activity-bg-secondary);
   border-radius: var(--activity-radius-xl) var(--activity-radius-xl) 0 0;
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  flex-shrink: 0;
 }
 
 .modal-participants__header-main {
@@ -218,6 +219,7 @@
   border-radius: var(--activity-radius-lg);
   margin-bottom: var(--activity-spacing-md);
   animation: slideDown 0.2s ease;
+  flex-shrink: 0;
 }
 
 .filters-header {
@@ -337,7 +339,6 @@
 }
 
 /* ========== ESTADÍSTICAS COMPACTAS ========== */
-/* ========== ESTADÍSTICAS COMPACTAS - VERSIÓN SUPER COMPACTA ========== */
 .quick-stats-compact {
   display: flex;
   flex-wrap: wrap;
@@ -347,6 +348,7 @@
   padding: 5px;
   border-radius: var(--activity-radius-md);
   border: 1px solid var(--activity-border-color);
+  flex-shrink: 0;
 }
 
 .stat-item {
@@ -392,24 +394,51 @@
 .stat-item:nth-child(3) { border-left: 2px solid var(--activity-danger); }
 .stat-item:nth-child(4) { border-left: 2px solid var(--activity-info); }
 
-/* ========== CONTENIDO ========== */
+/* ========== CONTENEDOR DEL CONTENIDO - AQUÍ VA EL SCROLL ========== */
 .modal-participants__content {
-  padding: var(--activity-spacing-md);
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
+  padding: var(--activity-spacing-md);
 }
 
-/* ========== TABLA DE PARTICIPANTES (ajustes) ========== */
+/* ========== LISTA DE PARTICIPANTES (TABLA) ========== */
+.participants-list {
+  width: 100%;
+}
+
+/* Contenedor de la tabla con scroll horizontal si es necesario */
+.participants-table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.participants-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
 .participants-table th {
-  font-size: 0.75rem;
+  background: var(--activity-bg-tertiary);
   padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--activity-text-secondary);
+  border-bottom: 2px solid var(--activity-border-color);
+  position: sticky;
+  top: 0;
+  background-color: var(--activity-bg-secondary);
+  z-index: 10;
 }
 
 .participants-table td {
   padding: 10px 8px;
+  border-bottom: 1px solid var(--activity-border-color);
+  color: var(--activity-text-primary);
 }
 
-/* ========== FOOTER ========== */
+/* ========== FOOTER FIJO ========== */
 .modal-participants__footer {
   padding: var(--activity-spacing-md) var(--activity-spacing-lg);
   border-top: 1px solid var(--activity-border-color);
@@ -418,9 +447,7 @@
   align-items: center;
   background: var(--activity-bg-secondary);
   border-radius: 0 0 var(--activity-radius-xl) var(--activity-radius-xl);
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
+  flex-shrink: 0;
 }
 
 .footer-summary {
@@ -458,7 +485,183 @@
   color: var(--activity-text-primary);
 }
 
-/* ========== ANIMACIONES NUEVAS ========== */
+/* ========== ESTILOS PARA EL MODAL DE CONFIRMACIÓN DE ELIMINACIÓN ========== */
+.delete-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  animation: fadeIn 0.15s ease;
+}
+
+.delete-confirm-modal {
+  background: #fff;
+  border-radius: 14px;
+  padding: 28px 32px 24px;
+  max-width: 420px;
+  width: 92%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  animation: slideUp 0.2s ease;
+}
+
+.delete-confirm-icon {
+  font-size: 2.4em;
+  margin-bottom: 10px;
+}
+
+.delete-confirm-title {
+  font-size: 1.15em;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 10px;
+}
+
+.delete-confirm-desc {
+  font-size: 0.93em;
+  color: #444;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.delete-confirm-warning {
+  background: #fff7e6;
+  border: 1px solid #f0a500;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.85em;
+  color: #7a4500;
+  margin-bottom: 14px;
+  text-align: left;
+  line-height: 1.5;
+}
+
+.delete-confirm-error {
+  background: #fde8e8;
+  border: 1px solid #e07070;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.85em;
+  color: #8b1a1a;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.btn-cancel-delete {
+  flex: 1;
+  padding: 9px 0;
+  border: 1.5px solid #ccc;
+  border-radius: 8px;
+  background: #fff;
+  color: #444;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-cancel-delete:hover:not(:disabled) {
+  background: #f0f0f0;
+}
+
+.btn-confirm-delete {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  border-radius: 8px;
+  background: #c0392b;
+  color: #fff;
+  font-size: 0.9em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-confirm-delete:hover:not(:disabled) {
+  background: #a93226;
+}
+
+.btn-confirm-delete:disabled,
+.btn-cancel-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ========== BADGES Y UTILIDADES ========== */
+.readonly-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  background: #fff3cd;
+  border: 1px solid #f0c040;
+  border-radius: 20px;
+  font-size: 0.75em;
+  color: #7d5a00;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.finishing-badge-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  background: #fde8e8;
+  border: 1px solid #e07070;
+  border-radius: 20px;
+  font-size: 0.75em;
+  color: #8b1a1a;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.btn-delete-participant {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 7px;
+  cursor: pointer;
+  font-size: 1em;
+  transition: background 0.15s, border-color 0.15s;
+  line-height: 1;
+}
+
+.btn-delete-participant:hover {
+  background: #fde8e8;
+  border-color: #e07070;
+}
+
+.participant-row.delivered {
+  background: #f0fff4;
+}
+
+/* ========== ANIMACIONES ========== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -472,10 +675,72 @@
   }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========== LOADING SPINNER ========== */
+.loading-participants {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 12px;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--activity-border-color);
+  border-top-color: var(--activity-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ========== ESTADOS VACÍOS ========== */
+.empty-participants {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-participants h4 {
+  margin: 0 0 8px 0;
+  color: var(--activity-text-secondary);
+}
+
+.empty-participants p {
+  margin: 0 0 16px 0;
+  color: var(--activity-text-tertiary);
+}
+
+.btn-clear-filters {
+  padding: 8px 16px;
+  background: var(--activity-bg-tertiary);
+  border: 1px solid var(--activity-border-color);
+  border-radius: var(--activity-radius-md);
+  color: var(--activity-text-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all var(--activity-transition-base);
+}
+
+.btn-clear-filters:hover {
+  background: var(--activity-border-color);
+  color: var(--activity-text-primary);
+}
+
 /* ========== RESPONSIVE DESIGN ========== */
 @media (max-width: 768px) {
   .modal-participants {
     max-height: 95vh;
+    height: 95vh;
     border-radius: var(--activity-radius-lg);
   }
 
@@ -514,11 +779,6 @@
 
   .quick-stats-compact {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .participants-table-container {
-    max-height: 300px;
-    font-size: 0.8rem;
   }
 
   .participants-table th,
@@ -573,24 +833,32 @@
   }
 }
 
-/* Mantener las animaciones y utilidades existentes */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
+/* ========== MODO OSCuro ========== */
+@media (prefers-color-scheme: dark) {
+  .participant-row.delivered {
+    background: rgba(34, 197, 94, 0.15);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .delete-confirm-modal {
+    background: #1e1e2e;
+    color: #e4e4e7;
+  }
+  
+  .delete-confirm-title {
+    color: #e4e4e7;
+  }
+  
+  .delete-confirm-desc {
+    color: #a1a1aa;
+  }
+  
+  .btn-cancel-delete {
+    background: #2d2d3a;
+    border-color: #3f3f4e;
+    color: #e4e4e7;
+  }
+  
+  .btn-cancel-delete:hover:not(:disabled) {
+    background: #3f3f4e;
   }
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-

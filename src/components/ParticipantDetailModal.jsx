@@ -175,70 +175,93 @@ const ParticipantDetailModal = ({
 
   // ✅ Función para cargar el historial de pagos
   const fetchPaymentHistory = useCallback(async () => {
-    const contributionId = contribution?.id || participant.contributionId;
-    if (!contributionId) {
-      console.error("No hay ID de contribución para cargar historial");
-      return;
-    }
-    try {
-      const payments = await apiService.request(
-        `/activity-payment/contribution/${contributionId}`,
-        { method: "GET" },
-      );
-      const formattedPayments = Array.isArray(payments)
-        ? payments.map((payment) => ({
-            id: payment.id,
-            amount: payment.price,
-            date: payment.registrationDate,
-            incomeMethod: payment.incomeMethod,
-            recordedBy: payment.recordedBy,
-            memberName: payment.memberName,
-            memberId: payment.memberId,
-          }))
-        : [];
-      const transformedPayments = transformArrayForDisplay(formattedPayments, [
-        "memberName",
-      ]);
-      setPaymentHistory(transformedPayments);
+  const contributionId = contribution?.id || participant.contributionId;
+  if (!contributionId) {
+    console.error("No hay ID de contribución para cargar historial");
+    return;
+  }
+  try {
+    const payments = await apiService.request(
+      `/activity-payment/contribution/${contributionId}`,
+      { method: "GET" },
+    );
 
-      const totalPaid = transformedPayments.reduce(
-        (sum, payment) => sum + (payment.amount || 0),
-        0,
-      );
-      // ✅ FIX: usar totalPrice (qty-aware) si está disponible, sino unitPrice × qty
-      const qty = contribution?.quantity || participant?.quantity || 1;
-      const unitPrice = activity?.price || 0;
-      const totalPrice = participant?.totalPrice || unitPrice * qty;
-      const pendingBalance = Math.max(0, totalPrice - totalPaid);
-      const isFullyPaid = pendingBalance <= 0;
-      setContributionData((prev) => ({
-        ...prev,
-        totalPaid,
-        pendingBalance,
-        isFullyPaid,
-        quantity: qty,
-        totalPrice,
-        paymentHistory: transformedPayments,
-      }));
-    } catch (err) {
-      console.error("❌ Error cargando historial de pagos:", err);
-      setPaymentHistory([]);
-    }
-  }, [
-    contribution?.id,
-    participant.contributionId,
-    activity?.price,
-    contribution?.quantity,
-    participant?.quantity,
-    participant?.totalPrice,
-  ]);
+    const formattedPayments = Array.isArray(payments)
+      ? payments.map((payment) => ({
+          id: payment.id,
+          amount: payment.price,
+          date: payment.registrationDate,
+          incomeMethod: payment.incomeMethod,
+          recordedBy: payment.recordedBy,
+          memberName: payment.memberName,
+          memberId: payment.memberId,
+        }))
+      : [];
+    const transformedPayments = transformArrayForDisplay(formattedPayments, [
+      "memberName",
+    ]);
+    setPaymentHistory(transformedPayments);
+
+    const totalPaid = transformedPayments.reduce(
+      (sum, payment) => sum + (payment.amount || 0),
+      0,
+    );
+
+    const qty = contribution?.quantity || participant?.quantity || 1; // ✅ qty definido aquí
+    const unitPrice = activity?.price || 0;
+
+    // ✅ CORRECCIÓN: Usar qty en lugar de quantity
+    const expectedTotal = unitPrice * qty;
+    const totalPrice =
+      participant?.totalPrice >= expectedTotal
+        ? participant.totalPrice
+        : contribution?.totalPrice >= expectedTotal
+          ? contribution.totalPrice
+          : expectedTotal;
+
+    const pendingBalance = Math.max(0, totalPrice - totalPaid);
+    const isFullyPaid = pendingBalance <= 0;
+
+    const enrollmentStatus = isFullyPaid
+      ? "COMPLETED"
+      : totalPaid > 0
+        ? "ACTIVE"
+        : "PENDING";
+
+    setContributionData((prev) => ({
+      ...prev,
+      totalPaid,
+      pendingBalance,
+      isFullyPaid,
+      enrollmentStatus,
+      quantity: qty,
+      totalPrice,
+      paymentHistory: transformedPayments,
+    }));
+  } catch (err) {
+    console.error("❌ Error cargando historial de pagos:", err);
+    setPaymentHistory([]);
+  }
+}, [
+  contribution?.id,
+  participant.contributionId,
+  activity?.price,
+  contribution?.quantity,
+  participant?.quantity,
+  participant?.totalPrice,
+  contribution?.totalPrice,
+]);
 
   const participantItemDelivered = participant?.itemDelivered;
 
+  // DESPUÉS — cargar pagos reales al abrir el modal
   useEffect(() => {
     setItemDelivered(
       contribution?.itemDelivered ?? participantItemDelivered ?? false,
     );
+    if (isOpen) {
+      fetchPaymentHistory();
+    }
   }, [isOpen, contribution, participantItemDelivered, fetchPaymentHistory]);
 
   // ─── Inicializar formulario de edición cuando se abre la pestaña ──────────
@@ -264,6 +287,7 @@ const ParticipantDetailModal = ({
     try {
       await fetchPaymentHistory();
       try {
+        // DESPUÉS
         const updatedContribution = await apiService.request(
           `/activity-payment/contribution/${contributionId}`,
           { method: "GET" },
@@ -272,7 +296,12 @@ const ParticipantDetailModal = ({
           updatedContribution,
           ["memberName"],
         );
-        setContributionData(transformedContribution);
+        // No pisamos contributionData completo porque perdería enrollmentStatus
+        // calculado por fetchPaymentHistory; solo retornamos el valor.
+        setContributionData((prev) => ({
+          ...prev,
+          ...transformedContribution,
+        }));
         return transformedContribution;
       } catch (err) {
         return contributionData || contribution || participant;
@@ -286,57 +315,73 @@ const ParticipantDetailModal = ({
   };
 
   // ─── Guardar edición del abono ─────────────────────────────────────────────
-  const handleEditPayment = async () => {
-    if (!editForm.selectedPaymentId) {
-      setEditError("Debes seleccionar un abono para editar.");
-      return;
-    }
-    if (!editForm.editAmount || parseFloat(editForm.editAmount) <= 0) {
-      setEditError("El monto debe ser mayor a cero.");
-      return;
+  // ─── Guardar edición del abono ─────────────────────────────────────────────
+const handleEditPayment = async () => {
+  if (!editForm.selectedPaymentId) {
+    setEditError("Debes seleccionar un abono para editar.");
+    return;
+  }
+  if (!editForm.editAmount || parseFloat(editForm.editAmount) <= 0) {
+    setEditError("El monto debe ser mayor a cero.");
+    return;
+  }
+
+  setEditLoading(true);
+  setEditError("");
+  setEditSuccess("");
+
+  try {
+    const result = await apiService.request(
+      `/activity-payment/update/${editForm.selectedPaymentId}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          amount: parseFloat(editForm.editAmount),
+          incomeMethod: editForm.editIncomeMethod,
+        }),
+      },
+    );
+
+    await refreshContributionData();
+
+    if (onAddPaymentSuccess) {
+      onAddPaymentSuccess({ type: "editPayment", apiResponse: result });
     }
 
-    setEditLoading(true);
-    setEditError("");
-    setEditSuccess("");
-
-    try {
-      const result = await apiService.request(
-        `/activity-payment/update/${editForm.selectedPaymentId}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            amount: parseFloat(editForm.editAmount),
-            incomeMethod: editForm.editIncomeMethod,
-          }),
-        },
+    setEditSuccess("✅ Abono actualizado correctamente.");
+    setEditForm({
+      selectedPaymentId: "",
+      editAmount: "",
+      editIncomeMethod: "CASH",
+    });
+    setTimeout(() => setEditSuccess(""), 3500);
+  } catch (err) {
+    if (err.status === 403) {
+      setEditError("⛔ La actividad ya cerró. No se pueden editar abonos.");
+    } 
+    // ✅ MEJORA OPCIONAL: Mensaje detallado cuando excede el saldo
+    else if (err.status === 400 && err.data?.error?.includes("excede el saldo")) {
+      const maxAllowed = err.data?.maxAllowed;
+      const unitPrice = err.data?.unitPrice;
+      const quantity = err.data?.quantity;
+      const totalPrice = err.data?.totalPrice;
+      
+      setEditError(
+        `❌ El monto excede el saldo disponible.\n\n` +
+        `💰 Precio unitario: $${unitPrice?.toLocaleString("es-CO") || "N/A"}\n` +
+        `📦 Cantidad: ${quantity || "N/A"} unidades\n` +
+        `💵 Total a pagar: $${totalPrice?.toLocaleString("es-CO") || "N/A"}\n` +
+        `✅ Máximo permitido: $${maxAllowed?.toLocaleString("es-CO") || "N/A"}`
       );
-
-      await refreshContributionData();
-
-      if (onAddPaymentSuccess) {
-        onAddPaymentSuccess({ type: "editPayment", apiResponse: result });
-      }
-
-      setEditSuccess("✅ Abono actualizado correctamente.");
-      setEditForm({
-        selectedPaymentId: "",
-        editAmount: "",
-        editIncomeMethod: "CASH",
-      });
-      setTimeout(() => setEditSuccess(""), 3500);
-    } catch (err) {
-      if (err.status === 403) {
-        setEditError("⛔ La actividad ya cerró. No se pueden editar abonos.");
-      } else {
-        const msg =
-          err.data?.error || err.message || "Error al actualizar el abono.";
-        setEditError(`❌ ${msg}`);
-      }
-    } finally {
-      setEditLoading(false);
+    } 
+    else {
+      const msg = err.data?.error || err.message || "Error al actualizar el abono.";
+      setEditError(`❌ ${msg}`);
     }
-  };
+  } finally {
+    setEditLoading(false);
+  }
+};
 
   // ✅ Función para generar PDF del participante
   const handleGeneratePDF = async () => {
@@ -486,20 +531,23 @@ const ParticipantDetailModal = ({
     "Sin distrito";
 
   const currentData = contributionData || contribution || participant;
-  const totalPaid = currentData?.totalPaid || participant.totalPaid || 0;
-  const pendingBalance =
-    currentData?.pendingBalance || participant.pendingBalance || 0;
-  const isFullyPaid =
-    currentData?.isFullyPaid || participant.isFullyPaid || false;
+  
   // ✅ FIX: quantity y totalPrice conscientes de unidades
-  const quantity =
-    currentData?.quantity ||
-    contribution?.quantity ||
-    participant?.quantity ||
-    1;
+  const quantity = currentData?.quantity || participant?.quantity || 1;
   const unitPrice = activity?.price || 0;
+  const expectedTotal = unitPrice * quantity;
+
+  const totalPaid = contributionData?.totalPaid ?? participant.totalPaid ?? 0;
+const pendingBalance = Math.max(0, expectedTotal - totalPaid);
+// DESPUÉS — solo usar props del participante si contributionData aún no cargó
+  const isFullyPaid =
+    contributionData?.isFullyPaid ?? participant.isFullyPaid ?? false;
   const activityPrice =
-    currentData?.totalPrice || participant?.totalPrice || unitPrice * quantity;
+    currentData?.totalPrice && currentData.totalPrice >= expectedTotal
+      ? currentData.totalPrice
+      : participant?.totalPrice && participant.totalPrice >= expectedTotal
+        ? participant.totalPrice
+        : expectedTotal;
   const compliancePercentage =
     activityPrice > 0 ? (totalPaid / activityPrice) * 100 : 0;
   // Solo STANDALONE puede cambiar quantity
@@ -1140,18 +1188,15 @@ const ParticipantDetailModal = ({
                       </div>
                       <div className="detail-item">
                         <span className="detail-label">
-                          Estado de Inscripción:
+                          Estado Inscripción:
                         </span>
                         <span
-                          className={`detail-value ${(currentData?.enrollmentStatus || participant.enrollmentStatus)?.toLowerCase() === "completed" ? "completed" : "pending"}`}
+                          className={`status-badge ${contributionData?.isFullyPaid || isFullyPaid ? "completed" : "pending"}`}
                         >
-                          {(currentData?.enrollmentStatus ||
-                            participant.enrollmentStatus) === "COMPLETED"
-                            ? "Completado"
-                            : (currentData?.enrollmentStatus ||
-                                  participant.enrollmentStatus) === "ACTIVE"
-                              ? "Activo"
-                              : "Pendiente"}
+                          {/* Priorizamos el cálculo local sobre el valor del servidor */}
+                          {contributionData?.isFullyPaid || isFullyPaid
+                            ? "COMPLETADO"
+                            : "ACTIVO"}
                         </span>
                       </div>
                       <div className="detail-item">
