@@ -1111,10 +1111,10 @@ const EnrollmentsPage = () => {
         updateData.cohortName = editFormData.cohortName.trim();
       }
       if (editFormData.startDate) {
-        updateData.startDate = editFormData.startDate + "T12:00:00"; // mediodía local
+        updateData.startDate = editFormData.startDate + "T23:59:59-05:00";
       }
       if (editFormData.endDate) {
-        updateData.endDate = editFormData.endDate + "T12:00:00";
+        updateData.endDate = editFormData.endDate + "T23:59:59-05:00";
       }
       if (editFormData.maxStudents) {
         updateData.maxStudents = parseInt(editFormData.maxStudents);
