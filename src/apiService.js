@@ -454,10 +454,6 @@ class ApiService {
 
   // ========== 📚 NIVELES FORMATIVOS ==========
 
-  /**
-   * Obtener todos los niveles activos
-   * GET /api/v1/levels
-   */
   async getActiveLevels() {
     try {
       log('📚 [getActiveLevels] Obteniendo niveles activos');
@@ -466,15 +462,10 @@ class ApiService {
       return response;
     } catch (error) {
       logError('❌ [getActiveLevels] Error:', error.message);
-      // Fallback a niveles por defecto si el endpoint falla
       return this.getDefaultLevels();
     }
   }
 
-  /**
-   * Obtener todos los niveles (incluye inactivos)
-   * GET /api/v1/levels/all
-   */
   async getAllLevels() {
     try {
       log('📚 [getAllLevels] Obteniendo todos los niveles');
@@ -487,10 +478,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Obtener nivel por código
-   * GET /api/v1/levels/code/{code}
-   */
   async getLevelByCode(code) {
     try {
       validateString(code, 'code', 1, 50);
@@ -503,9 +490,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Niveles por defecto (fallback)
-   */
   getDefaultLevels() {
     return [
       { id: 1, code: 'PREENCUENTRO', displayName: 'Pre-encuentro', levelOrder: 1, isActive: true },
@@ -669,12 +653,6 @@ class ApiService {
 
   // ========== NUEVO MÉTODO PARA REPORTE POR NIVEL ==========
 
-  /**
-   * Obtener reporte detallado de estudiantes por nivel específico
-   * GET /student-enrollment/by-level/{level}
-   * @param {string} level - Nivel (PREENCUENTRO, ENCUENTRO, etc.)
-   * @param {string|null} status - Filtrar por estado (ACTIVE, COMPLETED, FAILED)
-   */
   async getLevelStudents(level, status = null) {
     try {
       validateString(level, 'level', 1, 50);
@@ -2415,11 +2393,6 @@ class ApiService {
     }
   }
 
-  // ============================================================
-  // PEGA ESTE BLOQUE DENTRO DE LA CLASE ApiService,
-  // justo antes de la línea:  }  (cierre de la clase)
-  // ============================================================
-
   // ========== 🔔 NOTIFICACIONES ==========
 
   /**
@@ -2566,8 +2539,6 @@ class ApiService {
 
   // ============================================================
   // ⛪ MÓDULO FINANCIERO IGLESIA
-  // Pega este bloque dentro de la clase ApiService,
-  // justo antes del cierre de la clase  }
   // Base URL del módulo: /api/v1/finance
   // ============================================================
 
@@ -3085,12 +3056,7 @@ class ApiService {
   }
 
   // ============================================================
-  // FIN DEL BLOQUE ⛪ MÓDULO FINANCIERO IGLESIA
-  // ============================================================
-  // ============================================================
   // 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
-  // Pega este bloque dentro de la clase ApiService,
-  // justo antes del cierre de la clase  }
   // Base URL del módulo: /api/v1/counseling
   // ============================================================
 
@@ -3294,15 +3260,9 @@ class ApiService {
     }
   }
 
-  // ── Agrega este método dentro del bloque 🕊️ MÓDULO DE CONSEJERÍAS,
-  // justo después de updateCounselingSession() y antes de completeSession() ──
-
   /**
    * Inicia una sesión en tiempo real (SCHEDULED/RESCHEDULED → IN_PROGRESS).
-   * Devuelve StartSessionResponse con la sesión activa + contexto histórico completo del miembro:
-   *   - previousSessions: últimas 5 sesiones completadas con notas y follow-ups
-   *   - pendingFollowUps: seguimientos pendientes de sesiones anteriores
-   *   - memberStats: estadísticas del miembro con este pastor
+   * Devuelve StartSessionResponse con la sesión activa + contexto histórico completo del miembro.
    *
    * PATCH /counseling/{id}/start
    * @param {number} id - ID de la sesión a iniciar
@@ -3451,19 +3411,6 @@ class ApiService {
     }
   }
 
-  // ============================================================
-  // FIN DEL BLOQUE 🕊️ MÓDULO DE CONSEJERÍAS PASTORALES
-  // ============================================================
-
-  // ============================================================
-  // AGREGAR en apiService.js, dentro de la clase ApiService,
-  // justo antes del cierre de la clase (última línea con solo  }  )
-  //
-  // Cubre:
-  //  - Actividades ENROLLMENT disponibles para un miembro
-  //  - Actualizar requiresPayment de un nivel
-  // ============================================================
-
   // ========== 🎓 ACTIVIDADES ENROLLMENT DISPONIBLES ==========
 
   /**
@@ -3473,7 +3420,7 @@ class ApiService {
    * Solo incluye actividades cuyo nivel tiene requiresPayment = true y para
    * las que el miembro cumple la regla de nivel previo:
    *   - Primer nivel (isFirst) → acceso abierto
-   *   - Cualquier otro        → currentLevel.levelOrder == requiredLevel.levelOrder - 1
+   *   - Cualquier otro         → currentLevel.levelOrder == requiredLevel.levelOrder - 1
    *
    * GET /api/v1/activity/enrollment/available/{memberId}
    *
@@ -3552,14 +3499,11 @@ class ApiService {
     }
   }
 
-  // En apiService.js, agrega:
-
   /**
    * Obtiene notificaciones activas por username (NO requiere ID)
    */
-  // ✅ CORRECTO - Solo la ruta relativa
   getActiveNotificationsByUsername(username) {
-    return this.request(`/notifications/user/by-username/${username}/active`, {  // ← BIEN
+    return this.request(`/notifications/user/by-username/${username}/active`, {
       method: 'GET',
       requiresAuth: true
     });
@@ -3574,12 +3518,6 @@ class ApiService {
       requiresAuth: true
     }).then(data => data.unreadCount);
   }
-
-  // ============================================================
-  // Cubre:
-  //  - CRUD completo de LevelEnrollment
-  //  - CRUD completo de LessonTemplate
-  // ============================================================
 
   // ========== ⚙️ NIVELES FORMATIVOS — CRUD COMPLETO ==========
 
@@ -3720,10 +3658,399 @@ class ApiService {
   }
 
   // ============================================================
-  // FIN DEL BLOQUE — CRUD Niveles y Plantillas de Lección
+  // 🎸 MÓDULO DE ALABANZA (WORSHIP)
+  // Base URL del módulo: /api/v1/worship
   // ============================================================
 
-}
+  /**
+   * Obtener todos los integrantes del equipo de alabanza.
+   * GET /api/v1/worship
+   */
+  async getWorshipTeam() {
+    try {
+      log('🎸 [getWorshipTeam] Obteniendo equipo de alabanza');
+      const response = await this.request('/worship');
+      log('✅ [getWorshipTeam] Éxito -', response?.length || 0, 'adoradores');
+      return response;
+    } catch (error) {
+      logError('❌ [getWorshipTeam] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener la lista de instrumentos/roles configurados en el sistema.
+   * GET /api/v1/worship/roles
+   */
+  async getWorshipRoles() {
+    try {
+      log('🎹 [getWorshipRoles] Obteniendo instrumentos configurados');
+      const response = await this.request('/worship/roles');
+      return response;
+    } catch (error) {
+      logError('❌ [getWorshipRoles] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Buscar músicos disponibles (espiritual y técnicamente) para un instrumento específico.
+   * GET /api/v1/worship/available/{roleId}
+   * @param {number} roleId - ID del instrumento/rol
+   */
+  async getAvailableWorshipMembers(roleId) {
+    try {
+      validateId(roleId, 'roleId');
+      log('🔍 [getAvailableWorshipMembers] Buscando disponibles para rol ID:', roleId);
+      return this.request(`/worship/available/${roleId}`);
+    } catch (error) {
+      logError('❌ [getAvailableWorshipMembers] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Añadir un líder activo al equipo de alabanza.
+   * POST /api/v1/worship/add
+   * @param {number} memberId - ID del miembro (debe ser líder activo)
+   * @param {number} primaryRoleId - ID del instrumento principal
+   * @param {Array<number>} skillsIds - Array con IDs de instrumentos secundarios
+   * @param {string} notes - Notas opcionales
+   */
+  async addWorshipMember(memberId, primaryRoleId, skillsIds = [], notes = null) {
+    try {
+      validateId(memberId, 'memberId');
+      validateId(primaryRoleId, 'primaryRoleId');
+
+      const params = new URLSearchParams();
+      params.append('memberId', memberId);
+      
+      // 🚀 CORRECCIÓN AQUÍ: El backend espera 'primaryRoleId', no 'roleId'
+      params.append('primaryRoleId', primaryRoleId); 
+      
+      if (skillsIds && skillsIds.length > 0) {
+        params.append('skills', skillsIds.join(','));
+      }
+      if (notes) {
+        params.append('notes', notes.trim());
+      }
+
+      log('➕ [addWorshipMember] Añadiendo miembro al equipo:', memberId);
+      const response = await this.request(`/worship/add?${params.toString()}`, {
+        method: 'POST'
+      });
+      log('✅ [addWorshipMember] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [addWorshipMember] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar el estado técnico/musical de un adorador.
+   * PUT /api/v1/worship/{id}/status
+   * @param {number} worshipId - ID del registro en worship_team_member
+   * @param {string} status - ACTIVE, SUSPENDED, INACTIVE
+   * @param {string} notes - Motivo del cambio de estado
+   */
+  /**
+   * Actualizar el perfil completo de un adorador (Instrumentos y Estado).
+   * PUT /api/v1/worship/{id}
+   */
+  async updateWorshipMemberProfile(worshipId, primaryRoleId, skillsIds = [], status, notes = null) {
+    try {
+      validateId(worshipId, 'worshipId');
+      validateId(primaryRoleId, 'primaryRoleId');
+      validateString(status, 'status', 1, 20);
+
+      const params = new URLSearchParams();
+      params.append('primaryRoleId', primaryRoleId);
+      if (skillsIds && skillsIds.length > 0) {
+        params.append('skills', skillsIds.join(','));
+      }
+      params.append('status', status);
+      if (notes) {
+        params.append('notes', notes.trim());
+      }
+
+      log('🔄 [updateWorshipMemberProfile] Actualizando adorador ID:', worshipId);
+      const response = await this.request(`/worship/${worshipId}?${params.toString()}`, {
+        method: 'PUT'
+      });
+      log('✅ [updateWorshipMemberProfile] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateWorshipMemberProfile] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // ========== 📅 SCHEDULING (PROGRAMACIÓN DE ALABANZA) ==========
+
+  /**
+   * Crear un nuevo evento o culto en el calendario.
+   * POST /api/v1/worship/schedule/event
+   * @param {string} name - Nombre (Ej: Culto Dominical)
+   * @param {string} type - EventType (CULTO_DOMINGO, REUNION_JOVENES, etc)
+   * @param {string} date - Fecha y hora ISO (Ej: 2026-08-15T09:00:00)
+   * @param {string} description - Detalles adicionales
+   */
+  async createWorshipEvent(name, type, date, description = null) {
+    try {
+      validateString(name, 'name', 3, 100);
+      validateString(type, 'type', 1, 50);
+      validateString(date, 'date', 10, 30);
+
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      params.append('type', type);
+      params.append('date', date);
+      if (description) {
+        params.append('description', description.trim());
+      }
+
+      log('📅 [createWorshipEvent] Creando evento:', name);
+      const response = await this.request(`/worship/schedule/event?${params.toString()}`, {
+        method: 'POST'
+      });
+      log('✅ [createWorshipEvent] Éxito - ID:', response?.id);
+      return response;
+    } catch (error) {
+      logError('❌ [createWorshipEvent] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Asignar a todos los miembros activos a un evento específico.
+   * POST /api/v1/worship/schedule/event/{id}/assign-all
+   */
+  async assignAllWorshipMembersToEvent(eventId) {
+    try {
+      validateId(eventId, 'eventId');
+      log('👥 [assignAllWorshipMembersToEvent] Asignando todos al evento:', eventId);
+      const response = await this.request(`/worship/schedule/event/${eventId}/assign-all`, {
+        method: 'POST'
+      });
+      log('✅ [assignAllWorshipMembersToEvent] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [assignAllWorshipMembersToEvent] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar un evento/culto en el calendario.
+   * PUT /api/v1/worship/schedule/event/{id}
+   */
+  async updateWorshipEvent(id, name, type, date, description = null) {
+    try {
+      validateId(id, 'eventId');
+      validateString(name, 'name', 3, 100);
+      validateString(type, 'type', 1, 50);
+      validateString(date, 'date', 10, 30);
+
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      params.append('type', type);
+      params.append('date', date);
+      if (description) {
+        params.append('description', description.trim());
+      }
+
+      log('📅 [updateWorshipEvent] Actualizando evento ID:', id);
+      const response = await this.request(`/worship/schedule/event/${id}?${params.toString()}`, {
+        method: 'PUT'
+      });
+      log('✅ [updateWorshipEvent] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateWorshipEvent] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Sincronizar las asignaciones editadas de un evento.
+   * PUT /api/v1/worship/schedule/event/{eventId}/assignments
+   */
+  async syncEventAssignments(eventId, assignmentsList) {
+    try {
+      validateId(eventId, 'eventId');
+      if (!Array.isArray(assignmentsList)) throw new Error('Las asignaciones deben ser un arreglo');
+
+      log('🔄 [syncEventAssignments] Sincronizando músicos para evento ID:', eventId);
+      const response = await this.request(`/worship/schedule/event/${eventId}/assignments`, {
+        method: 'PUT',
+        body: JSON.stringify(assignmentsList)
+      });
+      log('✅ [syncEventAssignments] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [syncEventAssignments] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar un evento/culto en el calendario.
+   * DELETE /api/v1/worship/schedule/event/{id}
+   */
+  async deleteWorshipEvent(id) {
+    try {
+      validateId(id, 'eventId');
+      log('🗑️ [deleteWorshipEvent] Eliminando evento ID:', id);
+      const response = await this.request(`/worship/schedule/event/${id}`, {
+        method: 'DELETE'
+      });
+      log('✅ [deleteWorshipEvent] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [deleteWorshipEvent] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener todos los eventos y sus asignaciones.
+   * GET /api/v1/worship/schedule/events
+   */
+  async getWorshipEvents() {
+    try {
+      log('📅 [getWorshipEvents] Obteniendo calendario de eventos');
+      const response = await this.request('/worship/schedule/events');
+      return response || [];
+    } catch (error) {
+      logError('❌ [getWorshipEvents] Error:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Asignar manualmente a un músico a un evento.
+   * POST /api/v1/worship/schedule/assign
+   */
+  async assignWorshipMember(eventId, worshipMemberId, roleId) {
+    try {
+      validateId(eventId, 'eventId');
+      validateId(worshipMemberId, 'worshipMemberId');
+      validateId(roleId, 'roleId');
+
+      const params = new URLSearchParams();
+      params.append('eventId', eventId);
+      params.append('worshipMemberId', worshipMemberId);
+      params.append('roleId', roleId); // ID del instrumento a tocar
+
+      log('📌 [assignWorshipMember] Asignando adorador:', worshipMemberId, 'al evento:', eventId);
+      const response = await this.request(`/worship/schedule/assign?${params.toString()}`, {
+        method: 'POST'
+      });
+      log('✅ [assignWorshipMember] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [assignWorshipMember] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Ejecutar el algoritmo de auto-sugerencia mensual equitativa.
+   * POST /api/v1/worship/schedule/auto-suggest/batch
+   * @param {Object} data - MonthlyScheduleRequest { eventIds: [1,2,3], requiredRoles: { "1": 1, "2": 3 } }
+   */
+  async autoSuggestWorshipSchedule(data) {
+    try {
+      if (!data || !Array.isArray(data.eventIds) || data.eventIds.length === 0) {
+        throw new Error('Debe proporcionar al menos un evento (eventIds)');
+      }
+      if (!data.requiredRoles || typeof data.requiredRoles !== 'object') {
+        throw new Error('Debe configurar los instrumentos requeridos (requiredRoles)');
+      }
+
+      log('✨ [autoSuggestWorshipSchedule] Programando por lotes para', data.eventIds.length, 'eventos');
+      const response = await this.request('/worship/schedule/auto-suggest/batch', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      
+      log('✅ [autoSuggestWorshipSchedule] Éxito - Se crearon', response?.length || 0, 'asignaciones');
+      return response;
+      
+    } catch (error) {
+      logError('❌ [autoSuggestWorshipSchedule] Error:', error.message);
+      throw error;
+    }
+    
+  }
+  // ... (dentro de tu bloque de MÓDULO DE ALABANZA)
+
+  /**
+   * Crear un nuevo instrumento/rol de alabanza.
+   * POST /api/v1/worship/roles
+   */
+  async createWorshipRole(roleData) {
+    try {
+      if (!roleData || typeof roleData !== 'object') throw new Error('Datos de rol inválidos');
+      validateString(roleData.name, 'name', 2, 50);
+
+      log('🎹 [createWorshipRole] Creando rol:', roleData.name);
+      const response = await this.request('/worship/roles', {
+        method: 'POST',
+        body: JSON.stringify(roleData)
+      });
+      log('✅ [createWorshipRole] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [createWorshipRole] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Actualizar un instrumento/rol existente.
+   * PUT /api/v1/worship/roles/{id}
+   */
+  async updateWorshipRole(id, roleData) {
+    try {
+      validateId(id, 'roleId');
+      if (!roleData || typeof roleData !== 'object') throw new Error('Datos de rol inválidos');
+      validateString(roleData.name, 'name', 2, 50);
+
+      log('📝 [updateWorshipRole] Actualizando rol ID:', id);
+      const response = await this.request(`/worship/roles/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(roleData)
+      });
+      log('✅ [updateWorshipRole] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [updateWorshipRole] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar o desactivar un instrumento/rol.
+   * DELETE /api/v1/worship/roles/{id}
+   */
+  async deleteWorshipRole(id) {
+    try {
+      validateId(id, 'roleId');
+      log('🗑️ [deleteWorshipRole] Eliminando rol ID:', id);
+      const response = await this.request(`/worship/roles/${id}`, {
+        method: 'DELETE'
+      });
+      log('✅ [deleteWorshipRole] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [deleteWorshipRole] Error:', error.message);
+      throw error;
+    }
+  }
+
+} // Fin de la clase ApiService
 
 const apiService = new ApiService();
 export default apiService;

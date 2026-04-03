@@ -28,6 +28,7 @@ import ChurchFinancePage from './pages/ChurchFinancePage.jsx';
 import CounselingPage from './pages/CounselingPage.jsx';
 import ManualRaizViva from './pages/ManualRaizViva.jsx';
 import LevelsConfigPage from './pages/LevelsConfigPage.jsx';
+import WorshipPage from './pages/WorshipPage.jsx';
 
 function App() {
   return (
@@ -113,6 +114,18 @@ function App() {
                 <ProtectedRoute
                   element={<CellAttendancePage />}
                   requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_LIDER']}
+                />
+              }
+            />
+
+            {/* ALABANZA */}
+
+            <Route
+              path="worshipPage"
+              element={
+                <ProtectedRoute
+                  element={<WorshipPage />}
+                  requiredRoles={['ROLE_PASTORES', 'ROLE_ALABANZA']}
                 />
               }
             />
