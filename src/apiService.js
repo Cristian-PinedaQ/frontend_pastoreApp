@@ -3823,6 +3823,28 @@ class ApiService {
   }
 
   /**
+   * Registrar la asistencia del equipo de alabanza a un evento.
+   * POST /api/v1/worship/schedule/event/{eventId}/attendance
+   */
+  async recordWorshipAttendance(eventId, attendanceList) {
+    try {
+      validateId(eventId, 'eventId');
+      if (!Array.isArray(attendanceList)) throw new Error('Los datos de asistencia son inválidos');
+
+      log('📋 [recordWorshipAttendance] Registrando asistencia evento ID:', eventId);
+      const response = await this.request(`/worship/schedule/event/${eventId}/attendance`, {
+        method: 'POST',
+        body: JSON.stringify(attendanceList)
+      });
+      log('✅ [recordWorshipAttendance] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [recordWorshipAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Asignar a todos los miembros activos a un evento específico.
    * POST /api/v1/worship/schedule/event/{id}/assign-all
    */

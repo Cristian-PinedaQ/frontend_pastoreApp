@@ -1,6 +1,6 @@
 // ============================================
 // WorshipPage.jsx - Gestión del Ministerio de Alabanza
-// Incluye: Equipo (Filtros y Perfiles), Programación (CRUD y Asignaciones) y Roles
+// Incluye: Equipo, Programación (CRUD, Asignaciones, Asistencia) y Roles
 // ============================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -28,9 +28,10 @@ const EVENT_TYPES = {
 };
 
 // Íconos predefinidos para la creación de roles
-const ROLE_ICONS = ["🎵", "🎤", "🎸", "🎹", "🥁", "🎻", "🎺", "🎷", "🪕", "🎛️", "💻", "🎼"];
+const ROLE_ICONS = ["🎵", "🎤", "🎸", "🎹", "🥁", "🎻", "🎺", "🎷", "🪕", "🎛️", "💻", "🗣️"];
 
 const WorshipPage = () => {
+  // ========== AUTH ==========
   const { user, hasAnyRole } = useAuth();
   const canManageWorship = hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]);
 
@@ -96,6 +97,11 @@ const WorshipPage = () => {
     selectedEvents: [], 
     requiredRoles: {} 
   });
+
+  // 🚀 STATE MODAL ASISTENCIA
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [attendanceEvent, setAttendanceEvent] = useState(null);
+  const [attendanceList, setAttendanceList] = useState([]);
 
   // ========== DARK MODE ==========
   useEffect(() => {
@@ -376,15 +382,8 @@ const WorshipPage = () => {
   const openEventModal = (event = null) => {
     if (event) {
       setEditingEvent(event);
+      const dateLocal = new Date(event.eventDate).toISOString().slice(0, 16);
       
-      // 🚀 CORRECCIÓN DE ZONA HORARIA AL ABRIR EL MODAL
-      // En lugar de usar toISOString() que suma 5 horas por el UTC,
-      // extraemos la fecha y hora local exacta para el input.
-      const d = new Date(event.eventDate);
-      const pad = (n) => n.toString().padStart(2, '0');
-      const dateLocal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      
-      // Mapeamos las asignaciones actuales al formato del formulario
       const currentAssignments = (event.assignments || []).map(a => ({
         roleId: a.assignedRole.id.toString(),
         memberId: a.worshipTeamMember.id.toString()
@@ -410,7 +409,6 @@ const WorshipPage = () => {
     setShowEventModal(true);
   };
 
-  // LÓGICA DINÁMICA DE ASIGNACIONES DENTRO DEL MODAL
   const handleAddAssignmentRow = () => {
     setEventFormData(prev => ({ 
       ...prev, 
@@ -427,24 +425,22 @@ const WorshipPage = () => {
   const handleAssignmentChange = (index, field, value) => {
     const updated = [...eventFormData.assignments];
     
-    // 🚀 NUEVO: Prevenir que se seleccione el mismo músico dos veces en el UI
+    // Prevenir duplicados en UI
     if (field === 'memberId' && value !== "") {
       const isDuplicate = updated.some((a, i) => i !== index && a.memberId === value);
       if (isDuplicate) {
         showError("Este músico ya está asignado a este evento. Elige a otra persona.");
-        return; // Detenemos el cambio
+        return;
       }
     }
 
     updated[index][field] = value;
-    // Si cambia el rol, reseteamos el miembro seleccionado
     if (field === 'roleId') { 
       updated[index].memberId = ""; 
     }
     setEventFormData(prev => ({ ...prev, assignments: updated }));
   };
 
-  // Función que filtra los músicos que saben tocar el rol seleccionado
   const getEligibleMembersForRole = (roleId) => {
     if (!roleId) return [];
     return teamMembers.filter(m => 
@@ -453,7 +449,6 @@ const WorshipPage = () => {
     );
   };
 
-  // GUARDAR EVENTO (TEXTO Y ASIGNACIONES)
   const handleSaveEvent = async (e) => {
     e.preventDefault();
     try {
@@ -464,7 +459,6 @@ const WorshipPage = () => {
       
       let savedEventId = null;
 
-      // 1. Guardar o Actualizar Evento Base
       if (editingEvent) {
         await apiService.updateWorshipEvent(
           editingEvent.id, 
@@ -484,7 +478,6 @@ const WorshipPage = () => {
         savedEventId = response.id || response.eventId; 
       }
 
-      // 2. Sincronizar las asignaciones si el usuario agregó o modificó músicos en el modal
       const validAssignments = eventFormData.assignments.filter(a => a.roleId !== "" && a.memberId !== "");
       
       if (savedEventId) {
@@ -593,6 +586,52 @@ const WorshipPage = () => {
     }
   };
 
+  // 🚀 FUNCIONES PARA ASISTENCIA DE EVENTOS
+  const openAttendanceModal = (event) => {
+    setAttendanceEvent(event);
+    
+    // Mapeamos las asignaciones actuales. Si attended es null, por defecto lo marcamos true.
+    const initialList = (event.assignments || []).map(a => ({
+      assignmentId: a.id,
+      memberId: a.worshipTeamMember.id,
+      memberName: a.worshipTeamMember.leader?.member?.name || "Músico",
+      roleName: a.assignedRole?.name || "Instrumento",
+      attended: a.attended !== false // Si es null o true, queda true
+    }));
+
+    setAttendanceList(initialList);
+    setShowAttendanceModal(true);
+  };
+
+  const handleToggleAttendance = (assignmentId) => {
+    setAttendanceList(prev => prev.map(a => 
+      a.assignmentId === assignmentId ? { ...a, attended: !a.attended } : a
+    ));
+  };
+
+  const handleMarkAllAttendance = (status) => {
+    setAttendanceList(prev => prev.map(a => ({ ...a, attended: status })));
+  };
+
+  const handleSaveAttendance = async () => {
+    try {
+      setLoading(true);
+      const payload = attendanceList.map(a => ({
+        assignmentId: a.assignmentId,
+        attended: a.attended
+      }));
+
+      await apiService.recordWorshipAttendance(attendanceEvent.id, payload);
+      showSuccess("Asistencia guardada exitosamente.");
+      setShowAttendanceModal(false);
+      await loadData(); // Recargamos para reflejar cambios
+    } catch (err) {
+      showError(err.message || "Error al guardar asistencia");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   // =========================================================================
   // RENDERIZADOS DE COMPONENTES (TABS)
@@ -601,47 +640,22 @@ const WorshipPage = () => {
   const renderTeamTab = () => (
     <>
       <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
-        gap: '1rem', 
-        marginBottom: '1.5rem', 
-        backgroundColor: theme.bgSecondary, 
-        padding: '1rem', 
-        borderRadius: '8px', 
-        border: `1px solid ${theme.border}` 
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', 
+        marginBottom: '1.5rem', backgroundColor: theme.bgSecondary, padding: '1rem', 
+        borderRadius: '8px', border: `1px solid ${theme.border}` 
       }}>
         <div>
           <label style={{ display: 'block', fontSize: '0.85rem', color: theme.textSecondary, marginBottom: '0.3rem' }}>🔍 Buscar por nombre o instrumento</label>
           <input 
-            type="text" 
-            placeholder="Ej. Juan, Guitarra..." 
-            value={searchTeam} 
-            onChange={(e) => setSearchTeam(e.target.value)}
-            style={{ 
-              width: '100%', 
-              padding: '0.5rem', 
-              borderRadius: '6px', 
-              border: `1px solid ${theme.border}`, 
-              backgroundColor: theme.bg, 
-              color: theme.text, 
-              boxSizing: 'border-box' 
-            }}
+            type="text" placeholder="Ej. Juan, Guitarra..." value={searchTeam} onChange={(e) => setSearchTeam(e.target.value)}
+            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: `1px solid ${theme.border}`, backgroundColor: theme.bg, color: theme.text, boxSizing: 'border-box' }}
           />
         </div>
         <div>
           <label style={{ display: 'block', fontSize: '0.85rem', color: theme.textSecondary, marginBottom: '0.3rem' }}>📌 Estado</label>
           <select 
-            value={filterStatus} 
-            onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ 
-              width: '100%', 
-              padding: '0.5rem', 
-              borderRadius: '6px', 
-              border: `1px solid ${theme.border}`, 
-              backgroundColor: theme.bg, 
-              color: theme.text, 
-              boxSizing: 'border-box' 
-            }}
+            value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: `1px solid ${theme.border}`, backgroundColor: theme.bg, color: theme.text, boxSizing: 'border-box' }}
           >
             <option value="ALL">Todos los estados</option>
             <option value="ACTIVE">✅ Activos</option>
@@ -652,17 +666,8 @@ const WorshipPage = () => {
         <div>
           <label style={{ display: 'block', fontSize: '0.85rem', color: theme.textSecondary, marginBottom: '0.3rem' }}>🎹 Instrumento Principal</label>
           <select 
-            value={filterRole} 
-            onChange={(e) => setFilterRole(e.target.value)}
-            style={{ 
-              width: '100%', 
-              padding: '0.5rem', 
-              borderRadius: '6px', 
-              border: `1px solid ${theme.border}`, 
-              backgroundColor: theme.bg, 
-              color: theme.text, 
-              boxSizing: 'border-box' 
-            }}
+            value={filterRole} onChange={(e) => setFilterRole(e.target.value)}
+            style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: `1px solid ${theme.border}`, backgroundColor: theme.bg, color: theme.text, boxSizing: 'border-box' }}
           >
             <option value="ALL">Todos los instrumentos</option>
             {roles.map(r => (
@@ -728,11 +733,8 @@ const WorshipPage = () => {
                       <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', maxWidth: '200px' }}>
                         {member.skills?.map(skill => (
                           <span key={skill.id} style={{ 
-                            fontSize: '0.7rem', 
-                            padding: '0.2rem 0.4rem', 
-                            borderRadius: '8px', 
-                            backgroundColor: theme.bg, 
-                            border: `1px solid ${theme.border}` 
+                            fontSize: '0.7rem', padding: '0.2rem 0.4rem', borderRadius: '8px', 
+                            backgroundColor: theme.bg, border: `1px solid ${theme.border}` 
                           }}>
                             {skill.name}
                           </span>
@@ -770,25 +772,16 @@ const WorshipPage = () => {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
       {roles.map(role => (
         <div key={role.id} style={{ 
-          padding: '1.25rem', 
-          backgroundColor: theme.bgSecondary, 
-          border: `1px solid ${theme.border}`, 
-          borderRadius: '12px', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          justifyContent: 'space-between', 
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+          padding: '1.25rem', backgroundColor: theme.bgSecondary, border: `1px solid ${theme.border}`, 
+          borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
         }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <h3 style={{ margin: 0, fontSize: '1.1rem', color: theme.text }}>{role.name}</h3>
               <span style={{ 
-                fontSize: '0.7rem', 
-                padding: '0.2rem 0.5rem', 
-                borderRadius: '10px', 
+                fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '10px', 
                 backgroundColor: role.active ? `${theme.successText}20` : `${theme.textSecondary}20`, 
-                color: role.active ? theme.successText : theme.textSecondary, 
-                fontWeight: 'bold' 
+                color: role.active ? theme.successText : theme.textSecondary, fontWeight: 'bold' 
               }}>
                 {role.active ? 'Activo' : 'Inactivo'}
               </span>
@@ -833,17 +826,14 @@ const WorshipPage = () => {
       ) : (
         events.map(event => {
           const dateObj = new Date(event.eventDate);
+          // 🚀 NUEVO: Compara la fecha del evento con la hora actual exacta de tu navegador (Colombia)
+          const isFutureEvent = dateObj > new Date();
           return (
             <div 
               key={event.id} 
               style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                backgroundColor: theme.bgSecondary, 
-                border: `1px solid ${theme.border}`, 
-                borderRadius: '12px', 
-                overflow: 'hidden', 
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
+                display: 'flex', flexDirection: 'column', backgroundColor: theme.bgSecondary, 
+                border: `1px solid ${theme.border}`, borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
               }}
             >
               <div style={{ padding: '1.25rem', borderBottom: `1px solid ${theme.border}`, backgroundColor: isDarkMode ? '#1e293b' : '#f8fafc' }}>
@@ -873,66 +863,68 @@ const WorshipPage = () => {
                   </p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    {event.assignments.map(assignment => (
-                      <div key={assignment.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: theme.bg, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
-                        <div style={{ 
-                          width: '30px', 
-                          height: '30px', 
-                          borderRadius: '50%', 
-                          backgroundColor: `${theme.primary}20`, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center', 
-                          fontSize: '0.8rem' 
-                        }}>
-                          {assignment.assignedRole?.name?.charAt(0) || "👤"}
-                        </div>
-                        <div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: '500', color: theme.text }}>
-                            {getDisplayName(assignment.worshipTeamMember?.leader?.member?.name || 'Músico')}
+                    {event.assignments.map(assignment => {
+                      // Indicador visual simple si asistió o no (si ya se tomó lista)
+                      const attendanceIcon = assignment.attended === false ? "❌" : (assignment.attended === true ? "✅" : "");
+
+                      return (
+                        <div key={assignment.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', backgroundColor: theme.bg, borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+                          <div style={{ 
+                            width: '30px', height: '30px', borderRadius: '50%', backgroundColor: `${theme.primary}20`, 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' 
+                          }}>
+                            {assignment.assignedRole?.name?.charAt(0) || "👤"}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: theme.primary, fontWeight: 'bold' }}>
-                            {assignment.assignedRole?.name}
+                          <div style={{ flexGrow: 1 }}>
+                            <div style={{ fontSize: '0.9rem', fontWeight: '500', color: theme.text, textDecoration: assignment.attended === false ? 'line-through' : 'none' }}>
+                              {getDisplayName(assignment.worshipTeamMember?.leader?.member?.name || 'Músico')}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: theme.primary, fontWeight: 'bold' }}>
+                              {assignment.assignedRole?.name}
+                            </div>
                           </div>
+                          {attendanceIcon && <div style={{ fontSize: '0.85rem' }}>{attendanceIcon}</div>}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
               {canManageWorship && (
-                <div style={{ padding: '1rem', borderTop: `1px solid ${theme.border}`, display: 'flex', gap: '0.5rem', backgroundColor: theme.bg }}>
+                <div style={{ padding: '1rem', borderTop: `1px solid ${theme.border}`, display: 'flex', gap: '0.5rem', flexWrap: 'wrap', backgroundColor: theme.bg }}>
                   <button 
                     onClick={() => openEventModal(event)} 
-                    style={{ 
-                      flex: 1, 
-                      padding: '0.6rem', 
-                      borderRadius: '6px', 
-                      border: `1px solid ${theme.border}`, 
-                      backgroundColor: theme.bgSecondary, 
-                      color: theme.text, 
-                      cursor: 'pointer', 
-                      fontWeight: '500', 
-                      fontSize: '0.85rem' 
-                    }}
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '6px', border: `1px solid ${theme.border}`, backgroundColor: theme.bgSecondary, color: theme.text, cursor: 'pointer', fontWeight: '500', fontSize: '0.85rem' }}
                   >
-                    ✏️ Editar y Asignar
+                    ✏️ Editar
                   </button>
                   <button 
                     onClick={() => handleAssignAllToEvent(event.id, event.name)} 
+                    style={{ flex: 1, padding: '0.6rem', borderRadius: '6px', background: `${theme.primary}15`, color: theme.primary, border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.85rem' }}
+                  >
+                    👥 Citar Todos
+                  </button>
+                  {/* 🚀 BOTÓN DE ASISTENCIA */}
+                  {/* 🚀 BOTÓN DE ASISTENCIA (Con validación de evento futuro) */}
+                  <button 
+                    onClick={() => openAttendanceModal(event)} 
+                    disabled={isFutureEvent}
+                    title={isFutureEvent ? "No puedes pasar asistencia hasta que inicie el evento" : "Pasar Asistencia"}
                     style={{ 
-                      flex: 1, 
+                      flexBasis: '100%', 
                       padding: '0.6rem', 
                       borderRadius: '6px', 
-                      background: `${theme.primary}15`, 
-                      color: theme.primary, 
+                      background: isFutureEvent ? `${theme.textSecondary}15` : `${theme.successText}15`, 
+                      color: isFutureEvent ? theme.textSecondary : theme.successText, 
                       border: 'none', 
                       fontWeight: 'bold', 
-                      cursor: 'pointer', 
-                      fontSize: '0.85rem' 
+                      cursor: isFutureEvent ? 'not-allowed' : 'pointer', 
+                      fontSize: '0.85rem', 
+                      marginTop: '0.25rem',
+                      opacity: isFutureEvent ? 0.6 : 1
                     }}
                   >
-                    👥 Citar a Todos
+                    {isFutureEvent ? '⏳ Asistencia bloqueada (Evento Futuro)' : '📋 Pasar Asistencia'}
                   </button>
                 </div>
               )}
@@ -960,19 +952,14 @@ const WorshipPage = () => {
                 <span>👤 {user.username || user.name}</span>
                 <span style={{ 
                   backgroundColor: canManageWorship ? '#8b5cf6' : '#4299e1', 
-                  color: 'white', 
-                  padding: '0.2rem 0.5rem', 
-                  borderRadius: '12px', 
-                  marginLeft: '0.5rem', 
-                  fontSize: '0.8rem', 
-                  fontWeight: 'bold' 
+                  color: 'white', padding: '0.2rem 0.5rem', borderRadius: '12px', marginLeft: '0.5rem', fontSize: '0.8rem', fontWeight: 'bold' 
                 }}>
                   {canManageWorship ? '🎵 Director' : '👁️ Visor'}
                 </span>
               </div>
             )}
           </div>
-          <p>Gestiona el equipo, configura instrumentos y programa el cronograma mensual automáticamente.</p>
+          <p>Gestiona el equipo, configura instrumentos, programa el cronograma y toma asistencia.</p>
         </div>
 
         {/* MENSAJES GLOBALES */}
@@ -990,16 +977,11 @@ const WorshipPage = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               style={{
-                background: 'none', 
-                border: 'none', 
-                padding: '0.5rem 1rem', 
-                fontSize: '1rem',
+                background: 'none', border: 'none', padding: '0.5rem 1rem', fontSize: '1rem',
                 fontWeight: activeTab === tab.id ? 'bold' : 'normal',
                 color: activeTab === tab.id ? theme.primary : theme.textSecondary,
                 borderBottom: activeTab === tab.id ? `3px solid ${theme.primary}` : 'none',
-                cursor: 'pointer', 
-                marginBottom: '-0.65rem', 
-                whiteSpace: 'nowrap'
+                cursor: 'pointer', marginBottom: '-0.65rem', whiteSpace: 'nowrap'
               }}
             >
               {tab.label} {tab.count !== undefined && <span style={{ fontSize: '0.8rem', opacity: 0.7 }}>({tab.count})</span>}
@@ -1318,6 +1300,88 @@ const WorshipPage = () => {
         </div>
       )}
 
+      {/* 🚀 MODAL: ASISTENCIA DE EVENTO */}
+      {showAttendanceModal && attendanceEvent && (
+        <div className="leaders-page__modal-overlay" style={{ backgroundColor: 'rgba(0,0,0,0.6)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="leaders-page__modal" style={{ backgroundColor: theme.bgSecondary, padding: '0', borderRadius: '12px', width: '100%', maxWidth: '500px', border: `1px solid ${theme.border}`, overflow: 'hidden', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+            
+            <div style={{ backgroundColor: theme.primary, padding: '1.5rem', color: 'white', position: 'relative' }}>
+              <button onClick={() => setShowAttendanceModal(false)} style={{ position: 'absolute', top: '10px', right: '15px', background: 'none', border: 'none', fontSize: '1.5rem', color: 'white', opacity: 0.8, cursor: 'pointer' }}>✕</button>
+              <h2 style={{ margin: '0 0 0.5rem 0' }}>📋 Pasar Asistencia</h2>
+              <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.9 }}>{attendanceEvent.name}</p>
+            </div>
+
+            <div style={{ padding: '1.5rem', overflowY: 'auto' }}>
+              {attendanceList.length === 0 ? (
+                <div style={{ textAlign: 'center', color: theme.textSecondary, padding: '2rem 0' }}>
+                  No hay músicos asignados a este culto.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '0.85rem', color: theme.textSecondary }}>
+                      Presentes: <strong>{attendanceList.filter(a => a.attended).length}/{attendanceList.length}</strong>
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button type="button" onClick={() => handleMarkAllAttendance(true)} style={{ background: 'none', border: 'none', color: theme.successText, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>✅ Todos</button>
+                      <button type="button" onClick={() => handleMarkAllAttendance(false)} style={{ background: 'none', border: 'none', color: theme.danger, cursor: 'pointer', fontSize: '0.8rem', fontWeight: 'bold' }}>❌ Ninguno</button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {attendanceList.map((item, index) => (
+                      <div 
+                        key={item.assignmentId} 
+                        onClick={() => handleToggleAttendance(item.assignmentId)}
+                        style={{ 
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+                          padding: '1rem', borderBottom: index < attendanceList.length - 1 ? `1px solid ${theme.border}` : 'none',
+                          backgroundColor: item.attended ? (isDarkMode ? '#14532d20' : '#ecfdf5') : 'transparent',
+                          cursor: 'pointer', transition: 'background-color 0.2s', borderRadius: '8px'
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: theme.text, fontSize: '1rem', textDecoration: !item.attended ? 'line-through' : 'none' }}>
+                            {getDisplayName(item.memberName)}
+                          </div>
+                          <div style={{ color: theme.textSecondary, fontSize: '0.8rem' }}>{item.roleName}</div>
+                        </div>
+
+                        {/* Toggle de Asistencia */}
+                        <div style={{ 
+                          width: '50px', height: '26px', 
+                          backgroundColor: item.attended ? theme.successText : theme.textSecondary, 
+                          borderRadius: '13px', position: 'relative', transition: 'background-color 0.3s'
+                        }}>
+                          <div style={{ 
+                            width: '22px', height: '22px', backgroundColor: 'white', borderRadius: '50%', 
+                            position: 'absolute', top: '2px', left: item.attended ? '26px' : '2px',
+                            transition: 'left 0.3s', boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                          }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div style={{ padding: '1.5rem', borderTop: `1px solid ${theme.border}`, display: 'flex', justifyContent: 'flex-end', backgroundColor: theme.bgSecondary }}>
+              <button 
+                onClick={handleSaveAttendance} 
+                disabled={loading || attendanceList.length === 0}
+                style={{ 
+                  backgroundColor: theme.primary, color: 'white', border: 'none', padding: '0.75rem 2rem', 
+                  borderRadius: '8px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer'
+                }}
+              >
+                {loading ? 'Guardando...' : '💾 Guardar Asistencia'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: AUTO-SUGGEST */}
       {showAutoSuggestModal && (
         <div className="leaders-page__modal-overlay" style={{ backgroundColor: 'rgba(0,0,0,0.6)', position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -1588,7 +1652,7 @@ const WorshipPage = () => {
                 <label htmlFor="activeCheck" style={{ cursor: 'pointer', color: theme.text }}>
                   Instrumento Activo 
                   <span style={{ display: 'block', fontSize: '0.8rem', color: theme.textSecondary }}>
-                    Si se desactiva, no se podrá usar.
+                    Si se desactiva, no se podrá usar en la programación.
                   </span>
                 </label>
               </div>
