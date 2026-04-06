@@ -13,6 +13,7 @@ import nameHelper from "../services/nameHelper";
 import "../css/EnrollmentsPage.css";
 import { useAuth } from "../context/AuthContext";
 import { generateCohortPDF } from "../services/generateCohortPDF";
+import { generateAttendancePDF } from "../services/attendanceCohortsPdfGenerator";
 
 // Extraer funciones del helper
 const { getDisplayName } = nameHelper;
@@ -29,6 +30,9 @@ const log = (message, data) => {
 const logError = (message, error) => {
   console.error(`[EnrollmentsPage] ${message}`, error);
 };
+
+// ✅ Función auxiliar para asegurar que siempre manejamos un array
+const toArray = (val) => (Array.isArray(val) ? val : []);
 
 // ✅ Sanitización de HTML
 const escapeHtml = (text) => {
@@ -738,6 +742,69 @@ const EnrollmentsPage = () => {
       setFilteredEnrollments(data);
     }
   };
+
+  const handlePrintLessonAttendance = async (lesson) => {
+  try {
+    setExportingPDF(true);
+    
+    // 1. Obtener registros de asistencia reales
+    const response = await apiService.getAttendanceByLesson(lesson.id);
+    const attendanceRecords = toArray(response);
+    
+    // 2. Crear un Set con los IDs de INSCRIPCIÓN (studentEnrollmentId) que marcaron "present: true"
+    // Esto garantiza que si hay 40 registros en el JSON, solo cuente esos 40.
+    const attendedEnrollmentIds = new Set(
+      attendanceRecords
+        .filter(r => r.present === true)
+        .map(r => Number(r.studentEnrollmentId))
+    );
+
+    // 3. Asegurar que tenemos la lista de estudiantes completa de la cohorte
+    let currentStudents = students;
+    if (currentStudents.length === 0) {
+      const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
+      currentStudents = toArray(rawStudents).filter(s => s.status !== "CANCELLED");
+    }
+
+    // 4. Enriquecer datos y determinar asistencia real
+    const enrichedStudents = await Promise.all(
+      currentStudents.map(async (s) => {
+        // Determinamos si asistió comparando su ID de inscripción (s.id) con el Set
+        const hasAttended = attendedEnrollmentIds.has(Number(s.id));
+        
+        try {
+          const memberData = await apiService.getMemberById(s.memberId);
+          return {
+            ...s,
+            isActuallyPresent: hasAttended, // Guardamos el estado real aquí
+            leaderName: memberData.leaderName || memberData.leader?.name || "—"
+          };
+        } catch (e) {
+          return { ...s, isActuallyPresent: hasAttended, leaderName: "—" };
+        }
+      })
+    );
+
+    // 5. Lista de memberIds que asistieron para el generador (basada en el cruce anterior)
+    const finalAttendanceList = enrichedStudents
+      .filter(s => s.isActuallyPresent)
+      .map(s => s.memberId);
+
+    console.log("✅ Conteo final verificado:", {
+      total: enrichedStudents.length,
+      asistieron: finalAttendanceList.length, // Debería dar 40
+      faltaron: enrichedStudents.length - finalAttendanceList.length // Debería dar 24
+    });
+
+    generateAttendancePDF(selectedEnrollment, lesson, enrichedStudents, finalAttendanceList);
+
+  } catch (err) {
+    console.error("Error:", err);
+    alert("Error al procesar el conteo de asistencia.");
+  } finally {
+    setExportingPDF(false);
+  }
+};
 
   const handleFilterChange = (type, value) => {
     try {
@@ -1906,6 +1973,26 @@ const EnrollmentsPage = () => {
                           <div className="attendance-info">
                             <p>📅 {formatLocalDate(lesson.lessonDate)}</p>
                             <p>✅ {lesson.attendanceCount || 0} registros</p>
+                            {/* Botón de Impresión con los datos que pediste */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePrintLessonAttendance(lesson);
+                              }}
+                              className="btn-print-mini"
+                              style={{
+                                marginTop: "10px",
+                                padding: "5px 10px",
+                                fontSize: "12px",
+                                backgroundColor: "#1e40af",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "4px",
+                                cursor: "pointer",
+                              }}
+                            >
+                              🖨️ Generar Informe de Gestión
+                            </button>
                           </div>
                         </div>
                       ))}

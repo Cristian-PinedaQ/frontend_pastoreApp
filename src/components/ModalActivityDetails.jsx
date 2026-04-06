@@ -10,6 +10,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import apiService from "../apiService";
 import "../css/ModalActivityDetails.css";
 import ActivityDeliveryStats from "./ActivityDeliveryStats";
+import { generateActivityPDF } from "../services/activityDetailsPdfGenerator";
 
 // ✅ FIX timezone
 const parseLocalDate = (dateString) => {
@@ -84,13 +85,33 @@ const ModalActivityDetails = ({
   const searchInputRef = useRef(null);
 
   // ✅ NUEVO: Cargar participantes con info de entrega
+  // ✅ NUEVO: Cargar participantes y luego sus pagos respectivos
   useEffect(() => {
     if (isOpen && activity?.id) {
       apiService
-        .request(
-          `/activity-contribution/activity/${activity.id}/with-leader-info`,
-        )
-        .then((data) => setParticipants(data || []))
+        .request(`/activity-contribution/activity/${activity.id}/with-leader-info`)
+        .then(async (data) => {
+          const participantsData = data || [];
+          
+          // 🔄 Consultar los pagos para cada participante
+          const participantsWithPayments = await Promise.all(
+            participantsData.map(async (part) => {
+              try {
+                // ⚠️ CLAVE: Asegurarnos de usar el ID correcto (id o contributionId)
+                const contId = part.id || part.contributionId; 
+                if (!contId) return { ...part, payments: [] };
+
+                const payments = await apiService.request(`/activity-payment/contribution/${contId}`);
+                return { ...part, payments: payments || [] };
+              } catch (err) {
+                console.warn(`No se pudieron cargar pagos para la contribución ${part.id}`, err);
+                return { ...part, payments: [] };
+              }
+            })
+          );
+          
+          setParticipants(participantsWithPayments);
+        })
         .catch((error) => {
           console.error("Error cargando participantes:", error);
           setParticipants([]);
@@ -462,6 +483,22 @@ const ModalActivityDetails = ({
 
   const totalCosts = costs.reduce((sum, cost) => sum + (cost.price || 0), 0);
 
+  // Calculamos el total recaudado por cada método a partir de la lista de participantes
+  const totalCASH = participants.reduce((sum, part) => {
+    // Sumamos los pagos que sean 'CASH' dentro de cada participación
+    console.log(`Pagos del participante ${part.memberName}:`, part.payments);
+    const cashPayments =
+      part.payments?.filter((p) => p.incomeMethod === "CASH") || [];
+    return sum + cashPayments.reduce((pSum, p) => pSum + (p.price || 0), 0);
+  }, 0);
+
+  const totalBANK = participants.reduce((sum, part) => {
+    // Sumamos los pagos que sean 'BANK_TRANSFER'
+    const bankPayments =
+      part.payments?.filter((p) => p.incomeMethod === "BANK_TRANSFER") || [];
+    return sum + bankPayments.reduce((pSum, p) => pSum + (p.price || 0), 0);
+  }, 0);
+
   if (!isOpen || !activity) return null;
 
   const totalValue = (activity.price || 0) * (activity.quantity || 0);
@@ -477,6 +514,17 @@ const ModalActivityDetails = ({
     ? getLevelDisplayName(activity.requiredLevel)
     : "Sin nivel requerido";
 
+  // 👇 AGREGA ESTA FUNCIÓN AQUÍ, JUSTO ANTES DEL RETURN
+  const handlePrintPDF = () => {
+    generateActivityPDF({
+      activity,
+      balance,
+      participants,
+      totalCASH,
+      totalBANK,
+      totalValue
+    });
+  };  
   return (
     <div className="modal-activity-details-overlay">
       <div className="modal-activity-details">
@@ -612,6 +660,32 @@ const ModalActivityDetails = ({
                         <div className="finance-value">
                           {balance.totalCommitted?.toLocaleString("es-CO") ||
                             "0"}
+                        </div>
+                      </div>
+                    </div>
+                    {/* --- NUEVAS TARJETAS DE MÉTODOS DE PAGO --- */}
+                    <div
+                      className="finance-card method-cash"
+                      style={{ borderLeft: "4px solid #10b981" }}
+                    >
+                      <div className="finance-icon">💵</div>
+                      <div className="finance-content">
+                        <div className="finance-label">Total Efectivo</div>
+                        <div className="finance-value">
+                          ${totalCASH.toLocaleString("es-CO")}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className="finance-card method-bank"
+                      style={{ borderLeft: "4px solid #3b82f6" }}
+                    >
+                      <div className="finance-icon">🏦</div>
+                      <div className="finance-content">
+                        <div className="finance-label">Total Transferencia</div>
+                        <div className="finance-value">
+                          ${totalBANK.toLocaleString("es-CO")}
                         </div>
                       </div>
                     </div>
@@ -1128,6 +1202,15 @@ const ModalActivityDetails = ({
 
         {/* ACCIONES */}
         <div className="modal-activity-details__actions">
+          {/* 👇 NUEVO BOTÓN PARA EL PDF */}
+          <button 
+            className="btn btn-primary" 
+            onClick={handlePrintPDF}
+            style={{ marginRight: '10px', background: '#1e40af', color: 'white' }}
+          >
+            📄 Generar PDF
+          </button>
+
           <button className="btn btn-secondary" onClick={onClose}>
             Cerrar
           </button>

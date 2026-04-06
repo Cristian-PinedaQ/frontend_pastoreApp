@@ -695,3 +695,270 @@ html.dark-mode .leaders-page {
     cursor: default;
   }
 }
+
+/* ========== ESPECÍFICO PARA ADORADORES Y REPERTORIO ========== */
+
+/* Refuerzo para el overlay del modal en Alabanza */
+.worship-modal-overlay {
+  position: fixed !important; /* !important para asegurar que sobrepasa estilos inline */
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999 !important; /* Por encima de cualquier tabla o header */
+  backdrop-filter: blur(4px);
+}
+
+/* Dropdown de búsqueda de líderes (evita que se esconda tras la tabla) */
+.worship-leader-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: var(--bg-secondary, #fff);
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1001;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0 0;
+}
+
+/* Contenedor del modal de alabanza */
+.worship-modal-content {
+  background-color: var(--bg-secondary, #fff);
+  padding: 2rem;
+  border-radius: 12px;
+  width: 95%;
+  max-width: 550px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid var(--border-color, #eee);
+  position: relative;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode support */
+html.dark-mode .worship-modal-content {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+/* FUERZA BRUTA PARA MODALES DE ALABANZA */
+.worship-modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.8) !important; /* Fondo muy oscuro para notar si aparece */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 999999 !important; /* El valor más alto posible */
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.worship-modal-content {
+    background: white !important;
+    padding: 2rem !important;
+    border-radius: 12px !important;
+    width: 500px !important;
+    max-width: 90% !important;
+    min-height: 200px !important;
+    z-index: 1000000 !important;
+    color: #1f2937 !important; /* Forzar color de texto oscuro para ver si hay contenido */
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Si estás en modo oscuro, ajusta el contenido */
+html.dark-mode .worship-modal-content {
+    background: #1e293b !important;
+    color: #f3f4f6 !important;
+    border: 1px solid #334155 !important;
+}
+
+/* ========== CONFIGURACIÓN ESPECÍFICA MODAL ALABANZA ========== */
+
+/* 1. Capa de fondo (Overlay) */
+.worship-modal-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background-color: rgba(0, 0, 0, 0.75) !important; /* Oscurecido para resaltar el modal */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 999999 !important;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* 2. Contenedor del Modal */
+.worship-modal-content {
+    background-color: #ffffff !important; /* Fondo claro por defecto */
+    color: var(--gray-dark) !important;
+    padding: var(--spacing-xl) !important;
+    border-radius: var(--radius-xl) !important;
+    width: 95% !important;
+    max-width: 550px !important;
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    position: relative !important;
+    box-shadow: var(--shadow-lg) !important;
+    border: 1px solid var(--gray-color) !important;
+}
+
+/* Soporte Dark Mode para el Modal */
+html.dark-mode .worship-modal-content {
+    background-color: #1e293b !important; /* Azul oscuro de tu paleta */
+    color: #f3f4f6 !important;
+    border-color: #334155 !important;
+}
+
+/* 3. Resultados de búsqueda (Dropdown de líderes) */
+.worship-leader-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: var(--radius-md);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000001; /* Por encima del contenido del modal */
+    box-shadow: var(--shadow-md);
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 0 0;
+}
+
+/* Soporte Dark Mode para el Dropdown */
+html.dark-mode .worship-leader-search-results {
+    background-color: #1e293b;
+    border-color: #475569;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+/* Estilo de los items del dropdown en dark mode */
+html.dark-mode .leaders-page__leader-item:hover {
+    background-color: #334155;
+}
+
+/* Animación de entrada */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Esto es lo que debe mandar cuando el modo oscuro está activo */
+html.dark-mode .worship-modal-content {
+    background-color: #1e293b !important; /* El color oscuro de tu diseño */
+    color: #f3f4f6 !important;
+    border-color: #334155 !important;
+}
+
+html.dark-mode .leaders-page__filter-item input,
+html.dark-mode .leaders-page__filter-item select,
+html.dark-mode .leaders-page__filter-item textarea {
+    background-color: #0f172a !important;
+    color: #f3f4f6 !important;
+    border-color: #334155 !important;
+}
+
+.leaders-page__chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* Chip base */
+.leaders-page__chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+/* Hover */
+.leaders-page__chip:hover {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* Seleccionado */
+.leaders-page__chip.selected {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+  font-weight: 500;
+}
+
+/* Hover cuando está seleccionado */
+.leaders-page__chip.selected:hover {
+  background: #2563eb;
+}
+
+/* Modo oscuro */
+@media (prefers-color-scheme: dark) {
+  .leaders-page__chip {
+    background: #0f172a;
+    border-color: #334155;
+    color: #e5e7eb;
+  }
+
+  .leaders-page__chip:hover {
+    background: rgba(59, 130, 246, 0.2);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .leaders-page__filter-item input {
+    background-color: #0f172a;
+    color: #f3f4f6;
+    border-color: #334155;
+  }
+
+  .leaders-page__filter-item input::placeholder {
+    color: #94a3b8;
+  }
+}
+.worship-leader-search-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+
+  margin-top: 6px;
+  padding: 6px 0;
+
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+
+  background: white;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 20;
+}
+@media (prefers-color-scheme: dark) {
+  .worship-leader-search-results {
+    background: #020617; /* más oscuro que el input */
+    border-color: #334155;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  }
+}
