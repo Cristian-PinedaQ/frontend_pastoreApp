@@ -74,12 +74,6 @@ const CellGroupOverviewModal = ({
     const fetchAvailableDates = async () => {
       if (!isOpen || !userCells.length) return;
       try {
-        // Usamos el endpoint de estadísticas mensuales para obtener el listado de días
-        // Se asume que apiService.getMonthlyStatistics llama a:
-        // /api/v1/attendance-cell-group/statistics/cell/{cellId}/month/{year}/{month}
-
-        // Para obtener las fechas de todas las células, puedes usar la primera célula de la lista
-        // o mapear los resultados si las sesiones varían por célula.
         const firstCellId = userCells[0].id;
         const response = await apiService.getMonthlyStatistics(
           firstCellId,
@@ -88,9 +82,15 @@ const CellGroupOverviewModal = ({
         );
 
         if (response && response.dailyStats) {
-          // FILTRO CLAVE: Solo incluimos fechas donde 'hasSessionData' es true
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
           const sessionsWithData = response.dailyStats
-            .filter((day) => day.hasSessionData === true) //
+            .filter((day) => {
+              const sessionDate = new Date(day.date + "T00:00:00");
+              sessionDate.setHours(0, 0, 0, 0);
+              return day.hasSessionData === true && sessionDate <= today; // ← Filtro añadido
+            })
             .map((day) => day.date)
             .sort()
             .reverse();
@@ -167,6 +167,7 @@ const CellGroupOverviewModal = ({
     }
   }, [userCells, selectedMonth, selectedYear, selectedDate, apiService]);
   // ── Carga de fechas basada en la estructura real del JSON ──
+  // ── Carga de fechas filtrando solo sesiones con datos y SOLO PASADAS ──
   useEffect(() => {
     const fetchAvailableDates = async () => {
       if (!isOpen || !userCells.length) return;
@@ -181,10 +182,22 @@ const CellGroupOverviewModal = ({
             if (Array.isArray(cellArray)) allRecords.push(...cellArray);
           });
         }
+
+        // Obtener la fecha actual (sin hora) para comparar
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Filtrar SOLO fechas pasadas (<= hoy)
         const dates = [...new Set(allRecords.map((r) => r.attendanceDate))]
           .filter(Boolean)
+          .filter((dateStr) => {
+            const sessionDate = new Date(dateStr + "T00:00:00");
+            sessionDate.setHours(0, 0, 0, 0);
+            return sessionDate <= today; // ← SOLO FECHAS PASADAS O HOY
+          })
           .sort()
           .reverse();
+
         setAvailableDates(dates);
         setSelectedDate("");
       } catch (e) {
@@ -208,38 +221,61 @@ const CellGroupOverviewModal = ({
 
   // ── Aggregated totals ──────────────────────────────────────────────────────
   // Busca la constante aggregated y ajusta estos campos:
-const aggregated = useMemo(() => {
-  const withData = cellStats.filter(c => c.stats && c.stats.totalRegistered > 0);
-  if (!withData.length) return null;
+  const aggregated = useMemo(() => {
+    const withData = cellStats.filter(
+      (c) => c.stats && c.stats.totalRegistered > 0,
+    );
+    if (!withData.length) return null;
 
-  const totalPresent    = withData.reduce((s, c) => s + (c.stats.totalPresent || 0), 0);
-  const totalJustified  = withData.reduce((s, c) => s + (c.stats.totalJustified || 0), 0);
-  const totalNew        = withData.reduce((s, c) => s + (c.stats.totalNewParticipants || 0), 0);
-  
-  // ✅ Nuevo cálculo: El impacto real (Celebración)
-  const totalCelebracion = totalPresent + totalNew; 
+    const totalPresent = withData.reduce(
+      (s, c) => s + (c.stats.totalPresent || 0),
+      0,
+    );
+    const totalJustified = withData.reduce(
+      (s, c) => s + (c.stats.totalJustified || 0),
+      0,
+    );
+    const totalNew = withData.reduce(
+      (s, c) => s + (c.stats.totalNewParticipants || 0),
+      0,
+    );
 
-  const totalRegistered = withData.reduce((s, c) => s + (c.stats.totalRegistered || 0), 0);
-  const overallPct      = totalRegistered > 0 ? Math.round((totalPresent / totalRegistered) * 100) : 0;
-  
-  const avgPct = withData.length > 0
-    ? Math.round(withData.reduce((s, c) => {
-        const pct = c.stats.totalRegistered > 0 ? (c.stats.totalPresent / c.stats.totalRegistered) * 100 : 0;
-        return s + pct;
-      }, 0) / withData.length)
-    : 0;
+    // ✅ Nuevo cálculo: El impacto real (Celebración)
+    const totalCelebracion = totalPresent + totalNew;
 
-  return { 
-    totalPresent, 
-    totalRegistered, 
-    totalJustified, 
-    totalNew, 
-    totalCelebracion, // ← Retornamos el nuevo campo
-    overallPct, 
-    avgPct, 
-    cellsWithData: withData.length 
-  };
-}, [cellStats]);
+    const totalRegistered = withData.reduce(
+      (s, c) => s + (c.stats.totalRegistered || 0),
+      0,
+    );
+    const overallPct =
+      totalRegistered > 0
+        ? Math.round((totalPresent / totalRegistered) * 100)
+        : 0;
+
+    const avgPct =
+      withData.length > 0
+        ? Math.round(
+            withData.reduce((s, c) => {
+              const pct =
+                c.stats.totalRegistered > 0
+                  ? (c.stats.totalPresent / c.stats.totalRegistered) * 100
+                  : 0;
+              return s + pct;
+            }, 0) / withData.length,
+          )
+        : 0;
+
+    return {
+      totalPresent,
+      totalRegistered,
+      totalJustified,
+      totalNew,
+      totalCelebracion, // ← Retornamos el nuevo campo
+      overallPct,
+      avgPct,
+      cellsWithData: withData.length,
+    };
+  }, [cellStats]);
 
   // ── Sorted cells ──────────────────────────────────────────────────────────
   const sortedCells = useMemo(() => {
@@ -539,7 +575,9 @@ const aggregated = useMemo(() => {
                   appearance: "menulist",
                 }}
               >
-                <option value="">📅 Acumulado Mes</option>
+                <option value="">
+                  📅 Acumulado Mes ({availableDates.length} sesiones)
+                </option>
                 {availableDates.map((d) => (
                   <option key={d} value={d}>
                     {new Date(d + "T00:00:00").toLocaleDateString("es-CO", {

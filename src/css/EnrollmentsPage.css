@@ -486,7 +486,7 @@ body {
 .modal-header {
   background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
   color: white;
-  padding: 24px;
+  padding: 16px 24px; /* Un padding más controlado */
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -494,6 +494,8 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
+  min-height: 60px; /* Altura fija para evitar saltos */
+  box-sizing: border-box;
 }
 
 .modal-header h2 {
@@ -508,7 +510,7 @@ body {
   background: none;
   border: none;
   color: white;
-  font-size: 28px;
+  font-size: 24px;
   cursor: pointer;
   padding: 0;
   width: 40px;
@@ -518,7 +520,9 @@ body {
   justify-content: center;
   border-radius: var(--radius-md);
   transition: background-color var(--transition);
-  flex-shrink: 0;
+  flex-shrink: 0; /* Obliga al botón a no encogerse ni estirarse */
+  line-height: 1; /* Evita que el texto interno (X) genere scroll vertical */
+  overflow: hidden; /* Corta cualquier excedente visual */
 }
 
 .modal-close-btn:hover {
@@ -528,30 +532,48 @@ body {
 /* ========== MODAL TABS ========== */
 .modal-tabs {
   display: flex;
-  border-bottom: 2px solid var(--border-color);
+  flex-wrap: nowrap;        /* 👈 Evita que las pestañas salten a una segunda línea */
+  overflow-x: auto;         /* 👈 Permite scroll horizontal si hay muchas pestañas */
+  overflow-y: hidden;       /* 👈 Elimina cualquier micro-scroll vertical */
   background-color: var(--bg-secondary);
-  padding: 0;
-  gap: 0;
-  flex-wrap: wrap;
-  transition: background-color var(--transition);
+  border-bottom: 2px solid var(--border-color);
+  padding: 0 10px;          /* Espaciado lateral interno */
+  gap: 8px;                 /* Espacio entre botones */
+  
+  /* Ocultar la barra de scroll en navegadores modernos */
+  scrollbar-width: none;    /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  -webkit-overflow-scrolling: touch; /* Scroll suave en iOS */
+}
+
+/* Ocultar barra de scroll en Chrome, Safari y Opera */
+.modal-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
   background: none;
   border: none;
-  padding: 16px 20px;
+  padding: 14px 18px;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-tertiary);
   cursor: pointer;
+  white-space: nowrap;      /* 👈 Importante: evita que el texto se parta en dos líneas */
   transition: all var(--transition);
   position: relative;
   border-bottom: 3px solid transparent;
-  margin-bottom: -2px;
+  margin-bottom: -2px;      /* Alineación perfecta con el borde del contenedor */
+  flex-shrink: 0;           /* 👈 Evita que el botón se aplaste si no hay espacio */
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tab-btn:hover {
   color: var(--primary-color);
+  color: var(--primary-color);
+  background-color: rgba(37, 99, 235, 0.05); /* Efecto sutil al pasar el mouse */
 }
 
 .tab-btn.active {

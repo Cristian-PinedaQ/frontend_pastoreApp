@@ -3810,27 +3810,30 @@ class ApiService {
    * @param {string} type - EventType (CULTO_DOMINGO, REUNION_JOVENES, etc)
    * @param {string} date - Fecha y hora ISO (Ej: 2026-08-15T09:00:00)
    * @param {string} description - Detalles adicionales
+   * @param {number} praiseSongCount - Cantidad de alabanzas requeridas
+   * @param {number} worshipSongCount - Cantidad de adoración requerida
    */
-  async createWorshipEvent(name, type, date, description = null, songCount = 0) {
-    try {
-      validateString(name, 'name', 3, 100);
-      validateString(type, 'type', 1, 50);
-      validateString(date, 'date', 10, 30);
+  async createWorshipEvent(name, type, date, description = null, praiseSongCount = 0, worshipSongCount = 0) {
+    try {
+      validateString(name, 'name', 3, 100);
+      validateString(type, 'type', 1, 50);
+      validateString(date, 'date', 10, 30);
 
-      const params = new URLSearchParams();
-      params.append('name', name.trim());
-      params.append('type', type);
-      params.append('date', date);
-      params.append('songCount', songCount); // ✅ Agregado
-      if (description) params.append('description', description.trim());
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      params.append('type', type);
+      params.append('date', date);
+      params.append('praiseSongCount', praiseSongCount); // ✅ Agregado
+      params.append('worshipSongCount', worshipSongCount); // ✅ Agregado
+      if (description) params.append('description', description.trim());
 
-      log('📅 [createWorshipEvent] Creando evento:', name);
-      return await this.request(`/worship/schedule/event?${params.toString()}`, { method: 'POST' });
-    } catch (error) {
-      logError('❌ [createWorshipEvent] Error:', error.message);
-      throw error;
-    }
-  }
+      log('📅 [createWorshipEvent] Creando evento:', name);
+      return await this.request(`/worship/schedule/event?${params.toString()}`, { method: 'POST' });
+    } catch (error) {
+      logError('❌ [createWorshipEvent] Error:', error.message);
+      throw error;
+    }
+  }
 
   /**
    * Registrar la asistencia del equipo de alabanza a un evento.
@@ -3877,24 +3880,25 @@ class ApiService {
    * Actualizar un evento/culto en el calendario.
    * PUT /api/v1/worship/schedule/event/{id}
    */
-  async updateWorshipEvent(id, name, type, date, description = null, songCount = 0) {
-    try {
-      validateId(id, 'eventId');
-      validateString(name, 'name', 3, 100);
-      const params = new URLSearchParams();
-      params.append('name', name.trim());
-      params.append('type', type);
-      params.append('date', date);
-      params.append('songCount', songCount); // ✅ Agregado
-      if (description) params.append('description', description.trim());
+  async updateWorshipEvent(id, name, type, date, description = null, praiseSongCount = 0, worshipSongCount = 0) {
+    try {
+      validateId(id, 'eventId');
+      validateString(name, 'name', 3, 100);
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      params.append('type', type);
+      params.append('date', date);
+      params.append('praiseSongCount', praiseSongCount); // ✅ Agregado
+      params.append('worshipSongCount', worshipSongCount); // ✅ Agregado
+      if (description) params.append('description', description.trim());
 
-      log('📅 [updateWorshipEvent] Actualizando evento ID:', id);
-      return await this.request(`/worship/schedule/event/${id}?${params.toString()}`, { method: 'PUT' });
-    } catch (error) {
-      logError('❌ [updateWorshipEvent] Error:', error.message);
-      throw error;
-    }
-  }
+      log('📅 [updateWorshipEvent] Actualizando evento ID:', id);
+      return await this.request(`/worship/schedule/event/${id}?${params.toString()}`, { method: 'PUT' });
+    } catch (error) {
+      logError('❌ [updateWorshipEvent] Error:', error.message);
+      throw error;
+    }
+  }
 
   /**
    * Sincronizar las asignaciones editadas de un evento.
@@ -3976,26 +3980,24 @@ class ApiService {
     }
   }
 
-  /**
+ /**
    * Ejecutar el algoritmo de auto-sugerencia mensual equitativa.
    * POST /api/v1/worship/schedule/auto-suggest/batch
-   * @param {Object} data - MonthlyScheduleRequest { eventIds: [1,2,3], requiredRoles: { "1": 1, "2": 3 } }
+   * @param {Object} data - MonthlyScheduleRequest { eventIds: [1,2,3], requiredRoles: { "1": 1, "2": 3 }, praiseSongCount: 2, worshipSongCount: 2 }
    */
   async autoSuggestWorshipSchedule(data) {
-    try {
-      if (!data || !Array.isArray(data.eventIds)) throw new Error('Datos inválidos');
-      log('✨ [autoSuggestWorshipSchedule] Procesando batch');
-      return await this.request('/worship/schedule/auto-suggest/batch', {
-        method: 'POST',
-        body: JSON.stringify(data) // Incluye eventIds, requiredRoles y songCount
-      });
-    } catch (error) {
-      logError('❌ [autoSuggestWorshipSchedule] Error:', error.message);
-      throw error;
-    }
-  }
-  // ... (dentro de tu bloque de MÓDULO DE ALABANZA)
-
+    try {
+      if (!data || !Array.isArray(data.eventIds)) throw new Error('Datos inválidos');
+      log('✨ [autoSuggestWorshipSchedule] Procesando batch');
+      return await this.request('/worship/schedule/auto-suggest/batch', {
+        method: 'POST',
+        body: JSON.stringify(data) // ✅ Incluye eventIds, requiredRoles, praiseSongCount y worshipSongCount
+      });
+    } catch (error) {
+      logError('❌ [autoSuggestWorshipSchedule] Error:', error.message);
+      throw error;
+    }
+  }
   /**
    * Crear un nuevo instrumento/rol de alabanza.
    * POST /api/v1/worship/roles

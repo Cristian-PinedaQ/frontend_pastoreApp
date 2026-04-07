@@ -1,15 +1,29 @@
 import React, { useState, useEffect } from "react";
 import apiService from "../../apiService";
 import nameHelper from "../../services/nameHelper";
+import { generateSingleEventAttendancePDF, generateWorshipRangeAttendancePDF } from "../../services/worshipPdfGenerator"; // Ajusta la ruta a donde guardaste el archivo
 
 const { getDisplayName } = nameHelper;
 
 // Helper para asegurar que siempre trabajamos con arrays
 const toArray = (val) => (Array.isArray(val) ? val : []);
 
-// Agrega esto junto a los otros helpers de array (línea ~10)
+// Helper para extraer el setlist de forma segura
 const getSetlist = (event) =>
   event.setlist?.length ? event.setlist : toArray(event.suggestedSongs);
+
+// NUEVO HELPER: Parsea fechas evitando fallos en Safari/iOS y estandariza zonas horarias locales
+const parseSafeDate = (dateVal) => {
+  if (!dateVal) return new Date();
+  if (Array.isArray(dateVal)) {
+    // Si Spring Boot lo envía como array: [2026, 4, 12, 10, 30]
+    const [y, m, d, h = 0, min = 0, s = 0] = dateVal;
+    return new Date(y, m - 1, d, h, min, s);
+  }
+  // Si es string, aseguramos que tenga la 'T' para formato ISO
+  const safeString = String(dateVal).replace(" ", "T");
+  return new Date(safeString);
+};
 
 const WorshipScheduleTab = ({
   events = [],
@@ -40,7 +54,8 @@ const WorshipScheduleTab = ({
     type: "CULTO_DOMINGO",
     date: "",
     description: "",
-    songCount: 4, // Meta de canciones por defecto
+    praiseSongCount: 2, 
+    worshipSongCount: 2, 
     assignments: [],
     songIds: [],
   });
@@ -48,15 +63,25 @@ const WorshipScheduleTab = ({
   const [showAutoSuggestModal, setShowAutoSuggestModal] = useState(false);
   const [autoSuggestData, setAutoSuggestData] = useState({
     selectedEvents: [],
-    requiredRoles: {}, // { roleId: cantidad }
-    songCount: 4, // Meta para el algoritmo
+    requiredRoles: {},
+    praiseSongCount: 2, 
+    worshipSongCount: 2, 
   });
 
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [attendanceEvent, setAttendanceEvent] = useState(null);
   const [attendanceList, setAttendanceList] = useState([]);
+  const [isAttendanceLocked, setIsAttendanceLocked] = useState(false);
 
-  // --- EFECTO: Inicializar Requerimientos de Auto-Programación ---
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingEvent, setViewingEvent] = useState(null);
+  // --- ESTADOS DE FILTROS ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("ALL"); // ALL, PENDING, ACTIVE, COMPLETED
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  // --- EFECTO: Inicializar Requerimientos ---
   useEffect(() => {
     if (showAutoSuggestModal) {
       const initialReqs = {};
@@ -69,10 +94,84 @@ const WorshipScheduleTab = ({
         ...prev,
         selectedEvents: [],
         requiredRoles: initialReqs,
-        songCount: 4,
+        praiseSongCount: 2,
+        worshipSongCount: 2,
       }));
     }
   }, [showAutoSuggestModal, roles, safeRoles]);
+
+  // ========== LÓGICA DE VOCALISTAS ==========
+  const getAssignedVocalists = (songObj, eventAssignments) => {
+    const fullSong = safeSongs.find(s => String(s.id) === String(songObj.id)) || songObj;
+    const songVocalists = toArray(fullSong.vocalists);
+
+    if (songVocalists.length === 0) return null;
+
+    const leadVocalistIds = toArray(eventAssignments)
+      .filter(a => {
+        const roleName = (a.assignedRole?.name || "").toLowerCase();
+        const isLeadSinger = roleName.includes("vocal") || roleName.includes("voz") || roleName.includes("cant") || roleName.includes("líder") || roleName.includes("director");
+        const isChoir = roleName.includes("coro");
+        return isLeadSinger && !isChoir;
+      })
+      .map(a => String(a.worshipTeamMember?.id));
+
+    const singingToday = songVocalists.filter(v => leadVocalistIds.includes(String(v.id)));
+
+    const formatName = (member) => {
+      const rawName = member?.leader?.member?.name || member?.name || "Vocalista";
+      return getDisplayName(rawName);
+    };
+
+    if (singingToday.length > 0) {
+       return singingToday.map(formatName).join(" & ");
+    }
+    return null; 
+  };
+
+  // ========== LÓGICA: VISTA Y COMPARTIR ==========
+  const openViewModal = (event) => {
+    setViewingEvent(event);
+    setShowViewModal(true);
+  };
+
+  const handleShareEvent = async (event) => {
+    const currentSetlist = getSetlist(event);
+    const dateObj = parseSafeDate(event.eventDate); // Uso de parseo seguro
+    
+    let shareText = `⛪ *EVENTO: ${event.name}*\n`;
+    shareText += `📅 Fecha: ${dateObj.toLocaleDateString()}\n`;
+    shareText += `⏰ Hora: ${dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}\n\n`;
+    
+    shareText += `🎵 *SETLIST DE ADORACIÓN:*\n`;
+    
+    currentSetlist.forEach((s, idx) => {
+      const emoji = s.type === 'ALABANZA' ? '🙌' : '🙇';
+      const singer = getAssignedVocalists(s, event.assignments); 
+      const singerText = singer ? ` (🎤 ${singer})` : '';
+      
+      shareText += `${idx + 1}. ${emoji} *${s.title}*${singerText}\n`;
+      
+      if (s.youtubeLink) {
+        shareText += `   📺 YouTube: ${s.youtubeLink}\n`;
+      }
+      if (s.chordsLink) {
+        shareText += `   🎸 Acordes: ${s.chordsLink}\n`;
+      }
+      shareText += `\n`;
+    });
+
+    shareText += `🚀 _Generado por PastoreApp_`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: event.name, text: shareText });
+      } catch (err) { console.warn("Error compartiendo:", err); }
+    } else {
+      navigator.clipboard.writeText(shareText);
+      showSuccess("📋 ¡Información del evento copiada al portapapeles!");
+    }
+  };
 
   // ========== LÓGICA: AUTO-PROGRAMAR ==========
   const handleToggleAutoEvent = (eventId) => {
@@ -82,22 +181,23 @@ const WorshipScheduleTab = ({
         ? prev.selectedEvents.filter((id) => id !== eventId)
         : [...prev.selectedEvents, eventId];
 
-      // LOGICA DE VALOR REAL: 
-      // Si estamos seleccionando el primer evento, tomamos su songCount real de la BD
-      let newSongCount = prev.songCount;
+      let newPraise = prev.praiseSongCount;
+      let newWorship = prev.worshipSongCount;
+      
       if (!isSelected && newSelected.length === 1) {
         const firstEvent = safeEvents.find(e => e.id === eventId);
-        newSongCount = firstEvent?.songCount || 0;
-      } 
-      // Si deseleccionamos todo, volvemos al default
-      else if (newSelected.length === 0) {
-        newSongCount = 4;
+        newPraise = firstEvent?.praiseSongCount || 0;
+        newWorship = firstEvent?.worshipSongCount || 0;
+      } else if (newSelected.length === 0) {
+        newPraise = 2;
+        newWorship = 2;
       }
 
       return {
         ...prev,
         selectedEvents: newSelected,
-        songCount: newSongCount
+        praiseSongCount: newPraise,
+        worshipSongCount: newWorship
       };
     });
   };
@@ -126,7 +226,8 @@ const WorshipScheduleTab = ({
       await apiService.autoSuggestWorshipSchedule({
         eventIds: autoSuggestData.selectedEvents,
         requiredRoles: cleanRequirements,
-        songCount: autoSuggestData.songCount, // Integrado
+        praiseSongCount: autoSuggestData.praiseSongCount,
+        worshipSongCount: autoSuggestData.worshipSongCount,
       });
       showSuccess("✨ ¡Equipo y sugerencias de canciones generadas!");
       setShowAutoSuggestModal(false);
@@ -143,7 +244,7 @@ const WorshipScheduleTab = ({
     setEventModalTab("INFO");
     if (event) {
       setEditingEvent(event);
-      const d = new Date(event.eventDate);
+      const d = parseSafeDate(event.eventDate); // Uso de parseo seguro
       const pad = (n) => String(n).padStart(2, "0");
       const dateLocal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
@@ -155,7 +256,8 @@ const WorshipScheduleTab = ({
         type: event.eventType || "CULTO_DOMINGO",
         date: dateLocal,
         description: event.description || "",
-        songCount: event.songCount || 0,
+        praiseSongCount: event.praiseSongCount || 0,
+        worshipSongCount: event.worshipSongCount || 0,
         assignments: toArray(event.assignments).map((a) => ({
           roleId: a.assignedRole?.id?.toString() || "",
           memberId: a.worshipTeamMember?.id?.toString() || "",
@@ -183,7 +285,8 @@ const WorshipScheduleTab = ({
         type: "CULTO_DOMINGO",
         date: "",
         description: "",
-        songCount: 4,
+        praiseSongCount: 2,
+        worshipSongCount: 2,
         assignments: [],
         songIds: [],
       });
@@ -210,7 +313,8 @@ const WorshipScheduleTab = ({
           eventFormData.type,
           dateFormatted,
           eventFormData.description,
-          eventFormData.songCount,
+          eventFormData.praiseSongCount,
+          eventFormData.worshipSongCount,
         );
       } else {
         const res = await apiService.createWorshipEvent(
@@ -218,7 +322,8 @@ const WorshipScheduleTab = ({
           eventFormData.type,
           dateFormatted,
           eventFormData.description,
-          eventFormData.songCount,
+          eventFormData.praiseSongCount,
+          eventFormData.worshipSongCount,
         );
         savedId = res?.id || res?.eventId;
       }
@@ -233,7 +338,6 @@ const WorshipScheduleTab = ({
 
         await apiService.syncEventAssignments(savedId, validAssignments);
         
-        // CORRECCIÓN: Filtrar IDs vacíos antes de enviar al backend
         const cleanSongIds = toArray(eventFormData.songIds)
           .filter(id => id !== "" && id !== null)
           .map(Number);
@@ -266,21 +370,68 @@ const WorshipScheduleTab = ({
     }
   };
 
-  // ========== LÓGICA: ASISTENCIA ==========
+  // --- LÓGICA DE FILTRADO ---
+  const filteredEvents = safeEvents.filter((event) => {
+    // Filtro por Nombre
+    const matchName = event.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Filtro por Estado (Asume que tu backend ya devuelve event.status)
+    const matchStatus = filterStatus === "ALL" || event.status === filterStatus;
+    
+    // Filtro por Fechas
+    let matchDate = true;
+    const evDate = parseSafeDate(event.eventDate);
+    if (dateFrom) {
+      matchDate = matchDate && evDate >= new Date(`${dateFrom}T00:00:00`);
+    }
+    if (dateTo) {
+      matchDate = matchDate && evDate <= new Date(`${dateTo}T23:59:59`);
+    }
+
+    return matchName && matchStatus && matchDate;
+  });
+
+  // --- HANDLER PARA IMPRIMIR REPORTE FILTRADO ---
+  const handlePrintRangePDF = () => {
+    if (filteredEvents.length === 0) {
+      return showError("No hay eventos en este rango para imprimir.");
+    }
+    const startStr = dateFrom ? dateFrom : "Inicio histórico";
+    const endStr = dateTo ? dateTo : "Actualidad";
+    generateWorshipRangeAttendancePDF(filteredEvents, startStr, endStr);
+  };
+
+  // ========== LÓGICA: ASISTENCIA (BLOQUEO 24H SEGURO) ==========
   const openAttendanceModal = (event) => {
     setAttendanceEvent(event);
+    
+    // 1. Verificamos si alguna asignación ya tiene un valor booleano en "attended"
+    const hasBeenSavedBefore = toArray(event?.assignments).some(a => a.attended === true || a.attended === false);
+    
+    // 2. Calculamos las horas transcurridas usando getTime() para mayor precisión y evitar errores de zona horaria
+    const eventDate = parseSafeDate(event.eventDate);
+    const now = new Date();
+    // Restamos los milisegundos absolutos y convertimos a horas
+    const hoursSinceEvent = (now.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
+
+    // 3. Bloquear si ya se guardó Y pasaron más de 24 horas del evento
+    const shouldLock = hasBeenSavedBefore && hoursSinceEvent > 24;
+    setIsAttendanceLocked(shouldLock);
+
     setAttendanceList(
       toArray(event?.assignments).map((a) => ({
         assignmentId: a.id,
         memberName: a.worshipTeamMember?.leader?.member?.name || "Músico",
         roleName: a.assignedRole?.name || "Instrumento",
-        attended: a.attended !== false,
+        attended: a.attended === null || a.attended === undefined ? true : a.attended,
       })),
     );
     setShowAttendanceModal(true);
   };
 
   const handleSaveAttendance = async () => {
+    if (isAttendanceLocked) return;
+
     try {
       setLoading(true);
       const payload = attendanceList.map((a) => ({
@@ -300,40 +451,73 @@ const WorshipScheduleTab = ({
 
   return (
     <>
-      {/* HEADER ACTIONS */}
-      <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>
-        {canManageWorship && (
-          <>
-            <button
-              onClick={() => openEventModal()}
-              style={{
-                padding: "0.6rem 1.5rem",
-                borderRadius: "6px",
-                backgroundColor: theme.primary,
-                color: "white",
-                border: "none",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              ➕ Nuevo Evento
-            </button>
-            <button
-              onClick={() => setShowAutoSuggestModal(true)}
-              style={{
-                padding: "0.6rem 1.5rem",
-                borderRadius: "6px",
-                backgroundColor: "#8b5cf6",
-                color: "white",
-                border: "none",
-                fontWeight: "bold",
-                cursor: "pointer",
-              }}
-            >
-              ✨ Auto-Programar
-            </button>
-          </>
-        )}
+      {/* HEADER ACTIONS Y FILTROS */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
+        
+        {/* Botones Principales */}
+        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            {canManageWorship && (
+              <>
+                <button
+                  onClick={() => openEventModal()}
+                  style={{ padding: "0.6rem 1.5rem", borderRadius: "6px", backgroundColor: theme.primary, color: "white", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  ➕ Nuevo Evento
+                </button>
+                <button
+                  onClick={() => setShowAutoSuggestModal(true)}
+                  style={{ padding: "0.6rem 1.5rem", borderRadius: "6px", backgroundColor: "#8b5cf6", color: "white", border: "none", fontWeight: "bold", cursor: "pointer" }}
+                >
+                  ✨ Auto-Programar
+                </button>
+              </>
+            )}
+          </div>
+          
+          <button
+            onClick={handlePrintRangePDF}
+            style={{ padding: "0.6rem 1.5rem", borderRadius: "6px", backgroundColor: "#1e293b", color: "white", border: "none", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}
+          >
+            📄 Reporte Asistencia ({filteredEvents.length})
+          </button>
+        </div>
+
+        {/* Barra de Filtros */}
+        <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", backgroundColor: theme.bgSecondary, padding: "1rem", borderRadius: "8px", border: `1px solid ${theme.border}` }}>
+          <input
+            type="text"
+            placeholder="🔍 Buscar por nombre..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ flex: "1 1 200px", padding: "0.6rem", borderRadius: "6px", border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text }}
+          />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            style={{ flex: "1 1 150px", padding: "0.6rem", borderRadius: "6px", border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text }}
+          >
+            <option value="ALL">Todos los Estados</option>
+            <option value="PENDING">⏳ Pendiente</option>
+            <option value="ACTIVE">▶️ En Curso (Activo)</option>
+            <option value="COMPLETED">✅ Completado</option>
+          </select>
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flex: "1 1 300px" }}>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              style={{ flex: 1, padding: "0.6rem", borderRadius: "6px", border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text }}
+            />
+            <span style={{ color: theme.textSecondary }}>a</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              style={{ flex: 1, padding: "0.6rem", borderRadius: "6px", border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* GRID DE EVENTOS */}
@@ -358,13 +542,23 @@ const WorshipScheduleTab = ({
             <h3>No hay eventos programados</h3>
           </div>
         ) : (
-          safeEvents.map((event) => {
-            const dateObj = new Date(event.eventDate);
-            const isFuture = dateObj > new Date();
+          filteredEvents.map((event) => {
+            const dateObj = parseSafeDate(event.eventDate);
+            const isFuture = dateObj.getTime() > new Date().getTime();
             const currentSetlist = getSetlist(event);
+            
+            // Helper interno para el color del estado
+            const statusConfig = {
+              PENDING: { color: "#f59e0b", label: "⏳ Pendiente" },
+              ACTIVE: { color: "#10b981", label: "▶️ En Curso" },
+              COMPLETED: { color: "#3b82f6", label: "✅ Completado" }
+            };
+            const currentStatus = statusConfig[event.status] || statusConfig.PENDING;
+
             return (
               <div
                 key={event.id}
+                onClick={() => openViewModal(event)}
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -372,7 +566,11 @@ const WorshipScheduleTab = ({
                   border: `1px solid ${theme.border}`,
                   borderRadius: "12px",
                   overflow: "hidden",
+                  cursor: "pointer",
+                  transition: "transform 0.2s",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.02)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 <div
                   style={{
@@ -383,10 +581,13 @@ const WorshipScheduleTab = ({
                   }}
                 >
                   <h3 style={{ margin: 0, color: theme.text }}>{event.name}</h3>
-                  <div
-                    style={{ fontSize: "0.9rem", color: theme.textSecondary }}
-                  >
+                  <div style={{ fontSize: "0.9rem", color: theme.textSecondary }}>
                     📅 {dateObj.toLocaleString()}
+                  </div>
+                  
+                  {/* NUEVO: Etiqueta de Estado */}
+                  <div style={{ display: "inline-block", marginTop: "8px", padding: "2px 8px", borderRadius: "12px", fontSize: "0.75rem", fontWeight: "bold", backgroundColor: `${currentStatus.color}22`, color: currentStatus.color }}>
+                    {currentStatus.label}
                   </div>
                   <div
                     style={{
@@ -395,7 +596,7 @@ const WorshipScheduleTab = ({
                       color: theme.primary,
                     }}
                   >
-                    🎵 Meta: {event.songCount || 0} canciones
+                    🎵 Meta: 🙌 {event.praiseSongCount || 0} Alabanzas | 🙇 {event.worshipSongCount || 0} Adoración
                   </div>
 
                   {canManageWorship && (
@@ -425,7 +626,7 @@ const WorshipScheduleTab = ({
                   {toArray(event.assignments)
                     .slice(0, 3)
                     .map((a, idx) => (
-                      <div key={idx} style={{ fontSize: "0.85rem" }}>
+                      <div key={idx} style={{ fontSize: "0.85rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         • {a.worshipTeamMember?.leader?.member?.name} (
                         {a.assignedRole?.name})
                       </div>
@@ -434,11 +635,15 @@ const WorshipScheduleTab = ({
                     <strong>Setlist ({currentSetlist.length})</strong>
                     {currentSetlist
                       .slice(0, 3)
-                      .map((s, idx) => (
-                        <div key={idx} style={{ fontSize: "0.85rem" }}>
-                          🎵 {s.title}
-                        </div>
-                      ))}
+                      .map((s, idx) => {
+                        const singer = getAssignedVocalists(s, event.assignments);
+                        return (
+                          <div key={idx} style={{ fontSize: "0.85rem", color: s.type === 'ALABANZA' ? '#eab308' : '#8b5cf6', whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {s.type === 'ALABANZA' ? '🙌' : '🙇'} {s.title}
+                            {singer && <span style={{ color: theme.textSecondary, fontWeight: "500", marginLeft: "4px" }}>(🎤 {singer})</span>}
+                          </div>
+                        );
+                      })}
                   </div>
                 </div>
                 {canManageWorship && (
@@ -451,7 +656,10 @@ const WorshipScheduleTab = ({
                     }}
                   >
                     <button
-                      onClick={() => openEventModal(event)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEventModal(event);
+                      }}
                       style={{
                         flex: 1,
                         padding: "0.5rem",
@@ -462,7 +670,10 @@ const WorshipScheduleTab = ({
                       ✏️ Editar
                     </button>
                     <button
-                      onClick={() => openAttendanceModal(event)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openAttendanceModal(event);
+                      }}
                       disabled={isFuture}
                       style={{
                         flex: 1,
@@ -481,6 +692,152 @@ const WorshipScheduleTab = ({
           })
         )}
       </div>
+
+      {/* MODAL: VISTA COMPLETA Y COMPARTIR */}
+      {showViewModal && viewingEvent && (
+        <div
+          style={{
+            position: "fixed", inset: 0, display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 1100, backgroundColor: "rgba(0,0,0,0.7)",
+            padding: "1rem"
+          }}
+          onClick={() => setShowViewModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: theme.bgSecondary, borderRadius: "16px",
+              width: "100%", maxWidth: "550px", maxHeight: "85vh", overflowY: "auto",
+              position: "relative", boxShadow: "0 20px 25px -5px rgba(0,0,0,0.3)"
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: "1.5rem", borderBottom: `1px solid ${theme.border}`, position: 'sticky', top: 0, background: theme.bgSecondary, zIndex: 1 }}>
+              <button 
+                onClick={() => setShowViewModal(false)}
+                style={{ position: 'absolute', right: '1rem', top: '1rem', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: theme.textSecondary }}
+              >✕</button>
+              <h2 style={{ color: theme.text, margin: 0 }}>{viewingEvent.name}</h2>
+              <p style={{ color: theme.primary, margin: "5px 0 0 0" }}>📅 {parseSafeDate(viewingEvent.eventDate).toLocaleString()}</p>
+            </div>
+
+            <div style={{ padding: "1.5rem" }}>
+              <h4 style={{ color: theme.text, borderBottom: `1px solid ${theme.border}`, paddingBottom: "5px" }}>👥 Equipo de Alabanza</h4>
+              <div style={{ display: "grid", gap: "0.5rem", marginBottom: "1.5rem" }}>
+                {toArray(viewingEvent.assignments).map((a, idx) => (
+                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.95rem", color: theme.text }}>
+                    <span><strong>{a.assignedRole?.name}:</strong></span>
+                    <span>{a.worshipTeamMember?.leader?.member?.name}</span>
+                  </div>
+                ))}
+              </div>
+
+              <h4 style={{ color: theme.text, borderBottom: `1px solid ${theme.border}`, paddingBottom: "5px" }}>🎵 Setlist Detallado</h4>
+              <div style={{ display: "grid", gap: "1rem" }}>
+                {getSetlist(viewingEvent).map((song, idx) => {
+                  const singer = getAssignedVocalists(song, viewingEvent.assignments);
+                  
+                  return (
+                  <div key={idx} style={{ 
+                    padding: "12px", 
+                    borderRadius: "8px", 
+                    backgroundColor: theme.bg, 
+                    border: `1px solid ${theme.border}`,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px"
+                  }}>
+                    <div style={{ fontWeight: "bold", color: theme.text, fontSize: "1rem" }}>
+                      {song.type === 'ALABANZA' ? '🙌' : '🙇'} {song.title}
+                      {singer && (
+                        <span style={{ fontWeight: "normal", color: theme.primary, marginLeft: "8px", display: "inline-block", backgroundColor: theme.bgSecondary, padding: "2px 8px", borderRadius: "12px", fontSize: "0.85rem", border: `1px solid ${theme.border}` }}>
+                          🎤 Canta: {singer}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}>
+                      {song.youtubeLink ? (
+                        <a 
+                          href={song.youtubeLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          style={{ 
+                            fontSize: "0.85rem", 
+                            color: "#ff0000", 
+                            textDecoration: "none", 
+                            display: "flex", 
+                            alignItems: "center", 
+                            gap: "4px",
+                            fontWeight: "600"
+                          }}
+                        >
+                          📺 Ver en YouTube
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: "0.85rem", color: theme.textSecondary, opacity: 0.5 }}>🚫 Sin Video</span>
+                      )}
+
+                      {song.chordsLink && (
+                        <a 
+                          href={song.chordsLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          style={{ 
+                            fontSize: "0.85rem", 
+                            color: theme.primary, 
+                            textDecoration: "none", 
+                            display: "flex", 
+                            alignItems: "center", 
+                            gap: "4px",
+                            fontWeight: "600"
+                          }}
+                        >
+                          🎸 Ver Acordes
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )})}
+              </div>
+
+              <button
+                onClick={() => handleShareEvent(viewingEvent)}
+                style={{
+                  width: "100%", marginTop: "2rem", padding: "1rem", borderRadius: "8px",
+                  backgroundColor: "#3c0f84", color: "white", border: "none",
+                  fontWeight: "bold", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "10px"
+                }}
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="22" 
+                  height="22" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+                Compartir Setlist
+              </button>
+              <button
+                onClick={() => generateSingleEventAttendancePDF(viewingEvent)}
+                style={{
+                  width: "100%", marginTop: "1rem", padding: "1rem", borderRadius: "8px",
+                  backgroundColor: theme.primary, color: "white", border: "none",
+                  fontWeight: "bold", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "10px"
+                }}
+              >
+                📄 Descargar Asistencia PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: AUTO-PROGRAMAR */}
       {showAutoSuggestModal && (
@@ -521,35 +878,39 @@ const WorshipScheduleTab = ({
                 backgroundColor: theme.bg,
                 borderRadius: "8px",
                 border: `1px solid ${theme.border}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: '1rem'
               }}
             >
-              <label
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  color: theme.text,
-                }}
-              >
-                <span>🎵 Canciones a sugerir por evento:</span>
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem", color: theme.text, flex: 1 }}>
+                <span style={{ fontSize: '0.85rem' }}>🙌 Alabanzas por culto:</span>
                 <input
                   type="number"
                   min="0"
-                  value={autoSuggestData.songCount}
+                  value={autoSuggestData.praiseSongCount}
                   onChange={(e) =>
                     setAutoSuggestData({
                       ...autoSuggestData,
-                      songCount: parseInt(e.target.value) || 0,
+                      praiseSongCount: parseInt(e.target.value) || 0,
                     })
                   }
-                  style={{
-                    width: "60px",
-                    padding: "5px",
-                    borderRadius: "4px",
-                    border: `1px solid ${theme.border}`,
-                    background: theme.bgSecondary,
-                    color: theme.text,
-                  }}
+                  style={{ padding: "8px", borderRadius: "4px", border: `1px solid ${theme.border}`, background: theme.bgSecondary, color: theme.text }}
+                />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: "0.3rem", color: theme.text, flex: 1 }}>
+                <span style={{ fontSize: '0.85rem' }}>🙇 Adoración por culto:</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={autoSuggestData.worshipSongCount}
+                  onChange={(e) =>
+                    setAutoSuggestData({
+                      ...autoSuggestData,
+                      worshipSongCount: parseInt(e.target.value) || 0,
+                    })
+                  }
+                  style={{ padding: "8px", borderRadius: "4px", border: `1px solid ${theme.border}`, background: theme.bgSecondary, color: theme.text }}
                 />
               </label>
             </div>
@@ -593,7 +954,7 @@ const WorshipScheduleTab = ({
                         checked={autoSuggestData.selectedEvents.includes(e.id)}
                         onChange={() => handleToggleAutoEvent(e.id)}
                       />
-                      {e.name} (Meta: {e.songCount})
+                      {e.name} (Meta: 🙌 {e.praiseSongCount} | 🙇 {e.worshipSongCount})
                     </label>
                   ))
               )}
@@ -625,7 +986,7 @@ const WorshipScheduleTab = ({
                       border: `1px solid ${theme.border}`,
                     }}
                   >
-                    <span style={{ fontSize: "0.85rem", color: theme.text }}>
+                    <span style={{ fontSize: "1rem", color: theme.text }}>
                       {role.name}
                     </span>
                     <input
@@ -636,7 +997,7 @@ const WorshipScheduleTab = ({
                         handleRequirementChange(role.id, e.target.value)
                       }
                       style={{
-                        width: "50px",
+                        width: "35%",
                         textAlign: "center",
                         borderRadius: "4px",
                         border: `1px solid ${theme.border}`,
@@ -797,36 +1158,47 @@ const WorshipScheduleTab = ({
                         color: theme.text,
                       }}
                     />
-                    <div style={{ width: "120px" }}>
-                      <label
-                        style={{
-                          fontSize: "0.7rem",
-                          color: theme.textSecondary,
-                          display: "block",
-                        }}
-                      >
-                        Canciones:
+                  </div>
+
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: "0.8rem", color: theme.textSecondary, display: "block", marginBottom: "4px" }}>
+                        🙌 Cant. Alabanzas
                       </label>
                       <input
                         type="number"
-                        value={eventFormData.songCount}
+                        value={eventFormData.praiseSongCount}
                         onChange={(e) =>
                           setEventFormData({
                             ...eventFormData,
-                            songCount: parseInt(e.target.value) || 0,
+                            praiseSongCount: parseInt(e.target.value) || 0,
                           })
                         }
                         style={{
-                          width: "100%",
-                          padding: "0.7rem",
-                          borderRadius: "6px",
-                          border: `1px solid ${theme.border}`,
-                          background: theme.bg,
-                          color: theme.text,
+                          width: "100%", padding: "0.7rem", borderRadius: "6px", border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, boxSizing: "border-box"
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: "0.8rem", color: theme.textSecondary, display: "block", marginBottom: "4px" }}>
+                        🙇 Cant. Adoración
+                      </label>
+                      <input
+                        type="number"
+                        value={eventFormData.worshipSongCount}
+                        onChange={(e) =>
+                          setEventFormData({
+                            ...eventFormData,
+                            worshipSongCount: parseInt(e.target.value) || 0,
+                          })
+                        }
+                        style={{
+                          width: "100%", padding: "0.7rem", borderRadius: "6px", border: `1px solid ${theme.border}`, background: theme.bg, color: theme.text, boxSizing: "border-box"
                         }}
                       />
                     </div>
                   </div>
+
                   <textarea
                     placeholder="Descripción"
                     value={eventFormData.description}
@@ -984,7 +1356,7 @@ const WorshipScheduleTab = ({
                         <option value="">Canción</option>
                         {safeSongs.map((s) => (
                           <option key={s.id} value={String(s.id)}>
-                            {s.title}
+                            {s.type === 'ALABANZA' ? '🙌' : '🙇'} {s.title}
                           </option>
                         ))}
                       </select>
@@ -1099,11 +1471,20 @@ const WorshipScheduleTab = ({
             }}
           >
             <h2 style={{ color: theme.text, marginTop: 0 }}>📋 Asistencia</h2>
-            <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+            
+            {/* Mensaje de Bloqueo */}
+            {isAttendanceLocked && (
+              <div style={{ backgroundColor: "#fee2e2", color: "#b91c1c", padding: "0.8rem", borderRadius: "6px", marginBottom: "1rem", fontSize: "0.9rem" }}>
+                ⚠️ Han pasado más de 24 horas desde el evento. La asistencia ya no se puede modificar.
+              </div>
+            )}
+
+            <div style={{ maxHeight: "300px", overflowY: "auto", opacity: isAttendanceLocked ? 0.7 : 1 }}>
               {attendanceList.map((a, i) => (
                 <div
                   key={i}
                   onClick={() => {
+                    if (isAttendanceLocked) return; // Bloquear clic
                     const upd = [...attendanceList];
                     upd[i].attended = !upd[i].attended;
                     setAttendanceList(upd);
@@ -1113,7 +1494,7 @@ const WorshipScheduleTab = ({
                     justifyContent: "space-between",
                     padding: "0.8rem",
                     borderBottom: `1px solid ${theme.border}`,
-                    cursor: "pointer",
+                    cursor: isAttendanceLocked ? "not-allowed" : "pointer", // Cursor bloqueado
                     background: a.attended
                       ? isDarkMode
                         ? "#14532d20"
@@ -1146,23 +1527,25 @@ const WorshipScheduleTab = ({
                   cursor: "pointer",
                 }}
               >
-                Cancelar
+                {isAttendanceLocked ? "Cerrar" : "Cancelar"}
               </button>
-              <button
-                onClick={handleSaveAttendance}
-                disabled={loading}
-                style={{
-                  background: theme.primary,
-                  color: "white",
-                  padding: "0.5rem 1.5rem",
-                  borderRadius: "6px",
-                  border: "none",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
-              >
-                {loading ? "Guardando..." : "Guardar"}
-              </button>
+              {!isAttendanceLocked && (
+                <button
+                  onClick={handleSaveAttendance}
+                  disabled={loading}
+                  style={{
+                    background: theme.primary,
+                    color: "white",
+                    padding: "0.5rem 1.5rem",
+                    borderRadius: "6px",
+                    border: "none",
+                    fontWeight: "bold",
+                    cursor: "pointer",
+                  }}
+                >
+                  {loading ? "Guardando..." : "Guardar"}
+                </button>
+              )}
             </div>
           </div>
         </div>

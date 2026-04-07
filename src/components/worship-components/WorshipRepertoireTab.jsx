@@ -10,7 +10,7 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, theme, isD
   const [showSongModal, setShowSongModal] = useState(false);
   const [editingSong, setEditingSong] = useState(null);
   const [songFormData, setSongFormData] = useState({ 
-    title: "", musicalKey: "C", tempo: "", author: "", lyrics: "", chords: "", youtubeLink: "", chordsLink: "", vocalistIds: [] 
+    title: "", type: "ALABANZA", musicalKey: "C", tempo: "", author: "", lyrics: "", chords: "", youtubeLink: "", chordsLink: "", vocalistIds: [] 
   });
 
   const filteredSongs = songs.filter(s => 
@@ -22,13 +22,13 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, theme, isD
     if (song) {
       setEditingSong(song);
       setSongFormData({
-        title: song.title, musicalKey: song.musicalKey || "C", tempo: song.tempo || "", author: song.author || "", 
+        title: song.title, type: song.type || "ALABANZA", musicalKey: song.musicalKey || "C", tempo: song.tempo || "", author: song.author || "", 
         lyrics: song.lyrics || "", chords: song.chords || "", youtubeLink: song.youtubeLink || "", chordsLink: song.chordsLink || "",
         vocalistIds: song.vocalists ? song.vocalists.map(v => v.id) : []
       });
     } else {
       setEditingSong(null);
-      setSongFormData({ title: "", musicalKey: "C", tempo: "", author: "", lyrics: "", chords: "", youtubeLink: "", chordsLink: "", vocalistIds: [] });
+      setSongFormData({ title: "", type: "ALABANZA", musicalKey: "C", tempo: "", author: "", lyrics: "", chords: "", youtubeLink: "", chordsLink: "", vocalistIds: [] });
     }
     setShowSongModal(true);
   };
@@ -43,7 +43,6 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, theme, isD
     e.preventDefault();
     try {
       setLoading(true);
-      // Validar que vocalistIds sean números antes de enviar
       const payload = {
         ...songFormData,
         tempo: songFormData.tempo ? parseInt(songFormData.tempo) : null,
@@ -60,7 +59,6 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, theme, isD
       setShowSongModal(false); 
       await loadData();
     } catch (err) { 
-      // Si el error es 405, mostramos un mensaje más técnico para depurar
       const errorMsg = err.status === 405 ? "Error 405: El servidor no permite POST en esta ruta. Revisa la URL en apiService." : err.message;
       showError(errorMsg || "Error al guardar la canción"); 
     } finally { 
@@ -107,6 +105,9 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, theme, isD
                 <span style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem', borderRadius: '6px', backgroundColor: `${theme.primary}20`, color: theme.primary, fontWeight: 'bold' }}>{song.musicalKey}</span>
               </div>
               <div style={{ fontSize: '0.85rem', color: theme.textSecondary, marginBottom: '0.5rem' }}>
+                <div style={{ marginBottom: '0.3rem', fontWeight: '500', color: song.type === 'ALABANZA' ? '#eab308' : '#8b5cf6' }}>
+                  {song.type === 'ALABANZA' ? '🙌 Alabanza' : '🙇 Adoración'}
+                </div>
                 {song.author && <div>👤 Origen: {song.author}</div>}
                 {song.tempo && <div>⏱️ Tempo: {song.tempo} BPM</div>}
               </div>
@@ -141,9 +142,19 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, theme, isD
           <div className="leaders-page__modal" style={{ backgroundColor: theme.bgSecondary, padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '600px', border: `1px solid ${theme.border}`, maxHeight: '90vh', overflowY: 'auto' }}>
             <h2 style={{ margin: '0 0 1.5rem 0', color: theme.text }}>{editingSong ? '✏️ Editar Canción' : '➕ Añadir Canción'}</h2>
             <form onSubmit={handleSaveSong}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.3rem', color: theme.text }}>Título *</label>
-                <input type="text" required value={songFormData.title} onChange={(e) => setSongFormData({...songFormData, title: e.target.value})} style={{ width: '100%', padding: '0.7rem', borderRadius: '6px', border: `1px solid ${theme.border}`, backgroundColor: theme.bg, color: theme.text, boxSizing: 'border-box' }} />
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', color: theme.text }}>Título *</label>
+                  <input type="text" required value={songFormData.title} onChange={(e) => setSongFormData({...songFormData, title: e.target.value})} style={{ width: '100%', padding: '0.7rem', borderRadius: '6px', border: `1px solid ${theme.border}`, backgroundColor: theme.bg, color: theme.text, boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', color: theme.text }}>Tipo</label>
+                  <select value={songFormData.type} onChange={(e) => setSongFormData({...songFormData, type: e.target.value})} style={{ width: '100%', padding: '0.7rem', borderRadius: '6px', border: `1px solid ${theme.border}`, backgroundColor: theme.bg, color: theme.text, boxSizing: 'border-box' }}>
+                    <option value="ALABANZA">🙌 Alabanza</option>
+                    <option value="ADORACION">🙇 Adoración</option>
+                  </select>
+                </div>
               </div>
               
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
