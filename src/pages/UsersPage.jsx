@@ -28,6 +28,7 @@ const ROLE_OPTIONS = [
   { value: "ECONOMICO", label: "💰 Económico", icon: "💰", color: "#b45309" },
   { value: "LIDER", label: "⚔️ Líder", icon: "⭐", color: "#b91c1c" },
   { value: "PROFESORES", label: "📚 Profesores", icon: "✏️", color: "#1e40af" },
+  { value: "ALABANZA", label: "🎹 ALABANZA", icon: "🎼", color: "#ef31c0" },
 ];
 
 // ✅ Mapa de colores para cada rol
@@ -40,6 +41,7 @@ const ROLE_COLORS = {
   ECONOMICO: "#b45309",
   LIDER: "#b91c1c",
   PROFESORES: "#1e40af",
+  ALABANZA: "#e41ec6",
 };
 
 const UsersPage = () => {

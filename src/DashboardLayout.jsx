@@ -142,7 +142,7 @@ export const DashboardLayout = () => {
       label: "Alabanza",
       path: "/dashboard/worshipPage",
       icon: "🎹",
-      visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]),
+      visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]),
     },
     {
       label: "Actividades",
