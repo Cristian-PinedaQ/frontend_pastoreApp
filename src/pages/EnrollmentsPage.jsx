@@ -14,6 +14,7 @@ import "../css/EnrollmentsPage.css";
 import { useAuth } from "../context/AuthContext";
 import { generateCohortPDF } from "../services/generateCohortPDF";
 import { generateAttendancePDF } from "../services/attendanceCohortsPdfGenerator";
+import { generateCohortAttendanceFullPDF } from "../services/generateCohortAttendanceFullPDF";
 
 // Extraer funciones del helper
 const { getDisplayName } = nameHelper;
@@ -347,7 +348,7 @@ const EnrollmentsPage = () => {
       }
 
       // LOG PARA VER QUÉ ESTÁ LLEGANDO
-      console.log("📦 Datos crudos de cohortes:", enrollmentsArray);
+      //console.log("📦 Datos crudos de cohortes:", enrollmentsArray);
 
       const sorted = enrollmentsArray.sort((a, b) => {
         const dateA = new Date(a.startDate);
@@ -358,13 +359,13 @@ const EnrollmentsPage = () => {
       // ✅ CORRECCIÓN: Normalizar los datos de nivel correctamente
       const normalized = sorted.map((enrollment) => {
         // LOG PARA CADA COHORTE
-        console.log(`🔍 Procesando cohorte ID ${enrollment.id}:`, {
+        /*console.log(`🔍 Procesando cohorte ID ${enrollment.id}:`, {
           levelEnrollment: enrollment.levelEnrollment,
           levelType: typeof enrollment.levelEnrollment,
           isObject:
             enrollment.levelEnrollment &&
             typeof enrollment.levelEnrollment === "object",
-        });
+        });*/
 
         // Determinar el código del nivel
         let levelCode = null;
@@ -377,20 +378,20 @@ const EnrollmentsPage = () => {
           // Si es un objeto (como en tus datos)
           levelObject = enrollment.levelEnrollment;
           levelCode = enrollment.levelEnrollment.code;
-          console.log(`✅ Nivel encontrado como objeto: ${levelCode}`);
+          //console.log(`✅ Nivel encontrado como objeto: ${levelCode}`);
         } else if (typeof enrollment.levelEnrollment === "string") {
           // Si es string directamente
           levelCode = enrollment.levelEnrollment;
-          console.log(`✅ Nivel encontrado como string: ${levelCode}`);
+          //console.log(`✅ Nivel encontrado como string: ${levelCode}`);
         } else if (enrollment.level?.code) {
           // Si viene en level.code
           levelCode = enrollment.level.code;
           levelObject = enrollment.level;
-          console.log(`✅ Nivel encontrado en level.code: ${levelCode}`);
+          //console.log(`✅ Nivel encontrado en level.code: ${levelCode}`);
         } else if (enrollment.level && typeof enrollment.level === "string") {
           // Si level es string
           levelCode = enrollment.level;
-          console.log(`✅ Nivel encontrado en level string: ${levelCode}`);
+          //console.log(`✅ Nivel encontrado en level string: ${levelCode}`);
         }
 
         // Buscar el displayName correspondiente en el array de levels
@@ -431,21 +432,21 @@ const EnrollmentsPage = () => {
           ...enrollment,
         };
 
-        console.log(`✅ Cohorte normalizada:`, {
+        /*console.log(`✅ Cohorte normalizada:`, {
           id: normalizedEnrollment.id,
           name: normalizedEnrollment.cohortName,
           levelCode: normalizedEnrollment.levelCode,
           levelDisplayName: normalizedEnrollment.levelDisplayName,
-        });
+        });*/
 
         return normalizedEnrollment;
       });
 
-      console.log("📊 Cohortes normalizadas:", normalized);
+      //console.log("📊 Cohortes normalizadas:", normalized);
 
       // ✅ Obtener códigos de niveles permitidos
       const allowedCodes = allowedLevels.map((l) => l.code);
-      console.log("🔑 Niveles permitidos:", allowedCodes);
+      //console.log("🔑 Niveles permitidos:", allowedCodes);
 
       // Filtrar por niveles permitidos
       const roleFiltered =
@@ -461,10 +462,10 @@ const EnrollmentsPage = () => {
             })
           : normalized;
 
-      console.log(
+     /* console.log(
         "✅ Cohortes después de filtro por rol:",
         roleFiltered.length,
-      );
+      );*/
 
       setEnrollments(roleFiltered);
 
@@ -491,7 +492,7 @@ const EnrollmentsPage = () => {
         filtered = filtered.filter((e) => e.status === filterStatus);
       }
 
-      console.log("✅ Cohortes después de filtros:", filtered.length);
+      //console.log("✅ Cohortes después de filtros:", filtered.length);
       setFilteredEnrollments(filtered);
     } catch (err) {
       handleError("FETCH_ENROLLMENTS", "fetchEnrollments");
@@ -744,67 +745,196 @@ const EnrollmentsPage = () => {
   };
 
   const handlePrintLessonAttendance = async (lesson) => {
-  try {
-    setExportingPDF(true);
-    
-    // 1. Obtener registros de asistencia reales
-    const response = await apiService.getAttendanceByLesson(lesson.id);
-    const attendanceRecords = toArray(response);
-    
-    // 2. Crear un Set con los IDs de INSCRIPCIÓN (studentEnrollmentId) que marcaron "present: true"
-    // Esto garantiza que si hay 40 registros en el JSON, solo cuente esos 40.
-    const attendedEnrollmentIds = new Set(
-      attendanceRecords
-        .filter(r => r.present === true)
-        .map(r => Number(r.studentEnrollmentId))
-    );
+    try {
+      setExportingPDF(true);
 
-    // 3. Asegurar que tenemos la lista de estudiantes completa de la cohorte
-    let currentStudents = students;
-    if (currentStudents.length === 0) {
-      const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
-      currentStudents = toArray(rawStudents).filter(s => s.status !== "CANCELLED");
+      // 1. Obtener registros de asistencia reales
+      const response = await apiService.getAttendanceByLesson(lesson.id);
+      const attendanceRecords = toArray(response);
+
+      // 2. Crear un Set con los IDs de INSCRIPCIÓN (studentEnrollmentId) que marcaron "present: true"
+      // Esto garantiza que si hay 40 registros en el JSON, solo cuente esos 40.
+      const attendedEnrollmentIds = new Set(
+        attendanceRecords
+          .filter((r) => r.present === true)
+          .map((r) => Number(r.studentEnrollmentId)),
+      );
+
+      // 3. Asegurar que tenemos la lista de estudiantes completa de la cohorte
+      let currentStudents = students;
+      if (currentStudents.length === 0) {
+        const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(
+          selectedEnrollment.id,
+        );
+        currentStudents = toArray(rawStudents).filter(
+          (s) => s.status !== "CANCELLED",
+        );
+      }
+
+      // 4. Enriquecer datos y determinar asistencia real
+      const enrichedStudents = await Promise.all(
+        currentStudents.map(async (s) => {
+          // Determinamos si asistió comparando su ID de inscripción (s.id) con el Set
+          const hasAttended = attendedEnrollmentIds.has(Number(s.id));
+
+          try {
+            const memberData = await apiService.getMemberById(s.memberId);
+            return {
+              ...s,
+              isActuallyPresent: hasAttended, // Guardamos el estado real aquí
+              leaderName:
+                memberData.leaderName || memberData.leader?.name || "—",
+            };
+          } catch (e) {
+            return { ...s, isActuallyPresent: hasAttended, leaderName: "—" };
+          }
+        }),
+      );
+
+      // 5. Lista de memberIds que asistieron para el generador (basada en el cruce anterior)
+      const finalAttendanceList = enrichedStudents
+        .filter((s) => s.isActuallyPresent)
+        .map((s) => s.memberId);
+
+      console.log("✅ Conteo final verificado:", {
+        total: enrichedStudents.length,
+        asistieron: finalAttendanceList.length, // Debería dar 40
+        faltaron: enrichedStudents.length - finalAttendanceList.length, // Debería dar 24
+      });
+
+      generateAttendancePDF(
+        selectedEnrollment,
+        lesson,
+        enrichedStudents,
+        finalAttendanceList,
+      );
+    } catch (err) {
+      console.error("Error:", err);
+      alert("Error al procesar el conteo de asistencia.");
+    } finally {
+      setExportingPDF(false);
     }
+  };
 
-    // 4. Enriquecer datos y determinar asistencia real
-    const enrichedStudents = await Promise.all(
-      currentStudents.map(async (s) => {
-        // Determinamos si asistió comparando su ID de inscripción (s.id) con el Set
-        const hasAttended = attendedEnrollmentIds.has(Number(s.id));
-        
-        try {
-          const memberData = await apiService.getMemberById(s.memberId);
-          return {
-            ...s,
-            isActuallyPresent: hasAttended, // Guardamos el estado real aquí
-            leaderName: memberData.leaderName || memberData.leader?.name || "—"
-          };
-        } catch (e) {
-          return { ...s, isActuallyPresent: hasAttended, leaderName: "—" };
-        }
-      })
-    );
+  const handlePrintCohortAttendance = async () => {
+    if (!selectedEnrollment) return;
+    setExportingPDF(true);
+    setError("");
 
-    // 5. Lista de memberIds que asistieron para el generador (basada en el cruce anterior)
-    const finalAttendanceList = enrichedStudents
-      .filter(s => s.isActuallyPresent)
-      .map(s => s.memberId);
+    try {
+      // 1. Obtener todas las lecciones de la cohorte
+      const lessonsRaw = await apiService.getLessonsByEnrollment(
+        selectedEnrollment.id,
+      );
+      const allLessons = (lessonsRaw || []).sort(
+        (a, b) => a.lessonNumber - b.lessonNumber,
+      );
 
-    console.log("✅ Conteo final verificado:", {
-      total: enrichedStudents.length,
-      asistieron: finalAttendanceList.length, // Debería dar 40
-      faltaron: enrichedStudents.length - finalAttendanceList.length // Debería dar 24
-    });
+      if (allLessons.length === 0) {
+        alert("Esta cohorte no tiene lecciones registradas.");
+        return;
+      }
 
-    generateAttendancePDF(selectedEnrollment, lesson, enrichedStudents, finalAttendanceList);
+      // 2. Obtener estudiantes activos
+      let currentStudents = students;
+      if (currentStudents.length === 0) {
+        const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(
+          selectedEnrollment.id,
+        );
+        currentStudents = toArray(rawStudents).filter(
+          (s) => s.status !== "CANCELLED",
+        );
+      }
 
-  } catch (err) {
-    console.error("Error:", err);
-    alert("Error al procesar el conteo de asistencia.");
-  } finally {
-    setExportingPDF(false);
-  }
-};
+      // 3. Enriquecer estudiantes con leaderName (en paralelo)
+      const memberResults = await Promise.allSettled(
+        currentStudents.map((s) => apiService.getMemberById(s.memberId)),
+      );
+      const enrichedStudents = currentStudents.map((s, i) => {
+        const m =
+          memberResults[i].status === "fulfilled"
+            ? memberResults[i].value || {}
+            : {};
+        return {
+          ...s,
+          memberName: s.memberName || m.name || `Miembro ${s.memberId}`,
+          leaderName:
+            m.leaderName ??
+            m.leader?.name ??
+            m.cell?.groupLeader?.memberName ??
+            m.cell?.groupLeaderName ??
+            m.groupLeaderName ??
+            "Sin Líder Asignado",
+        };
+      });
+
+      // 4. Obtener registros de asistencia de TODAS las lecciones (en paralelo)
+      //    Solo incluir lecciones que tengan al menos 1 registro de asistencia
+      const attendanceResults = await Promise.allSettled(
+        allLessons.map((l) => apiService.getAttendanceByLesson(l.id)),
+      );
+
+      // 5. Construir attendanceMatrix: Map<lessonId, Set<memberId>>
+      //    y filtrar lecciones sin ningún registro
+      const attendanceMatrix = new Map();
+      const lessonsWithData = [];
+
+      allLessons.forEach((lesson, i) => {
+        const records = toArray(
+          attendanceResults[i].status === "fulfilled"
+            ? attendanceResults[i].value
+            : [],
+        );
+        // Solo incluir lecciones con al menos un registro (present true o false)
+        if (records.length === 0) return;
+
+        const presentIds = new Set(
+          records
+            .filter((r) => r.present === true)
+            .map((r) => Number(r.studentEnrollmentId)),
+        );
+
+        // Convertir studentEnrollmentId → memberId usando la lista de estudiantes
+        const presentMemberIds = new Set();
+        enrichedStudents.forEach((s) => {
+          if (presentIds.has(Number(s.id))) {
+            presentMemberIds.add(Number(s.memberId));
+          }
+        });
+
+        attendanceMatrix.set(lesson.id, presentMemberIds);
+        lessonsWithData.push({
+          ...lesson,
+          count: presentMemberIds.size,
+        });
+      });
+
+      if (lessonsWithData.length === 0) {
+        alert("No hay registros de asistencia ingresados en ninguna lección.");
+        return;
+      }
+
+      /*console.log("📊 Generando PDF consolidado:", {
+        lecciones: lessonsWithData.length,
+        estudiantes: enrichedStudents.length,
+      });*/
+
+      // 6. Llamar al generador
+      generateCohortAttendanceFullPDF(
+        selectedEnrollment,
+        lessonsWithData,
+        enrichedStudents,
+        attendanceMatrix,
+      );
+    } catch (err) {
+      console.error("Error generando PDF consolidado:", err);
+      setError(
+        "Error al generar el reporte de asistencias. Inténtalo de nuevo.",
+      );
+    } finally {
+      setExportingPDF(false);
+    }
+  };
 
   const handleFilterChange = (type, value) => {
     try {
@@ -1937,12 +2067,53 @@ const EnrollmentsPage = () => {
               {activeTab === "attendance" && (
                 <div className="tab-content">
                   <div className="tab-actions">
-                    <button
-                      onClick={handleRecordAttendance}
-                      className="btn-primary"
+                    <div
+                      className="tab-actions"
+                      style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}
                     >
-                      ➕ Registrar Asistencia
-                    </button>
+                      <button
+                        onClick={handleRecordAttendance}
+                        className="btn-primary"
+                      >
+                        ➕ Registrar Asistencia
+                      </button>
+                      <button
+                        onClick={handlePrintCohortAttendance}
+                        disabled={exportingPDF}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "6px",
+                          border: "none",
+                          fontWeight: 700,
+                          fontSize: "14px",
+                          cursor: exportingPDF ? "not-allowed" : "pointer",
+                          background: exportingPDF
+                            ? "#93c5fd"
+                            : "linear-gradient(135deg, #065f46 0%, #10b981 100%)",
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          opacity: exportingPDF ? 0.7 : 1,
+                        }}
+                      >
+                        {exportingPDF ? (
+                          <>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                animation: "spin 1s linear infinite",
+                              }}
+                            >
+                              ⏳
+                            </span>
+                            Preparando reporte...
+                          </>
+                        ) : (
+                          <>🖨️ Asistencias Generales</>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {attendanceSummary.length === 0 ? (
