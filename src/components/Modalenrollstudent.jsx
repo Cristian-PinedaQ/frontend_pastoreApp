@@ -1,84 +1,40 @@
-// 📝 ModalEnrollStudent.jsx - v3 CON FLUJO MEJORADO
-// Modal para inscribir múltiples estudiantes a cohortes por nivel
-// ✅ FLUJO CORREGIDO: Nivel → Estudiantes con ese nivel → Cohortes del nivel
-// ✅ GENERADOR PDF: Exportar listado de estudiantes por nivel
+// ============================================
+// ModalEnrollStudent.jsx - ELITE MODERN EDITION
+// ============================================
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import apiService from "../apiService";
+import { useConfirmation } from "../context/ConfirmationContext";
 import nameHelper from "../services/nameHelper";
-// Al inicio del archivo ModalEnrollStudent.jsx
 import { generateStudentsByLevelPDF } from "../services/studentsByLevelPdfGenerator";
+import { 
+  X, 
+  ChevronRight, 
+  ChevronLeft, 
+  Search, 
+  GraduationCap, 
+  Users, 
+  Layers, 
+  CheckCircle2, 
+  AlertTriangle, 
+  FileText, 
+  UserCheck, 
+  Calendar,
+  CreditCard,
+  Check,
+  Loader2
+} from "lucide-react";
 
 const { getDisplayName } = nameHelper;
 
-// Helper para extraer el code del nivel (puede ser objeto o string legacy)
 const getMemberLevelCode = (member) => {
   if (!member?.currentLevel) return null;
-  return typeof member.currentLevel === "object"
-    ? member.currentLevel.code
-    : member.currentLevel;
+  return typeof member.currentLevel === "object" ? member.currentLevel.code : member.currentLevel;
 };
 
 const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
-  // ========== DARK MODE ==========
+  const confirm = useConfirmation();
   const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const savedMode = localStorage.getItem("darkMode");
-    const htmlHasDarkClass =
-      document.documentElement.classList.contains("dark-mode");
-
-    setIsDarkMode(savedMode === "true" || htmlHasDarkClass || prefersDark);
-
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains("dark-mode"));
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (e) => {
-      if (localStorage.getItem("darkMode") === null) {
-        setIsDarkMode(e.matches);
-      }
-    };
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener("change", handleChange);
-    };
-  }, []);
-
-  // Tema
-  const themeColors = {
-    bg: isDarkMode ? "#0f172a" : "#ffffff",
-    bgSecondary: isDarkMode ? "#1e293b" : "#f9fafb",
-    bgLight: isDarkMode ? "#1a2332" : "#f5f7fa",
-    text: isDarkMode ? "#f1f5f9" : "#111827",
-    textSecondary: isDarkMode ? "#cbd5e1" : "#666666",
-    textTertiary: isDarkMode ? "#94a3b8" : "#999999",
-    border: isDarkMode ? "#334155" : "#e0e0e0",
-    borderLight: isDarkMode ? "#475569" : "#f0f0f0",
-    header: isDarkMode
-      ? "linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)"
-      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    card: isDarkMode ? "#1e293b" : "#ffffff",
-    hover: isDarkMode ? "#334155" : "#f9fafb",
-    selected: isDarkMode ? "#334155" : "#e0e7ff",
-    selectedBorder: isDarkMode ? "#6366f1" : "#667eea",
-    infoBox: isDarkMode ? "#1e3a8a" : "#f0f9ff",
-    infoBorder: isDarkMode ? "#3b82f6" : "#0284c7",
-    infoText: isDarkMode ? "#93c5fd" : "#0c4a6e",
-  };
-
-  // ========== ESTADO ==========
   const [step, setStep] = useState(1);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [studentsByLevel, setStudentsByLevel] = useState([]);
@@ -93,26 +49,30 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
   const [confirmedExternal, setConfirmedExternal] = useState([]);
   const isEnrolling = useRef(false);
 
-  // Definir niveles con su orden
   const LEVELS = [
-    { value: "PREENCUENTRO", label: "Pre-encuentro", order: 1 },
-    { value: "ENCUENTRO", label: "Encuentro", order: 2 },
-    { value: "POST_ENCUENTRO", label: "Post-encuentro", order: 3 },
-    { value: "BAUTIZOS", label: "Bautizos", order: 4 },
-    { value: "ESENCIA_1", label: "ESENCIA 1", order: 5 },
-    { value: "ESENCIA_2", label: "ESENCIA 2", order: 6 },
-    { value: "ESENCIA_3", label: "ESENCIA 3", order: 7 },
-    {
-      value: "SANIDAD_INTEGRAL_RAICES",
-      label: "Sanidad Integral Raíces",
-      order: 8,
-    },
-    { value: "ESENCIA_4", label: "ESENCIA 4", order: 9 },
-    { value: "ADIESTRAMIENTO", label: "Adiestramiento", order: 10 },
-    { value: "GRADUACION", label: "Graduación", order: 11 },
+    { value: "PREENCUENTRO",            label: "Pre-encuentro",            order: 1,  color: 'blue' },
+    { value: "ENCUENTRO",               label: "Encuentro",                 order: 2,  color: 'violet' },
+    { value: "POST_ENCUENTRO",          label: "Post-encuentro",            order: 3,  color: 'indigo' },
+    { value: "BAUTIZOS",                label: "Bautizos",                  order: 4,  color: 'cyan' },
+    { value: "ESENCIA_1",               label: "ESENCIA 1",                 order: 5,  color: 'emerald' },
+    { value: "ESENCIA_2",               label: "ESENCIA 2",                 order: 6,  color: 'emerald' },
+    { value: "ESENCIA_3",               label: "ESENCIA 3",                 order: 7,  color: 'emerald' },
+    { value: "SANIDAD_INTEGRAL_RAICES", label: "Sanidad Integral Raíces",   order: 8,  color: 'rose' },
+    { value: "ESENCIA_4",               label: "ESENCIA 4",                 order: 9,  color: 'emerald' },
+    { value: "ADIESTRAMIENTO",          label: "Adiestramiento",            order: 10, color: 'amber' },
+    { value: "GRADUACION",              label: "Graduación",                order: 11, color: 'purple' },
   ];
 
-  // ========== RESETEAR MODAL ==========
+  // ─── Theme Detection ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const checkDark = () => {
+      setIsDarkMode(document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark');
+    };
+    checkDark();
+    const invoker = setInterval(checkDark, 1000);
+    return () => clearInterval(invoker);
+  }, []);
+
   const handleReset = useCallback(() => {
     setStep(1);
     setSelectedLevel(null);
@@ -127,1651 +87,470 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     onClose();
   }, [onClose]);
 
-  // Cargar todos los miembros al abrir modal
-  useEffect(() => {
-    if (isOpen) {
-      loadAllMembers();
-    } else {
-      // Resetear estado al cerrar
-      handleReset();
-    }
-  }, [isOpen, handleReset]);
-
-  // Cargar todos los miembros
   const loadAllMembers = async () => {
     setLoading(true);
     setError("");
-
     try {
-      console.log("📚 Cargando todos los miembros...");
       const data = await apiService.getAllMembers();
       setAllMembers(data || []);
-      console.log("✅ Miembros cargados:", data?.length || 0);
     } catch (err) {
-      console.error("❌ Error cargando miembros:", err);
       setError("Error al cargar miembros: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ========== GENERAR PDF POR NIVEL ==========
-  // En ModalEnrollStudent.jsx - actualizar generatePDFByLevel
-
-  // En ModalEnrollStudent.jsx - Reemplazar la función generatePDFByLevel existente
+  useEffect(() => {
+    if (isOpen) loadAllMembers();
+    else handleReset();
+  }, [isOpen, handleReset]);
 
   const generatePDFByLevel = async (level) => {
     const levelInfo = LEVELS.find((l) => l.value === level);
     if (!levelInfo) return;
-
     try {
       setLoading(true);
-
-      // Usar el nuevo método que obtiene datos del backend
       const levelDetail = await apiService.getLevelStudents(level);
-
       if (!levelDetail || levelDetail.totalStudents === 0) {
-        alert(`No hay estudiantes en el nivel ${levelInfo.label}`);
+        await confirm({
+          title: "Sin Estudiantes",
+          message: `No se encontraron estudiantes registrados en el nivel ${levelInfo.label} para generar el reporte.`,
+          type: "info",
+          confirmLabel: "Entendido"
+        });
         return;
       }
-
-      // Combinar todos los estudiantes con su categoría de estado
-      const allStudents = [
-        ...(levelDetail.currentlyStudying || []).map((s) => ({
-          ...s,
-          statusCategory: "Cursando",
-          // Asegurar que todos los campos necesarios estén presentes
-          name: s.memberName || "Sin nombre",
-          document: s.document || "—",
-          email: s.email || "—",
-          phone: s.phone || "—",
-          address: s.address || "—",
-          district: s.district || "—",
-          districtDescription: s.districtDescription || s.district || "—",
-          gender: s.gender || "—",
-          maritalStatus: s.maritalStatus || "—",
-          // Datos de progreso
-          attendancePercentage: s.attendancePercentage || 0,
-          averageScore: s.averageScore || 0,
-          passed: s.passed,
-        })),
-        ...(levelDetail.completed || []).map((s) => ({
-          ...s,
-          statusCategory: "Completado",
-          name: s.memberName || "Sin nombre",
-          document: s.document || "—",
-          email: s.email || "—",
-          phone: s.phone || "—",
-          address: s.address || "—",
-          district: s.district || "—",
-          districtDescription: s.districtDescription || s.district || "—",
-          gender: s.gender || "—",
-          maritalStatus: s.maritalStatus || "—",
-          attendancePercentage: s.attendancePercentage || 0,
-          averageScore: s.averageScore || 0,
-          passed: s.passed,
-        })),
-        ...(levelDetail.failed || []).map((s) => ({
-          ...s,
-          statusCategory: "Reprobado",
-          name: s.memberName || "Sin nombre",
-          document: s.document || "—",
-          email: s.email || "—",
-          phone: s.phone || "—",
-          address: s.address || "—",
-          district: s.district || "—",
-          districtDescription: s.districtDescription || s.district || "—",
-          gender: s.gender || "—",
-          maritalStatus: s.maritalStatus || "—",
-          attendancePercentage: s.attendancePercentage || 0,
-          averageScore: s.averageScore || 0,
-          passed: s.passed,
-        })),
+      const students = [
+        ...(levelDetail.currentlyStudying || []).map(s => ({ ...s, statusCategory: "Cursando", name: s.memberName || "Sin nombre" })),
+        ...(levelDetail.completed || []).map(s => ({ ...s, statusCategory: "Completado", name: s.memberName || "Sin nombre" })),
+        ...(levelDetail.failed || []).map(s => ({ ...s, statusCategory: "Reprobado", name: s.memberName || "Sin nombre" }))
       ];
-
-      // Calcular estadísticas mejoradas
-      const maleCount = allStudents.filter(
-        (s) => s.gender === "MASCULINO",
-      ).length;
-      const femaleCount = allStudents.filter(
-        (s) => s.gender === "FEMENINO",
-      ).length;
-      const withEmail = allStudents.filter(
-        (s) => s.email && s.email !== "—" && s.email,
-      ).length;
-      const withPhone = allStudents.filter(
-        (s) => s.phone && s.phone !== "—" && s.phone,
-      ).length;
-      const withDocument = allStudents.filter(
-        (s) => s.document && s.document !== "—" && s.document,
-      ).length;
-      const withAddress = allStudents.filter(
-        (s) => s.address && s.address !== "—" && s.address,
-      ).length;
-
-      // Distribución por distrito usando districtDescription
-      const districtMap = {};
-      allStudents.forEach((s) => {
-        const district = s.districtDescription || s.district || "SIN DISTRITO";
-        districtMap[district] = (districtMap[district] || 0) + 1;
-      });
-
-      const districts = Object.entries(districtMap)
-        .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count);
-
-      // Generar PDF con todos los datos
       generateStudentsByLevelPDF({
-        students: allStudents,
-        level: level,
+        students,
+        level,
         levelLabel: levelInfo.label,
-        totalStudents: allStudents.length,
+        totalStudents: students.length,
         stats: {
-          maleCount,
-          femaleCount,
-          withEmail,
-          withPhone,
-          withDocument,
-          withAddress,
-          districts,
-          // Estadísticas adicionales del backend
-          passedCount:
-            levelDetail.passedCount || levelDetail.completed?.length || 0,
-          activeCount:
-            levelDetail.activeCount ||
-            levelDetail.currentlyStudying?.length ||
-            0,
-          failedCount:
-            levelDetail.failedCount || levelDetail.failed?.length || 0,
+          maleCount: students.filter(s => s.gender === "MASCULINO").length,
+          femaleCount: students.filter(s => s.gender === "FEMENINO").length,
+          passedCount: levelDetail.passedCount || 0,
+          activeCount: levelDetail.activeCount || 0,
+          failedCount: levelDetail.failedCount || 0,
           averageAttendance: levelDetail.averageAttendance || 0,
           averageScore: levelDetail.averageScore || 0,
         },
       });
-    } catch (error) {
-      console.error("❌ Error generando PDF:", error);
-      alert(
-        "Error al generar el PDF: " + (error.message || "Error desconocido"),
-      );
+    } catch (err) {
+      setError("Error generando PDF: " + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ========== CARGAR ESTUDIANTES POR NIVEL ==========
   const loadStudentsByLevel = useCallback(async () => {
     if (!selectedLevel) return;
     setLoading(true);
-    setError("");
     try {
-      const filtered = allMembers.filter(
-        (member) => getMemberLevelCode(member) === selectedLevel, // ← antes: member.currentLevel === selectedLevel
-      );
+      const filtered = allMembers.filter(m => getMemberLevelCode(m) === selectedLevel);
       setStudentsByLevel(filtered);
     } catch (err) {
-      setError("Error al cargar estudiantes: " + err.message);
+      setError("Error al filtrar estudiantes");
     } finally {
       setLoading(false);
     }
   }, [selectedLevel, allMembers]);
 
-  // Cargar estudiantes cuando se selecciona nivel y se avanza al paso 2
   useEffect(() => {
     if (selectedLevel && step === 2) {
       loadStudentsByLevel();
-      setSelectedStudents([]); // Resetear selección
+      setSelectedStudents([]);
     }
   }, [selectedLevel, step, loadStudentsByLevel]);
 
-  // ========== CARGAR COHORTES DISPONIBLES ==========
   const loadAvailableCohorts = useCallback(async () => {
     if (!selectedLevel) return;
     setLoading(true);
-    setError("");
     try {
       const data = await apiService.getAvailableCohortsByLevel(selectedLevel);
-
-      const transformedCohorts = (data || []).map((cohort) => {
-        // El API devuelve: id, name, level, levelCode, currentStudents, maxStudents, startDate, endDate, status
-        const currentStudents = cohort.currentStudents ?? 0;
-        const maxStudents = cohort.maxStudents ?? 0;
-        const availableSpots = maxStudents - currentStudents;
-        const available = availableSpots > 0;
-
-        return {
-          cohortId: cohort.cohortId ?? cohort.id, // compatibilidad
-          cohortName: cohort.cohortName ?? cohort.name, // compatibilidad
-          currentStudents,
-          maxStudents,
-          availableSpots,
-          available,
-          status: cohort.status,
-          startDate: cohort.startDate,
-          endDate: cohort.endDate,
-          maestro: cohort.maestro
-            ? {
-                ...cohort.maestro,
-                displayName: getDisplayName(cohort.maestro.name),
-              }
-            : null,
-        };
-      });
-
-      setAvailableCohorts(transformedCohorts);
+      const transformed = (data || []).map(c => ({
+        cohortId: c.cohortId ?? c.id,
+        cohortName: c.cohortName ?? c.name,
+        currentStudents: c.currentStudents ?? 0,
+        maxStudents: c.maxStudents ?? 0,
+        availableSpots: (c.maxStudents ?? 0) - (c.currentStudents ?? 0),
+        available: ((c.maxStudents ?? 0) - (c.currentStudents ?? 0)) > 0,
+        status: c.status,
+        startDate: c.startDate,
+        endDate: c.endDate,
+        maestro: c.maestro ? { ...c.maestro, displayName: getDisplayName(c.maestro.name) } : null,
+      }));
+      setAvailableCohorts(transformed);
     } catch (err) {
-      setError("Error al cargar cohortes: " + err.message);
+      setError("Error al cargar cohortes disponibles");
     } finally {
       setLoading(false);
     }
   }, [selectedLevel]);
 
-  // Cargar cohortes cuando se avanza al paso 3
   useEffect(() => {
-    if (selectedLevel && step === 3) {
-      loadAvailableCohorts();
-    }
+    if (selectedLevel && step === 3) loadAvailableCohorts();
   }, [selectedLevel, step, loadAvailableCohorts]);
 
-  // ========== MANEJAR SIGUIENTE PASO ==========
   const handleNext = () => {
-    if (step === 1 && !selectedLevel) {
-      setError("Debes seleccionar un nivel");
-      return;
-    }
-    if (step === 2 && selectedStudents.length === 0) {
-      setError("Debes seleccionar al menos un estudiante");
-      return;
-    }
-
+    if (step === 1 && !selectedLevel) { setError("Selecciona un nivel"); return; }
+    if (step === 2 && selectedStudents.length === 0) { setError("Selecciona al menos un estudiante"); return; }
     setStep(step + 1);
     setError("");
   };
 
-  // ========== MANEJAR PASO ANTERIOR ==========
-  const handlePrevious = () => {
-    if (step > 1) {
-      setStep(step - 1);
-      setError("");
-    }
-  };
+  const handlePrevious = () => { if (step > 1) setStep(step - 1); setError(""); };
 
-  // ========== SELECCIONAR/DESELECCIONAR ESTUDIANTE ==========
-  const toggleStudent = (student) => {
-    const alreadySelected = selectedStudents.some((s) => s.id === student.id);
-
+  const toggleStudent = async (student) => {
+    const alreadySelected = selectedStudents.some(s => s.id === student.id);
     if (alreadySelected) {
-      setSelectedStudents((prev) => prev.filter((s) => s.id !== student.id));
-      setConfirmedExternal((prev) => prev.filter((id) => id !== student.id));
+      setSelectedStudents(prev => prev.filter(s => s.id !== student.id));
+      setConfirmedExternal(prev => prev.filter(id => id !== student.id));
       return;
     }
-
-    // Si es PREENCUENTRO y el estudiante NO tiene ese nivel actual → advertencia
-    const isExternal =
-      selectedLevel === "PREENCUENTRO" &&
-      getMemberLevelCode(student) !== "PREENCUENTRO";
-
+    const isExternal = selectedLevel === "PREENCUENTRO" && getMemberLevelCode(student) !== "PREENCUENTRO";
     if (isExternal && !confirmedExternal.includes(student.id)) {
-      const nombre = getDisplayName(student.name);
-      const nivelActual = student.currentLevel
-        ? typeof student.currentLevel === "object"
-          ? student.currentLevel.displayName
-          : student.currentLevel
-        : "Sin nivel asignado";
-
-      const confirmed = window.confirm(
-        `⚠️ ADVERTENCIA\n\n` +
-          `"${nombre}" tiene nivel actual: ${nivelActual}\n\n` +
-          `Estás a punto de inscribirlo nuevamente en PREENCUENTRO, ` +
-          `lo que reiniciará su proceso formativo desde cero.\n\n` +
-          `¿Confirmas la inscripción?`,
-      );
-
-      if (!confirmed) return;
-      setConfirmedExternal((prev) => [...prev, student.id]);
+      const isConfirmed = await confirm({
+        title: "Advertencia Académica",
+        message: `"${getDisplayName(student.name)}" ya tiene un proceso formativo avanzado. ¿Seguro que quieres reiniciarlo inscribiéndolo en PREENCUENTRO?`,
+        type: "warning",
+        confirmLabel: "Sí, reiniciar proceso",
+        onConfirm: async () => { }
+      });
+      if (!isConfirmed) return;
+      setConfirmedExternal(prev => [...prev, student.id]);
     }
-
-    setSelectedStudents((prev) => [...prev, student]);
+    setSelectedStudents(prev => [...prev, student]);
   };
 
-  // ========== SELECCIONAR TODOS LOS ESTUDIANTES ==========
-  const selectAllStudents = () => {
-    if (selectedStudents.length === filteredStudents.length) {
-      setSelectedStudents([]);
-    } else {
-      setSelectedStudents(filteredStudents);
-    }
-  };
-
-  // ========== INSCRIBIR ESTUDIANTES ==========
-  const handleEnroll = async () => {
-    if (isEnrolling.current) return;  // ← guard contra doble ejecución
-  isEnrolling.current = true;
-    if (selectedStudents.length === 0 || !selectedCohort) {
-      setError("Falta seleccionar información");
-      return;
-    }
-
-    // ── Deduplicar por ID antes de procesar ──────────────────────
-    const uniqueStudents = selectedStudents.filter(
-      (student, index, self) =>
-        index === self.findIndex((s) => s.id === student.id),
+  const filteredStudents = useMemo(() => {
+    const source = selectedLevel === "PREENCUENTRO" ? allMembers : studentsByLevel;
+    const q = searchStudent.toLowerCase();
+    return source.filter(m => 
+      m.name?.toLowerCase().includes(q) || 
+      getDisplayName(m.name)?.toLowerCase().includes(q) ||
+      m.document?.includes(q)
     );
+  }, [selectedLevel, allMembers, studentsByLevel, searchStudent]);
 
-    if (uniqueStudents.length < selectedStudents.length) {
-      console.warn(
-        `⚠️ Se detectaron ${selectedStudents.length - uniqueStudents.length} estudiante(s) duplicados, se omitirán.`,
-      );
-    }
-
+  const handleEnroll = async () => {
+    if (isEnrolling.current) return;
+    isEnrolling.current = true;
     setLoading(true);
-    setError("");
     setEnrollingStatus({});
-
-    setLoading(true);
-    setError("");
-    setEnrollingStatus({});
-
     try {
-      console.log(`📝 Inscribiendo ${selectedStudents.length} estudiantes...`);
-
-      const results = [];
-      const errors = [];
-
-      // Inscribir cada estudiante secuencialmente
+      let successCount = 0;
       for (const student of selectedStudents) {
+        setEnrollingStatus(prev => ({ ...prev, [student.id]: 'enrolling' }));
         try {
-          setEnrollingStatus((prev) => ({
-            ...prev,
-            [student.id]: { status: "enrolling", name: student.name },
-          }));
-
-          await apiService.createStudentEnrollment(
-            student.id,
-            selectedCohort.cohortId,
-          );
-
-          setEnrollingStatus((prev) => ({
-            ...prev,
-            [student.id]: { status: "success", name: student.name },
-          }));
-
-          results.push(student.name);
+          await apiService.createStudentEnrollment(student.id, selectedCohort.cohortId);
+          setEnrollingStatus(prev => ({ ...prev, [student.id]: 'success' }));
+          successCount++;
         } catch (err) {
-          console.error(`❌ Error inscribiendo a ${student.name}:`, err);
-
-          setEnrollingStatus((prev) => ({
-            ...prev,
-            [student.id]: {
-              status: "error",
-              name: student.name,
-              error: err.message,
-            },
-          }));
-
-          errors.push({ name: student.name, error: err.message });
+          setEnrollingStatus(prev => ({ ...prev, [student.id]: 'error' }));
         }
       }
-
-      // Mostrar resumen
-      if (results.length > 0) {
-        const successMessage = `✅ ${results.length} estudiante(s) inscrito(s) exitosamente`;
-        if (errors.length === 0) {
-          alert(successMessage);
-        } else {
-          alert(
-            `${successMessage}\n❌ ${errors.length} error(es):\n${errors.map((e) => `${e.name}: ${e.error}`).join("\n")}`,
-          );
-        }
-      } else if (errors.length > 0) {
-        alert(
-          `❌ No se pudo inscribir ningún estudiante:\n${errors.map((e) => `${e.name}: ${e.error}`).join("\n")}`,
-        );
-      }
-
-      // Si al menos uno fue exitoso, refrescar y cerrar
-      if (results.length > 0) {
+      if (successCount > 0) {
         setTimeout(() => {
           handleReset();
           onEnrollmentSuccess();
-        }, 2000);
+        }, 1500);
       }
-    } catch (err) {
-      console.error("❌ Error en proceso de inscripción:", err);
-      setError("Error en el proceso de inscripción: " + err.message);
     } finally {
       setLoading(false);
-  isEnrolling.current = false;
+      isEnrolling.current = false;
     }
   };
-
-  // Fuente de búsqueda según nivel
-  const searchSource =
-    selectedLevel === "PREENCUENTRO" ? allMembers : studentsByLevel;
-
-  // Filtrar estudiantes por búsqueda
-  const filteredStudents = searchSource.filter(
-    (member) =>
-      member.name?.toLowerCase().includes(searchStudent.toLowerCase()) ||
-      getDisplayName(member.name)
-        ?.toLowerCase()
-        .includes(searchStudent.toLowerCase()) ||
-      member.email?.toLowerCase().includes(searchStudent.toLowerCase()) ||
-      member.document?.toLowerCase().includes(searchStudent.toLowerCase()),
-  );
 
   if (!isOpen) return null;
 
   return (
-    <div
-      className="modal-overlay"
-      style={{
-        backgroundColor: isDarkMode
-          ? "rgba(0, 0, 0, 0.7)"
-          : "rgba(0, 0, 0, 0.5)",
-      }}
-      onClick={handleReset}
-    >
-      <div
-        className="modal-container enroll-modal"
-        style={{
-          backgroundColor: themeColors.bg,
-          color: themeColors.text,
-          maxWidth: step === 2 ? "800px" : "700px",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in" onClick={handleReset} />
+      
+      <div className="relative bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95">
+        
         {/* Header */}
-        <div
-          className="modal-header"
-          style={{
-            background: themeColors.header,
-          }}
-        >
-          <h2 className="modal-title">
-            {step === 1 && "📚 Seleccionar Nivel"}
-            {step === 2 && "👥 Seleccionar Estudiantes"}
-            {step === 3 && "🎓 Seleccionar Cohorte"}
-          </h2>
-          <button className="modal-close-btn" onClick={handleReset}>
-            ✕
-          </button>
+        <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50">
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20`}>
+              <GraduationCap size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
+                {step === 1 ? "Inscripción: Paso 1" : step === 2 ? "Inscripción: Paso 2" : "Inscripción: Paso 3"}
+              </h2>
+              <p className="text-sm text-slate-500 font-medium mt-1">
+                {step === 1 ? "Selecciona el nivel académico" : step === 2 ? "Selecciona los estudiantes" : "Selecciona la cohorte activa"}
+              </p>
+            </div>
+          </div>
+          <button onClick={handleReset} className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
         </div>
 
         {/* Progress Bar */}
-        <div
-          className="progress-container"
-          style={{
-            backgroundColor: themeColors.bgLight,
-            borderBottomColor: themeColors.border,
-          }}
-        >
-          <div
-            className="progress-bar"
-            style={{ backgroundColor: themeColors.border }}
-          >
-            <div
-              className="progress-fill"
-              style={{ width: `${(step / 3) * 100}%` }}
-            ></div>
-          </div>
-          <p
-            className="progress-text"
-            style={{ color: themeColors.textSecondary }}
-          >
-            Paso {step} de 3
-          </p>
+        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800">
+          <div className="h-full bg-indigo-600 transition-all duration-500" style={{ width: `${(step / 3) * 100}%` }} />
         </div>
 
-        {/* Body */}
-        <div className="modal-body">
+        <div className="flex-1 overflow-y-auto p-8">
           {error && (
-            <div
-              className="error-message"
-              style={{
-                backgroundColor: isDarkMode ? "#7f1d1d" : "#fee2e2",
-                color: isDarkMode ? "#fca5a5" : "#991b1b",
-                borderLeftColor: isDarkMode ? "#dc2626" : "#ef4444",
-              }}
-            >
-              ❌ {error}
+            <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 rounded-2xl flex items-center gap-3 animate-head-shake">
+              <AlertTriangle size={18} />
+              <span className="text-sm font-bold">{error}</span>
             </div>
           )}
 
-          {loading && step !== 2 ? (
-            <div
-              className="loading-state"
-              style={{ color: themeColors.textSecondary }}
-            >
-              ⏳ Cargando información...
+          {/* STEP 1: LEVELS */}
+          {step === 1 && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <p className="text-slate-500 dark:text-slate-400 font-medium italic">Selecciona el nivel para proceder con la inscripción:</p>
+                {selectedLevel && (
+                  <button 
+                    onClick={() => generatePDFByLevel(selectedLevel)}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-50 dark:hover:bg-indigo-900/40 transition-all"
+                  >
+                    <FileText size={16} /> Exportar Listado
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {LEVELS.map(l => (
+                  <button
+                    key={l.value}
+                    onClick={() => setSelectedLevel(l.value)}
+                    className={`p-4 rounded-[1.5rem] border-2 text-left transition-all relative overflow-hidden group ${
+                      selectedLevel === l.value 
+                        ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' 
+                        : 'border-slate-100 dark:border-slate-800 hover:border-indigo-500/50'
+                    }`}
+                  >
+                    {selectedLevel === l.value && <div className="absolute top-2 right-2 text-indigo-600"><CheckCircle2 size={16} /></div>}
+                    <div className={`w-8 h-8 rounded-lg bg-${l.color}-500/10 text-${l.color}-600 dark:text-${l.color}-400 flex items-center justify-center mb-3`}>
+                      <Layers size={18} />
+                    </div>
+                    <p className="text-sm font-black text-slate-800 dark:text-slate-200 tracking-tight leading-tight">{l.label}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : (
-            <>
-              {/* PASO 1: Seleccionar Nivel con botón PDF */}
-              {step === 1 && (
-                <div className="step-content">
-                  <div className="level-header">
-                    <p
-                      className="step-info"
-                      style={{
-                        backgroundColor: themeColors.infoBox,
-                        borderLeftColor: themeColors.infoBorder,
-                        color: themeColors.infoText,
-                      }}
-                    >
-                      Selecciona el nivel para ver los estudiantes disponibles
-                    </p>
+          )}
 
-                    {selectedLevel && (
-                      <button
-                        className="pdf-button"
-                        onClick={() => generatePDFByLevel(selectedLevel)}
-                        style={{
-                          backgroundColor: isDarkMode ? "#4b5563" : "#f3f4f6",
-                          color: isDarkMode ? "#f1f5f9" : "#374151",
-                          border: `1px solid ${themeColors.border}`,
-                        }}
-                      >
-                        📄 Exportar Listado PDF
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="options-grid">
-                    {LEVELS.map((level) => (
-                      <div
-                        key={level.value}
-                        className={`option-card ${selectedLevel === level.value ? "selected" : ""}`}
-                        style={{
-                          borderColor:
-                            selectedLevel === level.value
-                              ? themeColors.selectedBorder
-                              : themeColors.border,
-                          backgroundColor:
-                            selectedLevel === level.value
-                              ? themeColors.selected
-                              : themeColors.card,
-                        }}
-                        onClick={() => setSelectedLevel(level.value)}
-                      >
-                        <input
-                          type="radio"
-                          checked={selectedLevel === level.value}
-                          onChange={() => setSelectedLevel(level.value)}
-                        />
-                        <span
-                          className="card-label"
-                          style={{ color: themeColors.text }}
-                        >
-                          {level.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {selectedLevel && (
-                    <div
-                      className="selection-summary"
-                      style={{
-                        backgroundColor: isDarkMode ? "#064e3b" : "#f0fdf4",
-                        borderLeftColor: isDarkMode ? "#10b981" : "#10b981",
-                        color: isDarkMode ? "#86efac" : "#065f46",
-                      }}
-                    >
-                      <p>
-                        ✅ Nivel seleccionado:{" "}
-                        <strong>
-                          {LEVELS.find((l) => l.value === selectedLevel)?.label}
-                        </strong>
-                      </p>
-                      <p>
-                        📊 Estudiantes en este nivel:{" "}
-                        <strong>
-                          {
-                            allMembers.filter(
-                              (m) => getMemberLevelCode(m) === selectedLevel,
-                            ).length
-                          }
-                        </strong>
-                      </p>
-                    </div>
-                  )}
+          {/* STEP 2: STUDENTS */}
+          {step === 2 && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar estudiante por nombre o documento..."
+                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/50 font-medium"
+                    value={searchStudent}
+                    onChange={(e) => setSearchStudent(e.target.value)}
+                  />
                 </div>
-              )}
-
-              {/* PASO 2: Seleccionar Estudiantes del nivel */}
-              {step === 2 && (
-                <div className="step-content">
-                  <p
-                    className="step-info"
-                    style={{
-                      backgroundColor: themeColors.infoBox,
-                      borderLeftColor: themeColors.infoBorder,
-                      color: themeColors.infoText,
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                    {selectedStudents.length} Seleccionados
+                  </span>
+                  <button 
+                    onClick={() => {
+                      if (selectedStudents.length === filteredStudents.length) setSelectedStudents([]);
+                      else setSelectedStudents(filteredStudents);
                     }}
+                    className="px-4 py-2 bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all"
                   >
-                    Nivel:{" "}
-                    <strong>
-                      {LEVELS.find((l) => l.value === selectedLevel)?.label}
-                    </strong>
-                    {" | "}
-                    Estudiantes encontrados:{" "}
-                    <strong>{studentsByLevel.length}</strong>
-                  </p>
+                    {selectedStudents.length === filteredStudents.length ? 'Deseleccionar' : 'Seleccionar Todos'}
+                  </button>
+                </div>
+              </div>
 
-                  {step === 2 && selectedLevel === "PREENCUENTRO" && (
-                    <div
-                      style={{
-                        backgroundColor: isDarkMode ? "#78350f" : "#fffbeb",
-                        borderLeft: `4px solid ${isDarkMode ? "#f59e0b" : "#d97706"}`,
-                        color: isDarkMode ? "#fcd34d" : "#92400e",
-                        padding: "10px 14px",
-                        borderRadius: "6px",
-                        fontSize: "13px",
-                        marginBottom: "12px",
-                      }}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {filteredStudents.map(student => {
+                  const isSelected = selectedStudents.some(s => s.id === student.id);
+                  const status = enrollingStatus[student.id];
+                  const isExternal = selectedLevel === "PREENCUENTRO" && getMemberLevelCode(student) !== "PREENCUENTRO";
+
+                  return (
+                    <div 
+                      key={student.id}
+                      onClick={() => status !== 'success' && toggleStudent(student)}
+                      className={`p-4 rounded-3xl border-2 transition-all cursor-pointer flex items-center gap-4 ${
+                        isSelected 
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20' 
+                          : 'border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 shadow-sm'
+                      } ${status === 'success' ? 'opacity-60 grayscale' : ''}`}
                     >
-                      ⚠️ <strong>Primer nivel:</strong> Puedes buscar cualquier
-                      miembro. Si el miembro ya tiene un nivel asignado, se
-                      pedirá confirmación antes de inscribirlo.
-                    </div>
-                  )}
-                  <div className="search-box">
-                    <input
-                      type="text"
-                      placeholder="🔍 Buscar estudiante por nombre, email o documento..."
-                      value={searchStudent}
-                      onChange={(e) => setSearchStudent(e.target.value)}
-                      className="search-input"
-                      style={{
-                        backgroundColor: themeColors.card,
-                        color: themeColors.text,
-                        borderColor: themeColors.border,
-                      }}
-                    />
-                  </div>
-
-                  {studentsByLevel.length > 0 && (
-                    <div className="select-all-container">
-                      <label className="select-all-label">
-                        <input
-                          type="checkbox"
-                          checked={
-                            selectedStudents.length ===
-                              filteredStudents.length &&
-                            filteredStudents.length > 0
-                          }
-                          onChange={selectAllStudents}
-                          disabled={filteredStudents.length === 0}
-                        />
-                        <span style={{ color: themeColors.text }}>
-                          {selectedStudents.length === filteredStudents.length
-                            ? "Deseleccionar todos"
-                            : "Seleccionar todos"}
-                        </span>
-                      </label>
-                      <span
-                        className="selected-count"
-                        style={{ color: themeColors.textSecondary }}
-                      >
-                        {selectedStudents.length} seleccionados
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="students-list">
-                    {loading ? (
-                      <div
-                        className="loading-state"
-                        style={{ color: themeColors.textSecondary }}
-                      >
-                        ⏳ Cargando estudiantes...
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg ${isSelected ? 'bg-indigo-600 shadow-lg shadow-indigo-500/20' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                        {status === 'success' ? <Check size={24} /> : student.name?.charAt(0)}
                       </div>
-                    ) : filteredStudents.length === 0 ? (
-                      <p
-                        className="no-options"
-                        style={{ color: themeColors.textTertiary }}
-                      >
-                        {searchStudent
-                          ? "No hay estudiantes que coincidan con la búsqueda"
-                          : "No hay estudiantes disponibles en este nivel"}
-                      </p>
-                    ) : (
-                      filteredStudents.map((student) => (
-                        <div
-                          key={student.id}
-                          className={`student-item ${selectedStudents.some((s) => s.id === student.id) ? "selected" : ""}`}
-                          style={{
-                            borderColor: selectedStudents.some(
-                              (s) => s.id === student.id,
-                            )
-                              ? themeColors.selectedBorder
-                              : themeColors.border,
-                            backgroundColor: selectedStudents.some(
-                              (s) => s.id === student.id,
-                            )
-                              ? themeColors.selected
-                              : themeColors.card,
-                            opacity:
-                              enrollingStatus[student.id]?.status === "success"
-                                ? 0.6
-                                : 1,
-                          }}
-                          onClick={() => toggleStudent(student)}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedStudents.some(
-                              (s) => s.id === student.id,
-                            )}
-                            onChange={() => toggleStudent(student)}
-                            disabled={
-                              enrollingStatus[student.id]?.status === "success"
-                            }
-                          />
-                          <div className="student-info">
-                            <div className="student-name">
-                              <strong style={{ color: themeColors.text }}>
-                                {getDisplayName(student.name)}
-                              </strong>
-                              {enrollingStatus[student.id]?.status ===
-                                "success" && (
-                                <span
-                                  className="success-badge"
-                                  style={{
-                                    color: isDarkMode ? "#86efac" : "#065f46",
-                                  }}
-                                >
-                                  ✅ Inscrito
-                                </span>
-                              )}
-                              {enrollingStatus[student.id]?.status ===
-                                "error" && (
-                                <span
-                                  className="error-badge"
-                                  style={{
-                                    color: isDarkMode ? "#fca5a5" : "#991b1b",
-                                  }}
-                                >
-                                  ❌ Error
-                                </span>
-                              )}
-                            </div>
-                            {selectedLevel === "PREENCUENTRO" &&
-                              getMemberLevelCode(student) !==
-                                "PREENCUENTRO" && (
-                                <span
-                                  style={{
-                                    fontSize: "10px",
-                                    backgroundColor: isDarkMode
-                                      ? "#78350f"
-                                      : "#fef3c7",
-                                    color: isDarkMode ? "#fcd34d" : "#92400e",
-                                    padding: "2px 6px",
-                                    borderRadius: "10px",
-                                    fontWeight: "600",
-                                    marginLeft: "6px",
-                                  }}
-                                >
-                                  ⚠️ Nivel:{" "}
-                                  {student.currentLevel
-                                    ? typeof student.currentLevel === "object"
-                                      ? student.currentLevel.displayName
-                                      : student.currentLevel
-                                    : "Sin nivel"}
-                                </span>
-                              )}
-                            <div
-                              className="student-details"
-                              style={{ color: themeColors.textSecondary }}
-                            >
-                              <span>{student.email || "Sin email"}</span>
-                              <span>{student.document || "Sin documento"}</span>
-                              <span>{student.phone || "Sin teléfono"}</span>
-                            </div>
-                          </div>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-black text-slate-800 dark:text-white tracking-tight uppercase line-clamp-1">
+                            {getDisplayName(student.name)}
+                          </p>
+                          {isSelected && <CheckCircle2 size={16} className="text-indigo-600 animate-in zoom-in" />}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* PASO 3: Seleccionar Cohorte */}
-              {/* PASO 3: Seleccionar Cohorte */}
-              {step === 3 && (
-                <div className="step-content">
-                  <p
-                    className="step-info"
-                    style={{
-                      backgroundColor: themeColors.infoBox,
-                      borderLeftColor: themeColors.infoBorder,
-                      color: themeColors.infoText,
-                    }}
-                  >
-                    <strong>Nivel:</strong>{" "}
-                    {LEVELS.find((l) => l.value === selectedLevel)?.label}
-                    <br />
-                    <strong>Estudiantes seleccionados:</strong>{" "}
-                    {selectedStudents.length}
-                  </p>
-
-                  {loading ? (
-                    <div
-                      className="loading-state"
-                      style={{ color: themeColors.textSecondary }}
-                    >
-                      ⏳ Cargando cohortes disponibles...
-                    </div>
-                  ) : (
-                    <>
-                      <div className="cohorts-list">
-                        {availableCohorts.length === 0 ? (
-                          <div
-                            className="no-cohorts"
-                            style={{
-                              backgroundColor: isDarkMode
-                                ? "#1e293b"
-                                : "#f9fafb",
-                              border: `1px dashed ${themeColors.border}`,
-                              borderRadius: "8px",
-                              padding: "30px 20px",
-                              textAlign: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "40px",
-                                display: "block",
-                                marginBottom: "12px",
-                              }}
-                            >
-                              📭
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">
+                          <span className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                            <CreditCard size={12} /> {student.document || '---'}
+                          </span>
+                          {isExternal && (
+                            <span className="flex items-center gap-1 text-[10px] text-amber-600 font-bold uppercase tracking-tight italic bg-amber-500/10 px-1.5 rounded-lg border border-amber-500/20">
+                              <AlertTriangle size={10} /> Avanzado
                             </span>
-                            <p
-                              style={{
-                                color: themeColors.textSecondary,
-                                marginBottom: "8px",
-                              }}
-                            >
-                              No hay cohortes disponibles para el nivel{" "}
-                              {
-                                LEVELS.find((l) => l.value === selectedLevel)
-                                  ?.label
-                              }
-                            </p>
-                            <p
-                              style={{
-                                color: themeColors.textTertiary,
-                                fontSize: "12px",
-                              }}
-                            >
-                              Verifica que existan cohortes creadas y activas
-                              para este nivel
-                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: COHORTS */}
+          {step === 3 && (
+            <div className="space-y-6">
+              <div className="p-6 rounded-[2rem] bg-indigo-600 text-white shadow-xl shadow-indigo-600/20 flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+                <div className="absolute top-[-20px] right-[-20px] w-40 h-40 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-white/20 rounded-full w-fit">
+                    <CheckCircle2 size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">{selectedLevel}</span>
+                  </div>
+                  <h3 className="text-3xl font-black tracking-tighter leading-none italic">Asignar Cohorte de Destino</h3>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="text-5xl font-black">{selectedStudents.length}</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest opacity-80">Estudiantes a Inscribir</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {availableCohorts.length === 0 ? (
+                  <div className="py-20 text-center space-y-4">
+                    <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto text-slate-300">
+                      <Layers size={40} />
+                    </div>
+                    <div>
+                      <p className="font-black text-slate-400 uppercase tracking-widest italic">No hay cohortes activas</p>
+                      <p className="text-sm text-slate-500 font-medium">Debes crear una cohorte para el nivel "{selectedLevel}" antes de continuar.</p>
+                    </div>
+                  </div>
+                ) : (
+                  availableCohorts.map(cohort => (
+                    <button
+                      key={cohort.cohortId}
+                      onClick={() => cohort.available && setSelectedCohort(cohort)}
+                      disabled={!cohort.available}
+                      className={`p-6 rounded-[2rem] border-2 text-left transition-all relative overflow-hidden group flex flex-col md:flex-row gap-6 md:items-center ${
+                        selectedCohort?.cohortId === cohort.cohortId
+                          ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20'
+                          : 'border-slate-100 dark:border-slate-800 hover:border-indigo-500/50 bg-white dark:bg-slate-900 shadow-sm'
+                      } ${!cohort.available ? 'opacity-60 grayscale cursor-not-allowed' : ''}`}
+                    >
+                      <div className="relative shrink-0">
+                        <div className={`w-16 h-16 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner`}>
+                          <Users size={32} strokeWidth={1.5} />
+                        </div>
+                        {selectedCohort?.cohortId === cohort.cohortId && (
+                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900 shadow-md">
+                            <Check size={14} strokeWidth={3} />
                           </div>
-                        ) : (
-                          availableCohorts.map((cohort) => (
-                            <div
-                              key={cohort.cohortId}
-                              className={`cohort-item ${selectedCohort?.cohortId === cohort.cohortId ? "selected" : ""}`}
-                              style={{
-                                borderColor:
-                                  selectedCohort?.cohortId === cohort.cohortId
-                                    ? themeColors.selectedBorder
-                                    : themeColors.border,
-                                backgroundColor:
-                                  selectedCohort?.cohortId === cohort.cohortId
-                                    ? themeColors.selected
-                                    : themeColors.card,
-                                cursor: cohort.available
-                                  ? "pointer"
-                                  : "not-allowed",
-                                opacity: cohort.available ? 1 : 0.6,
-                              }}
-                              onClick={() =>
-                                cohort.available && setSelectedCohort(cohort)
-                              }
-                            >
-                              <input
-                                type="radio"
-                                name="cohort"
-                                checked={
-                                  selectedCohort?.cohortId === cohort.cohortId
-                                }
-                                onChange={() => setSelectedCohort(cohort)}
-                                disabled={!cohort.available}
-                              />
-                              <div className="cohort-info" style={{ flex: 1 }}>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  <strong
-                                    style={{
-                                      color: themeColors.text,
-                                      fontSize: "14px",
-                                    }}
-                                  >
-                                    {cohort.cohortName}
-                                  </strong>
-                                  <span
-                                    className="status-badge"
-                                    style={{
-                                      backgroundColor: cohort.available
-                                        ? isDarkMode
-                                          ? "#064e3b"
-                                          : "#d1fae5"
-                                        : isDarkMode
-                                          ? "#7f1d1d"
-                                          : "#fee2e2",
-                                      color: cohort.available
-                                        ? isDarkMode
-                                          ? "#86efac"
-                                          : "#065f46"
-                                        : isDarkMode
-                                          ? "#fca5a5"
-                                          : "#991b1b",
-                                      padding: "4px 8px",
-                                      borderRadius: "12px",
-                                      fontSize: "11px",
-                                      fontWeight: "600",
-                                    }}
-                                  >
-                                    {cohort.available
-                                      ? "✅ Disponible"
-                                      : "❌ Llena"}
-                                  </span>
-                                </div>
-
-                                <div
-                                  style={{
-                                    display: "grid",
-                                    gridTemplateColumns: "1fr 1fr",
-                                    gap: "8px",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      fontSize: "11px",
-                                      color: themeColors.textSecondary,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        color: themeColors.textTertiary,
-                                      }}
-                                    >
-                                      📅 Inicio:
-                                    </span>{" "}
-                                    {new Date(
-                                      cohort.startDate,
-                                    ).toLocaleDateString()}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "11px",
-                                      color: themeColors.textSecondary,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        color: themeColors.textTertiary,
-                                      }}
-                                    >
-                                      📅 Fin:
-                                    </span>{" "}
-                                    {new Date(
-                                      cohort.endDate,
-                                    ).toLocaleDateString()}
-                                  </div>
-                                </div>
-
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "16px",
-                                    flexWrap: "wrap",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      fontSize: "11px",
-                                      color: themeColors.textSecondary,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        color: themeColors.textTertiary,
-                                      }}
-                                    >
-                                      👤 Maestro:
-                                    </span>{" "}
-                                    {cohort.maestro?.displayName ||
-                                      "No asignado"}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "11px",
-                                      color: themeColors.textSecondary,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        color: themeColors.textTertiary,
-                                      }}
-                                    >
-                                      📊 Cupo:
-                                    </span>{" "}
-                                    {cohort.currentStudents}/
-                                    {cohort.maxStudents}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "11px",
-                                      color: themeColors.textSecondary,
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        color: themeColors.textTertiary,
-                                      }}
-                                    >
-                                      🪑 Disponibles:
-                                    </span>{" "}
-                                    <span
-                                      style={{
-                                        color:
-                                          cohort.availableSpots > 0
-                                            ? themeColors.success
-                                            : themeColors.danger,
-                                        fontWeight: "bold",
-                                      }}
-                                    >
-                                      {cohort.availableSpots}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {cohort.status && (
-                                  <div
-                                    style={{
-                                      fontSize: "10px",
-                                      color: themeColors.textTertiary,
-                                    }}
-                                  >
-                                    Estado: {cohort.status}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))
                         )}
                       </div>
 
-                      {selectedCohort && (
-                        <div
-                          className="selection-summary"
-                          style={{
-                            backgroundColor: isDarkMode ? "#064e3b" : "#f0fdf4",
-                            borderLeftColor: isDarkMode ? "#10b981" : "#10b981",
-                            color: isDarkMode ? "#86efac" : "#065f46",
-                            marginTop: "16px",
-                            padding: "12px 16px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          <p style={{ margin: "0 0 4px 0" }}>
-                            <strong>✅ Cohorte seleccionada:</strong>{" "}
-                            {selectedCohort.cohortName}
-                          </p>
-                          <p style={{ margin: 0, fontSize: "12px" }}>
-                            Inscribirás{" "}
-                            <strong>{selectedStudents.length}</strong>{" "}
-                            estudiante(s) en esta cohorte
-                          </p>
+                      <div className="flex-1 space-y-3">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                          <h4 className="text-lg font-black text-slate-900 dark:text-white tracking-tight uppercase italic">{cohort.cohortName}</h4>
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                            cohort.available ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                          }`}>
+                            {cohort.available ? 'Disponible' : 'Sin Cupos'}
+                          </span>
                         </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </>
+
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Maestro</p>
+                            <p className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                              <UserCheck size={14} className="text-indigo-500" /> {cohort.maestro?.displayName || 'Por Asignar'}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Periodo</p>
+                            <p className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                              <Calendar size={14} className="text-indigo-500" /> {new Date(cohort.startDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Cupos Libres</p>
+                            <p className={`text-xs font-black flex items-center gap-1.5 ${cohort.availableSpots < 5 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                              <Users size={14} /> {cohort.availableSpots} de {cohort.maxStudents}
+                            </p>
+                          </div>
+                          <div className="space-y-0.5">
+                             <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full mt-4 overflow-hidden border border-slate-200 dark:border-slate-700">
+                                <div className="h-full bg-indigo-500 transition-all duration-1000" style={{ width: `${(cohort.currentStudents / cohort.maxStudents) * 100}%` }} />
+                             </div>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
           )}
         </div>
 
         {/* Footer */}
-        <div
-          className="modal-footer"
-          style={{
-            backgroundColor: themeColors.bgLight,
-            borderTopColor: themeColors.border,
-          }}
-        >
-          <button
-            className="btn-secondary"
-            onClick={handlePrevious}
-            disabled={step === 1 || loading}
-            style={{
-              backgroundColor: themeColors.bgSecondary,
-              color: themeColors.text,
-              borderColor: themeColors.border,
-            }}
-          >
-            ← Anterior
-          </button>
-
-          {step < 3 ? (
-            <button
-              className="btn-primary"
-              onClick={handleNext}
-              disabled={
-                loading ||
-                (step === 1 && !selectedLevel) ||
-                (step === 2 && selectedStudents.length === 0)
-              }
+        <div className="px-8 py-6 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-950/50">
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleReset} 
+              className="px-6 py-3 rounded-2xl font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-sm active:scale-95"
             >
-              Siguiente →
+              Cancelar Proceso
             </button>
-          ) : (
-            <button
-              className="btn-primary"
-              onClick={handleEnroll}
-              disabled={
-                loading || !selectedCohort || selectedStudents.length === 0
-              }
-              style={{ pointerEvents: loading ? "none" : "auto" }} // ← bloqueo extra
-            >
-              {loading
-                ? "⏳ Inscribiendo..."
-                : `✅ Inscribir ${selectedStudents.length} estudiante(s)`}
-            </button>
-          )}
-
-          <button
-            className="btn-tertiary"
-            onClick={handleReset}
-            style={{
-              color: themeColors.textSecondary,
-              borderColor: themeColors.border,
-            }}
-          >
-            ✕ Cancelar
-          </button>
+          </div>
+          <div className="flex items-center gap-3">
+            {step > 1 && (
+              <button 
+                onClick={handlePrevious} 
+                className="px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2 hover:bg-slate-50 transition-all active:scale-95 text-sm"
+              >
+                <ChevronLeft size={20} /> Atrás
+              </button>
+            )}
+            {step < 3 ? (
+              <button 
+                onClick={handleNext}
+                disabled={loading || (step === 1 && !selectedLevel) || (step === 2 && selectedStudents.length === 0)}
+                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black flex items-center gap-2 shadow-lg shadow-indigo-500/25 transition-all text-sm active:scale-95 disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
+              >
+                Siguiente Paso <ChevronRight size={20} />
+              </button>
+            ) : (
+              <button 
+                onClick={handleEnroll}
+                disabled={loading || !selectedCohort || selectedStudents.length === 0}
+                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all text-sm active:scale-95 disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
+              >
+                {loading ? <Loader2 className="animate-spin" size={20} /> : <CheckCircle2 size={20} />}
+                {loading ? "Sincronizando..." : "Finalizar Inscripción"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          animation: fadeIn 0.3s ease-in-out;
-          padding: 20px;
-          transition: background-color 300ms ease-in-out;
-        }
-
-        .modal-container {
-          border-radius: 12px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          width: 100%;
-          max-height: 90vh;
-          overflow-y: auto;
-          animation: slideInUp 0.3s ease-in-out;
-          display: flex;
-          flex-direction: column;
-          transition: all 300ms ease-in-out;
-        }
-
-        .modal-header {
-          color: white;
-          padding: 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-radius: 12px 12px 0 0;
-          transition: background 300ms ease-in-out;
-        }
-
-        .modal-title {
-          margin: 0;
-          font-size: 20px;
-          font-weight: 700;
-        }
-
-        .modal-close-btn {
-          background: none;
-          border: none;
-          color: white;
-          font-size: 24px;
-          cursor: pointer;
-          padding: 0;
-          width: 40px;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 6px;
-          transition: background-color 0.2s;
-        }
-
-        .modal-close-btn:hover {
-          background-color: rgba(255, 255, 255, 0.2);
-        }
-
-        .progress-container {
-          padding: 16px 24px;
-          border-bottom: 1px solid;
-          transition: all 300ms ease-in-out;
-        }
-
-        .progress-bar {
-          height: 6px;
-          border-radius: 3px;
-          overflow: hidden;
-          margin-bottom: 8px;
-          transition: background 300ms ease-in-out;
-        }
-
-        .progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-          transition: width 0.3s ease;
-        }
-
-        .progress-text {
-          margin: 0;
-          font-size: 12px;
-          font-weight: 500;
-          transition: color 300ms ease-in-out;
-        }
-
-        .modal-body {
-          flex: 1;
-          padding: 24px;
-          overflow-y: auto;
-          transition: color 300ms ease-in-out;
-        }
-
-        .error-message {
-          padding: 12px 16px;
-          border-radius: 8px;
-          margin-bottom: 16px;
-          border-left: 4px solid;
-          transition: all 300ms ease-in-out;
-        }
-
-        .loading-state {
-          text-align: center;
-          padding: 40px 20px;
-          transition: color 300ms ease-in-out;
-        }
-
-        .step-content {
-          animation: fadeIn 0.3s ease-in-out;
-        }
-
-        .level-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 20px;
-          gap: 16px;
-        }
-
-        .pdf-button {
-          padding: 8px 16px;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-          white-space: nowrap;
-        }
-
-        .pdf-button:hover {
-          opacity: 0.8;
-          transform: translateY(-2px);
-        }
-
-        .step-info {
-          margin: 0;
-          padding: 12px 16px;
-          border-left: 4px solid;
-          border-radius: 6px;
-          font-size: 13px;
-          transition: all 300ms ease-in-out;
-          flex: 1;
-        }
-
-        .step-info strong {
-          font-weight: 600;
-        }
-
-        .search-box {
-          margin-bottom: 16px;
-        }
-
-        .search-input {
-          width: 100%;
-          padding: 10px 12px;
-          border: 1.5px solid;
-          border-radius: 8px;
-          font-size: 14px;
-          font-family: inherit;
-          transition: all 0.2s;
-        }
-
-        .search-input:focus {
-          outline: none;
-          border-color: #667eea;
-          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .select-all-container {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 16px;
-          padding: 8px 12px;
-          background-color: ${themeColors.bgLight};
-          border-radius: 8px;
-        }
-
-        .select-all-label {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          cursor: pointer;
-          font-size: 14px;
-        }
-
-        .select-all-label input {
-          cursor: pointer;
-        }
-
-        .selected-count {
-          font-size: 13px;
-          font-weight: 500;
-        }
-
-        .students-list {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          max-height: 400px;
-          overflow-y: auto;
-        }
-
-        .student-item {
-          padding: 12px 16px;
-          border: 1.5px solid;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-        }
-
-        .student-item:hover {
-          transform: translateX(4px);
-        }
-
-        .student-item input {
-          margin-top: 2px;
-          cursor: pointer;
-        }
-
-        .student-info {
-          flex: 1;
-        }
-
-        .student-name {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          margin-bottom: 4px;
-        }
-
-        .student-name strong {
-          font-weight: 600;
-        }
-
-        .success-badge,
-        .error-badge {
-          font-size: 11px;
-          font-weight: 600;
-        }
-
-        .student-details {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 16px;
-          font-size: 12px;
-        }
-
-        .options-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-          gap: 12px;
-          margin-bottom: 20px;
-        }
-
-        .option-card {
-          padding: 16px 12px;
-          border: 1.5px solid;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-          text-align: center;
-        }
-
-        .option-card:hover {
-          transform: translateY(-2px);
-        }
-
-        .option-card input {
-          margin-bottom: 8px;
-          cursor: pointer;
-        }
-
-        .card-label {
-          display: block;
-          font-weight: 500;
-          font-size: 13px;
-          transition: color 300ms ease-in-out;
-        }
-
-        .cohorts-list {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          max-height: 400px;
-          overflow-y: auto;
-        }
-
-        .cohort-item {
-          padding: 12px 16px;
-          border: 1.5px solid;
-          border-radius: 8px;
-          cursor: pointer;
-          transition: all 0.2s;
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-        }
-
-        .cohort-item:hover {
-          transform: translateX(4px);
-        }
-
-        .cohort-item input {
-          margin-top: 2px;
-          cursor: pointer;
-        }
-
-        .cohort-info {
-          flex: 1;
-        }
-
-        .cohort-info strong {
-          display: block;
-          margin-bottom: 4px;
-        }
-
-        .cohort-info p {
-          margin: 0 0 8px;
-          font-size: 12px;
-        }
-
-        .status-badge {
-          display: inline-block;
-          padding: 4px 8px;
-          border-radius: 4px;
-          font-size: 11px;
-          font-weight: 600;
-          transition: all 300ms ease-in-out;
-        }
-
-        .no-options {
-          text-align: center;
-          padding: 20px;
-          transition: color 300ms ease-in-out;
-        }
-
-        .selection-summary {
-          margin-top: 20px;
-          padding: 12px 16px;
-          border-left: 4px solid;
-          border-radius: 6px;
-          font-size: 13px;
-          transition: all 300ms ease-in-out;
-        }
-
-        .modal-footer {
-          display: flex;
-          gap: 12px;
-          justify-content: flex-end;
-          padding: 16px 24px;
-          border-top: 1px solid;
-          border-radius: 0 0 12px 12px;
-          transition: all 300ms ease-in-out;
-        }
-
-        .btn-primary,
-        .btn-secondary,
-        .btn-tertiary {
-          padding: 10px 20px;
-          border: none;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .btn-primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-          box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-          transform: translateY(-2px);
-        }
-
-        .btn-secondary {
-          border: 1px solid;
-          transition: all 300ms ease-in-out;
-        }
-
-        .btn-secondary:hover:not(:disabled) {
-          opacity: 0.8;
-        }
-
-        .btn-tertiary {
-          background: none;
-          border: 1px solid;
-          transition: all 300ms ease-in-out;
-        }
-
-        .btn-tertiary:hover:not(:disabled) {
-          opacity: 0.8;
-        }
-
-        .btn-primary:disabled,
-        .btn-secondary:disabled,
-        .btn-tertiary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideInUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        @media (max-width: 768px) {
-          .modal-container {
-            width: 98%;
-            max-height: 98vh;
-          }
-
-          .options-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-
-          .level-header {
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .pdf-button {
-            width: 100%;
-          }
-
-          .student-details {
-            flex-direction: column;
-            gap: 4px;
-          }
-
-          .modal-footer {
-            flex-direction: column;
-          }
-
-          .btn-primary,
-          .btn-secondary,
-          .btn-tertiary {
-            width: 100%;
-          }
-        }
-      `}</style>
     </div>
   );
 };

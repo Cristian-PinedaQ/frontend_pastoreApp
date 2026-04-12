@@ -1,36 +1,57 @@
-// ============================================
-// ManualRaizViva.jsx — Manual de Funciones
-// Proceso RAÍZ VIVA | PastoreApp
-// Diseño editorial · Responsive completo
-// ============================================
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { 
+  Layers, 
+  Target, 
+  GraduationCap, 
+  Rocket, 
+  ChevronRight, 
+  CheckCircle2, 
+  Info, 
+  ArrowRight,
+  BookOpen,
+  LayoutGrid,
+  FileText,
+  Clock,
+  Zap,
+  ShieldCheck,
+  UserPlus,
+  Calendar,
+  ClipboardCheck,
+  Star,
+  Activity,
+  UserCheck,
+  Home,
+  Briefcase,
+  Users,
+  Search,
+  Flag
+} from "lucide-react";
 
-import React, { useState, useCallback, useEffect } from "react"; // Eliminado useRef
-
-// ── Datos ─────────────────────────────────────────────────────────────────────
+// ── Datos Maestros ─────────────────────────────────────────────────────────────────────
 const AREAS = {
   CONEXION: {
-    key: "CONEXION", num: "01", emoji: "⛓️‍💥",
-    label: "Área 01 · Primer Contacto", title: "Conexión", subtitle: "Primer Contacto",
-    color: "#1B6CA8", light: "#E8F3FC", mid: "#9EC8E8", border: "#B3D4EE", dark: "#0D4470",
-    desc: "Primera puerta de entrada al proceso RAÍZ VIVA. Gestiona el primer contacto de los nuevos asistentes, los registra en PastoreApp, supervisa los altares de vida y programa los eventos evangelísticos.",
+    key: "CONEXION", num: "01", icon: <Target size={24} />,
+    label: "ÁREA 01 · CONEXIÓN", title: "Conexión", subtitle: "Primer Contacto",
+    color: "from-blue-600 to-indigo-500", shade: "blue",
+    desc: "Puerta de entrada al proceso. Gestiona el registro de nuevos asistentes, supervisa altares de vida y programa eventos de evangelismo.",
   },
   CIMIENTO: {
-    key: "CIMIENTO", num: "02", emoji: "🏗️",
-    label: "Área 02 · Consolidación", title: "Cimiento", subtitle: "Consolidación",
-    color: "#2E7D6A", light: "#E6F3EF", mid: "#8EC9B8", border: "#A8D5C8", dark: "#1A5046",
-    desc: "Recibe a quienes aprobaron el nivel inicial y los conduce por Encuentro (con pago), Pos-encuentro y Bautizos (sin pago). Coordina con el ministerio económico las actividades de recaudo.",
+    key: "CIMIENTO", num: "02", icon: <Layers size={24} />,
+    label: "ÁREA 02 · CIMIENTO", title: "Cimiento", subtitle: "Consolidación",
+    color: "from-emerald-600 to-teal-500", shade: "emerald",
+    desc: "Conduce por Encuentros, Pos-encuentros y Bautizos. Coordina con el área económica las actividades de recaudo para retiros espirituales.",
   },
   ESENCIA: {
-    key: "ESENCIA", num: "03", emoji: "🪴",
-    label: "Área 03 · Discipulado", title: "Esencia", subtitle: "Discipulado",
-    color: "#7B3FA8", light: "#F0E8F8", mid: "#C4A0E0", border: "#CEB3E8", dark: "#4E2570",
-    desc: "Responsable del proceso de formación de discipulado. Gestiona seis niveles con pago: Esencia 1–4, Adiestramiento y Graduación. Registra y supervisa la asistencia de cada estudiante.",
+    key: "ESENCIA", num: "03", icon: <BookOpen size={24} />,
+    label: "ÁREA 03 · ESENCIA", title: "Esencia", subtitle: "Discipulado",
+    color: "from-violet-600 to-purple-500", shade: "violet",
+    desc: "Formación académica de discipulado. Gestiona niveles de aprendizaje, matrículas económicas y supervisión de asistencia a lecciones.",
   },
   DESPLIEGUE: {
-    key: "DESPLIEGUE", num: "04", emoji: "🚀",
-    label: "Área 04 · Comisión y Liderazgo", title: "Despliegue", subtitle: "Comisión y Liderazgo",
-    color: "#B05E12", light: "#FDF0E3", mid: "#E0B080", border: "#E8C498", dark: "#723A05",
-    desc: "Cierra el ciclo RAÍZ VIVA comisionando a quienes completaron los 10 niveles. Gestiona promoción al liderazgo, supervisión de líderes, administración de altares de vida y ministerios.",
+    key: "DESPLIEGUE", num: "04", icon: <Rocket size={24} />,
+    label: "ÁREA 04 · DESPLIEGUE", title: "Despliegue", subtitle: "Comisión",
+    color: "from-amber-600 to-orange-500", shade: "amber",
+    desc: "Cierra el ciclo comisionando líderes. Gestiona promociones, creación de altares de vida y supervisión ministerial superior.",
   },
 };
 
@@ -51,886 +72,207 @@ const FUNCTIONS = {
   CONEXION: [
     {
       id: "CON-01", title: "Creación de cohortes PRE-ENCUENTRO",
-      desc: "Crear en PastoreApp la cohorte del nivel inicial de formación antes de iniciar cada ciclo de atención.",
+      desc: "Habilitar el nivel inicial de formación en PastoreApp antes de cada ciclo de atención.",
       steps: [
-        "Ingresar a PastoreApp y navegar a la sección de Formaciones.",
-        "Clic en + Nueva Cohorte y seleccionar el nivel PREENCUENTRO.",
-        "Completar fechas, cupo máximo y parámetros académicos (asistencia y calificación mínimas).",
-        "Guardar. El sistema generará matrícula automática al agregar nuevos conectados.",
+        "Ir a Formaciones -> + Nueva Cohorte.",
+        "Seleccionar nivel PREENCUENTRO.",
+        "Configurar fechas y cupo máximo.",
+        "Guardar para habilitar matrícula automática."
       ],
-      path: "PastoreApp → 🌾Formaciones → + Nueva Cohorte",
+      path: "Formaciones -> + Nueva Cohorte",
     },
     {
       id: "CON-02", title: "Registro de nuevos conectados",
-      desc: "Cada persona que hace primer contacto debe ser registrada. PastoreApp la matricula automáticamente en la cohorte Pre-encuentro activa.",
+      desc: "Matrícula automática en Pre-encuentro al registrar personas nuevas en el sistema.",
       steps: [
-        "Ir a PastoreApp → 👥Membresia.",
-        "Presionar el botón +Agregar en el encabezado superior.",
-        "Completar el formulario: nombre, documento, teléfono, líder asignado y distrito.",
-        "El sistema realiza la matrícula automática a la cohorte activa.",
+        "Ir a Membresia -> + Agregar.",
+        "Completar datos personales y líder asignado.",
+        "El sistema realiza la vinculación académica automática."
       ],
-      path: "PastoreApp → 👥Membresia → +Agregar",
-      note: "Debe existir una cohorte PREENCUENTRO activa antes de registrar el primer conectado del ciclo.",
+      path: "Membresia -> + Agregar",
+      note: "Requiere una cohorte PREENCUENTRO activa previa.",
     },
     {
       id: "CON-03", title: "Supervisión de asistencia en altares",
-      desc: "Verificar que los líderes de los altares de vida registren puntualmente la asistencia de sus grupos cada semana.",
+      desc: "Monitorear que los líderes registren puntualmente la asistencia semanal.",
       steps: [
-        "Acceder a PastoreApp → ✅Asistencias.",
-        "Revisar el estado de registro de cada altar activo por fecha (Dom, Mié, Jue).",
-        "Contactar al líder de altares sin registro en el plazo establecido.",
-        "Generar reporte mensual para los pastores sobre niveles de asistencia.",
+        "Ficha de Asistencias -> Vista General.",
+        "Verificar registros dominicales y semanales.",
+        "Contactar líderes con registros pendientes."
       ],
-      path: "PastoreApp → ✅Asistencias -> 🏘️Vista General",
+      path: "Asistencias -> Vista General",
     },
     {
-      id: "CON-04", title: "Programación de eventos evangelísticos",
-      desc: "Crear eventos especiales de evangelismo que habilitan días adicionales de registro de asistencia para los altares participantes.",
+      id: "CON-04", title: "Programación de eventos especiales",
+      desc: "Crear jornadas de evangelismo que habilitan registros de presencia extra.",
       steps: [
-        "Ir a PastoreApp → ✅Asistencias.",
-        "Clic en Crear Evento en el encabezado superior.",
-        "Completar nombre del evento, fechas y altares de vida participantes.",
-        "Publicar. Los altares seleccionados podrán registrar asistencia en esas fechas.",
+        "Asistencias -> Crear Evento.",
+        "Definir nombre, fecha y altares participantes.",
+        "Habilitar registro por período limitado."
       ],
-      path: "PastoreApp → ✅Asistencias → 🎯Crear Evento",
+      path: "Asistencias -> Crear Evento",
     },
   ],
   CIMIENTO: [
     {
       id: "CIM-01", title: "Creación de cohortes de consolidación",
-      desc: "Crear las tres cohortes bajo su responsabilidad: Encuentro, Pos-encuentro y Bautizos, cada una con sus requisitos propios.",
+      desc: "Gestionar los tres niveles de consolidación (Encuentro, Pos-encuentro y Bautizos).",
       steps: [
-        "Ir a PastoreApp → 🌾Formaciones → + Nueva Cohorte.",
-        "Seleccionar ENCUENTRO, POST_ENCUENTRO o BAUTIZOS.",
-        "Para ENCUENTRO: notificar al ministerio económico para generar la actividad de recaudo.",
-        "Para POS-ENCUENTRO y BAUTIZOS: proceder con inscripción manual de aprobados.",
+        "Formaciones -> + Nueva Cohorte.",
+        "Seleccionar el tipo de nivel correspondiente.",
+        "Definir requisitos de aprobación (Asistencia %)."
       ],
-      path: "PastoreApp → 🌾Formaciones → + Nueva Cohorte",
+      path: "Formaciones -> + Nueva Cohorte",
     },
     {
       id: "CIM-02", title: "Seguimiento económico — Encuentro",
-      desc: "El nivel Encuentro requiere pago previo. Hacer seguimiento del estado de pago de cada aspirante a través de la actividad económica creada.",
+      desc: "Validar pagos de retiros espirituales desde el módulo de actividades.",
       steps: [
-        "Acceder a PastoreApp → 📅Actividades.",
-        "Localizar la actividad activa vinculada a la cohorte Encuentro vigente.",
-        "Revisar estado de pago por participante y dar seguimiento a saldos pendientes.",
-        "Al pago completo, el sistema matricula automáticamente al estudiante.",
+        "Actividades -> Buscar Evento Encuentro.",
+        "Revisar saldos y pagos totales.",
+        "Al completarse el pago, la matrícula se automatiza."
       ],
-      path: "PastoreApp → 📅Actividades → [Actividad Encuentro]",
-      note: "La matrícula automática al Encuentro se activa SOLO al registrar el pago total. Coordinarse con el ministerio económico si hay demoras.",
+      path: "Actividades -> Seleccionar Evento",
+      note: "La matrícula solo se activa con el pago real capturado en sistema.",
     },
     {
-      id: "CIM-03", title: "Inscripción manual — Pos-encuentro y Bautizos",
-      desc: "Estos niveles no requieren pago. El área gestiona la inscripción directa de los estudiantes que aprobaron el nivel anterior.",
+      id: "CIM-03", title: "Inscripción manual a Bautizos",
+      desc: "Procesar a los estudiantes aprobados para su ceremonia de bautismo.",
       steps: [
-        "Esperar a que el nivel anterior cierre formalmente.",
-        "Ir a PastoreApp → 🎓Estudiantes.",
-        "Clic en el botón + Inscribir del encabezado superior.",
-        "Seleccionar la cohorte de destino y buscar a cada estudiante aprobado.",
+        "Estudiantes -> + Inscribir.",
+        "Cargar aprobados del nivel Pos-encuentro.",
+        "Confirmar cohorte de Bautizos activa."
       ],
-      path: "PastoreApp → 🎓Estudiantes → + Inscribir",
+      path: "Estudiantes -> + Inscribir",
     },
   ],
   ESENCIA: [
     {
       id: "ESE-01", title: "Creación de cohortes de discipulado",
-      desc: "Crear todas las cohortes bajo su responsabilidad. Todos los niveles de Esencia requieren pago y coordinación con el ministerio económico.",
+      desc: "Lanzar niveles académicos (Esencia 1-4) con requisitos financieros.",
       steps: [
-        "Ir a PastoreApp → 🌾Formaciones → + Nueva Cohorte.",
-        "Seleccionar el nivel: ESENCIA_1 a ESENCIA_4, ADIESTRAMIENTO o GRADUACION.",
-        "Completar parámetros: fechas, cupo, docente, asistencia y calificación mínimas.",
-        "Notificar al ministerio económico para generar la actividad de recaudo.",
-        "Al pago total del estudiante, el sistema lo matricula automáticamente.",
+        "Formaciones -> + Nueva Cohorte -> Seleccionar Nivel.",
+        "Asignar docente y configurar parámetros de aula.",
+        "Sincronizar con Actividades Económicas."
       ],
-      path: "PastoreApp → 🌾Formaciones → + Nueva Cohorte",
+      path: "Formaciones -> + Nueva Cohorte",
     },
     {
-      id: "ESE-02", title: "Seguimiento de inscripciones económicas",
-      desc: "Todos los niveles de Esencia requieren pago. Hacer seguimiento activo del estado económico de cada aspirante desde Actividades.",
+      id: "ESE-02", title: "Gestión de matrículas pagadas",
+      desc: "Monitorear el flujo de inscripciones basadas en cumplimiento de pago.",
       steps: [
-        "Acceder a PastoreApp → 📅Actividades.",
-        "Seleccionar la actividad activa de la cohorte de Esencia en curso.",
-        "Revisar el listado de participantes y el estado de pago de cada uno.",
-        "Coordinar con el ministerio económico los pagos pendientes.",
+        "Módulo Actividades -> Revisar Inscritos.",
+        "Coordinar con Tesorería registros pendientes.",
+        "Confirmar activación académica de estudiantes."
       ],
-      path: "PastoreApp → 📅Actividades → [Actividad Esencia activa]",
+      path: "Actividades -> Estudiantes Inscritos",
     },
     {
-      id: "ESE-03", title: "Registro de asistencia a clases",
-      desc: "El área de Esencia registra la asistencia a cada lección. Este registro determina si el estudiante aprueba o reprueba el nivel.",
+      id: "ESE-03", title: "Registro de asistencia a lecciones",
+      desc: "Capturar la presencia en sesión para determinar la aprobación del nivel.",
       steps: [
-        "Ir a PastoreApp → 🌾Formaciones.",
-        "Clic sobre la cohorte activa para abrir el modal de detalle.",
-        "Seleccionar la pestaña Asistencias dentro del modal.",
-        "Presionar la lección a registrar, buscar al estudiante y marcar asistencia.",
-        "Supervisar porcentajes y alertar a quienes estén en riesgo de reprobar.",
+        "Formaciones -> Seleccionar Cohorte activa.",
+        "Pestaña Asistencias -> Seleccionar Lección.",
+        "Marcar asistencia en lista digital de clase."
       ],
-      path: "PastoreApp → 🌾Formaciones → [Cohorte] → ✅Asistencias → [Lección] → Estudiante",
+      path: "Formaciones -> [Cohorte] -> Asistencias",
     },
   ],
   DESPLIEGUE: [
     {
-      id: "DES-01", title: "Promoción al liderazgo",
-      desc: "Promueve al liderazgo a los miembros que completaron el proceso y cumplen los tres parámetros definidos por los pastores.",
+      id: "DES-01", title: "Promoción al liderazgo formal",
+      desc: "Habilitar nuevos líderes basándose en fidelidad, doctrina y formación.",
       steps: [
-        "Ir a PastoreApp → 🦺Servidores.",
-        "Presionar el botón Promover en el encabezado superior.",
-        "El sistema verifica los tres parámetros automáticamente y permite o bloquea la promoción.",
+        "Servidores -> Promover nuevo líder.",
+        "Seleccionar candidato de la base académica.",
+        "El sistema valida requisitos automáticamente."
       ],
-      path: "PastoreApp → 🦺Servidores → 🌟Promover",
-      note: "Parámetros: (1) Fidelidad en diezmos  (2) Estado civil según las Escrituras  (3) Formación completa (10 niveles).",
+      path: "Servidores -> Botón Promover",
+      note: "Requiere 10 niveles aprobados, estado civil bíblico y fidelidad en diezmos.",
     },
     {
-      id: "DES-02", title: "Supervisión y suspensión de líderes",
-      desc: "El sistema suspende automáticamente a líderes de equipo con 3 faltas consecutivas. El área también puede inactivar manualmente.",
+      id: "DES-02", title: "Supervisión y control de líderes",
+      desc: "Monitorear la fatiga o faltas para inactivación o corrección.",
       steps: [
-        "El sistema monitorea asistencias y suspende al acumular 3 faltas consecutivas.",
-        "Para inactivación manual: Servidores → clic sobre el líder.",
-        "Abrir ficha de detalle y presionar el botón Desactivar.",
+        "Ficha de Servidor -> Ver Historial.",
+        "Detectar 3 faltas consecutivas (Inactivación Auto).",
+        "Gestionar procesos de restauración manual."
       ],
-      path: "PastoreApp → 🦺Servidores → [Líder] → Ficha de detalle → Desactivar",
+      path: "Servidores -> Detalle de Líder",
     },
     {
-      id: "DES-03", title: "Reactivación de líderes suspendidos",
-      desc: "El sistema verifica que el líder cumple nuevamente los parámetros. Los suspendidos por asistencia tienen una oportunidad adicional.",
+      id: "DES-03", title: "Reactivación de suspendidos",
+      desc: "Reincorporar líderes que han subsanado sus faltas o requisitos.",
       steps: [
-        "Ir a PastoreApp → 🦺Servidores.",
-        "Presionar el botón Reactivar suspendidos.",
-        "El sistema reactivará solo a quienes cumplan los parámetros vigentes.",
-        "Los que vuelvan a fallar son inactivados junto con su altar de vida.",
+        "Servidores -> Reactivar Suspendidos.",
+        "Validar cumplimiento de nuevos parámetros.",
+        "Restaurar altar de vida asoaciado."
       ],
-      path: "PastoreApp → 🦺Servidores → ▶️Reactivar Suspendidos",
+      path: "Servidores -> Reactivar Suspendidos",
     },
     {
-      id: "DES-04", title: "Creación de nuevos altares de vida",
-      desc: "Cuando un líder consolidó su equipo y está listo para abrir su propio grupo celular, el área crea el altar en el sistema.",
+      id: "DES-04", title: "Lanzamiento de nuevos Altares de Vida",
+      desc: "Formalizar la apertura de un nuevo grupo celular en la red.",
       steps: [
-        "Ir a PastoreApp → 🏘️Altares de vida.",
-        "Clic en el botón + Nuevo.",
-        "Completar: nombre, líder principal, horario, día, dirección y distrito.",
+        "Altares de Vida -> + Nuevo Altar.",
+        "Asignar nombre, líder principal y geolocalización.",
+        "Definir día y hora oficial de reunión."
       ],
-      path: "PastoreApp → 🏘️Altares de vida → + Nuevo",
-    },
-    {
-      id: "DES-05", title: "Agregar miembros al altar",
-      desc: "A solicitud del líder del altar, el área incorpora nuevos miembros al equipo del grupo celular correspondiente.",
-      steps: [
-        "Ir a PastoreApp → 🏘️Altares de vida.",
-        "Clic sobre el altar de destino para abrir el modal de detalle.",
-        "Seleccionar la pestaña + Agregar Miembros.",
-        "Buscar al miembro y presionar + Agregar.",
-      ],
-      path: "PastoreApp → 🏘️Altares → [Altar] → Modal → + Agregar Miembros",
-    },
-    {
-      id: "DES-06", title: "Reasignación y desvinculación de miembros",
-      desc: "Por solicitud de los pastores, puede reasignar miembros entre altares de vida o desvincularlos del equipo.",
-      steps: [
-        "Ir a PastoreApp → 🏘️Altares de vida.",
-        "Clic sobre el altar afectado para abrir el modal de detalle.",
-        "Seleccionar la pestaña Editar.",
-        "Cambiar el altar de destino o presionar Desvincular para retirar al miembro.",
-      ],
-      path: "PastoreApp → 🏘️Altares → [Altar] → Modal → Editar → Desvincular",
-    },
-    {
-      id: "DES-07", title: "Gestión de ministerios",
-      desc: "Gestiona la vinculación y retiro de servidores en los ministerios de la iglesia y supervisa su funcionamiento general.",
-      steps: [
-        "Acceder al módulo de Ministerios en PastoreApp.",
-        "Para agregar un servidor: seleccionar el ministerio → Agregar servidor.",
-        "Para retirar: seleccionar al servidor → Retirar.",
-        "Supervisar la actividad general y reportar novedades a los pastores.",
-      ],
-      path: "PastoreApp → Ministerios",
+      path: "Altares de Vida -> + Nuevo",
     },
   ],
 };
 
-// ── Inline CSS (single injection, matches PDF editorial style) ─────────────────
-const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
-
-.mrv *,
-.mrv *::before,
-.mrv *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-.mrv {
-  font-family: 'DM Sans', sans-serif;
-  background: #0E1B2E;
-  color: #1A1918;
-  min-height: 100vh;
-}
-
-/* ── Sticky nav ───────────────────────── */
-.mrv-nav {
-  position: sticky; top: 0; z-index: 100;
-  background: rgba(14,27,46,0.97);
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  display: flex; align-items: center;
-  height: 52px; padding: 0 24px;
-  overflow-x: auto; scrollbar-width: none; gap: 0;
-}
-.mrv-nav::-webkit-scrollbar { display: none; }
-
-.mrv-nav-brand {
-  font-size: 11px; font-weight: 800; letter-spacing: 2.5px;
-  text-transform: uppercase; color: #C8982A;
-  white-space: nowrap; margin-right: 20px; flex-shrink: 0;
-}
-
-.mrv-nav-btn {
-  position: relative; height: 52px; padding: 0 14px;
-  background: transparent; border: none; cursor: pointer;
-  font-family: 'DM Sans', sans-serif; font-size: 11.5px; font-weight: 600;
-  letter-spacing: 0.4px; text-transform: uppercase;
-  color: rgba(245,240,232,0.4); white-space: nowrap; flex-shrink: 0;
-  transition: color 0.15s;
-}
-.mrv-nav-btn:hover { color: rgba(245,240,232,0.8); }
-.mrv-nav-btn.nav-active { color: #fff; }
-
-/* ── Hero ─────────────────────────────── */
-.mrv-hero {
-  background: #0E1B2E;
-  padding: 72px 40px 64px;
-  text-align: center; position: relative; overflow: hidden;
-}
-@media (max-width: 600px) {
-  .mrv-hero { padding: 48px 20px 40px; }
-}
-
-.mrv-hero-blob {
-  position: absolute; border-radius: 50%; pointer-events: none;
-}
-
-.mrv-hero-eyebrow {
-  font-size: 10px; letter-spacing: 4px; font-weight: 400;
-  text-transform: uppercase; color: rgba(245,240,232,0.38);
-  margin-bottom: 20px;
-}
-.mrv-hero-bar {
-  width: 56px; height: 3px; background: #C8982A;
-  margin: 0 auto 28px; border-radius: 2px;
-}
-.mrv-hero-h1 {
-  font-size: clamp(36px, 7vw, 68px); font-weight: 800;
-  color: #F5F0E8; letter-spacing: -2px; line-height: 1.02; margin-bottom: 8px;
-}
-.mrv-hero-h1 span { color: #C8982A; }
-.mrv-hero-sub {
-  font-size: 14px; color: rgba(245,240,232,0.38);
-  margin: 0 auto 48px; font-weight: 300;
-}
-.mrv-hero-pills {
-  display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
-}
-.mrv-pill {
-  padding: 9px 20px; border-radius: 40px; font-size: 12px;
-  font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
-  cursor: pointer; border: 1px solid; transition: all 0.18s;
-  font-family: 'DM Sans', sans-serif; background: transparent;
-}
-.mrv-pill:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
-
-/* ── Overview ─────────────────────────── */
-.mrv-overview {
-  background: #fff; border-bottom: 1px solid #E4E3DF;
-  padding: 56px 40px 48px;
-}
-@media (max-width: 600px) { .mrv-overview { padding: 36px 20px 32px; } }
-
-.mrv-eyebrow {
-  font-size: 10px; font-weight: 700; letter-spacing: 3px;
-  text-transform: uppercase; color: #C8982A; margin-bottom: 10px;
-}
-.mrv-section-title {
-  font-size: clamp(22px, 3.5vw, 32px); font-weight: 700;
-  color: #1A1918; margin-bottom: 10px; letter-spacing: -0.5px;
-}
-.mrv-section-desc {
-  font-size: 14px; color: #5E5D5A; max-width: 560px;
-  line-height: 1.7; margin-bottom: 48px;
-}
-
-/* Flow */
-.mrv-flow {
-  display: flex; align-items: center; justify-content: center;
-  flex-wrap: wrap; gap: 4px; max-width: 860px; margin: 0 auto 48px;
-}
-.mrv-flow-node-btn {
-  display: flex; flex-direction: column; align-items: center; gap: 10px;
-  padding: 16px 12px; flex: 0 0 150px; background: transparent; border: none;
-  cursor: pointer; font-family: 'DM Sans', sans-serif; transition: transform 0.18s;
-}
-.mrv-flow-node-btn:hover { transform: translateY(-3px); }
-.mrv-flow-icon {
-  width: 70px; height: 70px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 26px; border: 2px solid; transition: box-shadow 0.18s;
-}
-.mrv-flow-node-btn:hover .mrv-flow-icon { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
-.mrv-flow-label { font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
-.mrv-flow-sub { font-size: 10px; color: #8A8880; font-weight: 400; }
-.mrv-flow-arrow { font-size: 18px; color: #D4D3CF; flex-shrink: 0; margin-bottom: 22px; }
-
-@media (max-width: 480px) {
-  .mrv-flow { flex-direction: column; gap: 0; }
-  .mrv-flow-arrow { transform: rotate(90deg); margin: 0; }
-  .mrv-flow-node-btn { flex: none; width: 100%; flex-direction: row; gap: 16px; padding: 12px 16px; }
-  .mrv-flow-icon { flex-shrink: 0; }
-}
-
-/* Levels track */
-.mrv-track {
-  background: #0E1B2E; border-radius: 14px;
-  padding: 24px 24px; max-width: 900px; margin: 0 auto;
-}
-.mrv-track-eyebrow {
-  font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
-  color: #C8982A; margin-bottom: 14px; font-weight: 700;
-}
-.mrv-track-pills {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 5px; justify-content: center;
-}
-.mrv-track-badge {
-  padding: 5px 11px; border-radius: 6px; border: 1px solid;
-  font-size: 11px; font-weight: 600; white-space: nowrap;
-}
-.mrv-track-sep { font-size: 11px; color: rgba(245,240,232,0.18); }
-
-/* ── Area section ─────────────────────── */
-.mrv-area { scroll-margin-top: 52px; }
-
-.mrv-area-hdr {
-  position: relative; overflow: hidden;
-  background: #0E1B2E;
-  padding: 36px 40px 32px;
-}
-@media (max-width: 600px) { .mrv-area-hdr { padding: 28px 20px 24px; } }
-
-.mrv-area-hdr-gold { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: #C8982A; }
-.mrv-area-hdr-side { position: absolute; top: 0; bottom: 0; left: 0; width: 5px; }
-.mrv-area-hdr-num {
-  position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
-  font-size: 96px; font-weight: 800; line-height: 1;
-  opacity: 0.04; pointer-events: none; user-select: none; color: #fff;
-}
-@media (max-width: 600px) { .mrv-area-hdr-num { display: none; } }
-
-.mrv-area-hdr-inner {
-  position: relative; display: flex; align-items: flex-start; gap: 22px;
-  max-width: 1060px; margin: 0 auto;
-}
-@media (max-width: 480px) { .mrv-area-hdr-inner { gap: 14px; } }
-
-.mrv-area-icon {
-  width: 66px; height: 66px; border-radius: 14px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 26px; border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.06);
-}
-@media (max-width: 480px) {
-  .mrv-area-icon { width: 50px; height: 50px; border-radius: 10px; font-size: 20px; }
-}
-
-.mrv-area-num-tag {
-  display: inline-flex; align-items: center;
-  font-size: 9px; font-weight: 700; letter-spacing: 2px;
-  text-transform: uppercase; padding: 3px 10px; border-radius: 4px;
-  background: rgba(200,152,42,0.15); color: #C8982A; margin-bottom: 8px;
-}
-.mrv-area-h2 {
-  font-size: clamp(22px, 4vw, 32px); font-weight: 800;
-  color: #F5F0E8; letter-spacing: -0.5px; margin-bottom: 10px;
-}
-.mrv-area-desc-txt {
-  font-size: 13.5px; line-height: 1.7; color: rgba(184,200,216,0.82); max-width: 680px;
-}
-
-/* funcs wrapper */
-.mrv-funcs-wrap {
-  padding: 28px 40px 40px; max-width: 1060px; margin: 0 auto;
-}
-@media (max-width: 600px) { .mrv-funcs-wrap { padding: 20px 16px 32px; } }
-
-.mrv-funcs-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-  gap: 14px;
-}
-
-/* ── Function Card ────────────────────── */
-.mrv-card {
-  background: #fff; border: 1px solid #E4E3DF; border-radius: 10px;
-  overflow: hidden; display: flex; flex-direction: column;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-.mrv-card:hover {
-  box-shadow: 0 6px 24px rgba(0,0,0,0.09);
-  transform: translateY(-2px);
-}
-.mrv-card-top-bar { height: 4px; flex-shrink: 0; }
-
-.mrv-card-btn {
-  width: 100%; background: transparent; border: none; text-align: left;
-  padding: 20px 20px 16px; cursor: pointer;
-  display: flex; align-items: flex-start; gap: 14px;
-  font-family: 'DM Sans', sans-serif;
-}
-.mrv-card-btn-text { flex: 1; min-width: 0; }
-
-/* ID badge — matching PDF: colored light bg + border pill */
-.mrv-card-id {
-  display: inline-flex; align-items: center;
-  font-size: 9.5px; font-weight: 700; letter-spacing: 1.8px;
-  text-transform: uppercase; padding: 3px 11px; border-radius: 20px;
-  border: 1px solid; margin-bottom: 10px;
-  font-family: 'DM Sans', sans-serif;
-}
-
-.mrv-card-title-txt {
-  font-size: 14px; font-weight: 600; color: #1A1918;
-  line-height: 1.35; letter-spacing: -0.1px;
-}
-
-/* chevron circle */
-.mrv-chevron {
-  width: 26px; height: 26px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; margin-top: 1px; font-size: 12px; font-weight: 800;
-  transition: transform 0.22s;
-}
-
-/* card body */
-.mrv-card-body { padding: 0 20px 20px; }
-.mrv-card-sep { height: 1px; background: #EEEDE9; margin-bottom: 14px; }
-.mrv-card-desc-txt { font-size: 13px; color: #5E5D5A; line-height: 1.65; margin-bottom: 16px; }
-
-/* steps */
-.mrv-steps { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.mrv-step { display: flex; align-items: flex-start; gap: 10px; }
-.mrv-step-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
-.mrv-step-txt { font-size: 13px; color: #1A1918; line-height: 1.55; }
-
-/* path pill — matching PDF: gray bg + border + monospace */
-.mrv-path-pill {
-  background: #F5F4F1; border: 1px solid #E0DFD9;
-  border-radius: 6px; padding: 7px 12px;
-  font-family: 'DM Mono', 'Courier New', monospace; font-size: 11px;
-  color: #5E5D5A; line-height: 1.4; margin-bottom: 12px;
-  word-break: break-all;
-}
-
-/* note box — matching PDF: light area color + left accent stripe */
-.mrv-note {
-  border-radius: 8px; padding: 11px 13px 11px 16px;
-  display: flex; gap: 12px; align-items: flex-start;
-  border: 1px solid; border-left: 3px solid; position: relative;
-}
-.mrv-note-icon {
-  width: 20px; height: 20px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 800; color: #fff; flex-shrink: 0; margin-top: 1px;
-}
-.mrv-note-txt { font-size: 12px; line-height: 1.6; }
-
-/* ── Area divider ─────────────────────── */
-.mrv-divider { height: 1px; background: #E4E3DF; }
-
-/* ── Footer ───────────────────────────── */
-.mrv-footer { background: #0E1B2E; padding: 40px; text-align: center; }
-.mrv-footer-title { font-size: 14px; font-weight: 600; color: rgba(245,240,232,0.7); margin-bottom: 6px; }
-.mrv-footer-sub { font-size: 12px; color: rgba(245,240,232,0.3); letter-spacing: 0.5px; }
-
-/* =========================================
-   🚑 MOBILE HARD FIX — RAIZ VIVA
-   Esto SI corrige el layout real
-   ========================================= */
-
-html, body {
-  overflow-x: hidden;
-}
-
-.mrv {
-  overflow-x: hidden;
-}
-
-/* 🔥 NAV SCROLL SAFE */
-@media (max-width: 768px) {
-
-  .mrv-area {
-    scroll-margin-top: 64px;
-  }
-
-  .mrv-nav {
-    height: 50px;
-  }
-
-}
-
-/* 🔥 HERO FIX REAL */
-@media (max-width: 768px) {
-
-  .mrv-hero {
-    padding: 42px 16px 34px;
-  }
-
-  .mrv-hero-h1 {
-    font-size: clamp(30px, 9vw, 44px);
-    line-height: 1.05;
-  }
-
-  .mrv-hero-sub {
-    font-size: 13px;
-    margin-bottom: 26px;
-  }
-
-  .mrv-hero-blob {
-    display: none;
-  }
-
-}
-
-/* 🔥 FLOW STACK REAL */
-@media (max-width: 640px) {
-
-  .mrv-flow {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .mrv-flow-node-btn {
-    width: 100%;
-    flex-direction: row;
-    justify-content: flex-start;
-    padding: 12px 14px;
-    background: #FAFAF8;
-    border-radius: 12px;
-  }
-
-  .mrv-flow-icon {
-    width: 48px;
-    height: 48px;
-    font-size: 20px;
-  }
-
-  .mrv-flow-arrow {
-    display: none;
-  }
-
-}
-
-/* 🔥 TRACK PILLS MOBILE */
-@media (max-width: 640px) {
-
-  .mrv-track-pills {
-    justify-content: flex-start;
-  }
-
-  .mrv-track {
-    padding: 16px;
-  }
-
-  .mrv-track-badge {
-    font-size: 10px;
-    padding: 5px 9px;
-  }
-
-}
-
-/* 🔥 AREA HEADER COMPACT */
-@media (max-width: 640px) {
-
-  .mrv-area-hdr-inner {
-    flex-direction: row;
-    align-items: flex-start;
-  }
-
-  .mrv-area-h2 {
-    font-size: 20px;
-  }
-
-  .mrv-area-desc-txt {
-    font-size: 12.5px;
-    line-height: 1.6;
-  }
-
-}
-
-/* 🔥 GRID 1 COLUMN REAL */
-@media (max-width: 700px) {
-
-  .mrv-funcs-grid {
-    grid-template-columns: 1fr;
-  }
-
-}
-
-/* 🔥 CARD ULTRA COMPACT */
-@media (max-width: 640px) {
-
-  .mrv-card-btn {
-    padding: 14px 14px 12px;
-  }
-
-  .mrv-card-title-txt {
-    font-size: 13px;
-  }
-
-  .mrv-card-desc-txt {
-    font-size: 12.5px;
-  }
-
-  .mrv-card-body {
-    padding: 0 14px 14px;
-  }
-
-  .mrv-step-txt {
-    font-size: 12.5px;
-  }
-
-}
-
-/* 🔥 FOOTER */
-@media (max-width: 640px) {
-
-  .mrv-footer {
-    padding: 22px 14px;
-  }
-
-}
-/* =========================================
-   📱 NAV MANUAL RAIZ VIVA RESPONSIVE REAL
-   Respeta Dashboard Layout
-   ========================================= */
-
-@media (max-width: 900px) {
-
-  .mrv-nav {
-    position: relative;   /* 🔥 deja de ser sticky */
-    top: auto;
-    height: auto;
-    padding: 8px 12px;
-    border-bottom: none;
-    background: transparent;
-  }
-
-  .mrv-nav-inner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-  }
-
-  /* 🔥 convertir botones en pestaña */
-  .mrv-nav-links {
-    display: none;
-  }
-
-
-}
-
-/* 🔥 MOBILE REAL */
-@media (max-width: 640px) {
-
-  .mrv-nav {
-    margin-bottom: 6px;
-  }
-
-}
-
-/* =========================================
-   🧠 DASHBOARD CONTAINER FIT FIX
-   El manual se adapta al viewport disponible
-   ========================================= */
-
-.mrv {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* TODOS los wrappers deben poder encoger */
-.mrv-overview,
-.mrv-hero,
-.mrv-area-hdr,
-.mrv-funcs-wrap,
-.mrv-track,
-.mrv-flow {
-  width: 100%;
-  max-width: 100%;
-}
-
-/* 🔥 padding fluido real */
-@media (max-width: 1200px) {
-
-  .mrv-hero,
-  .mrv-overview,
-  .mrv-area-hdr,
-  .mrv-funcs-wrap {
-    padding-left: clamp(16px, 4vw, 40px);
-    padding-right: clamp(16px, 4vw, 40px);
-  }
-
-}
-
-/* 🔥 elementos absolutos no deben generar overflow */
-.mrv-area-hdr-num {
-  right: 16px;
-}
-
-/* 🔥 pills deben poder cortar */
-.mrv-track-pills {
-  overflow-x: auto;
-  justify-content: flex-start;
-  padding-bottom: 4px;
-}
-
-/* 🔥 flow nunca debe forzar ancho */
-.mrv-flow-node-btn {
-  min-width: 0;
-}
-
-/* 🔥 grid seguro dentro de dashboard */
-.mrv-funcs-grid {
-  width: 100%;
-  min-width: 0;
-}
-
-/* 🔥 cards pueden encoger */
-.mrv-card {
-  min-width: 0;
-}
-
-/* 🔥 textos largos no deben romper layout */
-.mrv-step-txt,
-.mrv-card-desc-txt,
-.mrv-path-pill {
-  word-break: break-word;
-}
-
-/* 🔥 nav nunca debe expandir layout */
-.mrv-nav {
-  max-width: 100%;
-}
-
-/* 🔥 hero blobs jamás deben afectar layout */
-.mrv-hero-blob {
-  max-width: 100%;
-}
-
-/* =========================================
-   🚨 FIX CRÍTICO OVERFLOW DASHBOARD
-   Permite que las páginas internas encogan
-   ========================================= */
-
-.dashboard-layout {
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-.dashboard-layout__main {
-  min-width: 0;        /* 🔥 CLAVE ABSOLUTA */
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.dashboard-layout__content {
-  min-width: 0;        /* 🔥 CLAVE ABSOLUTA */
-  width: 100%;
-  max-width: 100%;
-  overflow-x: hidden;
-}
-
-/* 🔥 cualquier página interna */
-.dashboard-layout__content > * {
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* 🔥 evita scroll fantasma en móviles */
-body {
-  overflow-x: hidden;
-}
-
-`;
-
-// ── FunctionCard ──────────────────────────────────────────────────────────────
-const FunctionCard = React.memo(({ func, area }) => {
-  const [open, setOpen] = useState(false);
-  const { color, light, mid, dark } = AREAS[area];
-
+const FunctionCard = React.memo(({ func, areaKey }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const area = AREAS[areaKey];
+  
   return (
-    <div className="mrv-card">
-      {/* color accent bar — same as PDF */}
-      <div className="mrv-card-top-bar" style={{ background: color }} />
-
-      {/* header / trigger */}
-      <button
-        className="mrv-card-btn"
-        onClick={() => setOpen((p) => !p)}
-        aria-expanded={open}
+    <div className="group relative bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-white/5 overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-1">
+      <div className={`h-1.5 w-full bg-gradient-to-r ${area.color}`} />
+      
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-6 text-left space-y-3 outline-none"
       >
-        <div className="mrv-card-btn-text">
-          {/* ID badge: light bg + colored border — matches PDF */}
-          <div
-            className="mrv-card-id"
-            style={{ background: light, borderColor: mid, color }}
-          >
+        <div className="flex items-center justify-between">
+          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border border-${area.shade}-500/20 bg-${area.shade}-500/5 text-${area.shade}-600 dark:text-${area.shade}-400`}>
             {func.id}
+          </span>
+          <div className={`p-2 rounded-xl bg-slate-50 dark:bg-white/5 text-slate-400 group-hover:text-indigo-500 transition-all ${isOpen ? 'rotate-180' : ''}`}>
+            <ChevronRight size={16} />
           </div>
-          <div className="mrv-card-title-txt">{func.title}</div>
         </div>
-
-        {/* chevron — light bg circle */}
-        <div
-          className="mrv-chevron"
-          style={{
-            background: light, color,
-            transform: open ? "rotate(180deg)" : "none",
-          }}
-        >
-          ▾
-        </div>
+        <h3 className="text-[15px] font-black tracking-tight text-slate-900 dark:text-white leading-tight uppercase group-hover:text-indigo-600 transition-colors">
+          {func.title}
+        </h3>
       </button>
 
-      {open && (
-        <div className="mrv-card-body">
-          <div className="mrv-card-sep" />
-
-          <p className="mrv-card-desc-txt">{func.desc}</p>
-
-          <div className="mrv-steps">
-            {func.steps.map((step, i) => (
-              <div key={i} className="mrv-step">
-                <div className="mrv-step-dot" style={{ background: color }} />
-                <span className="mrv-step-txt">{step}</span>
+      {isOpen && (
+        <div className="px-6 pb-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="h-px bg-slate-100 dark:bg-white/5" />
+          <p className="text-xs font-bold text-slate-600 dark:text-slate-400 leading-relaxed italic">
+            {func.desc}
+          </p>
+          
+          <div className="space-y-2.5">
+            {func.steps.map((step, idx) => (
+              <div key={idx} className="flex gap-3">
+                <div className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-gradient-to-br ${area.color} shadow-lg shadow-indigo-500/30`} />
+                <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300">{step}</span>
               </div>
             ))}
           </div>
 
-          {/* path — gray pill matching PDF */}
-          <div className="mrv-path-pill">{func.path}</div>
+          <div className="p-3 bg-slate-50 dark:bg-white/5 rounded-xl border border-dashed border-slate-200 dark:border-white/10 flex items-center gap-3">
+             <LayoutGrid size={14} className="text-indigo-500 flex-shrink-0" />
+             <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate">{func.path}</span>
+          </div>
 
-          {/* note — left accent stripe matching PDF */}
           {func.note && (
-            <div
-              className="mrv-note"
-              style={{
-                background: light,
-                borderColor: mid,
-                borderLeftColor: color,
-              }}
-            >
-              <div className="mrv-note-icon" style={{ background: color }}>!</div>
-              <span className="mrv-note-txt" style={{ color: dark }}>{func.note}</span>
+            <div className={`p-4 bg-${area.shade}-500/5 border-l-4 border-${area.shade}-500 rounded-r-2xl flex gap-3 text-slate-900 dark:text-white`}>
+              <Info size={16} className={`text-${area.shade}-600 flex-shrink-0 mt-0.5`} />
+              <p className="text-[10px] font-bold leading-relaxed">{func.note}</p>
             </div>
           )}
         </div>
@@ -940,210 +282,198 @@ const FunctionCard = React.memo(({ func, area }) => {
 });
 FunctionCard.displayName = "FunctionCard";
 
-// ── AreaSection ───────────────────────────────────────────────────────────────
-const AreaSection = React.memo(({ areaKey }) => {
-  const area = AREAS[areaKey];
-  const funcs = FUNCTIONS[areaKey];
-
-  return (
-    <section className="mrv-area" id={`area-${areaKey}`}>
-      {/* dark header — matches PDF area header */}
-      <div className="mrv-area-hdr">
-        <div className="mrv-area-hdr-gold" />
-        <div className="mrv-area-hdr-side" style={{ background: area.color }} />
-        <div className="mrv-area-hdr-num">{area.num}</div>
-
-        <div className="mrv-area-hdr-inner">
-          <div className="mrv-area-icon">{area.emoji}</div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="mrv-area-num-tag">
-              ÁREA {area.num} · {area.subtitle.toUpperCase()}
-            </div>
-            <h2 className="mrv-area-h2">{area.title}</h2>
-            <p className="mrv-area-desc-txt">{area.desc}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* funcs — left border = area color, matches PDF sidebar */}
-      <div style={{ background: "#F5F4F1", borderLeft: `5px solid ${area.color}` }}>
-        <div className="mrv-funcs-wrap">
-          <div className="mrv-funcs-grid">
-            {funcs.map((func) => (
-              <FunctionCard key={func.id} func={func} area={areaKey} />
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-});
-AreaSection.displayName = "AreaSection";
-
-// ── Main ──────────────────────────────────────────────────────────────────────
 const ManualRaizViva = () => {
-  const [activeArea, setActiveArea] = useState(null);
+  const [activeArea, setActiveArea] = useState("CONEXION");
   const areaKeys = Object.keys(AREAS);
 
-  // IntersectionObserver for nav highlight
-  useEffect(() => {
-    const els = areaKeys
-      .map((k) => document.getElementById(`area-${k}`))
-      .filter(Boolean);
-    if (!els.length) return;
-
-    const obs = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) setActiveArea(e.target.id.replace("area-", ""));
-        });
-      },
-      { threshold: 0.2 }
-    );
-    els.forEach((el) => obs.observe(el));
-    return () => obs.disconnect();
-  }, [areaKeys]); // Agregada dependencia 'areaKeys'
-
-  const scrollTo = useCallback((key) => {
+  const scrollToArea = useCallback((key) => {
     setActiveArea(key);
-    document
-      .getElementById(`area-${key}`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById(`area-${key}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
   return (
-    <div className="mrv">
-      <style>{CSS}</style>
-
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0f172a] transition-colors duration-500 pt-20 pb-20">
+      
       {/* ── STICKY NAV ── */}
-      <nav className="mrv-nav">
-        <span className="mrv-nav-brand">RAÍZ VIVA</span>
-        {areaKeys.map((key) => {
-          const area = AREAS[key];
-          const isActive = activeArea === key;
-          return (
-            <button
-              key={key}
-              className={`mrv-nav-btn${isActive ? " nav-active" : ""}`}
-              onClick={() => scrollTo(key)}
-              style={isActive ? { color: area.color } : {}}
-            >
-              {area.emoji} {area.title}
-              {isActive && (
-                <span
-                  style={{
-                    position: "absolute", bottom: 0, left: 14, right: 14,
-                    height: 2, background: area.color, borderRadius: "2px 2px 0 0",
-                  }}
-                />
-              )}
-            </button>
-          );
-        })}
+      <nav className="fixed top-0 left-0 right-0 z-[100] h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border-b border-slate-200 dark:border-white/5 flex items-center px-4 md:px-8 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-6 max-w-7xl mx-auto w-full">
+           <div className="flex items-center gap-2 group cursor-pointer mr-6">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/20">
+                 <ShieldCheck size={18} />
+              </div>
+              <span className="text-xs font-black tracking-tighter text-slate-900 dark:text-white uppercase">Raíz Viva</span>
+           </div>
+           
+           <div className="flex items-center gap-1">
+             {areaKeys.map(key => (
+               <button 
+                 key={key}
+                 onClick={() => scrollToArea(key)}
+                 className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                    activeArea === key 
+                      ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xl" 
+                      : "text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                 }`}
+               >
+                 {AREAS[key].title}
+               </button>
+             ))}
+           </div>
+        </div>
       </nav>
 
-      {/* ── HERO ── */}
-      <header className="mrv-hero">
-        <div className="mrv-hero-blob" style={{ width: 440, height: 440, top: "-40%", left: "-8%", background: "radial-gradient(circle, rgba(27,108,168,0.18) 0%, transparent 70%)" }} />
-        <div className="mrv-hero-blob" style={{ width: 360, height: 360, bottom: "-30%", right: "-5%", background: "radial-gradient(circle, rgba(123,63,168,0.14) 0%, transparent 70%)" }} />
-        <div className="mrv-hero-blob" style={{ width: 280, height: 280, top: "10%", right: "20%", background: "radial-gradient(circle, rgba(46,125,106,0.1) 0%, transparent 70%)" }} />
+      <div className="max-w-[1400px] mx-auto px-4 md:px-8 space-y-16 animate-in">
+        
+        {/* ── HERO ── */}
+        <header className="relative py-20 px-8 rounded-[4rem] bg-slate-900 overflow-hidden group shadow-2xl shadow-indigo-500/10">
+           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600 opacity-20 blur-[120px] -mr-48 -mt-48 transition-all duration-1000 group-hover:scale-110" />
+           <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-violet-600 opacity-10 blur-[100px] -ml-32 -mb-32" />
+           
+           <div className="relative z-10 text-center space-y-6 max-w-3xl mx-auto">
+              <div className="inline-flex items-center gap-3 px-4 py-1.5 bg-white/10 backdrop-blur-md rounded-full border border-white/10 mb-2">
+                 <Zap size={14} className="text-amber-400 animate-pulse" />
+                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-200">Manual de Ingeniería Pastoral</span>
+              </div>
+              <h1 className="text-4xl md:text-7xl font-black text-white tracking-tighter leading-[0.9] uppercase italic">
+                Proceso <span className="text-indigo-400 not-italic">Raíz Viva</span>
+              </h1>
+              <p className="text-slate-400 font-bold text-sm md:text-lg max-w-2xl mx-auto leading-relaxed">
+                El mapa operativo para consolidar, discipular y comisionar a la próxima generación de líderes en el Reino.
+              </p>
+              
+              <div className="flex flex-wrap justify-center gap-4 pt-4">
+                 <div className="flex items-center gap-2 px-5 py-2.5 bg-white/5 rounded-2xl border border-white/5">
+                    <CheckCircle2 size={16} className="text-emerald-500" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Versión 2026</span>
+                 </div>
+                 <div className="flex items-center gap-2 px-5 py-2.5 bg-white/5 rounded-2xl border border-white/5">
+                    <Activity size={16} className="text-indigo-500" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-widest">Optimizado PastoreApp</span>
+                 </div>
+              </div>
+           </div>
+        </header>
 
-        <div style={{ position: "relative" }}>
-          <p className="mrv-hero-eyebrow">Manual de Funciones · Proceso de Formación</p>
-          <div className="mrv-hero-bar" />
-          <h1 className="mrv-hero-h1">Proceso <span>RAÍZ VIVA</span></h1>
-          <p className="mrv-hero-sub">Sistema PastoreApp · Versión 2026</p>
+        {/* ── TRACK OVERVIEW ── */}
+        <section className="space-y-10 py-10">
+           <div className="flex items-center gap-4 mb-10">
+              <div className="h-px bg-slate-200 dark:bg-white/5 flex-1" />
+              <div className="flex items-center gap-3 px-6 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 rounded-2xl shadow-sm">
+                 <LayoutGrid size={16} className="text-indigo-600" />
+                 <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Arquitectura de Proceso</span>
+              </div>
+              <div className="h-px bg-slate-200 dark:bg-white/5 flex-1" />
+           </div>
 
-          <div className="mrv-hero-pills">
-            {areaKeys.map((key) => {
-              const area = AREAS[key];
-              return (
-                <button
-                  key={key}
-                  className="mrv-pill"
-                  onClick={() => scrollTo(key)}
-                  style={{ color: area.color, borderColor: `${area.color}66`, background: `${area.color}18` }}
-                >
-                  {area.emoji} {area.title}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </header>
-
-      {/* ── OVERVIEW ── */}
-      <section className="mrv-overview">
-        <p className="mrv-eyebrow">Arquitectura del proceso</p>
-        <h2 className="mrv-section-title">Las cuatro áreas del proceso</h2>
-        <p className="mrv-section-desc">
-          El proceso RAÍZ VIVA acompaña al nuevo creyente desde el primer contacto
-          con la iglesia hasta su comisión como líder activo, articulando cuatro áreas en secuencia.
-        </p>
-
-        {/* Flow nodes */}
-        <div className="mrv-flow">
-          {areaKeys.map((key, i) => {
-            const area = AREAS[key];
-            return (
-              <React.Fragment key={key}>
-                <button
-                  className="mrv-flow-node-btn"
-                  onClick={() => scrollTo(key)}
-                  aria-label={`Ir a ${area.title}`}
-                >
-                  <div className="mrv-flow-icon" style={{ background: area.light, borderColor: area.border }}>
-                    {area.emoji}
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {areaKeys.map((key, i) => {
+                const area = AREAS[key];
+                return (
+                  <div 
+                    key={key}
+                    onClick={() => scrollToArea(key)}
+                    className="group relative cursor-pointer p-8 bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-white/5 hover:border-indigo-500/30 transition-all hover:-translate-y-2 hover:shadow-2xl shadow-slate-100 dark:shadow-none overflow-hidden"
+                  >
+                    <div className={`absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r ${area.color}`} />
+                    <div className="flex flex-col h-full gap-6">
+                       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${area.color} flex items-center justify-center text-white shadow-lg shadow-indigo-600/20 group-hover:scale-110 transition-transform`}>
+                          {area.icon}
+                       </div>
+                       <div className="space-y-2">
+                          <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">ÁREA {area.num}</p>
+                          <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">{area.title}</h3>
+                       </div>
+                       <p className="text-xs font-bold text-slate-500 leading-relaxed italic">{area.subtitle}</p>
+                       <div className="mt-auto flex items-center gap-2 text-[10px] font-black text-indigo-600 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                          Ver Manual <ArrowRight size={14} />
+                       </div>
+                    </div>
                   </div>
-                  <span className="mrv-flow-label" style={{ color: area.color }}>{area.title}</span>
-                  <span className="mrv-flow-sub">{area.subtitle}</span>
-                </button>
-                {i < areaKeys.length - 1 && (
-                  <div className="mrv-flow-arrow">→</div>
-                )}
-              </React.Fragment>
+                );
+              })}
+           </div>
+
+           {/* Levels Linear Track */}
+           <div className="bg-slate-900/5 dark:bg-white/5 p-8 rounded-[3rem] border border-slate-200 dark:border-white/5 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-3 min-w-max">
+                 {LEVELS.map((lvl, i) => (
+                    <React.Fragment key={lvl.num}>
+                       <div className="group flex flex-col items-center gap-3">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm transition-all border-2 border-transparent bg-white dark:bg-slate-800 shadow-sm group-hover:bg-indigo-600 group-hover:text-white ${lvl.area === activeArea ? 'ring-4 ring-indigo-500/20 bg-indigo-500 text-white' : 'text-slate-400'}`}>
+                             {lvl.num}
+                          </div>
+                          <span className="text-[9px] font-black uppercase text-slate-400 tracking-tighter group-hover:text-slate-900 dark:group-hover:text-white whitespace-nowrap">{lvl.name}</span>
+                       </div>
+                       {i < LEVELS.length - 1 && <ChevronRight size={14} className="text-slate-300 dark:text-slate-700 flex-shrink-0" />}
+                    </React.Fragment>
+                 ))}
+              </div>
+           </div>
+        </section>
+
+        {/* ── AREA SECTIONS ── */}
+        <main className="space-y-32">
+          {areaKeys.map((key) => {
+            const area = AREAS[key];
+            const funcs = FUNCTIONS[key];
+            return (
+              <section key={key} id={`area-${key}`} className="scroll-mt-40 space-y-12 animate-in slide-in-from-bottom-10 duration-1000">
+                
+                {/* Section Header */}
+                <div className="flex flex-col md:flex-row gap-10 items-start">
+                   <div className="relative group">
+                      <div className={`w-28 h-28 rounded-[2.5rem] bg-gradient-to-br ${area.color} flex items-center justify-center text-white shadow-2xl shadow-indigo-600/30 group-hover:rotate-6 transition-transform`}>
+                         {area.icon}
+                      </div>
+                      <div className="absolute -bottom-4 -right-4 w-12 h-12 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center font-black text-2xl text-slate-900 dark:text-white shadow-xl border border-slate-100 dark:border-white/10">
+                         {area.num}
+                      </div>
+                   </div>
+                   <div className="flex-1 space-y-4">
+                      <div className="flex items-center gap-10">
+                         <h2 className="text-4xl md:text-6xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">
+                            {area.title} <span className="text-indigo-600 not-italic opacity-30 tracking-widest">{area.subtitle}</span>
+                         </h2>
+                      </div>
+                      <p className="text-lg font-bold text-slate-500 max-w-3xl leading-relaxed italic">
+                        {area.desc}
+                      </p>
+                   </div>
+                </div>
+
+                {/* Grid of functions */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                   {funcs.map((func) => (
+                     <FunctionCard key={func.id} func={func} areaKey={key} />
+                   ))}
+                </div>
+              </section>
             );
           })}
-        </div>
-
-        {/* 10 levels */}
-        <div className="mrv-track">
-          <p className="mrv-track-eyebrow">Ruta de formación completa — 10 niveles</p>
-          <div className="mrv-track-pills">
-            {LEVELS.map((lvl, i) => {
-              const area = AREAS[lvl.area];
-              return (
-                <React.Fragment key={lvl.num}>
-                  <div
-                    className="mrv-track-badge"
-                    style={{ color: area.color, borderColor: `${area.color}55`, background: `${area.color}1E` }}
-                  >
-                    {lvl.num} · {lvl.name}
-                  </div>
-                  {i < LEVELS.length - 1 && <span className="mrv-track-sep">›</span>}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── AREA SECTIONS ── */}
-      <main>
-        {areaKeys.map((key, i) => (
-          <React.Fragment key={key}>
-            {i > 0 && <div className="mrv-divider" />}
-            <AreaSection areaKey={key} />
-          </React.Fragment>
-        ))}
-      </main>
+        </main>
+      </div>
 
       {/* ── FOOTER ── */}
-      <footer className="mrv-footer">
-        <p className="mrv-footer-title">Manual de Funciones — Proceso RAÍZ VIVA</p>
-        <p className="mrv-footer-sub">Sistema PastoreApp · Versión 2025 · Uso interno</p>
+      <footer className="mt-40 py-20 bg-slate-900 text-center space-y-4">
+         <div className="w-16 h-1 bg-indigo-600 mx-auto rounded-full mb-8" />
+         <p className="text-sm font-black text-white uppercase tracking-[0.4em]">Manual Operativo Raíz Viva</p>
+         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic leading-relaxed">
+            Consola de Gestión Pastoral v2.6 • © 2026 Todos los derechos reservados
+         </p>
+         <div className="flex justify-center gap-6 pt-10">
+            <ShieldCheck size={24} className="text-indigo-500 opacity-50" />
+            <Flag size={24} className="text-slate-700" />
+            <Zap size={24} className="text-amber-500 opacity-30" />
+         </div>
       </footer>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}} />
     </div>
   );
 };

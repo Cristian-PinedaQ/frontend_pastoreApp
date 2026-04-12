@@ -4,6 +4,7 @@
 // ============================================
 
 import React, { useState, useContext, useEffect, useCallback } from "react";
+import { useConfirmation } from "../context/ConfirmationContext";
 import apiService from "../apiService";
 import AuthContext from "../context/AuthContext";
 import { generateParticipantsPDF } from "../services/participantsPdfGenerator";
@@ -41,6 +42,7 @@ const ParticipantDetailModal = ({
   onAddPaymentSuccess,
   readOnly = false,
 }) => {
+  const confirm = useConfirmation();
   const { user } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState("details");
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -432,7 +434,12 @@ const handleEditPayment = async () => {
       }
     } catch (error) {
       console.error("Error generando PDF:", error);
-      setError("❌ Error al generar el PDF");
+      await confirm({
+        title: "Error de Exportación",
+        message: "No se pudo generar el PDF del participante. Verifique los datos e intente nuevamente.",
+        type: "error",
+        confirmLabel: "Cerrar"
+      });
       setTimeout(() => setError(""), 3000);
     } finally {
       setGeneratingPDF(false);
@@ -678,9 +685,13 @@ const pendingBalance = Math.max(0, expectedTotal - totalPaid);
             <div className="error-actions">
               <button
                 className="error-action-btn"
-                onClick={() => {
-                  setActiveTab("details");
-                  alert("Funcionalidad de edición de miembro - Próximamente");
+                onClick={async () => {
+                  await confirm({
+                    title: "Próximamente",
+                    message: "La funcionalidad de edición directa de miembros desde este módulo estará disponible en la próxima actualización.",
+                    type: "info",
+                    confirmLabel: "Entendido"
+                  });
                 }}
               >
                 ✏️ Ver Datos del Miembro

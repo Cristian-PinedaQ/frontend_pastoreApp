@@ -4,9 +4,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
+import { useConfirmation } from './context/ConfirmationContext';
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
+  const confirm = useConfirmation();
   const { register, loading, error } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
@@ -53,7 +55,12 @@ export const RegisterPage = () => {
       });
 
       // Mostrar mensaje de éxito y redirigir
-      alert('Registro exitoso. Ahora puedes iniciar sesión.');
+      await confirm({
+        title: "¡Registro Exitoso!",
+        message: "Tu cuenta ha sido creada correctamente. Ahora puedes iniciar sesión con tus credenciales.",
+        type: "success",
+        confirmLabel: "Ir al Login"
+      });
       navigate('/login');
     } catch (err) {
       setValidationError(err.message || 'Error al registrar');

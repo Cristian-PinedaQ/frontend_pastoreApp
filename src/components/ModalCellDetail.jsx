@@ -1,2136 +1,456 @@
-// ============================================
-// ModalCellDetail.jsx
-// Vista completa de una célula: Info | Miembros | Agregar Miembro | Editar
-// Acciones (Verificar, Estado, Multiplicación, PDF, Eliminar) en el header
-// ============================================
-
 import React, { useState, useEffect, useCallback } from "react";
+import { 
+  X, 
+  Home, 
+  ShieldCheck, 
+  Users, 
+  Search, 
+  UserPlus, 
+  Edit3, 
+  CheckCircle2, 
+  AlertTriangle, 
+  PauseCircle, 
+  StopCircle, 
+  FileText, 
+  MapPin,  
+  TrendingUp, 
+  Save, 
+  Unlink, 
+  Info,
+  Plus,
+  Loader2,
+} from 'lucide-react';
 import apiService from "../apiService";
-import { logUserAction, logSecurityEvent } from "../utils/securityLogger";
+import { logUserAction } from "../utils/securityLogger";
 import nameHelper from "../services/nameHelper";
 import { generateCellDetailPDF } from "../services/cellDetailPdfGenerator";
-import "../css/ModalCellDetail.css";
 
 const { getDisplayName } = nameHelper;
 
-const DEBUG = process.env.REACT_APP_DEBUG === "true";
-const log = (msg, d) =>
-  DEBUG && console.log(`[ModalCellDetail] ${msg}`, d || "");
-const logError = (msg, e) => console.error(`[ModalCellDetail] ${msg}`, e);
-
-const escapeHtml = (text) => {
-  if (!text || typeof text !== "string") return "";
-  return text.replace(
-    /[&<>"']/g,
-    (m) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#039;",
-      })[m],
-  );
-};
-
-// ── Constantes ────────────────────────────────────────────────────────────────
-
 const STATUS_MAP = {
-  ACTIVE: { label: "Activa", icon: "✅", color: "#10b981", bg: "#d1fae5" },
-  INCOMPLETE_LEADERSHIP: {
-    label: "Liderazgo Incompleto",
-    icon: "⚠️",
-    color: "#f59e0b",
-    bg: "#fef3c7",
-  },
-  INACTIVE: { label: "Inactiva", icon: "⏹️", color: "#6b7280", bg: "#f3f4f6" },
-  SUSPENDED: {
-    label: "Suspendida",
-    icon: "⏸️",
-    color: "#ef4444",
-    bg: "#fee2e2",
-  },
+  ACTIVE: { label: "Activa", icon: CheckCircle2, color: "emerald", bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400" },
+  INCOMPLETE_LEADERSHIP: { label: "Liderazgo Incompleto", icon: AlertTriangle, color: "amber", bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400" },
+  INACTIVE: { label: "Inactiva", icon: StopCircle, color: "slate", bg: "bg-slate-500/10", text: "text-slate-600 dark:text-slate-400" },
+  SUSPENDED: { label: "Suspendida", icon: PauseCircle, color: "rose", bg: "bg-rose-500/10", text: "text-rose-600 dark:text-rose-400" },
 };
 
 const TABS = [
-  { id: "info", label: "📋 Información" },
-  { id: "members", label: "👥 Miembros" },
-  { id: "add", label: "➕ Agregar Miembro" },
-  { id: "edit", label: "✏️ Editar" },
+  { id: "info", label: "Información", icon: Info },
+  { id: "members", label: "Miembros", icon: Users },
+  { id: "add", label: "Nuevo Miembro", icon: UserPlus },
+  { id: "edit", label: "Configuración", icon: Edit3 },
 ];
 
-const DAYS_OF_WEEK = [
-  "Lunes",
-  "Martes",
-  "Miércoles",
-  "Jueves",
-  "Viernes",
-  "Sábado",
-  "Domingo",
-];
+const DAYS_OF_WEEK = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const DISTRICTS = ["Sector Pastores", "Jurisdicción D1", "Jurisdicción D2", "Jurisdicción D3"];
 
-const DISTRICTS = [
-  "NORTE",
-  "SUR",
-  "ESTE",
-  "OESTE",
-  "CENTRO",
-  "NORESTE",
-  "NOROESTE",
-  "SURESTE",
-  "SUROESTE",
-];
-
-// ── Convierte cualquier formato de hora al formato HH:mm que requiere <input type="time"> ──
-const toInputTime = (timeStr) => {
-  if (!timeStr) return "";
-  if (/^\d{2}:\d{2}$/.test(timeStr)) return timeStr;
-  if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) return timeStr.slice(0, 5);
-  const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (match) {
-    let h = parseInt(match[1], 10);
-    const m = match[2];
-    const period = match[3].toUpperCase();
-    if (period === "PM" && h !== 12) h += 12;
-    if (period === "AM" && h === 12) h = 0;
-    return `${String(h).padStart(2, "0")}:${m}`;
-  }
-  return timeStr;
-};
-
-// ── Componente principal ──────────────────────────────────────────────────────
-
-const ModalCellDetail = ({
-  isOpen,
-  onClose,
-  cell: initialCell,
-  onCellChanged,
-  onOpenLeaderDetail,
-}) => {
-  // ── State ──────────────────────────────────────────────────────────────────
+const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) => {
   const [cell, setCell] = useState(initialCell);
   const [activeTab, setActiveTab] = useState("info");
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
-
-  // Add-member sub-state
-  const [addStep, setAddStep] = useState(1);
+  
+  // Search state
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [addResult, setAddResult] = useState(null);
-  const [addError, setAddError] = useState("");
 
-  // Edit sub-state
+  // Edit state
   const [editForm, setEditForm] = useState({});
   const [editLoading, setEditLoading] = useState(false);
-  const [editError, setEditError] = useState("");
-  const [editSuccess, setEditSuccess] = useState("");
 
-  // Delete sub-state
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  // Confirmation state
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
-  // Unlink leader sub-state
-  const [unlinkTarget, setUnlinkTarget] = useState(null); // { leaderId, leaderName, role }
-  const [unlinking, setUnlinking] = useState(false);
-
-  // Leader search for edit
-  const [leaderSearchField, setLeaderSearchField] = useState(null);
-  const [leaderSearchTerm, setLeaderSearchTerm] = useState("");
-  const [leaderResults, setLeaderResults] = useState([]);
-  const [searchingLeaders, setSearchingLeaders] = useState(false);
-
-  // Dark mode
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    try {
-      const savedMode = localStorage.getItem("darkMode");
-      const htmlDark =
-        document.documentElement.classList.contains("dark-mode") ||
-        document.documentElement.classList.contains("dark");
-      const mediaDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-      ).matches;
-      setIsDarkMode(savedMode === "true" || htmlDark || mediaDark);
-    } catch (_) {}
-  }, []);
-
-  const T = {
-    bg: isDarkMode ? "#1e293b" : "#ffffff",
-    bgSecondary: isDarkMode ? "#0f172a" : "#f9fafb",
-    text: isDarkMode ? "#f3f4f6" : "#1f2937",
-    textSub: isDarkMode ? "#9ca3af" : "#6b7280",
-    border: isDarkMode ? "#334155" : "#e5e7eb",
-    rowAlt: isDarkMode ? "#1a2332" : "#f8fafc",
-    cardBg: isDarkMode ? "#1e293b" : "#ffffff",
-    errorBg: isDarkMode ? "#7f1d1d30" : "#fee2e2",
-    errorText: isDarkMode ? "#fecaca" : "#991b1b",
-    successBg: isDarkMode ? "#14532d30" : "#d1fae5",
-    successText: isDarkMode ? "#a7f3d0" : "#065f46",
-    warnBg: isDarkMode ? "#78350f30" : "#fef3c7",
-    warnText: isDarkMode ? "#fcd34d" : "#92400e",
-  };
-
-  // ── Sync cell prop ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (initialCell) {
       setCell(initialCell);
-      setError("");
-      setSuccessMsg("");
+      setEditForm({ ...initialCell });
     }
   }, [initialCell]);
 
-  // ── Load members when tab opens ─────────────────────────────────────────────
   useEffect(() => {
-    if (
-      isOpen &&
-      (activeTab === "members" || activeTab === "add") &&
-      cell?.id
-    ) {
-      loadMembers();
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      if (activeTab === 'members' || activeTab === 'add') loadMembers();
     }
-  }, [isOpen, activeTab, cell?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Reset add-member form when switching away
-  useEffect(() => {
-    if (activeTab !== "add") {
-      setAddStep(1);
-      setSearchTerm("");
-      setSearchResults([]);
-      setSelectedMember(null);
-      setAddResult(null);
-      setAddError("");
-    }
-  }, [activeTab]);
-
-  // ── Initialize edit form when switching to edit tab ──────────────────────────
-  useEffect(() => {
-    if (activeTab === "edit" && cell) {
-      setEditForm({
-        name: cell.name ?? "",
-        meetingDay: cell.meetingDay ?? "",
-        meetingTime: toInputTime(
-          cell.meetingTime ?? cell.meetingTimeFormatted ?? "",
-        ),
-        meetingAddress: cell.meetingAddress ?? "",
-        maxCapacity: cell.maxCapacity ?? 12,
-        district: cell.district ?? "",
-        notes: cell.notes ?? "",
-        mainLeaderId: cell.mainLeaderId ?? null,
-        groupLeaderId: cell.groupLeaderId ?? null,
-        hostId: cell.hostId ?? null,
-        timoteoId: cell.timoteoId ?? null,
-        mainLeaderName: cell.mainLeaderName ?? "",
-        groupLeaderName: cell.groupLeaderName ?? "",
-        hostName: cell.hostName ?? "",
-        timoteoName: cell.timoteoName ?? "",
-      });
-      setEditError("");
-      setEditSuccess("");
-      setLeaderSearchField(null);
-      setLeaderSearchTerm("");
-      setLeaderResults([]);
-    }
-  }, [activeTab, cell]);
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  const showSuccess = (msg) => {
-    setSuccessMsg(msg);
-    setTimeout(() => setSuccessMsg(""), 5000);
-  };
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen, activeTab, cell?.id]);
 
   const loadMembers = useCallback(async () => {
     if (!cell?.id) return;
     setLoadingMembers(true);
     try {
       const raw = await apiService.getCellMembers(cell.id);
-      const list = Array.isArray(raw) ? raw : [];
-      setMembers(
-        list.map((m) => ({
-          ...m,
-          displayName: getDisplayName(escapeHtml(m.name || "Sin nombre")),
-        })),
-      );
-      log("Miembros cargados", { count: list.length });
+      setMembers(raw || []);
     } catch (err) {
-      logError("Error cargando miembros:", err);
+      setError("Error al sincronizar integrantes");
     } finally {
       setLoadingMembers(false);
     }
   }, [cell?.id]);
 
-  // ── Actions ─────────────────────────────────────────────────────────────────
   const handleVerify = async () => {
     setLoading(true);
-    setError("");
     try {
       const result = await apiService.verifyCell(cell.id);
-      showSuccess(
-        `✅ ${cell.name} verificada — Estado: ${result.statusDisplay || result.status}`,
-      );
+      setCell(prev => ({ ...prev, status: result.status }));
       if (onCellChanged) onCellChanged();
-      setCell((prev) => ({ ...prev, status: result.status }));
       logUserAction("verify_cell", { cellId: cell.id });
     } catch (err) {
-      setError(`Error al verificar: ${err.message}`);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleChangeStatus = async (newStatus) => {
-    setShowStatusMenu(false);
-    const names = {
-      ACTIVE: "Activa",
-      SUSPENDED: "Suspendida",
-      INACTIVE: "Inactiva",
-    };
-    if (
-      !window.confirm(
-        `¿Cambiar estado de "${cell.name}" a ${names[newStatus] || newStatus}?`,
-      )
-    )
-      return;
-    setLoading(true);
-    setError("");
-    try {
-      await apiService.changeCellStatus(cell.id, newStatus);
-      showSuccess(`✅ Estado cambiado a ${names[newStatus] || newStatus}`);
-      setCell((prev) => ({ ...prev, status: newStatus }));
-      if (onCellChanged) onCellChanged();
-    } catch (err) {
-      setError(`Error al cambiar estado: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMultiplication = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      if (!cell.isMultiplying) {
-        if (!window.confirm(`¿Iniciar multiplicación para "${cell.name}"?`)) {
-          setLoading(false);
-          return;
-        }
-        await apiService.startMultiplication(cell.id);
-        showSuccess(`🌱 Multiplicación iniciada para ${cell.name}`);
-        setCell((prev) => ({ ...prev, isMultiplying: true }));
-      } else {
-        if (!window.confirm(`¿Completar multiplicación para "${cell.name}"?`)) {
-          setLoading(false);
-          return;
-        }
-        await apiService.completeMultiplication(cell.id);
-        showSuccess(`✅ Multiplicación completada para ${cell.name}`);
-        setCell((prev) => ({
-          ...prev,
-          isMultiplying: false,
-          multiplicationCount: (prev.multiplicationCount || 0) + 1,
-        }));
-      }
-      if (onCellChanged) onCellChanged();
-    } catch (err) {
-      setError(`Error: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExportPDF = () => {
-    generateCellDetailPDF(cell, members);
-    logUserAction("export_cell_pdf", { cellId: cell.id });
-  };
-
-  const handleRemoveMember = async (memberId, memberName) => {
-    if (!window.confirm(`¿Remover a "${memberName}" de la célula?`)) return;
-    setLoading(true);
-    try {
-      await apiService.removeMemberFromCell(cell.id, memberId);
-      showSuccess(`✅ ${memberName} removido de ${cell.name}`);
-      await loadMembers();
-      setCell((prev) => ({
-        ...prev,
-        currentMemberCount: Math.max(0, (prev.currentMemberCount || 1) - 1),
-      }));
-      if (onCellChanged) onCellChanged();
-    } catch (err) {
-      setError(`Error al remover miembro: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Unlink leader ────────────────────────────────────────────────────────────
-  const handleConfirmUnlink = async () => {
-    if (!unlinkTarget) return;
-    setUnlinking(true);
-    setError("");
-    try {
-      const result = await apiService.unlinkLeaderFromCell(
-        cell.id,
-        unlinkTarget.leaderId,
-      );
-
-      const roleToFields = {
-        mainLeader: {
-          idKey: "mainLeaderId",
-          nameKey: "mainLeaderName",
-          activeKey: "mainLeaderIsActive",
-        },
-        groupLeader: {
-          idKey: "groupLeaderId",
-          nameKey: "groupLeaderName",
-          activeKey: "groupLeaderIsActive",
-        },
-        host: {
-          idKey: "hostId",
-          nameKey: "hostName",
-          activeKey: "hostIsActive",
-        },
-        timoteo: {
-          idKey: "timoteoId",
-          nameKey: "timoteoName",
-          activeKey: "timoteoIsActive",
-        },
-      };
-      const fields = roleToFields[unlinkTarget.role];
-
-      // Actualizar cell state
-      setCell((prev) => ({
-        ...prev,
-        status: result.newCellStatus ?? prev.status,
-        hasAllLeadersActive: false,
-        missingOrInactiveLeaders:
-          result.missingOrInactiveLeaders ?? prev.missingOrInactiveLeaders,
-        ...(fields
-          ? {
-              [fields.idKey]: null,
-              [fields.nameKey]: null,
-              [fields.activeKey]: null,
-            }
-          : {}),
-      }));
-
-      // Limpiar también el editForm para que quede en sincronía
-      if (fields) {
-        setEditForm((prev) => ({
-          ...prev,
-          [fields.idKey]: null,
-          // nameKey en editForm usa el mismo key que en cell (ej: mainLeaderName)
-          [fields.nameKey]: "",
-        }));
-      }
-
-      showSuccess(
-        `✂️ Líder "${unlinkTarget.leaderName}" desvinculado. Estado: ${result.newCellStatusDisplay ?? result.newCellStatus}`,
-      );
-      logUserAction("unlink_leader_from_cell", {
-        cellId: cell.id,
-        leaderId: unlinkTarget.leaderId,
-        role: unlinkTarget.role,
-      });
-      if (onCellChanged) onCellChanged();
-    } catch (err) {
-      setEditError(`Error al desvincular líder: ${err.message}`);
-    } finally {
-      setUnlinking(false);
-      setUnlinkTarget(null);
-    }
-  };
-
-  // ── Delete cell ──────────────────────────────────────────────────────────────
-  const handleDeleteCell = async () => {
-    if (deleteConfirmText !== cell.name) return;
-    setDeleting(true);
-    setError("");
-    try {
-      await apiService.deleteCell(cell.id);
-      logUserAction("delete_cell", { cellId: cell.id, cellName: cell.name });
-      setShowDeleteConfirm(false);
-      if (onCellChanged) onCellChanged();
-      onClose();
-    } catch (err) {
-      setError(`Error al eliminar célula: ${err.message}`);
-      setDeleting(false);
-    }
-  };
-
-  // ── Edit cell ────────────────────────────────────────────────────────────────
-  const handleEditField = (field, value) => {
-    setEditForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSearchLeaders = async () => {
-    if (leaderSearchTerm.trim().length < 2) return;
-    setSearchingLeaders(true);
-    try {
-      const servants = await apiService.getLeadersByType("SERVANT");
-      const q = leaderSearchTerm.toLowerCase().trim();
-      const results = (Array.isArray(servants) ? servants : [])
-        .filter(
-          (l) =>
-            l.name?.toLowerCase().includes(q) ||
-            l.memberName?.toLowerCase().includes(q) ||
-            l.document?.toLowerCase().includes(q),
-        )
-        .map((l) => ({
-          id: l.leaderId ?? l.id,
-          name: l.name ?? l.memberName ?? `Líder #${l.leaderId ?? l.id}`,
-          document: l.document ?? "",
-        }))
-        .slice(0, 10);
-      setLeaderResults(results);
-      if (results.length === 0)
-        logError("Sin resultados para:", leaderSearchTerm);
-    } catch (err) {
-      logError("Error buscando líderes:", err);
-      setLeaderResults([]);
-    } finally {
-      setSearchingLeaders(false);
-    }
-  };
-
-  const handleSelectLeader = (leader) => {
-    if (!leaderSearchField) return;
-    const idField = leaderSearchField;
-    const nameField = leaderSearchField.replace("Id", "Name");
-    setEditForm((prev) => ({
-      ...prev,
-      [idField]: leader.id,
-      [nameField]: leader.name || `Líder #${leader.id}`,
-    }));
-    setLeaderSearchField(null);
-    setLeaderSearchTerm("");
-    setLeaderResults([]);
   };
 
   const handleSaveEdit = async () => {
     setEditLoading(true);
-    setEditError("");
-    setEditSuccess("");
     try {
-      if (!editForm.name?.trim()) {
-        setEditError("El nombre es obligatorio");
-        setEditLoading(false);
-        return;
-      }
-
-      const payload = {
-        name: editForm.name.trim(),
-        mainLeaderId: editForm.mainLeaderId,
-        groupLeaderId: editForm.groupLeaderId,
-        hostId: editForm.hostId,
-        timoteoId: editForm.timoteoId,
-        meetingDay: editForm.meetingDay || null,
-        meetingTime: editForm.meetingTime || null,
-        meetingAddress: editForm.meetingAddress || null,
-        maxCapacity: editForm.maxCapacity
-          ? parseInt(editForm.maxCapacity, 10)
-          : null,
-        district: editForm.district || null,
-        notes: editForm.notes || null,
-      };
-
-      await apiService.updateCell(cell.id, payload);
-      setEditSuccess("✅ Célula actualizada exitosamente");
-      logUserAction("edit_cell", { cellId: cell.id });
-
-      setCell((prev) => ({
-        ...prev,
-        name: payload.name,
-        meetingDay: payload.meetingDay,
-        meetingTime: payload.meetingTime,
-        meetingTimeFormatted: payload.meetingTime,
-        meetingAddress: payload.meetingAddress,
-        maxCapacity: payload.maxCapacity,
-        district: payload.district,
-        notes: payload.notes,
-        mainLeaderId: payload.mainLeaderId,
-        groupLeaderId: payload.groupLeaderId,
-        hostId: payload.hostId,
-        timoteoId: payload.timoteoId,
-        mainLeaderName: editForm.mainLeaderName,
-        groupLeaderName: editForm.groupLeaderName,
-        hostName: editForm.hostName,
-        timoteoName: editForm.timoteoName,
-      }));
-
+      await apiService.updateCell(cell.id, editForm);
+      setCell(prev => ({ ...prev, ...editForm }));
       if (onCellChanged) onCellChanged();
-      onClose();
+      setActiveTab("info");
     } catch (err) {
-      setEditError(err.message || "Error al actualizar la célula");
+      setError(err.message);
     } finally {
       setEditLoading(false);
     }
   };
 
-  // ── Add member flow ──────────────────────────────────────────────────────────
   const handleSearch = async () => {
-    if (searchTerm.trim().length < 2) {
-      setAddError("Ingresa al menos 2 caracteres");
-      return;
-    }
+    if (searchTerm.trim().length < 2) return;
     setSearching(true);
-    setAddError("");
-    setSearchResults([]);
     try {
-      const [allMembers, currentMembers] = await Promise.all([
-        apiService.getAllMembers(),
-        apiService.getCellMembers(cell.id),
-      ]);
-      const currentIds = new Set(
-        (Array.isArray(currentMembers) ? currentMembers : []).map((m) => m.id),
-      );
-      const q = searchTerm.toLowerCase().trim();
-      const results = allMembers
-        .filter(
-          (m) =>
-            !currentIds.has(m.id) &&
-            (m.name?.toLowerCase().includes(q) ||
-              m.document?.toLowerCase().includes(q) ||
-              m.email?.toLowerCase().includes(q)),
-        )
-        .map((m) => ({
-          ...m,
-          displayName: getDisplayName(escapeHtml(m.name || "Sin nombre")),
-        }))
-        .slice(0, 20);
-      setSearchResults(results);
-      if (results.length === 0)
-        setAddError("No se encontraron miembros disponibles");
+      const all = await apiService.getAllMembers();
+      const q = searchTerm.toLowerCase();
+      setSearchResults(all.filter(m => m.name?.toLowerCase().includes(q) || m.document?.includes(q)).slice(0, 10));
     } catch (err) {
-      setAddError("Error al buscar miembros");
-      logSecurityEvent("member_search_error", { errorType: "api_error" });
+      setError("Error en búsqueda");
     } finally {
       setSearching(false);
     }
   };
 
-  const handleConfirmAdd = async () => {
+  const handleAddMember = async (member) => {
     setLoading(true);
-    setAddError("");
     try {
-      const result = await apiService.addMemberToCell(
-        cell.id,
-        selectedMember.id,
-      );
-      setAddResult(result);
-      setAddStep(3);
+      await apiService.addMemberToCell(cell.id, member.id);
       await loadMembers();
-      setCell((prev) => ({
-        ...prev,
-        currentMemberCount: (prev.currentMemberCount || 0) + 1,
-      }));
-      if (onCellChanged) onCellChanged();
-      logUserAction("add_member_to_cell", {
-        cellId: cell.id,
-        memberId: selectedMember.id,
-      });
+      setCell(prev => ({ ...prev, currentMemberCount: (prev.currentMemberCount || 0) + 1 }));
+      setActiveTab("members");
     } catch (err) {
-      setAddError(err.message || "Error al agregar miembro");
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Render helpers ───────────────────────────────────────────────────────────
-  const statusInfo = STATUS_MAP[cell?.status] || {
-    label: cell?.status,
-    icon: "•",
-    color: "#6b7280",
-    bg: "#f3f4f6",
+  const handleUnlinkMember = (member) => {
+    setConfirmDialog({
+      title: "¿Desvincular Integrante?",
+      message: `El registro de ${member.name} será omitido de esta célula.`,
+      action: async () => {
+        setLoading(true);
+        try {
+          await apiService.removeMemberFromCell(cell.id, member.id);
+          await loadMembers();
+          setCell(prev => ({ ...prev, currentMemberCount: Math.max(0, (prev.currentMemberCount || 1) - 1) }));
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+          setConfirmDialog(null);
+        }
+      }
+    });
   };
 
   if (!isOpen || !cell) return null;
 
-  // ── Info tab ─────────────────────────────────────────────────────────────────
-  const renderInfo = () => {
-    const LEADER_ROLES = [
-      {
-        role: "mainLeader",
-        label: "Líder Principal",
-        idKey: "mainLeaderId",
-        nameKey: "mainLeaderName",
-        activeKey: "mainLeaderIsActive",
-      },
-      {
-        role: "groupLeader",
-        label: "Líder de Grupo",
-        idKey: "groupLeaderId",
-        nameKey: "groupLeaderName",
-        activeKey: "groupLeaderIsActive",
-      },
-      {
-        role: "host",
-        label: "Anfitrión/a",
-        idKey: "hostId",
-        nameKey: "hostName",
-        activeKey: "hostIsActive",
-      },
-      {
-        role: "timoteo",
-        label: "Timoteo",
-        idKey: "timoteoId",
-        nameKey: "timoteoName",
-        activeKey: "timoteoIsActive",
-      },
-    ];
+  const status = STATUS_MAP[cell.status] || STATUS_MAP.ACTIVE;
 
-    // Sin botón desvincular — solo info + badges de estado
-    const leaderItem = ({ role, label, idKey, nameKey, activeKey }) => {
-      const name = cell[nameKey];
-      const isActive = cell[activeKey];
-
-      return (
-        <div
-          key={role}
-          className="mcd-detail-row mcd-detail-row--leader"
-          style={{ borderBottomColor: T.border }}
-        >
-          <span className="mcd-detail-label" style={{ color: T.textSub }}>
-            {label}
-          </span>
-          <div className="mcd-detail-value-row">
-            <span className="mcd-detail-value" style={{ color: T.text }}>
-              {name || "—"}
-            </span>
-            <div className="mcd-leader-row-actions">
-              {isActive === false && (
-                <span className="mcd-badge mcd-badge--warn">⚠ Inactivo</span>
-              )}
-              {isActive === true && (
-                <span className="mcd-badge mcd-badge--ok">✓ Activo</span>
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    };
-
-    const infoItem = (label, value) => (
-      <div className="mcd-detail-row" style={{ borderBottomColor: T.border }}>
-        <span className="mcd-detail-label" style={{ color: T.textSub }}>
-          {label}
-        </span>
-        <span className="mcd-detail-value" style={{ color: T.text }}>
-          {value || "—"}
-        </span>
-      </div>
-    );
-
-    const pct = cell.occupancyPercentage || 0;
-    const barColor = pct >= 90 ? "#ef4444" : pct >= 75 ? "#f59e0b" : "#10b981";
-
-    return (
-      <div className="mcd-info-grid">
-        {/* Tarjeta Liderazgo */}
-        <div
-          className="mcd-card"
-          style={{ backgroundColor: T.cardBg, borderColor: T.border }}
-        >
-          <div className="mcd-card-title-row">
-            <h4 className="mcd-card-title" style={{ color: "#1e40af" }}>
-              👥 Equipo de Liderazgo
-            </h4>
-            <button
-              className="mcd-btn mcd-btn--sm mcd-btn--secondary"
-              style={{
-                borderColor: T.border,
-                color: T.text,
-                backgroundColor: T.bgSecondary,
-                fontSize: "12px",
-              }}
-              onClick={() => setActiveTab("edit")}
-              title="Ir a editar para cambiar o desvincular líderes"
-            >
-              ✏️ Gestionar líderes
-            </button>
-          </div>
-          {LEADER_ROLES.map(leaderItem)}
-        </div>
-
-        {/* Tarjeta Reunión */}
-        <div
-          className="mcd-card"
-          style={{ backgroundColor: T.cardBg, borderColor: T.border }}
-        >
-          <h4 className="mcd-card-title" style={{ color: "#1e40af" }}>
-            📍 Reunión
-          </h4>
-          {infoItem("Día", cell.meetingDay)}
-          {infoItem("Hora", cell.meetingTimeFormatted)}
-          {infoItem("Dirección", cell.meetingAddress)}
-          {infoItem("Distrito", cell.districtLabel || cell.district)}
-        </div>
-
-        {/* Tarjeta Estadísticas */}
-        <div
-          className="mcd-card"
-          style={{ backgroundColor: T.cardBg, borderColor: T.border }}
-        >
-          <h4 className="mcd-card-title" style={{ color: "#1e40af" }}>
-            📊 Estadísticas
-          </h4>
-          {infoItem("Creación", cell.creationDateFormatted)}
-          {infoItem("ID Célula", `#${cell.id}`)}
-          {infoItem(
-            "Multiplicaciones",
-            `${cell.multiplicationCount || 0} veces`,
-          )}
-          <div
-            className="mcd-detail-row"
-            style={{ borderBottomColor: T.border }}
-          >
-            <span className="mcd-detail-label" style={{ color: T.textSub }}>
-              Ocupación
-            </span>
-            <div className="mcd-occupancy-inline">
-              <div className="mcd-occ-bar-track">
-                <div
-                  className="mcd-occ-bar-fill"
-                  style={{ width: `${pct}%`, backgroundColor: barColor }}
-                />
-              </div>
-              <span
-                style={{
-                  color: T.text,
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {cell.currentMemberCount || 0} / {cell.maxCapacity || "∞"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Alertas de liderazgo */}
-        {/* Alertas de liderazgo */}
-        {!cell.hasAllLeadersActive &&
-          cell.missingOrInactiveLeaders?.length > 0 &&
-          (() => {
-            // Mapa de líderes disponibles en la célula para poder abrir su detalle
-            const leaderRoleMap = [
-              {
-                role: "mainLeader",
-                label: "Líder Principal",
-                idKey: "mainLeaderId",
-                nameKey: "mainLeaderName",
-              },
-              {
-                role: "groupLeader",
-                label: "Líder de Grupo",
-                idKey: "groupLeaderId",
-                nameKey: "groupLeaderName",
-              },
-              {
-                role: "host",
-                label: "Anfitrión/a",
-                idKey: "hostId",
-                nameKey: "hostName",
-              },
-              {
-                role: "timoteo",
-                label: "Timoteo",
-                idKey: "timoteoId",
-                nameKey: "timoteoName",
-              },
-            ];
-
-            // Intenta relacionar un issue string con un líder concreto buscando su nombre en el texto
-            // DESPUÉS
-            const findLeaderForIssue = (issueText) => {
-              const lower = issueText.toLowerCase();
-
-              // 1. Intentar por nombre exacto del líder
-              const byName = leaderRoleMap.find((r) => {
-                const name = cell[r.nameKey];
-                return name && lower.includes(name.toLowerCase());
-              });
-              if (byName) return byName;
-
-              // 2. Intentar por palabras clave del rol en el texto del issue
-              if (lower.includes("principal") || lower.includes("main leader"))
-                return leaderRoleMap.find((r) => r.role === "mainLeader");
-              if (lower.includes("grupo") || lower.includes("group leader"))
-                return leaderRoleMap.find((r) => r.role === "groupLeader");
-              if (
-                lower.includes("anfitrión") ||
-                lower.includes("anfitrion") ||
-                lower.includes("host")
-              )
-                return leaderRoleMap.find((r) => r.role === "host");
-              if (lower.includes("timoteo"))
-                return leaderRoleMap.find((r) => r.role === "timoteo");
-
-              return null;
-            };
-
-            return (
-              <div
-                className="mcd-card"
-                style={{ borderColor: "#f59e0b", backgroundColor: T.cardBg }}
-              >
-                <h4
-                  className="mcd-card-title"
-                  style={{ color: isDarkMode ? "#fbbf24" : "#b45309" }}
-                >
-                  ⚠️ Problemas Detectados
-                </h4>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
-                  }}
-                >
-                  {cell.missingOrInactiveLeaders.map((issue, i) => {
-                    const matched = findLeaderForIssue(issue);
-                    const leaderId = matched ? cell[matched.idKey] : null;
-                    const leaderName = matched ? cell[matched.nameKey] : null;
-                    const roleLabel = matched ? matched.label : null;
-
-                    // Detectar tipo de problema para el ícono
-                    const isSuspended = /suspens/i.test(issue);
-                    const isMissing =
-                      /sin asignar|no asignado|falta|missing/i.test(issue);
-                    const statusIcon = isSuspended
-                      ? "⏸️"
-                      : isMissing
-                        ? "❌"
-                        : "⚠️";
-
-                    return (
-                      <div
-                        key={i}
-                        style={{
-                          backgroundColor: isDarkMode ? "#78350f18" : "#fffbeb",
-                          border: `1px solid ${isDarkMode ? "#92400e60" : "#fde68a"}`,
-                          borderRadius: "10px",
-                          padding: "12px 14px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "6px",
-                        }}
-                      >
-                        {/* Cabecera: rol + ícono */}
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "8px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "6px",
-                            }}
-                          >
-                            <span style={{ fontSize: "14px" }}>
-                              {statusIcon}
-                            </span>
-                            {roleLabel && (
-                              <span
-                                style={{
-                                  fontSize: "10px",
-                                  fontWeight: 700,
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  color: isDarkMode ? "#fbbf24" : "#92400e",
-                                  backgroundColor: isDarkMode
-                                    ? "#78350f30"
-                                    : "#fef3c7",
-                                  padding: "2px 8px",
-                                  borderRadius: "6px",
-                                }}
-                              >
-                                {roleLabel}
-                              </span>
-                            )}
-                            {leaderName && (
-                              <span
-                                style={{
-                                  fontSize: "12px",
-                                  fontWeight: 600,
-                                  color: T.text,
-                                }}
-                              >
-                                {leaderName}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Botón ver detalle del líder */}
-                          {leaderId && onOpenLeaderDetail && (
-                            <button
-                              className="mcd-btn mcd-btn--sm mcd-btn--secondary"
-                              style={{
-                                borderColor: isDarkMode
-                                  ? "#92400e60"
-                                  : "#fcd34d",
-                                color: isDarkMode ? "#fbbf24" : "#92400e",
-                                backgroundColor: isDarkMode
-                                  ? "#78350f20"
-                                  : "#fef9c3",
-                                fontSize: "11px",
-                                padding: "4px 10px",
-                              }}
-                              onClick={() => onOpenLeaderDetail(leaderId)}
-                              title={`Ver detalle de ${leaderName}`}
-                            >
-                              👤 Ver líder
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Motivo completo */}
-                        <p
-                          style={{
-                            fontSize: "12px",
-                            color: isDarkMode ? "#fcd34d" : "#92400e",
-                            lineHeight: 1.5,
-                            margin: 0,
-                            wordBreak: "break-word",
-                          }}
-                        >
-                          {issue}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
-
-        {/* Notas */}
-        {cell.notes && (
-          <div
-            className="mcd-card"
-            style={{ backgroundColor: T.cardBg, borderColor: T.border }}
-          >
-            <h4 className="mcd-card-title" style={{ color: "#1e40af" }}>
-              📝 Notas
-            </h4>
-            <p style={{ fontSize: "13px", color: T.textSub, lineHeight: 1.6 }}>
-              {cell.notes}
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // ── Members tab ───────────────────────────────────────────────────────────────
-  const renderMembers = () => (
-    <div className="mcd-members">
-      <div className="mcd-members-header">
-        <span style={{ color: T.textSub, fontSize: "13px" }}>
-          {loadingMembers
-            ? "Cargando miembros…"
-            : `${members.length} miembro${members.length !== 1 ? "s" : ""} registrado${members.length !== 1 ? "s" : ""}`}
-        </span>
-        <button
-          className="mcd-btn mcd-btn--sm mcd-btn--secondary"
-          onClick={loadMembers}
-          disabled={loadingMembers}
-          style={{
-            borderColor: T.border,
-            color: T.text,
-            backgroundColor: T.bgSecondary,
-          }}
-        >
-          🔄 Actualizar
-        </button>
-      </div>
-
-      {loadingMembers ? (
-        <div className="mcd-loading" style={{ color: T.textSub }}>
-          ⏳ Cargando…
-        </div>
-      ) : members.length === 0 ? (
-        <div className="mcd-empty" style={{ color: T.textSub }}>
-          <span style={{ fontSize: "32px" }}>👥</span>
-          <p>Esta célula no tiene miembros registrados.</p>
-          <button
-            className="mcd-btn mcd-btn--primary"
-            onClick={() => setActiveTab("add")}
-          >
-            ➕ Agregar primer miembro
-          </button>
-        </div>
-      ) : (
-        <div className="mcd-table-wrapper">
-          <table className="mcd-table" style={{ borderColor: T.border }}>
-            <thead>
-              <tr
-                style={{ backgroundColor: isDarkMode ? "#0f172a" : "#f1f5f9" }}
-              >
-                {[
-                  "#",
-                  "Nombre",
-                  "Documento",
-                  "Teléfono",
-                  "Email",
-                  "Acciones",
-                ].map((h) => (
-                  <th
-                    key={h}
-                    className="mcd-th"
-                    style={{ color: T.textSub, borderBottomColor: T.border }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m, i) => (
-                <tr
-                  key={m.id}
-                  className="mcd-tr"
-                  style={{ backgroundColor: i % 2 === 0 ? T.cardBg : T.rowAlt }}
-                >
-                  <td
-                    className="mcd-td"
-                    style={{ color: T.textSub, borderBottomColor: T.border }}
-                  >
-                    {i + 1}
-                  </td>
-                  <td
-                    className="mcd-td mcd-td--name"
-                    style={{ color: T.text, borderBottomColor: T.border }}
-                  >
-                    <span className="mcd-member-avatar">👤</span>
-                    {m.displayName}
-                  </td>
-                  <td
-                    className="mcd-td"
-                    style={{ color: T.textSub, borderBottomColor: T.border }}
-                  >
-                    {m.document || "—"}
-                  </td>
-                  <td
-                    className="mcd-td"
-                    style={{ color: T.textSub, borderBottomColor: T.border }}
-                  >
-                    {m.phone || "—"}
-                  </td>
-                  <td
-                    className="mcd-td"
-                    style={{ color: T.textSub, borderBottomColor: T.border }}
-                  >
-                    {m.email || "—"}
-                  </td>
-                  <td
-                    className="mcd-td"
-                    style={{ borderBottomColor: T.border }}
-                  >
-                    <button
-                      className="mcd-btn mcd-btn--sm mcd-btn--danger-ghost"
-                      onClick={() => handleRemoveMember(m.id, m.displayName)}
-                      disabled={loading}
-                      title="Remover de la célula"
-                    >
-                      ✕
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-
-  // ── Add member tab ────────────────────────────────────────────────────────────
-  const isFull =
-    cell.maxCapacity && cell.currentMemberCount >= cell.maxCapacity;
-
-  const renderAddMember = () => {
-    if (isFull)
-      return (
-        <div
-          className="mcd-full-cell"
-          style={{ backgroundColor: T.errorBg, color: T.errorText }}
-        >
-          <h3>⚠️ Célula llena</h3>
-          <p>
-            Esta célula alcanzó su capacidad máxima de {cell.maxCapacity}{" "}
-            miembros.
-          </p>
-        </div>
-      );
-
-    if (addStep === 1)
-      return (
-        <div className="mcd-add-step">
-          <p className="mcd-add-desc" style={{ color: T.textSub }}>
-            Busca el miembro que deseas agregar a{" "}
-            <strong style={{ color: T.text }}>{cell.name}</strong>
-          </p>
-          <div className="mcd-search-row">
-            <input
-              type="text"
-              placeholder="Nombre, documento o email…"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="mcd-input"
-              style={{
-                backgroundColor: T.bgSecondary,
-                color: T.text,
-                borderColor: T.border,
-              }}
-              disabled={searching}
-            />
-            <button
-              className="mcd-btn mcd-btn--primary"
-              onClick={handleSearch}
-              disabled={searching || searchTerm.trim().length < 2}
-            >
-              {searching ? "Buscando…" : "🔍 Buscar"}
-            </button>
-          </div>
-
-          {addError && (
-            <div
-              className="mcd-inline-error"
-              style={{ backgroundColor: T.errorBg, color: T.errorText }}
-            >
-              ❌ {addError}
-            </div>
-          )}
-
-          {searchResults.length > 0 && (
-            <div className="mcd-results">
-              <p className="mcd-results-count" style={{ color: T.textSub }}>
-                {searchResults.length} resultado
-                {searchResults.length !== 1 ? "s" : ""}
-              </p>
-              <div className="mcd-results-list">
-                {searchResults.map((m) => (
-                  <button
-                    key={m.id}
-                    className="mcd-result-item"
-                    style={{
-                      backgroundColor: T.bgSecondary,
-                      borderColor: T.border,
-                    }}
-                    onClick={() => {
-                      setSelectedMember(m);
-                      setAddStep(2);
-                      setAddError("");
-                    }}
-                  >
-                    <span className="mcd-result-avatar">👤</span>
-                    <div className="mcd-result-info">
-                      <span
-                        className="mcd-result-name"
-                        style={{ color: T.text }}
-                      >
-                        {m.displayName}
-                      </span>
-                      <span
-                        className="mcd-result-meta"
-                        style={{ color: T.textSub }}
-                      >
-                        {m.document && `🆔 ${m.document}`}
-                        {m.phone && ` • 📞 ${m.phone}`}
-                        {m.email && ` • 📧 ${m.email}`}
-                      </span>
-                    </div>
-                    <span
-                      className="mcd-result-arrow"
-                      style={{ color: T.textSub }}
-                    >
-                      →
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-
-    if (addStep === 2)
-      return (
-        <div className="mcd-add-step">
-          <p className="mcd-add-desc" style={{ color: T.textSub }}>
-            Confirma que deseas agregar este miembro:
-          </p>
-          <div
-            className="mcd-confirm-card"
-            style={{ backgroundColor: T.bgSecondary, borderColor: T.border }}
-          >
-            <div className="mcd-confirm-member">
-              <span className="mcd-confirm-avatar">👤</span>
-              <div>
-                <div className="mcd-confirm-name" style={{ color: T.text }}>
-                  {selectedMember.displayName}
-                </div>
-                <div className="mcd-confirm-meta" style={{ color: T.textSub }}>
-                  {selectedMember.document &&
-                    `🆔 ${selectedMember.document} • `}
-                  {selectedMember.phone && `📞 ${selectedMember.phone} • `}
-                  {selectedMember.email && `📧 ${selectedMember.email}`}
-                </div>
-              </div>
-            </div>
-            <div
-              className="mcd-confirm-cell"
-              style={{ borderTopColor: T.border }}
-            >
-              <span style={{ color: T.textSub, fontSize: "12px" }}>
-                Será agregado a
-              </span>
-              <strong style={{ color: T.text }}>{cell.name}</strong>
-            </div>
-            <div
-              className="mcd-confirm-warn"
-              style={{
-                backgroundColor: isDarkMode ? "#78350f20" : "#fff3cd",
-                color: isDarkMode ? "#fbbf24" : "#856404",
-              }}
-            >
-              ⚠️ El miembro será agregado inmediatamente.
-            </div>
-          </div>
-
-          {addError && (
-            <div
-              className="mcd-inline-error"
-              style={{ backgroundColor: T.errorBg, color: T.errorText }}
-            >
-              ❌ {addError}
-            </div>
-          )}
-
-          <div className="mcd-confirm-actions">
-            <button
-              className="mcd-btn mcd-btn--secondary"
-              onClick={() => setAddStep(1)}
-              disabled={loading}
-              style={{
-                borderColor: T.border,
-                color: T.text,
-                backgroundColor: T.bgSecondary,
-              }}
-            >
-              ← Atrás
-            </button>
-            <button
-              className="mcd-btn mcd-btn--primary"
-              onClick={handleConfirmAdd}
-              disabled={loading}
-            >
-              {loading ? "Agregando…" : "✅ Confirmar"}
-            </button>
-          </div>
-        </div>
-      );
-
-    if (addStep === 3)
-      return (
-        <div className="mcd-add-step mcd-add-step--success">
-          <div className="mcd-success-icon">✅</div>
-          <h3 style={{ color: T.text }}>¡Miembro agregado!</h3>
-          <div
-            className="mcd-success-detail"
-            style={{ backgroundColor: T.successBg, color: T.successText }}
-          >
-            <strong>{selectedMember.displayName}</strong> fue agregado a{" "}
-            <strong>{cell.name}</strong>
-            <br />
-            <span style={{ fontSize: "12px" }}>
-              Ocupación actual:{" "}
-              {addResult?.currentMembers || cell.currentMemberCount} /{" "}
-              {cell.maxCapacity || "∞"}
-            </span>
-          </div>
-          <div className="mcd-confirm-actions">
-            <button
-              className="mcd-btn mcd-btn--secondary"
-              onClick={() => {
-                setAddStep(1);
-                setSearchTerm("");
-                setSearchResults([]);
-                setSelectedMember(null);
-                setAddResult(null);
-              }}
-              style={{
-                borderColor: T.border,
-                color: T.text,
-                backgroundColor: T.bgSecondary,
-              }}
-            >
-              ➕ Agregar otro
-            </button>
-            <button
-              className="mcd-btn mcd-btn--primary"
-              onClick={() => setActiveTab("members")}
-            >
-              👥 Ver Miembros
-            </button>
-          </div>
-        </div>
-      );
-  };
-
-  // ── Edit tab ──────────────────────────────────────────────────────────────────
-  const renderEdit = () => {
-    // Roles de líderes con sus claves
-    const LEADER_ROLES_EDIT = [
-      {
-        role: "mainLeader",
-        label: "Líder Principal",
-        idKey: "mainLeaderId",
-        nameKey: "mainLeaderName",
-      },
-      {
-        role: "groupLeader",
-        label: "Líder de Grupo",
-        idKey: "groupLeaderId",
-        nameKey: "groupLeaderName",
-      },
-      {
-        role: "host",
-        label: "Anfitrión/a",
-        idKey: "hostId",
-        nameKey: "hostName",
-      },
-      {
-        role: "timoteo",
-        label: "Timoteo",
-        idKey: "timoteoId",
-        nameKey: "timoteoName",
-      },
-    ];
-
-    const leaderField = (label, idKey, nameKey, role) => (
-      <div className="mcd-edit-field" key={idKey}>
-        <label className="mcd-edit-label" style={{ color: T.textSub }}>
-          {label}
-        </label>
-        <div className="mcd-edit-leader-row">
-          <div
-            className="mcd-edit-leader-current"
-            style={{
-              backgroundColor: T.bgSecondary,
-              borderColor: T.border,
-              color: T.text,
-            }}
-          >
-            <span className="mcd-edit-leader-avatar">👤</span>
-            <span className="mcd-edit-leader-name">
-              {editForm[nameKey] || "— Sin asignar —"}
-            </span>
-          </div>
-
-          {/* Botón Cambiar */}
-          <button
-            className="mcd-btn mcd-btn--sm mcd-btn--secondary"
-            style={{
-              borderColor: T.border,
-              color: T.text,
-              backgroundColor: T.bgSecondary,
-            }}
-            onClick={() => {
-              setLeaderSearchField(idKey);
-              setLeaderSearchTerm("");
-              setLeaderResults([]);
-            }}
-            type="button"
-            title={`Buscar y asignar un nuevo ${label}`}
-          >
-            🔄 Cambiar
-          </button>
-
-          {/* Botón Desvincular — solo si hay líder asignado */}
-          {editForm[idKey] && (
-            <button
-              className="mcd-btn mcd-btn--sm mcd-btn--ghost-danger"
-              onClick={() =>
-                setUnlinkTarget({
-                  leaderId: editForm[idKey],
-                  leaderName: editForm[nameKey] || `Líder #${editForm[idKey]}`,
-                  role,
-                })
-              }
-              disabled={loading || unlinking}
-              type="button"
-              title={`Desvincular a ${editForm[nameKey] || "este líder"} de la célula`}
-            >
-              ✂️ Desvincular
-            </button>
-          )}
-        </div>
-
-        {/* Inline leader search */}
-        {leaderSearchField === idKey && (
-          <div
-            className="mcd-leader-search-inline"
-            style={{ borderColor: T.border, backgroundColor: T.bg }}
-          >
-            <div className="mcd-search-row">
-              <input
-                type="text"
-                placeholder="Buscar líder por nombre o documento…"
-                value={leaderSearchTerm}
-                onChange={(e) => setLeaderSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSearchLeaders()}
-                className="mcd-input"
-                style={{
-                  backgroundColor: T.bgSecondary,
-                  color: T.text,
-                  borderColor: T.border,
-                }}
-                autoFocus
-              />
-              <button
-                className="mcd-btn mcd-btn--primary mcd-btn--sm"
-                onClick={handleSearchLeaders}
-                disabled={
-                  searchingLeaders || leaderSearchTerm.trim().length < 2
-                }
-                type="button"
-              >
-                {searchingLeaders ? "…" : "🔍"}
-              </button>
-              <button
-                className="mcd-btn mcd-btn--sm mcd-btn--secondary"
-                style={{
-                  borderColor: T.border,
-                  color: T.text,
-                  backgroundColor: T.bgSecondary,
-                }}
-                onClick={() => {
-                  setLeaderSearchField(null);
-                  setLeaderResults([]);
-                }}
-                type="button"
-              >
-                ✕
-              </button>
-            </div>
-            {leaderResults.length > 0 && (
-              <div className="mcd-leader-results">
-                {leaderResults.map((l) => (
-                  <button
-                    key={l.id}
-                    className="mcd-leader-result-item"
-                    style={{
-                      backgroundColor: T.bgSecondary,
-                      borderColor: T.border,
-                      color: T.text,
-                    }}
-                    onClick={() => handleSelectLeader(l)}
-                    type="button"
-                  >
-                    <span>👤</span>
-                    <div className="mcd-leader-result-info">
-                      <span style={{ fontWeight: 600, fontSize: "13px" }}>
-                        {l.name || `Líder #${l.id}`}
-                      </span>
-                      {l.document && (
-                        <span style={{ color: T.textSub, fontSize: "11px" }}>
-                          🆔 {l.document}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-
-    return (
-      <div className="mcd-edit-form">
-        {editError && (
-          <div
-            className="mcd-inline-error"
-            style={{ backgroundColor: T.errorBg, color: T.errorText }}
-          >
-            ❌ {editError}
-          </div>
-        )}
-        {editSuccess && (
-          <div
-            className="mcd-feedback mcd-feedback--success"
-            style={{
-              backgroundColor: T.successBg,
-              color: T.successText,
-              borderRadius: "10px",
-            }}
-          >
-            {editSuccess}
-          </div>
-        )}
-
-        {/* Información básica */}
-        <div
-          className="mcd-card"
-          style={{ backgroundColor: T.cardBg, borderColor: T.border }}
-        >
-          <h4 className="mcd-card-title" style={{ color: "#1e40af" }}>
-            📝 Información General
-          </h4>
-
-          <div className="mcd-edit-field">
-            <label className="mcd-edit-label" style={{ color: T.textSub }}>
-              Nombre de la célula *
-            </label>
-            <input
-              type="text"
-              value={editForm.name || ""}
-              onChange={(e) => handleEditField("name", e.target.value)}
-              className="mcd-input"
-              style={{
-                backgroundColor: T.bgSecondary,
-                color: T.text,
-                borderColor: T.border,
-              }}
-              placeholder="Nombre de la célula"
-            />
-          </div>
-
-          <div className="mcd-edit-row-2">
-            <div className="mcd-edit-field">
-              <label className="mcd-edit-label" style={{ color: T.textSub }}>
-                Día de reunión
-              </label>
-              <select
-                value={editForm.meetingDay || ""}
-                onChange={(e) => handleEditField("meetingDay", e.target.value)}
-                className="mcd-input mcd-select"
-                style={{
-                  backgroundColor: T.bgSecondary,
-                  color: T.text,
-                  borderColor: T.border,
-                }}
-              >
-                <option value="">— Seleccionar —</option>
-                {DAYS_OF_WEEK.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mcd-edit-field">
-              <label className="mcd-edit-label" style={{ color: T.textSub }}>
-                Hora de reunión
-              </label>
-              <input
-                type="time"
-                value={editForm.meetingTime || ""}
-                onChange={(e) => handleEditField("meetingTime", e.target.value)}
-                className="mcd-input"
-                style={{
-                  backgroundColor: T.bgSecondary,
-                  color: T.text,
-                  borderColor: T.border,
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="mcd-edit-field">
-            <label className="mcd-edit-label" style={{ color: T.textSub }}>
-              Dirección
-            </label>
-            <input
-              type="text"
-              value={editForm.meetingAddress || ""}
-              onChange={(e) =>
-                handleEditField("meetingAddress", e.target.value)
-              }
-              className="mcd-input"
-              style={{
-                backgroundColor: T.bgSecondary,
-                color: T.text,
-                borderColor: T.border,
-              }}
-              placeholder="Dirección de reunión"
-            />
-          </div>
-
-          <div className="mcd-edit-row-2">
-            <div className="mcd-edit-field">
-              <label className="mcd-edit-label" style={{ color: T.textSub }}>
-                Capacidad máxima
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                value={editForm.maxCapacity || ""}
-                onChange={(e) => handleEditField("maxCapacity", e.target.value)}
-                className="mcd-input"
-                style={{
-                  backgroundColor: T.bgSecondary,
-                  color: T.text,
-                  borderColor: T.border,
-                }}
-              />
-            </div>
-            <div className="mcd-edit-field">
-              <label className="mcd-edit-label" style={{ color: T.textSub }}>
-                Distrito
-              </label>
-              <select
-                value={editForm.district || ""}
-                onChange={(e) => handleEditField("district", e.target.value)}
-                className="mcd-input mcd-select"
-                style={{
-                  backgroundColor: T.bgSecondary,
-                  color: T.text,
-                  borderColor: T.border,
-                }}
-              >
-                <option value="">— Seleccionar —</option>
-                {DISTRICTS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mcd-edit-field">
-            <label className="mcd-edit-label" style={{ color: T.textSub }}>
-              Notas
-            </label>
-            <textarea
-              value={editForm.notes || ""}
-              onChange={(e) => handleEditField("notes", e.target.value)}
-              className="mcd-input mcd-textarea"
-              style={{
-                backgroundColor: T.bgSecondary,
-                color: T.text,
-                borderColor: T.border,
-              }}
-              placeholder="Notas adicionales…"
-              rows={3}
-            />
-          </div>
-        </div>
-
-        {/* Líderes — con Cambiar y Desvincular */}
-        <div
-          className="mcd-card"
-          style={{ backgroundColor: T.cardBg, borderColor: T.border }}
-        >
-          <h4 className="mcd-card-title" style={{ color: "#1e40af" }}>
-            👥 Equipo de Liderazgo
-          </h4>
-          <p
-            style={{ fontSize: "12px", color: T.textSub, marginBottom: "12px" }}
-          >
-            Usa <strong>🔄 Cambiar</strong> para asignar un nuevo líder, o{" "}
-            <strong>✂️ Desvincular</strong> para liberar el rol.
-          </p>
-          {LEADER_ROLES_EDIT.map(({ label, idKey, nameKey, role }) =>
-            leaderField(label, idKey, nameKey, role),
-          )}
-        </div>
-
-        {/* Botones */}
-        <div className="mcd-edit-actions">
-          <button
-            className="mcd-btn mcd-btn--secondary"
-            onClick={() => setActiveTab("info")}
-            disabled={editLoading}
-            style={{
-              borderColor: T.border,
-              color: T.text,
-              backgroundColor: T.bgSecondary,
-            }}
-          >
-            ← Cancelar
-          </button>
-          <button
-            className="mcd-btn mcd-btn--primary"
-            onClick={handleSaveEdit}
-            disabled={editLoading}
-          >
-            {editLoading ? "⏳ Guardando…" : "💾 Guardar Cambios"}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Unlink leader confirmation overlay ───────────────────────────────────────
-  const renderUnlinkConfirm = () => {
-    if (!unlinkTarget) return null;
-
-    return (
-      <div
-        className="mcd-delete-overlay"
-        onClick={() => !unlinking && setUnlinkTarget(null)}
-      >
-        <div
-          className="mcd-delete-modal"
-          style={{ backgroundColor: T.bg, borderColor: T.border }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="mcd-delete-icon">✂️</div>
-          <h3 className="mcd-delete-title" style={{ color: T.text }}>
-            ¿Desvincular este líder?
-          </h3>
-          <p className="mcd-delete-desc" style={{ color: T.textSub }}>
-            <strong style={{ color: T.text }}>{unlinkTarget.leaderName}</strong>{" "}
-            será desvinculado de la célula{" "}
-            <strong style={{ color: T.text }}>{cell.name}</strong>.
-          </p>
-
-          <div
-            className="mcd-confirm-warn"
-            style={{
-              backgroundColor: T.warnBg,
-              color: T.warnText,
-              borderRadius: "10px",
-              padding: "12px 16px",
-              marginBottom: "16px",
-              fontSize: "13px",
-            }}
-          >
-            ⚠️ El líder quedará libre para ser asignado a otra célula. El estado
-            de la célula se actualizará automáticamente a{" "}
-            <strong>Liderazgo Incompleto</strong>.
-          </div>
-
-          <div className="mcd-delete-actions">
-            <button
-              className="mcd-btn mcd-btn--secondary"
-              onClick={() => setUnlinkTarget(null)}
-              disabled={unlinking}
-              style={{
-                borderColor: T.border,
-                color: T.text,
-                backgroundColor: T.bgSecondary,
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              className="mcd-btn mcd-btn--danger"
-              onClick={handleConfirmUnlink}
-              disabled={unlinking}
-            >
-              {unlinking ? "⏳ Desvinculando…" : "✂️ Confirmar Desvinculación"}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Delete confirmation overlay ───────────────────────────────────────────────
-  const renderDeleteConfirm = () => {
-    if (!showDeleteConfirm) return null;
-
-    return (
-      <div
-        className="mcd-delete-overlay"
-        onClick={() => {
-          setShowDeleteConfirm(false);
-          setDeleteConfirmText("");
-        }}
-      >
-        <div
-          className="mcd-delete-modal"
-          style={{ backgroundColor: T.bg, borderColor: T.border }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="mcd-delete-icon">🗑️</div>
-          <h3 className="mcd-delete-title" style={{ color: T.text }}>
-            ¿Eliminar esta célula?
-          </h3>
-          <p className="mcd-delete-desc" style={{ color: T.textSub }}>
-            Esta acción marcará la célula{" "}
-            <strong style={{ color: T.errorText }}>{cell.name}</strong> como
-            inactiva. Los miembros serán desvinculados.
-          </p>
-
-          <div
-            className="mcd-delete-confirm-box"
-            style={{ backgroundColor: T.errorBg, borderColor: "#ef4444" }}
-          >
-            <p
-              style={{
-                color: T.errorText,
-                fontSize: "12px",
-                fontWeight: 600,
-                margin: "0 0 8px",
-              }}
-            >
-              Para confirmar, escribe el nombre de la célula:
-            </p>
-            <div className="mcd-delete-expected" style={{ color: T.errorText }}>
-              {cell.name}
-            </div>
-            <input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              className="mcd-input"
-              style={{
-                backgroundColor: T.bg,
-                color: T.text,
-                borderColor:
-                  deleteConfirmText === cell.name ? "#10b981" : T.border,
-              }}
-              placeholder="Escribe el nombre aquí…"
-              autoFocus
-            />
-          </div>
-
-          <div className="mcd-delete-actions">
-            <button
-              className="mcd-btn mcd-btn--secondary"
-              onClick={() => {
-                setShowDeleteConfirm(false);
-                setDeleteConfirmText("");
-              }}
-              disabled={deleting}
-              style={{
-                borderColor: T.border,
-                color: T.text,
-                backgroundColor: T.bgSecondary,
-              }}
-            >
-              Cancelar
-            </button>
-            <button
-              className="mcd-btn mcd-btn--danger"
-              onClick={handleDeleteCell}
-              disabled={deleting || deleteConfirmText !== cell.name}
-            >
-              {deleting ? "⏳ Eliminando…" : "🗑️ Eliminar Célula"}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // ── Main render ───────────────────────────────────────────────────────────────
   return (
-    <div className="mcd-overlay" onClick={onClose}>
-      <div
-        className="mcd-container"
-        style={{ backgroundColor: T.bg, color: T.text }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* ── HEADER ── */}
-        <div className="mcd-header" style={{ borderBottomColor: T.border }}>
-          <div className="mcd-header-info">
-            <div className="mcd-header-top">
-              <span className="mcd-header-icon">🏠</span>
-              <div>
-                <h2 className="mcd-header-title" style={{ color: T.text }}>
-                  {cell.name}
-                </h2>
-                <div className="mcd-header-badges">
-                  <span
-                    className="mcd-status-badge"
-                    style={{
-                      backgroundColor: statusInfo.bg,
-                      color: statusInfo.color,
-                    }}
-                  >
-                    {statusInfo.icon} {statusInfo.label}
-                  </span>
-                  {cell.districtLabel && (
-                    <span
-                      className="mcd-district-badge"
-                      style={{
-                        backgroundColor: `${cell.districtColor}20`,
-                        color: cell.districtColor,
-                      }}
-                    >
-                      📍 {cell.districtLabel}
-                    </span>
-                  )}
-                  {cell.isMultiplying && (
-                    <span className="mcd-multiplying-badge">
-                      🌱 En Multiplicación
-                    </span>
-                  )}
-                </div>
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-0 sm:p-6 bg-slate-900/60 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="w-full max-w-6xl bg-white dark:bg-[#0f172a] sm:rounded-[3rem] shadow-2xl flex flex-col h-full sm:h-[85vh] overflow-hidden border border-slate-200 dark:border-white/10 animate-in slide-in-from-bottom-12 duration-500">
+        
+        {/* HEADER SECTION */}
+        <div className="relative pt-10 px-10 pb-2 shrink-0 overflow-hidden">
+           <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+           
+           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-8 relative z-10">
+              <div className="flex items-center gap-6">
+                 <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center shadow-2xl shadow-indigo-500/20 shrink-0 border border-white/10">
+                    <Home className="w-10 h-10 text-white" />
+                 </div>
+                 <div>
+                    <div className="flex items-center gap-3 mb-2">
+                       <span className={`px-4 py-1.5 ${status.bg} ${status.text} text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border border-white/5 flex items-center gap-2`}>
+                          <status.icon size={14} className="animate-pulse" /> {status.label}
+                       </span>
+                       {cell.isMultiplying && (
+                         <span className="px-4 py-1.5 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-xl shadow-lg shadow-emerald-500/20">🌱 Multiplicación</span>
+                       )}
+                    </div>
+                    <h2 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-none">{cell.name}</h2>
+                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Botones de acción */}
-          <div className="mcd-header-actions">
-            <button
-              className="mcd-action-btn mcd-action-btn--verify"
-              onClick={handleVerify}
-              disabled={loading}
-              title="Verificar estado de liderazgo"
-            >
-              🔍 Verificar
-            </button>
+              <div className="flex items-center gap-4 w-full xl:w-auto overflow-x-auto no-scrollbar pb-2 xl:pb-0">
+                 <button onClick={handleVerify} disabled={loading} className="flex-1 sm:flex-none h-14 px-8 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-[0.2em] transition-all active:scale-95 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-3">
+                    {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <ShieldCheck size={20} />} Verificar
+                 </button>
+                 <button onClick={() => generateCellDetailPDF(cell, members)} className="h-14 w-14 sm:w-auto sm:px-8 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white rounded-[1.2rem] font-black text-[11px] uppercase tracking-[0.2em] hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center gap-3">
+                    <FileText size={20} /> <span className="hidden sm:inline">Exportar PDF</span>
+                 </button>
+                 <button onClick={onClose} className="h-14 w-14 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-[1.2rem] transition-all flex items-center justify-center"><X size={24} /></button>
+              </div>
+           </div>
 
-            <button
-              className={`mcd-action-btn ${cell.isMultiplying ? "mcd-action-btn--complete" : "mcd-action-btn--multiply"}`}
-              onClick={handleMultiplication}
-              disabled={
-                loading || (!cell.isMultiplying && !cell.hasAllLeadersActive)
-              }
-              title={
-                cell.isMultiplying
-                  ? "Completar multiplicación"
-                  : "Iniciar multiplicación"
-              }
-            >
-              {cell.isMultiplying ? "✅ Completar Mult." : "🌱 Multiplicar"}
-            </button>
-
-            {/* Menú de estado */}
-            <div className="mcd-status-menu-wrapper">
-              <button
-                className="mcd-action-btn mcd-action-btn--status"
-                onClick={() => setShowStatusMenu((v) => !v)}
-                disabled={loading}
-                title="Cambiar estado"
-              >
-                📌 Estado ▾
-              </button>
-              {showStatusMenu && (
-                <div
-                  className="mcd-status-dropdown"
-                  style={{ backgroundColor: T.bg, borderColor: T.border }}
-                  onMouseLeave={() => setShowStatusMenu(false)}
+           {/* NAVIGATION TABS */}
+           <div className="flex gap-8 mt-10 border-b border-slate-100 dark:border-white/5 overflow-x-auto no-scrollbar">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative pb-5 flex items-center gap-3 transition-all ${activeTab === tab.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 opacity-60'}`}
                 >
-                  {[
-                    { s: "ACTIVE", label: "✅ Activa" },
-                    { s: "SUSPENDED", label: "⏸️ Suspendida" },
-                    { s: "INACTIVE", label: "⏹️ Inactiva" },
-                  ].map(({ s, label }) => (
-                    <button
-                      key={s}
-                      className="mcd-dropdown-item"
-                      style={{ color: T.text }}
-                      onClick={() => handleChangeStatus(s)}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  <tab.icon size={18} />
+                  <span className="text-xs font-black uppercase tracking-[0.2em]">{tab.label}</span>
+                  {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 dark:bg-indigo-400 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" />}
+                </button>
+              ))}
+           </div>
+        </div>
+
+        {/* CONTENT AREA */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-10 bg-slate-50/30 dark:bg-black/20">
+           {activeTab === 'info' && (
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="lg:col-span-2 space-y-8 text-slate-800 dark:text-slate-200">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {[
+                        { label: 'COBERTURA 12', name: cell.mainLeaderName, icon: ShieldCheck, color: 'indigo' },
+                        { label: 'LÍDER DE GRUPO', name: cell.groupLeaderName, icon: Users, color: 'emerald' },
+                        { label: 'ANFITRIÓN', name: cell.hostName, icon: Home, color: 'amber' },
+                        { label: 'TIMOTEO', name: cell.timoteoName, icon: TrendingUp, color: 'violet' }
+                      ].map((r, i) => (
+                        <div key={i} className="p-6 bg-white dark:bg-[#1a2332] rounded-[2rem] border-2 border-slate-100 dark:border-white/5 flex items-center gap-5 hover:border-indigo-500/30 transition-all shadow-sm">
+                           <div className={`w-14 h-14 bg-${r.color}-500/10 rounded-2xl flex items-center justify-center text-${r.color}-500 shadow-inner`}>
+                              <r.icon size={28} />
+                           </div>
+                           <div className="min-w-0">
+                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{r.label}</p>
+                              <p className="font-black text-base truncate">{r.name || 'SIN ASIGNAR'}</p>
+                           </div>
+                        </div>
+                      ))}
+                   </div>
+
+                   <div className="p-8 bg-white dark:bg-[#1a2332] rounded-[2.5rem] border-2 border-slate-100 dark:border-white/5 space-y-6">
+                      <div className="flex items-center gap-3">
+                         <MapPin className="text-indigo-500" size={20} />
+                         <h4 className="text-[11px] font-black uppercase tracking-[0.2em]">Logística de Altar</h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                         <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Día Ministerial</p>
+                            <p className="font-black text-sm">{cell.meetingDay || 'S.N.'}</p>
+                         </div>
+                         <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Horario Pactado</p>
+                            <p className="font-black text-sm">{cell.meetingTimeFormatted || cell.meetingTime || 'S.N.'}</p>
+                         </div>
+                         <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Sector / Distrito</p>
+                            <p className="font-black text-sm">{cell.district || 'S.N.'}</p>
+                         </div>
+                      </div>
+                      <div className="pt-4 border-t border-slate-100 dark:border-white/5">
+                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Ubicación Física</p>
+                         <p className="font-black text-sm">{cell.meetingAddress || 'S.N.'}</p>
+                      </div>
+                   </div>
                 </div>
-              )}
-            </div>
 
-            <button
-              className="mcd-action-btn mcd-action-btn--pdf"
-              onClick={handleExportPDF}
-              disabled={loading}
-              title="Exportar PDF de esta célula"
-            >
-              📄 PDF
-            </button>
+                <div className="space-y-8">
+                   <div className="p-10 bg-indigo-600 rounded-[3rem] text-white shadow-2xl shadow-indigo-500/20 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -mr-10 -mt-10 blur-3xl group-hover:bg-white/20 transition-all duration-700" />
+                      <p className="text-[10px] font-black text-indigo-100/60 uppercase tracking-[0.3em] mb-6">Métrica de Censo</p>
+                      <div className="flex items-end gap-3 mb-8">
+                         <span className="text-7xl font-black leading-none">{cell.currentMemberCount || 0}</span>
+                         <span className="text-2xl font-black text-indigo-100/40 mb-2 uppercase tracking-tighter">/ {cell.maxCapacity || 12}</span>
+                      </div>
+                      <div className="h-4 bg-white/20 rounded-full overflow-hidden border border-white/10">
+                         <div className="h-full bg-white rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(255,255,255,0.5)]" style={{ width: `${Math.min(100, ((cell.currentMemberCount || 0) / (cell.maxCapacity || 12)) * 100)}%` }} />
+                      </div>
+                   </div>
 
-            <button
-              className="mcd-action-btn mcd-action-btn--delete"
-              onClick={() => {
-                setShowDeleteConfirm(true);
-                setDeleteConfirmText("");
-              }}
-              disabled={loading || deleting}
-              title="Eliminar célula"
-            >
-              🗑️ Eliminar
-            </button>
+                   {cell.notes && (
+                     <div className="p-8 bg-white dark:bg-[#1a2332] rounded-[2.5rem] border-2 border-slate-100 dark:border-white/5">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Anotaciones Ministeriales</p>
+                        <p className="text-sm font-bold leading-relaxed opacity-80 italic">"{cell.notes}"</p>
+                     </div>
+                   )}
+                </div>
+             </div>
+           )}
 
-            <button
-              className="mcd-close-btn"
-              onClick={onClose}
-              style={{ color: T.textSub }}
-              title="Cerrar"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* ── Feedback messages ── */}
-        {error && (
-          <div
-            className="mcd-feedback mcd-feedback--error"
-            style={{ backgroundColor: T.errorBg, color: T.errorText }}
-          >
-            ❌ {error}
-          </div>
-        )}
-        {successMsg && (
-          <div
-            className="mcd-feedback mcd-feedback--success"
-            style={{ backgroundColor: T.successBg, color: T.successText }}
-          >
-            {successMsg}
-          </div>
-        )}
-
-        {/* ── TABS ── */}
-        <div className="mcd-tabs" style={{ borderBottomColor: T.border }}>
-          {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                className={`mcd-tab ${isActive ? "mcd-tab--active" : ""}`}
-                style={{
-                  color: isActive ? "#1e40af" : T.textSub,
-                  borderBottomColor: isActive ? "#1e40af" : "transparent",
-                  backgroundColor: "transparent",
-                }}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-                {tab.id === "members" && members.length > 0 && (
-                  <span className="mcd-tab-count">{members.length}</span>
+           {activeTab === 'members' && (
+             <div className="animate-in slide-in-from-right-4 duration-500 h-full">
+                {loadingMembers ? (
+                   <div className="flex flex-col items-center justify-center py-20 gap-4">
+                      <Loader2 className="w-12 h-12 text-indigo-500 animate-spin" />
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando membresía...</p>
+                   </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-12">
+                     {members.map(m => (
+                       <div key={m.id} className="p-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-indigo-500/40 transition-all shadow-sm">
+                          <div className="flex items-center gap-5">
+                             <div className="w-14 h-14 bg-slate-50 dark:bg-black/20 rounded-2xl flex items-center justify-center font-black text-indigo-500 text-xl shadow-inner">{m.name?.[0].toUpperCase()}</div>
+                             <div className="min-w-0">
+                                <h4 className="font-black text-sm uppercase tracking-tight truncate max-w-[120px]">{m.name}</h4>
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{m.document || '---'}</p>
+                             </div>
+                          </div>
+                          <button onClick={() => handleUnlinkMember(m)} className="p-3 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all"><Unlink size={18} /></button>
+                       </div>
+                     ))}
+                     <button onClick={() => setActiveTab('add')} className="p-8 border-4 border-dashed border-slate-100 dark:border-white/5 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 text-slate-400 hover:border-indigo-500/40 hover:text-indigo-500 transition-all opacity-60 hover:opacity-100 group">
+                        <div className="w-14 h-14 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform"><Plus size={32} /></div>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Vincular Integrante</span>
+                     </button>
+                  </div>
                 )}
-              </button>
-            );
-          })}
+             </div>
+           )}
+
+           {activeTab === 'add' && (
+             <div className="max-w-2xl mx-auto animate-in zoom-in-95 duration-500 py-10">
+                <div className="text-center mb-12">
+                   <div className="w-24 h-24 bg-indigo-500/10 rounded-[2.5rem] flex items-center justify-center text-indigo-500 mx-auto mb-6 shadow-inner">
+                      <UserPlus size={48} />
+                   </div>
+                   <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Vinculación de Red</h3>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">Expande el censo ministerial integrando nuevos discípulos</p>
+                </div>
+
+                <div className="relative group mb-12">
+                   <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={24} />
+                   <input
+                     type="text"
+                     placeholder="Buscar por Nombre o Documento..."
+                     className="w-full h-20 pl-16 pr-8 bg-white dark:bg-[#1a2332] rounded-[2rem] border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-lg transition-all shadow-lg shadow-indigo-500/5"
+                     value={searchTerm}
+                     onChange={e => setSearchTerm(e.target.value)}
+                     onKeyUp={e => e.key === 'Enter' && handleSearch()}
+                   />
+                </div>
+
+                {searching ? (
+                   <div className="flex justify-center py-10"><Loader2 className="w-12 h-12 text-indigo-600 animate-spin" /></div>
+                ) : searchResults.length > 0 ? (
+                  <div className="space-y-4">
+                     {searchResults.map(m => (
+                       <button key={m.id} onClick={() => handleAddMember(m)} className="w-full p-6 bg-white dark:bg-[#1a2332] rounded-[2rem] border-2 border-slate-100 dark:border-white/5 flex items-center justify-between group hover:border-emerald-500 hover:bg-emerald-50/20 transition-all active:scale-95 shadow-sm">
+                          <div className="flex items-center gap-6">
+                             <div className="w-16 h-16 bg-slate-50 dark:bg-black/20 rounded-2xl flex items-center justify-center font-black text-indigo-500 text-2xl shadow-inner">{m.name[0]}</div>
+                             <div className="text-left">
+                                <h4 className="font-black text-base uppercase tracking-tight">{m.name}</h4>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{m.document}</p>
+                             </div>
+                          </div>
+                          <Plus className="text-emerald-500 group-hover:scale-150 transition-transform" size={24} />
+                       </button>
+                     ))}
+                  </div>
+                ) : searchTerm.length > 2 && (
+                  <div className="p-12 text-center bg-slate-100/50 dark:bg-black/20 rounded-[3rem] border-4 border-dashed border-slate-200 dark:border-white/5">
+                     <Users className="mx-auto text-slate-300 dark:text-slate-700 mb-4" size={48} />
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No se encontraron registros activos</p>
+                  </div>
+                )}
+             </div>
+           )}
+
+           {activeTab === 'edit' && (
+             <div className="animate-in slide-in-from-left-4 duration-500 space-y-12 pb-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Identificador del Altar</label>
+                      <input type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full h-16 px-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm transition-all" />
+                   </div>
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Censo Estimado</label>
+                      <input type="number" value={editForm.maxCapacity} onChange={e => setEditForm({ ...editForm, maxCapacity: e.target.value })} className="w-full h-16 px-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm transition-all" />
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Día de Encuentro</label>
+                      <select value={editForm.meetingDay} onChange={e => setEditForm({ ...editForm, meetingDay: e.target.value })} className="w-full h-16 px-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm appearance-none">
+                         {DAYS_OF_WEEK.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                   </div>
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Horario</label>
+                      <input type="time" value={editForm.meetingTime} onChange={e => setEditForm({ ...editForm, meetingTime: e.target.value })} className="w-full h-16 px-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm transition-all" />
+                   </div>
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Sector Cobertura</label>
+                      <select value={editForm.district} onChange={e => setEditForm({ ...editForm, district: e.target.value })} className="w-full h-16 px-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm appearance-none">
+                         {DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                   </div>
+                </div>
+
+                <div className="space-y-3">
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Ubicación Física</label>
+                   <div className="relative">
+                      <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-500" size={20} />
+                      <input type="text" value={editForm.meetingAddress} onChange={e => setEditForm({ ...editForm, meetingAddress: e.target.value })} className="w-full h-16 pl-14 pr-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm transition-all" />
+                   </div>
+                </div>
+
+                <div className="flex justify-end pt-8">
+                   <button onClick={handleSaveEdit} disabled={editLoading} className="w-full sm:w-auto h-16 px-12 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.3em] transition-all active:scale-95 shadow-2xl shadow-indigo-500/20 flex items-center justify-center gap-4">
+                      {editLoading ? <Loader2 className="animate-spin w-5 h-5" /> : <Save size={20} />} Actualizar Configuración
+                   </button>
+                </div>
+             </div>
+           )}
         </div>
 
-        {/* ── CONTENT ── */}
-        <div className="mcd-body">
-          {activeTab === "info" && renderInfo()}
-          {activeTab === "members" && renderMembers()}
-          {activeTab === "add" && renderAddMember()}
-          {activeTab === "edit" && renderEdit()}
-        </div>
-
-        {/* ── OVERLAYS ── */}
-        {renderUnlinkConfirm()}
-        {renderDeleteConfirm()}
+        {/* CONFIRMATION OVERLAY */}
+        {confirmDialog && (
+          <div className="fixed inset-0 z-[2000] bg-slate-950/60 backdrop-blur-xl flex items-center justify-center p-6 animate-in fade-in duration-300">
+             <div className="w-full max-w-md bg-white dark:bg-[#0f172a] rounded-[2.5rem] p-10 shadow-2xl border border-rose-500/20 animate-in zoom-in-95 duration-500 text-center">
+                <div className="w-20 h-20 bg-rose-500/10 rounded-3xl flex items-center justify-center text-rose-500 mx-auto mb-8 shadow-inner">
+                   <AlertTriangle size={40} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-4">{confirmDialog.title}</h3>
+                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-relaxed mb-10">{confirmDialog.message}</p>
+                <div className="flex gap-4">
+                   <button onClick={() => setConfirmDialog(null)} className="flex-1 h-14 bg-slate-100 dark:bg-white/5 text-slate-400 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all hover:bg-slate-200">Cancelar</button>
+                   <button onClick={confirmDialog.action} className="flex-1 h-14 bg-rose-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all hover:bg-rose-500 shadow-xl shadow-rose-500/20 active:scale-95">Confirmar</button>
+                </div>
+             </div>
+          </div>
+        )}
       </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.1); border-radius: 20px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.3); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+      `}} />
     </div>
   );
 };

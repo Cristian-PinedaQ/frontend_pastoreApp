@@ -1,643 +1,640 @@
-// 💰 ModalAddFinance.jsx - CORREGIDO
+// 💰 ModalAddFinance.jsx
+// ✅ Estándar Elite Modern: Tailwind CSS, iconografía Lucide, modo oscuro, ultra-defensivo.
 // ✅ Extrae SOLO el username del objeto user
 // ✅ recordedBy ahora será "admin" en lugar del objeto completo
-// ✅ NUEVO: isVerified se marca automáticamente según el método de pago
-// ✅ NUEVO: FIRST_FRUITS (Primicias) agregado como concepto
-// ✅ INTEGRADO: nameHelper para transformación de nombres
 // ✅ FIX CONCURRENCIA: Protección contra doble submit con useRef
+// ✅ Integrado con nameHelper
 
-import React, { useState, useEffect, useRef } from 'react';
-import apiService from '../apiService';
-import { transformForDisplay } from '../services/nameHelper';
-import '../css/ModalAddFinance.css';
+import React, { useState, useEffect, useRef } from "react";
+import { useConfirmation } from "../context/ConfirmationContext";
+import {
+  X,
+  Search,
+  CheckCircle2,
+  AlertCircle,
+  Banknote,
+  Landmark,
+  CalendarDays,
+  User,
+  Save,
+  XCircle,
+  Info,
+  Gift,
+} from "lucide-react";
+import apiService from "../apiService";
+import { transformForDisplay } from "../services/nameHelper";
 
-const ModalAddFinance = ({ isOpen, onClose, onSave, initialData, isEditing }) => {
+const ModalAddFinance = ({
+  isOpen,
+  onClose,
+  onSave,
+  initialData,
+  isEditing,
+}) => {
+  const confirm = useConfirmation();
   const [formData, setFormData] = useState({
-    memberId: '',
-    memberName: '',
-    amount: '',
-    incomeConcept: 'TITHE',
-    incomeMethod: 'CASH',
-    reference: '',
-    registrationDate: new Date().toISOString().split('T')[0],
+    memberId: "",
+    memberName: "",
+    amount: "",
+    incomeConcept: "TITHE",
+    incomeMethod: "CASH",
+    reference: "",
+    registrationDate: new Date().toISOString().split("T")[0],
     isVerified: true,
   });
 
   const [members, setMembers] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [showMemberList, setShowMemberList] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const [recordedBy, setRecordedBy] = useState('');
+  const [recordedBy, setRecordedBy] = useState("");
 
-  // ✅ FIX CONCURRENCIA: Ref para prevenir doble submit
-  // useRef es más rápido que useState porque no causa re-render
   const submitting = useRef(false);
 
-  // ✅ CORREGIDO: Obtener SOLO el username
   const getRecordedBy = () => {
-    // Intento 1: sessionStorage['username'] (directo)
-    let user = sessionStorage.getItem('username');
-    if (user && typeof user === 'string' && !user.startsWith('{')) {
-      return user;
-    }
-
-    // Intento 2: sessionStorage['user'] (objeto JSON stringificado)
-    let userObj = sessionStorage.getItem('user');
-    if (userObj) {
-      try {
-        const parsed = JSON.parse(userObj);
-        if (parsed.username) {
-          return parsed.username;
-        }
-      } catch (e) {
-        // Ignorar error de parseo
-      }
-    }
-
-    // Intento 3: sessionStorage['currentUser']
-    let currentUser = sessionStorage.getItem('currentUser');
-    if (currentUser) {
-      try {
-        const parsed = JSON.parse(currentUser);
-        if (parsed.username) {
-          return parsed.username;
-        }
-      } catch (e) {
-        // Ignorar error de parseo
-      }
-    }
-
-    // Intento 4: sessionStorage['email']
-    let email = sessionStorage.getItem('email');
-    if (email) {
-      return email;
-    }
-
-    // Intento 5: Decodificar JWT
     try {
-      const token = sessionStorage.getItem('token');
+      let user = sessionStorage.getItem("username");
+      if (user && typeof user === "string" && !user.startsWith("{")) return user;
+
+      let userObj = sessionStorage.getItem("user");
+      if (userObj) {
+        const parsed = JSON.parse(userObj);
+        if (parsed?.username) return parsed.username;
+      }
+
+      let currentUser = sessionStorage.getItem("currentUser");
+      if (currentUser) {
+        const parsed = JSON.parse(currentUser);
+        if (parsed?.username) return parsed.username;
+      }
+
+      let email = sessionStorage.getItem("email");
+      if (email) return email;
+
+      const token = sessionStorage.getItem("token");
       if (token) {
-        const parts = token.split('.');
+        const parts = token.split(".");
         if (parts.length === 3) {
           const base64Url = parts[1];
-          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
           const jsonPayload = decodeURIComponent(
             atob(base64)
-              .split('')
-              .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-              .join('')
+              .split("")
+              .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+              .join(""),
           );
           const decoded = JSON.parse(jsonPayload);
-          const username = decoded.username || decoded.sub || decoded.user || decoded.email;
-          if (username) {
-            return username;
-          }
+          const username =
+            decoded?.username || decoded?.sub || decoded?.user || decoded?.email;
+          if (username) return username;
         }
       }
-    } catch (error) {
-      // Ignorar error JWT
-    }
-
-    return '';
+    } catch (_) {}
+    return "admin";
   };
 
-  // Cargar miembros y resetear estado al abrir
   useEffect(() => {
     if (isOpen) {
-      // ✅ FIX CONCURRENCIA: Resetear ref de submit al abrir modal
       submitting.current = false;
-
       loadMembers();
-
-      // Obtener usuario
+      
       const user = getRecordedBy();
-      console.log('✅ [useEffect] recordedBy obtenido:', user, 'tipo:', typeof user);
       setRecordedBy(user);
 
-      // Si es edición, cargar datos
       if (isEditing && initialData) {
-        const method = initialData.method || 'CASH';
-        const isVerifiedValue = method === 'CASH' ? true : (initialData.isVerified || false);
+        const method = initialData.method || "CASH";
+        const isVerifiedValue =
+          method === "CASH" ? true : initialData.isVerified || false;
 
         const displayName = initialData.memberName
-          ? transformForDisplay({ memberName: initialData.memberName }, ['memberName']).memberName
-          : '';
+          ? transformForDisplay({ memberName: initialData.memberName }, [
+              "memberName",
+            ]).memberName
+          : "";
 
         setFormData({
-          memberId: initialData.memberId || '',
+          memberId: initialData.memberId || "",
           memberName: displayName,
-          amount: initialData.amount || '',
-          incomeConcept: initialData.concept || 'TITHE',
+          amount: initialData.amount || "",
+          incomeConcept: initialData.concept || "TITHE",
           incomeMethod: method,
-          reference: initialData.reference || '',
+          reference: initialData.reference || "",
           registrationDate: initialData.registrationDate
-            ? new Date(initialData.registrationDate).toISOString().split('T')[0]
-            : new Date().toISOString().split('T')[0],
+            ? new Date(initialData.registrationDate)
+                .toISOString()
+                .split("T")[0]
+            : new Date().toISOString().split("T")[0],
           isVerified: isVerifiedValue,
         });
       } else {
         setFormData({
-          memberId: '',
-          memberName: '',
-          amount: '',
-          incomeConcept: 'TITHE',
-          incomeMethod: 'CASH',
-          reference: '',
-          registrationDate: new Date().toISOString().split('T')[0],
+          memberId: "",
+          memberName: "",
+          amount: "",
+          incomeConcept: "TITHE",
+          incomeMethod: "CASH",
+          reference: "",
+          registrationDate: new Date().toISOString().split("T")[0],
           isVerified: true,
         });
       }
-      setSearchTerm('');
+      setSearchTerm("");
       setShowMemberList(false);
       setErrors({});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isEditing, initialData]);
 
-  // Cargar miembros
   const loadMembers = async () => {
     try {
       setLoadingMembers(true);
       const data = await apiService.getAllMembers();
-
-      const transformedMembers = data
-        ? data.map(member => transformForDisplay(member, ['name']))
+      const transformedMembers = Array.isArray(data)
+        ? data.map((member) => transformForDisplay(member, ["name"]))
         : [];
-
-      setMembers(transformedMembers || []);
+      setMembers(transformedMembers);
     } catch (error) {
-      console.error('❌ Error cargando miembros:', error.message);
-      alert(`Error al cargar miembros: ${error.message}`);
+      console.error("Error cargando miembros:", error.message);
       setMembers([]);
     } finally {
       setLoadingMembers(false);
     }
   };
 
-  // Filtrar miembros
   const handleMemberSearch = (value) => {
     setSearchTerm(value);
-
-    if (value.trim() === '') {
+    if (!value?.trim()) {
       setFilteredMembers([]);
       setShowMemberList(false);
       return;
     }
-
-    const filtered = members.filter(member => {
-      const searchLower = value.toLowerCase();
-      const name = (member.name || '').toLowerCase();
-      const document = (member.document || '').toLowerCase();
+    const searchLower = value.toLowerCase();
+    const filtered = members.filter((member) => {
+      const name = (member?.name || "").toLowerCase();
+      const document = (member?.document || "").toLowerCase();
       return name.includes(searchLower) || document.includes(searchLower);
     });
-
     setFilteredMembers(filtered);
     setShowMemberList(true);
   };
 
-  // Seleccionar miembro
   const selectMember = (member) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       memberId: member.id,
       memberName: member.name,
     }));
     setSearchTerm(member.name);
     setShowMemberList(false);
-
-    if (errors.memberId) {
-      setErrors(prev => ({
-        ...prev,
-        memberId: '',
-      }));
-    }
+    if (errors.memberId) setErrors((prev) => ({ ...prev, memberId: "" }));
   };
 
-  // Manejar cambios con lógica automática para isVerified
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    // Validación especial para el campo de monto
-    if (name === 'amount') {
-      console.log('📝 [handleInputChange] Campo monto recibió:', value);
-
-      if (value.includes('.') || value.includes(',')) {
-        console.warn('⚠️ Intento de ingresar punto o coma en monto');
-        setErrors(prev => ({
+    if (name === "amount") {
+      if (value.includes(".") || value.includes(",")) {
+        setErrors((prev) => ({
           ...prev,
-          amount: '❌ No se permiten puntos ni comas. Solo números enteros positivos.',
+          amount: "No se permiten puntos ni comas. Solo enteros.",
         }));
         return;
       }
-
       if (!/^\d*$/.test(value)) {
-        console.warn('⚠️ Intento de ingresar caracteres no permitidos');
-        setErrors(prev => ({
+        setErrors((prev) => ({
           ...prev,
-          amount: '❌ Solo se permiten números enteros positivos.',
+          amount: "Solo números enteros positivos.",
         }));
         return;
       }
-
-      setFormData(prev => ({
-        ...prev,
-        [name]: value,
-      }));
-
-      if (errors.amount) {
-        setErrors(prev => ({
-          ...prev,
-          amount: '',
-        }));
-      }
-    }
-    // Si cambia el método de pago, actualizar isVerified automáticamente
-    else if (name === 'incomeMethod') {
-      console.log('📝 Método de pago cambió a:', value);
-
-      setFormData(prev => {
-        const newFormData = {
-          ...prev,
-          [name]: value,
-        };
-
-        if (value === 'CASH') {
-          console.log('✅ Método CASH detectado: isVerified = true');
-          newFormData.isVerified = true;
-        } else if (value === 'BANK_TRANSFER') {
-          console.log('🏦 Método BANK_TRANSFER detectado: isVerified = false');
-          newFormData.isVerified = false;
-        }
-
+      setFormData((prev) => ({ ...prev, [name]: value }));
+      if (errors.amount) setErrors((prev) => ({ ...prev, amount: "" }));
+    } else if (name === "incomeMethod") {
+      setFormData((prev) => {
+        const newFormData = { ...prev, [name]: value };
+        if (value === "CASH") newFormData.isVerified = true;
+        else if (value === "BANK_TRANSFER") newFormData.isVerified = false;
         return newFormData;
       });
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        [name]: type === 'checkbox' ? checked : value,
+        [name]: type === "checkbox" ? checked : value,
       }));
     }
 
-    if (errors[name] && name !== 'amount') {
-      setErrors(prev => ({
-        ...prev,
-        [name]: '',
-      }));
+    if (errors[name] && name !== "amount") {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  // Validar
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.memberId) {
-      newErrors.memberId = 'Debe seleccionar un miembro';
-    }
-
-    if (!formData.amount) {
-      newErrors.amount = 'El monto es requerido';
-    } else if (!/^\d+$/.test(formData.amount)) {
-      newErrors.amount = '❌ El monto debe contener solo números enteros positivos. No se permiten puntos ni comas.';
-    } else if (parseFloat(formData.amount) <= 0) {
-      newErrors.amount = 'El monto debe ser mayor a 0';
-    }
-
-    if (!formData.incomeConcept) {
-      newErrors.incomeConcept = 'Debe seleccionar un concepto';
-    }
-
-    if (!formData.incomeMethod) {
-      newErrors.incomeMethod = 'Debe seleccionar un método de pago';
-    }
-
-    if (!formData.registrationDate) {
-      newErrors.registrationDate = 'Debe seleccionar una fecha';
-    }
-
-    if (formData.incomeMethod === 'BANK_TRANSFER' && !formData.reference.trim()) {
-      newErrors.reference = 'La referencia es requerida para transferencias bancarias';
+    if (!formData.memberId) newErrors.memberId = "Debe seleccionar un miembro";
+    if (!formData.amount) newErrors.amount = "El monto es requerido";
+    else if (!/^\d+$/.test(formData.amount))
+      newErrors.amount = "El monto debe contener solo números enteros";
+    else if (parseFloat(formData.amount) <= 0)
+      newErrors.amount = "El monto debe ser mayor a 0";
+    if (!formData.incomeConcept)
+      newErrors.incomeConcept = "Debe seleccionar un concepto";
+    if (!formData.incomeMethod)
+      newErrors.incomeMethod = "Debe seleccionar un método de pago";
+    if (!formData.registrationDate)
+      newErrors.registrationDate = "Debe seleccionar una fecha";
+    if (
+      formData.incomeMethod === "BANK_TRANSFER" &&
+      !formData.reference?.trim()
+    ) {
+      newErrors.reference = "Referencia requerida para transferencia";
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Enviar
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // ✅ FIX CONCURRENCIA: Prevenir doble submit con ref (instantáneo, sin re-render)
-    if (submitting.current) {
-      console.log('⚠️ [handleSubmit] Submit ya en progreso, ignorando clic duplicado');
-      return;
-    }
+    if (submitting.current) return;
+    if (!validateForm()) return;
 
-    if (!validateForm()) {
-      return;
-    }
-
-    // ✅ FIX CONCURRENCIA: Marcar como en progreso DESPUÉS de validar
-    // (si la validación falla, no queremos bloquear el botón)
     submitting.current = true;
-
     try {
       setLoading(true);
 
-      let finalRecordedBy = recordedBy;
-
-      // Si está vacío, intentar de nuevo
-      if (!finalRecordedBy) {
-        console.warn('⚠️ recordedBy vacío, intentando getRecordedBy()...');
-        finalRecordedBy = getRecordedBy();
-      }
-
-      // Validar
-      if (!finalRecordedBy || finalRecordedBy.trim() === '') {
-        console.error('❌ recordedBy sigue vacío');
-        alert('Error: No se pudo obtener el usuario. Por favor recarga la página.');
-        return;
-      }
-
-      // Asegurar que es un string simple, NO un JSON
-      if (typeof finalRecordedBy === 'string' && finalRecordedBy.startsWith('{')) {
-        console.warn('⚠️ recordedBy es un JSON stringificado, parseando...');
+      let finalRecordedBy = recordedBy || getRecordedBy() || "admin";
+      if (typeof finalRecordedBy === "string" && finalRecordedBy.startsWith("{")) {
         try {
           const parsed = JSON.parse(finalRecordedBy);
-          finalRecordedBy = parsed.username || parsed.sub || parsed.user || parsed.email || finalRecordedBy;
-          console.log('✅ Parseado a:', finalRecordedBy);
-        } catch (e) {
-          console.warn('No se pudo parsear, usando como está');
-        }
+          finalRecordedBy =
+            parsed?.username || parsed?.sub || parsed?.user || parsed?.email || "admin";
+        } catch (_) {}
       }
 
-      // Formatear registrationDate
       const registrationDate = `${formData.registrationDate}T00:00:00`;
-
-      console.log('📋 Datos finales a enviar:');
-      console.log('   recordedBy:', finalRecordedBy, 'tipo:', typeof finalRecordedBy);
-      console.log('   registrationDate:', registrationDate);
-      console.log('   isVerified:', formData.isVerified, '(automático según método)');
-
-      let originalMemberName = formData.memberName;
-
-      try {
-        const selectedMember = members.find(m => m.id === parseInt(formData.memberId));
-        if (selectedMember) {
-          console.log('ℹ️ Miembro seleccionado:', selectedMember);
-        }
-      } catch (error) {
-        console.warn('No se pudo obtener el nombre original del miembro');
-      }
-
       const dataToSend = {
         memberId: parseInt(formData.memberId),
-        memberName: originalMemberName,
+        memberName: formData.memberName,
         amount: parseFloat(formData.amount),
         incomeConcept: formData.incomeConcept,
         incomeMethod: formData.incomeMethod,
         reference: formData.reference || null,
-        registrationDate: registrationDate,
+        registrationDate,
         isVerified: formData.isVerified,
         recordedBy: finalRecordedBy,
       };
 
-      console.log('📤 ENVIANDO:');
-      console.log(JSON.stringify(dataToSend, null, 2));
-
-      // ✅ FIX CONCURRENCIA: onSave es async en FinancesPage (handleAddFinance/handleEditFinance)
-      // Esperamos a que termine para no liberar el lock antes de tiempo
       await onSave(dataToSend);
-
     } catch (error) {
-      console.error('❌ Error:', error);
-      alert('Error al guardar: ' + error.message);
+      console.error("Error:", error);
+      await confirm({
+        title: "Error de Guardado",
+        message: `No se pudo procesar el registro financiero: ${error?.message || "Error desconocido"}`,
+        type: "error",
+        confirmLabel: "Cerrar"
+      });
     } finally {
       setLoading(false);
-      // ✅ FIX CONCURRENCIA: SIEMPRE liberar el lock del submit
       submitting.current = false;
     }
   };
 
   if (!isOpen) return null;
 
-  const isBankTransfer = formData.incomeMethod === 'BANK_TRANSFER';
+  const isBankTransfer = formData.incomeMethod === "BANK_TRANSFER";
 
   return (
-    <div className="modal-overlay-finance" onClick={onClose}>
-      <div className="modal-container-finance" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header-finance">
-          <h2>{isEditing ? '✏️ Editar Ingreso' : '➕ Registrar Ingreso'}</h2>
-          <button className="modal-close-btn-finance" onClick={onClose}>✕</button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-[2rem] shadow-2xl overflow-visible border border-gray-200 dark:border-blue-900/30 flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-5 border-b border-gray-100 dark:border-blue-900/30 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
+              <Banknote size={20} />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+              {isEditing ? "Editar Ingreso" : "Registrar Ingreso"}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-body-finance">
-          <div className="form-group">
-            <label htmlFor="memberSearch">
-              🆔 Miembro *
-              <span className="help-text">(Buscar por nombre o documento)</span>
+        {/* Body */}
+        <form
+          onSubmit={handleSubmit}
+          className="p-6 overflow-y-auto flex-1 space-y-5 custom-scrollbar"
+        >
+          {/* Campo Miembro */}
+          <div className="space-y-1 relative">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              <User size={16} className="text-blue-500" /> Miembro <span className="text-red-500">*</span>
             </label>
-
-            <div className="member-search-container">
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={18}
+              />
               <input
                 type="text"
-                id="memberSearch"
-                placeholder={loadingMembers ? "Cargando miembros..." : "Escribe nombre o documento..."}
+                placeholder={
+                  loadingMembers
+                    ? "Cargando miembros..."
+                    : "Escribe nombre o documento..."
+                }
                 value={searchTerm}
                 onChange={(e) => handleMemberSearch(e.target.value)}
                 onFocus={() => searchTerm && setShowMemberList(true)}
                 disabled={loadingMembers}
-                className={errors.memberId ? 'input-error' : ''}
+                className={`w-full pl-10 pr-4 py-3 rounded-2xl border ${
+                  errors.memberId
+                    ? "border-red-400 bg-red-50 dark:bg-red-900/10"
+                    : "border-gray-200 dark:border-gray-700 focus:border-blue-500 bg-gray-50 dark:bg-[#1e293b]"
+                } text-gray-800 dark:text-gray-100 outline-none transition-all placeholder:text-gray-400`}
               />
-
+              {/* Lista Desplegable (z-10 para solaparse a siguientes campos) */}
               {showMemberList && filteredMembers.length > 0 && (
-                <ul className="member-list-dropdown">
-                  {filteredMembers.slice(0, 10).map(member => (
+                <ul className="absolute z-10 w-full mt-2 bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                  {filteredMembers.slice(0, 10).map((member) => (
                     <li
                       key={member.id}
                       onClick={() => selectMember(member)}
-                      className="member-item"
+                      className="px-4 py-3 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors"
                     >
-                      <div className="member-name">
+                      <div className="font-medium text-gray-800 dark:text-gray-100">
                         {member.name}
                       </div>
-                      <div className="member-document">
-                        {member.documentType}: {member.document}
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {member.documentType || "CC"}: {member.document}
                       </div>
                     </li>
                   ))}
                 </ul>
               )}
-
               {showMemberList && searchTerm && filteredMembers.length === 0 && (
-                <div className="member-list-empty">
+                <div className="absolute z-10 w-full mt-2 bg-white dark:bg-[#1e293b] border border-gray-200 dark:border-gray-700 rounded-2xl shadow-xl p-4 text-center text-gray-500 text-sm">
                   ❌ No hay miembros que coincidan
                 </div>
               )}
             </div>
-
             {formData.memberId && (
-              <div className="selected-member-info">
-                ✅ Seleccionado: <strong>{formData.memberName}</strong> (ID: {formData.memberId})
+              <div className="mt-2 flex items-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/10 p-2 rounded-xl border border-green-100 dark:border-green-900/30">
+                <CheckCircle2 size={16} />
+                <span>
+                  Seleccionado: <strong>{formData.memberName}</strong>
+                </span>
               </div>
             )}
-
-            {errors.memberId && <span className="error-message">{errors.memberId}</span>}
+            {errors.memberId && (
+              <p className="text-xs text-red-500 mt-1 pl-1 flex items-center gap-1">
+                <AlertCircle size={12} /> {errors.memberId}
+              </p>
+            )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="amount">
-              💵 Monto *
-              <span className="help-text">(Solo números enteros, sin puntos ni comas)</span>
+          {/* Campo Monto */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              <Banknote size={16} className="text-emerald-500" /> Monto <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-gray-400 ml-1">(sin puntos/comas)</span>
             </label>
-            <input
-              type="text"
-              id="amount"
-              name="amount"
-              placeholder="Ej: 50000"
-              value={formData.amount}
-              onChange={handleInputChange}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              className={errors.amount ? 'input-error' : ''}
-            />
-            {errors.amount && <span className="error-message">{errors.amount}</span>}
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
+              <input
+                type="text"
+                name="amount"
+                placeholder="Ej: 50000"
+                value={formData.amount}
+                onChange={handleInputChange}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className={`w-full pl-8 pr-4 py-3 rounded-2xl border ${
+                  errors.amount
+                    ? "border-red-400 bg-red-50 dark:bg-red-900/10"
+                    : "border-gray-200 dark:border-gray-700 focus:border-blue-500 bg-gray-50 dark:bg-[#1e293b]"
+                } text-gray-800 dark:text-gray-100 outline-none transition-all placeholder:text-gray-400`}
+              />
+            </div>
+            {errors.amount && (
+              <p className="text-xs text-red-500 mt-1 pl-1 flex items-center gap-1">
+                <AlertCircle size={12} /> {errors.amount}
+              </p>
+            )}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="incomeConcept">💵 Concepto *</label>
-            <select
-              id="incomeConcept"
-              name="incomeConcept"
-              value={formData.incomeConcept}
-              onChange={handleInputChange}
-              className={errors.incomeConcept ? 'input-error' : ''}
-            >
-              <option value="TITHE">💵 Diezmo</option>
-              <option value="OFFERING">🎁 Ofrenda</option>
-              <option value="SEED_OFFERING">🌱 Ofrenda de Semilla</option>
-              <option value="BUILDING_FUND">🏗️ Fondo de Construcción</option>
-              <option value="FIRST_FRUITS">🍇 Primicias</option>
-              <option value="CELL_GROUP_OFFERING">🏘️ Ofrenda Grupo de Célula</option>
-            </select>
-            {errors.incomeConcept && <span className="error-message">{errors.incomeConcept}</span>}
-          </div>
+          {/* Grid: Concepto / Método */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Concepto */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <Gift size={16} className="text-purple-500" /> Concepto <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="incomeConcept"
+                value={formData.incomeConcept}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 rounded-2xl border ${
+                  errors.incomeConcept ? "border-red-400" : "border-gray-200 dark:border-gray-700 focus:border-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                } bg-gray-50 dark:bg-[#1e293b] text-gray-800 dark:text-gray-100 outline-none transition-all appearance-none cursor-pointer`}
+              >
+                <option value="TITHE">💵 Diezmo</option>
+                <option value="OFFERING">🎁 Ofrenda</option>
+                <option value="SEED_OFFERING">🌱 Ofrenda de Semilla</option>
+                <option value="BUILDING_FUND">🏗️ Fondo Const.</option>
+                <option value="FIRST_FRUITS">🍇 Primicias</option>
+                <option value="CELL_GROUP_OFFERING">🏘️ Ofrenda Célula</option>
+              </select>
+              {errors.incomeConcept && (
+                <p className="text-xs text-red-500 mt-1 pl-1">
+                  {errors.incomeConcept}
+                </p>
+              )}
+            </div>
 
-          <div className="form-group">
-            <label htmlFor="incomeMethod">💳 Método de Pago *</label>
-            <select
-              id="incomeMethod"
-              name="incomeMethod"
-              value={formData.incomeMethod}
-              onChange={handleInputChange}
-              className={errors.incomeMethod ? 'input-error' : ''}
-            >
-              <option value="CASH">💵 Efectivo</option>
-              <option value="BANK_TRANSFER">🏦 Transferencia Bancaria</option>
-            </select>
-            {errors.incomeMethod && <span className="error-message">{errors.incomeMethod}</span>}
-
-            <div className="verification-auto-status">
-              {formData.incomeMethod === 'CASH' ? (
-                <span className="status-verified">✅ Se marcará automáticamente como verificado (Efectivo)</span>
-              ) : (
-                <span className="status-pending">⏳ Debe ser marcado manualmente como verificado (Transferencia)</span>
+            {/* Método */}
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                {formData.incomeMethod === "CASH" ? (
+                  <Banknote size={16} className="text-green-500" />
+                ) : (
+                  <Landmark size={16} className="text-blue-500" />
+                )}
+                Método Pago <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="incomeMethod"
+                value={formData.incomeMethod}
+                onChange={handleInputChange}
+                className={`w-full px-4 py-3 rounded-2xl border ${
+                  errors.incomeMethod ? "border-red-400" : "border-gray-200 dark:border-gray-700 focus:border-blue-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                } bg-gray-50 dark:bg-[#1e293b] text-gray-800 dark:text-gray-100 outline-none transition-all appearance-none cursor-pointer`}
+              >
+                <option value="CASH">💵 Efectivo</option>
+                <option value="BANK_TRANSFER">🏦 Transferencia</option>
+              </select>
+              {errors.incomeMethod && (
+                <p className="text-xs text-red-500 mt-1 pl-1">
+                  {errors.incomeMethod}
+                </p>
               )}
             </div>
           </div>
 
+          {/* Alerta de Verificación (Auto) */}
+          <div className="text-xs flex items-center gap-2 px-1">
+            {formData.incomeMethod === "CASH" ? (
+              <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                <CheckCircle2 size={14} /> Verificado automáticamente (Efectivo)
+              </span>
+            ) : (
+              <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                <Info size={14} /> Requiere verificación manual (Transferencia)
+              </span>
+            )}
+          </div>
+
+          {/* Transferencia: Referencia */}
           {isBankTransfer && (
-            <>
-              <div className="form-group">
-                <label htmlFor="reference">
-                  📝 Referencia *
-                  <span className="help-text">(Número de referencia, comprobante, etc.)</span>
+            <div className="space-y-3 bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30">
+              <div className="space-y-1">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <Landmark size={16} className="text-blue-500" /> Referencia <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  id="reference"
                   name="reference"
-                  placeholder="Ej: Comprobante #12345, Ref. Bancaria"
+                  placeholder="Ej: Comprobante #12345"
                   value={formData.reference}
                   onChange={handleInputChange}
-                  className={errors.reference ? 'input-error' : ''}
+                  className={`w-full px-4 py-3 rounded-2xl border ${
+                    errors.reference
+                      ? "border-red-400 bg-red-50 dark:bg-red-900/10"
+                      : "border-gray-200 dark:border-gray-700 focus:border-blue-500 bg-white dark:bg-[#1e293b]"
+                  } text-gray-800 dark:text-gray-100 outline-none transition-all placeholder:text-gray-400`}
                 />
-                {errors.reference && <span className="error-message">{errors.reference}</span>}
+                {errors.reference && (
+                  <p className="text-xs text-red-500 mt-1 pl-1 flex items-center gap-1">
+                    <AlertCircle size={12} /> {errors.reference}
+                  </p>
+                )}
               </div>
-
-              <div className="bank-transfer-notice">
-                <div className="notice-header">
-                  🏦 Transferencia Bancaria Detectada
-                </div>
-                <div className="notice-body">
-                  ⚠️ Por favor ingresa el número de referencia en el campo anterior.
-                </div>
-                <div className="notice-checkboxes">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      name="confirmReference"
-                      onChange={(e) => {
-                        console.log('Referencia confirmada:', e.target.checked);
-                      }}
-                    />
-                    ✓ He verificado la referencia de transferencia
-                  </label>
-                </div>
+              <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                <Info size={16} />
+                Por favor, ingresa el número de comprobante bancario.
               </div>
-            </>
+            </div>
           )}
 
-          <div className="form-group">
-            <label htmlFor="registrationDate">📅 Fecha de Registro *</label>
+          {/* Fecha */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              <CalendarDays size={16} className="text-orange-500" /> Fecha de Registro <span className="text-red-500">*</span>
+            </label>
             <input
               type="date"
-              id="registrationDate"
               name="registrationDate"
               value={formData.registrationDate}
               onChange={handleInputChange}
-              className={errors.registrationDate ? 'input-error' : ''}
+              className={`w-full px-4 py-3 rounded-2xl border ${
+                errors.registrationDate
+                  ? "border-red-400 bg-red-50 dark:bg-red-900/10"
+                  : "border-gray-200 dark:border-gray-700 focus:border-blue-500 bg-gray-50 dark:bg-[#1e293b]"
+              } text-gray-800 dark:text-gray-100 outline-none transition-all`}
             />
-            {errors.registrationDate && <span className="error-message">{errors.registrationDate}</span>}
+            {errors.registrationDate && (
+              <p className="text-xs text-red-500 mt-1 pl-1">
+                {errors.registrationDate}
+              </p>
+            )}
           </div>
 
-          <div className="form-group-checkbox">
-            <label className="checkbox-label">
+          {/* Checkbox: isVerified */}
+          <label className="flex items-start gap-3 p-3 mt-2 border border-gray-200 dark:border-gray-700 rounded-2xl bg-gray-50 dark:bg-[#1a2332] cursor-pointer hover:bg-gray-100 dark:hover:bg-[#1e293b] transition-colors">
+            <div className="mt-0.5">
               <input
                 type="checkbox"
                 name="isVerified"
                 checked={formData.isVerified}
                 onChange={handleInputChange}
-                disabled={formData.incomeMethod === 'CASH'}
-                title={formData.incomeMethod === 'CASH' ? 'Se marca automáticamente para Efectivo' : 'Marca para verificar esta transferencia'}
+                disabled={formData.incomeMethod === "CASH"}
+                className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 disabled:opacity-50"
               />
-              {formData.incomeMethod === 'CASH' ? (
-                <span>✅ Verificado automáticamente (Efectivo)</span>
-              ) : (
-                <span>⏳ Marcar como verificado (Transferencia Bancaria)</span>
-              )}
-            </label>
-          </div>
-
-          <div className="modal-footer-finance">
-            <button
-              type="button"
-              className="btn btn-cancel"
-              onClick={onClose}
-              disabled={loading}
-            >
-              ❌ Cancelar
-            </button>
-            <button
-              type="submit"
-              className="btn btn-submit"
-              disabled={loading || !recordedBy}
-            >
-              {loading ? '⏳ Guardando...' : isEditing ? '💾 Actualizar' : '💾 Registrar'}
-            </button>
-          </div>
+            </div>
+            <div className="flex-1">
+              <span className="block text-sm font-semibold text-gray-800 dark:text-gray-200">
+                Verificación del Ingreso
+              </span>
+              <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">
+                {formData.incomeMethod === "CASH"
+                  ? "Se marca automáticamente para pagos en Efectivo"
+                  : "Marca esta casilla cuando el pago esté verificado en banco"}
+              </span>
+            </div>
+          </label>
         </form>
+
+        {/* Footer */}
+        <div className="px-6 py-5 border-t border-gray-100 dark:border-blue-900/30 flex justify-end gap-3 shrink-0 bg-gray-50/50 dark:bg-[#0f172a]">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+          >
+            <XCircle size={18} /> Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading || !recordedBy}
+            className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <svg
+                  className="animate-spin h-5 w-5 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+                <span>Guardando...</span>
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                <span>{isEditing ? "Actualizar" : "Registrar"}</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

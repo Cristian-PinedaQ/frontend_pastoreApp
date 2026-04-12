@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ConfirmationProvider } from './context/ConfirmationContext';
 
 // ✅ CORRECCIÓN 1: RegisterPage es NAMED EXPORT (con {})
 import LoginPage from './LoginPage';
@@ -14,8 +15,8 @@ import ProtectedRoute, { UnauthorizedPage } from './ProtectedRoute';
 import { DashboardLayout } from './DashboardLayout';
 
 // Páginas del dashboard
-import { DashboardHome } from './pages/DashboardHome';
-import { MembersPage } from './pages/MembersPage';
+import DashboardHome from './pages/DashboardHome';
+import MembersPage from './pages/MembersPage';
 import EnrollmentsPage from './pages/EnrollmentsPage';
 import StudentsPage from './pages/StudentsPage';
 import UsersPage from './pages/UsersPage';
@@ -39,180 +40,182 @@ function App() {
       }}
     >
       <AuthProvider>
-        <Routes>
-          {/* ========== RUTAS PÚBLICAS ========== */}
+        <ConfirmationProvider>
+          <Routes>
+            {/* ========== RUTAS PÚBLICAS ========== */}
 
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />  {/* ← RegisterPage */}
-          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />  {/* ← RegisterPage */}
+            <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-          {/* ========== DASHBOARD PROTEGIDO ========== */}
-
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute element={<DashboardLayout />} />
-            }
-          >
-            {/* Dashboard Home */}
-            <Route index element={<DashboardHome />} />
-
-            {/* Miembros */}
-            <Route
-              path="members"
-              element={
-                <ProtectedRoute element={<MembersPage />} />
-              }
-            />
-
-            {/* Inscripciones */}
-            <Route
-              path="enrollments"
-              element={
-                <ProtectedRoute
-                  element={<EnrollmentsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_PROFESORES']}
-                />
-              }
-            />
-
-            {/* Estudiantes */}
-            <Route
-              path="students"
-              element={
-                <ProtectedRoute
-                  element={<StudentsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
-                />
-              }
-            />
-            {/* Liderazgo */}
-            <Route
-              path="leadership"
-              element={
-                <ProtectedRoute
-                  element={<LeadersPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA','ROLE_DESPLIEGUE']}
-                />
-              }
-            />
-
-            {/* celulas */}
-            <Route
-              path="cellgroups"
-              element={
-                <ProtectedRoute
-                  element={<CellGroupsPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION','ROLE_DESPLIEGUE']}
-                />
-              }
-            />
+            {/* ========== DASHBOARD PROTEGIDO ========== */}
 
             <Route
-              path="cellgroups-atendance"
+              path="/dashboard"
               element={
-                <ProtectedRoute
-                  element={<CellAttendancePage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_LIDER']}
-                />
+                <ProtectedRoute element={<DashboardLayout />} />
               }
-            />
+            >
+              {/* Dashboard Home */}
+              <Route index element={<DashboardHome />} />
 
-            {/* ALABANZA */}
+              {/* Miembros */}
+              <Route
+                path="members"
+                element={
+                  <ProtectedRoute element={<MembersPage />} />
+                }
+              />
 
-            <Route
-              path="worshipPage"
-              element={
-                <ProtectedRoute
-                  element={<WorshipPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_ALABANZA']}
-                />
-              }
-            />
+              {/* Inscripciones */}
+              <Route
+                path="enrollments"
+                element={
+                  <ProtectedRoute
+                    element={<EnrollmentsPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_PROFESORES']}
+                  />
+                }
+              />
 
-            {/* Concejeria */}
-            <Route
-              path="Counseling"
-              element={
-                <ProtectedRoute
-                  element={<CounselingPage />}
-                  requiredRoles={['ROLE_PASTORES']}
-                />
-              }
-            />
+              {/* Estudiantes */}
+              <Route
+                path="students"
+                element={
+                  <ProtectedRoute
+                    element={<StudentsPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
+                  />
+                }
+              />
+              {/* Liderazgo */}
+              <Route
+                path="leadership"
+                element={
+                  <ProtectedRoute
+                    element={<LeadersPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA','ROLE_DESPLIEGUE']}
+                  />
+                }
+              />
 
-            {/* Finanzas */}
-            <Route
-              path="finances"
-              element={
-                <ProtectedRoute
-                  element={<FinancesPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
-                />
-              }
-            />
+              {/* celulas */}
+              <Route
+                path="cellgroups"
+                element={
+                  <ProtectedRoute
+                    element={<CellGroupsPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION','ROLE_DESPLIEGUE']}
+                  />
+                }
+              />
 
-            <Route
-              path="financesChurch"
-              element={
-                <ProtectedRoute
-                  element={<ChurchFinancePage />}
-                  requiredRoles={['ROLE_PASTORES']}
-                />
-              }
-            />
+              <Route
+                path="cellgroups-atendance"
+                element={
+                  <ProtectedRoute
+                    element={<CellAttendancePage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_LIDER']}
+                  />
+                }
+              />
 
-            {/* Finanzas */}
-            <Route
-              path="Activity"
-              element={
-                <ProtectedRoute
-                  element={<ActivityPage />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
-                />
-              }
-            />
+              {/* ALABANZA */}
 
-            {/* Configuracion niveles y lecciones */}
-            <Route
-              path="LevelsConfig"
-              element={
-                <ProtectedRoute
-                  element={<LevelsConfigPage />}
-                  requiredRoles={['ROLE_PASTORES']}
-                />
-              }
-            />
+              <Route
+                path="worshipPage"
+                element={
+                  <ProtectedRoute
+                    element={<WorshipPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_ALABANZA']}
+                  />
+                }
+              />
 
-            {/* ManualRaizViva */}
-            <Route
-              path="ManualRaizViva"
-              element={
-                <ProtectedRoute
-                  element={<ManualRaizViva />}
-                  requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_LIDER']}
-                />
-              }
-            />
+              {/* Concejeria */}
+              <Route
+                path="Counseling"
+                element={
+                  <ProtectedRoute
+                    element={<CounselingPage />}
+                    requiredRoles={['ROLE_PASTORES']}
+                  />
+                }
+              />
 
-            {/* Usuarios */}
-            <Route
-              path="users"
-              element={
-                <ProtectedRoute
-                  element={<UsersPage />}
-                  requiredRoles={['ROLE_PASTORES']}
-                  requireAll={true}
-                />
-              }
-            />
-          </Route>
+              {/* Finanzas */}
+              <Route
+                path="finances"
+                element={
+                  <ProtectedRoute
+                    element={<FinancesPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
+                  />
+                }
+              />
 
-          {/* ========== REDIRECCIONES ========== */}
+              <Route
+                path="financesChurch"
+                element={
+                  <ProtectedRoute
+                    element={<ChurchFinancePage />}
+                    requiredRoles={['ROLE_PASTORES']}
+                  />
+                }
+              />
 
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+              {/* Finanzas */}
+              <Route
+                path="Activity"
+                element={
+                  <ProtectedRoute
+                    element={<ActivityPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
+                  />
+                }
+              />
+
+              {/* Configuracion niveles y lecciones */}
+              <Route
+                path="LevelsConfig"
+                element={
+                  <ProtectedRoute
+                    element={<LevelsConfigPage />}
+                    requiredRoles={['ROLE_PASTORES']}
+                  />
+                }
+              />
+
+              {/* ManualRaizViva */}
+              <Route
+                path="ManualRaizViva"
+                element={
+                  <ProtectedRoute
+                    element={<ManualRaizViva />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_LIDER']}
+                  />
+                }
+              />
+
+              {/* Usuarios */}
+              <Route
+                path="users"
+                element={
+                  <ProtectedRoute
+                    element={<UsersPage />}
+                    requiredRoles={['ROLE_PASTORES']}
+                    requireAll={true}
+                  />
+                }
+              />
+            </Route>
+
+            {/* ========== REDIRECCIONES ========== */}
+
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </ConfirmationProvider>
       </AuthProvider>
     </BrowserRouter>
   );

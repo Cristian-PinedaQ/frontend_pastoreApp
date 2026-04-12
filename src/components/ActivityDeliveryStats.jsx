@@ -1,334 +1,176 @@
-// ============================================================
-// ActivityDeliveryStats.jsx
-// Panel de estadísticas de entregas para la ficha de actividad
-// Muestra cuántos artículos se entregaron y cuántos faltan
-// ============================================================
-
 import React, { useMemo } from "react";
+import { 
+  Users, 
+  CreditCard, 
+  Package, 
+  Clock, 
+  CheckCircle2,
+  TrendingUp,
+  AlertTriangle,
+  ClipboardList,
+  Info
+} from "lucide-react";
 
 /**
  * @param {Array}   participants  - array de ActivityContributionWithLeaderDTO
- *                                  Cada item debe tener: isFullyPaid, itemDelivered
- * @param {string}  activityName  - nombre de la actividad (opcional)
+ * @param {string}  activityName  - nombre de la actividad
  * @param {boolean} compact       - modo compacto para cabecera de lista
  */
 const ActivityDeliveryStats = ({ participants = [], activityName = "", compact = false }) => {
   const stats = useMemo(() => {
     const total = participants.length;
-
-    // Artículos entregados (independiente del estado de pago)
     const delivered = participants.filter((p) => p.itemDelivered === true).length;
-
-    // Pagos completos (isFullyPaid)
     const fullyPaid = participants.filter((p) => p.isFullyPaid === true).length;
+    const paidAndDelivered = participants.filter((p) => p.isFullyPaid && p.itemDelivered).length;
+    const paidNotDelivered = participants.filter((p) => p.isFullyPaid && !p.itemDelivered).length;
+    const deliveredNotPaid = participants.filter((p) => !p.isFullyPaid && p.itemDelivered).length;
+    const neitherPaidNorDelivered = participants.filter((p) => !p.isFullyPaid && !p.itemDelivered).length;
 
-    // Pagado + entregado
-    const paidAndDelivered = participants.filter(
-      (p) => p.isFullyPaid && p.itemDelivered
-    ).length;
-
-    // Pagado pero NO entregado → artículos por entregar prioritarios
-    const paidNotDelivered = participants.filter(
-      (p) => p.isFullyPaid && !p.itemDelivered
-    ).length;
-
-    // Entregado pero NO pagado → caso irregular
-    const deliveredNotPaid = participants.filter(
-      (p) => !p.isFullyPaid && p.itemDelivered
-    ).length;
-
-    // Ni pagado ni entregado
-    const neitherPaidNorDelivered = participants.filter(
-      (p) => !p.isFullyPaid && !p.itemDelivered
-    ).length;
-
-    const pendingDelivery = total - delivered;
     const deliveryPct = total > 0 ? Math.round((delivered / total) * 100) : 0;
     const paymentPct = total > 0 ? Math.round((fullyPaid / total) * 100) : 0;
 
     return {
-      total,
-      delivered,
-      pendingDelivery,
-      fullyPaid,
-      paidAndDelivered,
-      paidNotDelivered,
-      deliveredNotPaid,
-      neitherPaidNorDelivered,
-      deliveryPct,
-      paymentPct,
+      total, delivered, pendingDelivery: total - delivered,
+      fullyPaid, paidAndDelivered, paidNotDelivered,
+      deliveredNotPaid, neitherPaidNorDelivered,
+      deliveryPct, paymentPct,
     };
   }, [participants]);
 
   if (stats.total === 0) return null;
 
-  // ── Modo compacto: fila de chips ─────────────────────────────────────────
+  // ── MODO COMPACTO (Chips para listas) ─────────────────────────────────────────
   if (compact) {
     return (
-      <div className="ads-compact">
-        <span className="ads-chip ads-chip--total" title="Total inscritos">
-          👥 {stats.total}
-        </span>
-        <span className="ads-chip ads-chip--paid" title="Pagos completos">
-          💳 {stats.fullyPaid} pagados
-        </span>
-        <span className="ads-chip ads-chip--delivered" title="Artículos entregados">
-          📦 {stats.delivered} entregados
-        </span>
+      <div className="flex flex-wrap gap-2 items-center animate-in fade-in duration-500">
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest border border-slate-200 dark:border-slate-700">
+           <Users className="w-3 h-3" /> {stats.total}
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 rounded-full text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest border border-indigo-100 dark:border-indigo-500/20">
+           <CreditCard className="w-3 h-3" /> {stats.fullyPaid}
+        </div>
+        <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 rounded-full text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest border border-emerald-100 dark:border-emerald-500/20">
+           <Package className="w-3 h-3" /> {stats.delivered}
+        </div>
         {stats.paidNotDelivered > 0 && (
-          <span
-            className="ads-chip ads-chip--alert"
-            title="Pagaron pero aún no recibieron el artículo"
-          >
-            ⚠️ {stats.paidNotDelivered} por entregar
-          </span>
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-500/10 rounded-full text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest border border-amber-100 dark:border-amber-500/20 animate-pulse">
+             <AlertTriangle className="w-3 h-3" /> {stats.paidNotDelivered} x Entregar
+          </div>
         )}
-
-        <style>{`
-          .ads-compact { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-          .ads-chip {
-            display: inline-flex; align-items: center; gap: 4px;
-            padding: 3px 10px; border-radius: 20px;
-            font-size: 0.76em; font-weight: 600; white-space: nowrap;
-          }
-          .ads-chip--total   { background: #e9ecef; color: #495057; }
-          .ads-chip--paid    { background: #cce5ff; color: #004085; }
-          .ads-chip--delivered { background: #d4edda; color: #155724; }
-          .ads-chip--alert   { background: #fff3cd; color: #856404; }
-        `}</style>
       </div>
     );
   }
 
-  // ── Modo completo: panel de estadísticas ─────────────────────────────────
+  // ── MODO COMPLETO (Panel de Dashboard) ──────────────────────────────────
   return (
-    <div className="ads-panel">
-      {/* Título */}
-      <div className="ads-panel__header">
-        <span className="ads-panel__title-icon">📦</span>
-        <h4 className="ads-panel__title">Resumen de Entregas</h4>
-        {activityName && (
-          <span className="ads-panel__activity">{activityName}</span>
-        )}
-      </div>
-
-      {/* Cards de métricas */}
-      <div className="ads-metrics">
-        {/* Total inscritos */}
-        <div className="ads-metric ads-metric--neutral">
-          <div className="ads-metric__icon">👥</div>
-          <div className="ads-metric__value">{stats.total}</div>
-          <div className="ads-metric__label">Inscritos</div>
-        </div>
-
-        {/* Pagos completos */}
-        <div className="ads-metric ads-metric--blue">
-          <div className="ads-metric__icon">💳</div>
-          <div className="ads-metric__value">{stats.fullyPaid}</div>
-          <div className="ads-metric__label">Pagos completos</div>
-          <div className="ads-metric__pct">{stats.paymentPct}%</div>
-        </div>
-
-        {/* Artículos entregados */}
-        <div className="ads-metric ads-metric--green">
-          <div className="ads-metric__icon">📦</div>
-          <div className="ads-metric__value">{stats.delivered}</div>
-          <div className="ads-metric__label">Entregados</div>
-          <div className="ads-metric__pct">{stats.deliveryPct}%</div>
-        </div>
-
-        {/* Pendientes de entrega */}
-        <div className={`ads-metric ${stats.pendingDelivery > 0 ? "ads-metric--yellow" : "ads-metric--green"}`}>
-          <div className="ads-metric__icon">
-            {stats.pendingDelivery > 0 ? "🕐" : "✅"}
-          </div>
-          <div className="ads-metric__value">{stats.pendingDelivery}</div>
-          <div className="ads-metric__label">Sin entregar</div>
-        </div>
-      </div>
-
-      {/* Barras de progreso */}
-      <div className="ads-bars">
-        {/* Barra de pagos */}
-        <div className="ads-bar-group">
-          <div className="ads-bar-header">
-            <span className="ads-bar-label">💳 Pagos completos</span>
-            <span className="ads-bar-count">
-              {stats.fullyPaid} / {stats.total}
-            </span>
-          </div>
-          <div className="ads-bar-track">
-            <div
-              className="ads-bar-fill ads-bar-fill--blue"
-              style={{ width: `${stats.paymentPct}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Barra de entregas */}
-        <div className="ads-bar-group">
-          <div className="ads-bar-header">
-            <span className="ads-bar-label">📦 Artículos entregados</span>
-            <span className="ads-bar-count">
-              {stats.delivered} / {stats.total}
-            </span>
-          </div>
-          <div className="ads-bar-track">
-            <div
-              className="ads-bar-fill ads-bar-fill--green"
-              style={{ width: `${stats.deliveryPct}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Tabla de desglose */}
-      <div className="ads-breakdown">
-        <div className="ads-breakdown__title">Desglose</div>
-        <div className="ads-breakdown__grid">
-          <div className="ads-breakdown__item ads-breakdown__item--success">
-            <span className="ads-breakdown__icon">✅</span>
-            <span className="ads-breakdown__desc">Pagado y entregado</span>
-            <span className="ads-breakdown__count">{stats.paidAndDelivered}</span>
-          </div>
-          <div className={`ads-breakdown__item ${stats.paidNotDelivered > 0 ? "ads-breakdown__item--warning" : "ads-breakdown__item--ok"}`}>
-            <span className="ads-breakdown__icon">
-              {stats.paidNotDelivered > 0 ? "⚠️" : "✔️"}
-            </span>
-            <span className="ads-breakdown__desc">Pagado, artículo pendiente</span>
-            <span className="ads-breakdown__count">{stats.paidNotDelivered}</span>
-          </div>
-          {stats.deliveredNotPaid > 0 && (
-            <div className="ads-breakdown__item ads-breakdown__item--info">
-              <span className="ads-breakdown__icon">📋</span>
-              <span className="ads-breakdown__desc">Entregado sin pago completo</span>
-              <span className="ads-breakdown__count">{stats.deliveredNotPaid}</span>
+    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* HEADER */}
+      <div className="px-8 py-6 bg-slate-50/50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+         <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-500/10 text-indigo-600 rounded-xl flex items-center justify-center">
+               <ClipboardList className="w-5 h-5" />
             </div>
-          )}
-          <div className="ads-breakdown__item ads-breakdown__item--danger">
-            <span className="ads-breakdown__icon">🕐</span>
-            <span className="ads-breakdown__desc">Sin pago ni entrega</span>
-            <span className="ads-breakdown__count">{stats.neitherPaidNorDelivered}</span>
-          </div>
-        </div>
+            <div>
+               <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest">Resumen de Seguimiento Operativo</h4>
+               {activityName && <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">{activityName}</p>}
+            </div>
+         </div>
+         <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm">
+            <TrendingUp className="w-4 h-4 text-emerald-500" />
+            <span className="text-[10px] font-black text-slate-600 dark:text-slate-300 uppercase tracking-widest">{stats.deliveryPct}% Eficacia</span>
+         </div>
       </div>
 
-      {/* Alerta si hay pagados pero sin entregar */}
-      {stats.paidNotDelivered > 0 && (
-        <div className="ads-alert">
-          <span className="ads-alert__icon">📬</span>
-          <div className="ads-alert__text">
-            <strong>{stats.paidNotDelivered} participante{stats.paidNotDelivered !== 1 ? "s" : ""}</strong>
-            {" "}completaron su pago y aún no {stats.paidNotDelivered !== 1 ? "han recibido" : "ha recibido"} el artículo.
-          </div>
-        </div>
-      )}
+      <div className="p-8 space-y-8">
+         {/* METRICS GRID */}
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'Inscritos', value: stats.total, icon: Users, color: 'slate' },
+              { label: 'Pagos OK', value: stats.fullyPaid, icon: CreditCard, color: 'indigo', pct: stats.paymentPct },
+              { label: 'Entregados', value: stats.delivered, icon: Package, color: 'emerald', pct: stats.deliveryPct },
+              { label: 'Por Entregar', value: stats.pendingDelivery, icon: stats.pendingDelivery > 0 ? Clock : CheckCircle2, color: stats.pendingDelivery > 0 ? 'amber' : 'emerald' }
+            ].map(m => (
+              <div key={m.label} className="p-5 bg-slate-50 dark:bg-slate-950/40 rounded-[2rem] border border-slate-100 dark:border-slate-800 relative group overflow-hidden">
+                 <div className={`w-8 h-8 bg-${m.color}-500/10 text-${m.color}-600 dark:text-${m.color}-400 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                    <m.icon className="w-4 h-4" />
+                 </div>
+                 <p className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{m.value}</p>
+                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{m.label}</p>
+                 {m.pct !== undefined && (
+                   <div className="absolute top-4 right-4 text-[8px] font-black bg-white dark:bg-slate-800 px-2 py-0.5 rounded-full border dark:border-slate-700">
+                      {m.pct}%
+                   </div>
+                 )}
+              </div>
+            ))}
+         </div>
 
-      <style>{`
-        /* ── Panel ─────────────────────────────────────────────────────── */
-        .ads-panel {
-          background: #fff;
-          border: 1px solid #e9ecef;
-          border-radius: 12px;
-          padding: 18px 20px;
-          margin: 14px 0;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
+         {/* PROGRESS BARS */}
+         <div className="space-y-6">
+            <div className="space-y-3">
+               <div className="flex justify-between items-end">
+                  <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                     <CreditCard className="w-4 h-4 text-indigo-500" /> Compromiso de Pago
+                  </span>
+                  <span className="text-[10px] font-black bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-lg uppercase tracking-widest">
+                     {stats.fullyPaid} / {stats.total} Completados
+                  </span>
+               </div>
+               <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-50 dark:border-slate-700 p-[2px]">
+                  <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 rounded-full transition-all duration-1000 ease-out" style={{ width: `${stats.paymentPct}%` }}></div>
+               </div>
+            </div>
 
-        /* ── Header ─────────────────────────────────────────────────────── */
-        .ads-panel__header {
-          display: flex; align-items: center; gap: 8px; margin-bottom: 16px;
-        }
-        .ads-panel__title-icon { font-size: 1.25em; }
-        .ads-panel__title {
-          margin: 0; font-size: 1em; font-weight: 700; color: #2d3748;
-        }
-        .ads-panel__activity {
-          margin-left: auto; font-size: 0.78em; color: #6c757d;
-          font-style: italic; max-width: 160px;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
+            <div className="space-y-3">
+               <div className="flex justify-between items-end">
+                  <span className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                     <Package className="w-4 h-4 text-emerald-500" /> Logística de Entrega
+                  </span>
+                  <span className="text-[10px] font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-lg uppercase tracking-widest">
+                     {stats.delivered} / {stats.total} Finalizados
+                  </span>
+               </div>
+               <div className="h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-50 dark:border-slate-700 p-[2px]">
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-1000 ease-out" style={{ width: `${stats.deliveryPct}%` }}></div>
+               </div>
+            </div>
+         </div>
 
-        /* ── Métricas ───────────────────────────────────────────────────── */
-        .ads-metrics {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 10px;
-          margin-bottom: 18px;
-        }
-        @media (max-width: 580px) {
-          .ads-metrics { grid-template-columns: repeat(2, 1fr); }
-        }
-        .ads-metric {
-          border-radius: 10px; padding: 12px 10px; text-align: center;
-          border: 1px solid transparent; position: relative;
-        }
-        .ads-metric--neutral { background: #f8f9fa; border-color: #dee2e6; }
-        .ads-metric--blue    { background: #e8f4fd; border-color: #bee3f8; }
-        .ads-metric--green   { background: #f0fff4; border-color: #9ae6b4; }
-        .ads-metric--yellow  { background: #fffbf0; border-color: #f6e05e; }
+         {/* BREAKDOWN LIST */}
+         <div className="pt-6 border-t border-slate-50 dark:border-slate-800">
+            <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Análisis de Casos</h5>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               {[
+                 { label: 'Pagos y Entregas OK', count: stats.paidAndDelivered, icon: CheckCircle2, color: 'emerald', bg: 'emerald' },
+                 { label: 'Pendientes por Entregar', count: stats.paidNotDelivered, icon: AlertTriangle, color: 'amber', bg: 'amber', highlight: stats.paidNotDelivered > 0 },
+                 { label: 'Irregular (Entregado s/pago)', count: stats.deliveredNotPaid, icon: Info, color: 'blue', bg: 'blue', hidden: stats.deliveredNotPaid === 0 },
+                 { label: 'Sin Acción Registrada', count: stats.neitherPaidNorDelivered, icon: Clock, color: 'slate', bg: 'slate' }
+               ].map(it => !it.hidden && (
+                 <div key={it.label} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${it.highlight ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 shadow-lg shadow-amber-500/5' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
+                    <div className="flex items-center gap-3">
+                       <it.icon className={`w-4 h-4 text-${it.color}-500`} />
+                       <span className={`text-[11px] font-black uppercase tracking-tight ${it.highlight ? 'text-amber-700 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300'}`}>{it.label}</span>
+                    </div>
+                    <span className={`text-sm font-black text-${it.color}-600 dark:text-${it.color}-400`}>{it.count}</span>
+                 </div>
+               ))}
+            </div>
+         </div>
 
-        .ads-metric__icon  { font-size: 1.3em; margin-bottom: 4px; }
-        .ads-metric__value { font-size: 1.7em; font-weight: 800; line-height: 1; margin-bottom: 2px; color: #2d3748; }
-        .ads-metric__label { font-size: 0.7em; color: #6c757d; font-weight: 500; }
-        .ads-metric__pct {
-          position: absolute; top: 6px; right: 8px;
-          font-size: 0.65em; font-weight: 700;
-          background: rgba(0,0,0,0.08); color: #4a5568;
-          padding: 1px 5px; border-radius: 10px;
-        }
-
-        /* ── Barras ──────────────────────────────────────────────────────── */
-        .ads-bars { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-        .ads-bar-group {}
-        .ads-bar-header {
-          display: flex; justify-content: space-between; align-items: center;
-          margin-bottom: 4px;
-        }
-        .ads-bar-label { font-size: 0.78em; font-weight: 600; color: #4a5568; }
-        .ads-bar-count { font-size: 0.75em; color: #6c757d; font-weight: 500; }
-        .ads-bar-track {
-          height: 8px; background: #e9ecef; border-radius: 99px; overflow: hidden;
-        }
-        .ads-bar-fill {
-          height: 100%; border-radius: 99px;
-          transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .ads-bar-fill--blue  { background: linear-gradient(90deg, #4299e1, #3182ce); }
-        .ads-bar-fill--green { background: linear-gradient(90deg, #48bb78, #38a169); }
-
-        /* ── Desglose ─────────────────────────────────────────────────────── */
-        .ads-breakdown { margin-bottom: 14px; }
-        .ads-breakdown__title {
-          font-size: 0.72em; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.06em; color: #6c757d; margin-bottom: 8px;
-        }
-        .ads-breakdown__grid { display: flex; flex-direction: column; gap: 6px; }
-        .ads-breakdown__item {
-          display: flex; align-items: center; gap: 8px;
-          padding: 7px 12px; border-radius: 7px; border-left: 3px solid;
-        }
-        .ads-breakdown__item--success { background: #f0fff4; border-color: #48bb78; }
-        .ads-breakdown__item--warning { background: #fffbf0; border-color: #f6ad55; }
-        .ads-breakdown__item--ok      { background: #f7fafc; border-color: #cbd5e0; }
-        .ads-breakdown__item--info    { background: #ebf8ff; border-color: #63b3ed; }
-        .ads-breakdown__item--danger  { background: #fff5f5; border-color: #fc8181; }
-        .ads-breakdown__icon  { font-size: 1em; flex-shrink: 0; }
-        .ads-breakdown__desc  { flex: 1; font-size: 0.8em; color: #4a5568; font-weight: 500; }
-        .ads-breakdown__count {
-          font-size: 0.9em; font-weight: 700; color: #2d3748;
-          min-width: 24px; text-align: right;
-        }
-
-        /* ── Alerta ──────────────────────────────────────────────────────── */
-        .ads-alert {
-          display: flex; align-items: center; gap: 10px;
-          background: #fff3cd; border: 1px solid #ffc107;
-          border-radius: 8px; padding: 10px 14px;
-        }
-        .ads-alert__icon { font-size: 1.2em; flex-shrink: 0; }
-        .ads-alert__text { font-size: 0.82em; color: #856404; }
-      `}</style>
+         {/* ALERTA CRÍTICA */}
+         {stats.paidNotDelivered > 0 && (
+           <div className="p-5 bg-amber-600 text-white rounded-[2rem] shadow-xl shadow-amber-600/20 flex items-center gap-5 animate-in slide-in-from-top-4">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                 <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                 <p className="text-xs font-black uppercase tracking-widest leading-none mb-1">Prioridad de Entrega</p>
+                 <p className="text-[10px] font-bold text-white/70 uppercase tracking-tight">Hay {stats.paidNotDelivered} participante(s) con pago completo que aún no reciben su material.</p>
+              </div>
+           </div>
+         )}
+      </div>
     </div>
   );
 };

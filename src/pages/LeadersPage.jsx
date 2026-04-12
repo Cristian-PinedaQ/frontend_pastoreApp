@@ -1,1465 +1,640 @@
-// ============================================
-// LeadersPage.jsx - Gestión de Líderes (SERVANT, LEADER_144 y LEADER_12)
-// Versión con control de permisos por roles usando AuthContext directamente
-// ============================================
-
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiService from "../apiService";
 import { generateLeadersPDF } from "../services/leadersPdfGenerator";
-import { logSecurityEvent, logUserAction } from "../utils/securityLogger";
 import nameHelper from "../services/nameHelper";
 import ModalPromoteLeader from "../components/ModalPromoteLeader";
 import ModalLeaderStatistics from "../components/ModalLeaderStatistics";
 import ModalLeaderDetail from "../components/ModalLeaderDetail";
 import { useAuth } from "../context/AuthContext";
-import "../css/LeadersPage.css";
+import { 
+  Users, 
+  Crown, 
+  ShieldCheck, 
+  Search, 
+  FileText, 
+  BarChart3, 
+  RefreshCcw, 
+  ChevronRight,
+  UserPlus,
+  AlertTriangle,
+  Clock,
+  MoreVertical,
+  Phone,
+  LayoutGrid,
+  List,
+  ShieldAlert,
+  Star,
+  Award,
+  Activity,
+  Zap,
+  CheckCircle2,
+  Ghost,
+  MoreHorizontal
+} from "lucide-react";
 
-// Extraer función del helper para transformar nombres
 const { getDisplayName } = nameHelper;
-
-// 🔐 Debug condicional
-const DEBUG = process.env.REACT_APP_DEBUG === "true";
-
-const log = (message, data) => {
-  if (DEBUG) {
-    console.log(`[LeadersPage] ${message}`, data || "");
-  }
-};
-
-const logError = (message, error) => {
-  console.error(`[LeadersPage] ${message}`, error);
-};
-
-// ✅ Sanitización de HTML
-const escapeHtml = (text) => {
-  if (!text || typeof text !== "string") return "";
-  const map = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  };
-  return text.replace(/[&<>"']/g, (m) => map[m]);
-};
-
-// ✅ Validación de búsqueda
-const validateSearchText = (text) => {
-  if (!text || typeof text !== "string") return "";
-  if (text.length > 100) return text.substring(0, 100);
-  return text.trim();
-};
-
-// ========== CONSTANTES ==========
-const LEADER_TYPE_MAP = {
-  SERVANT: { label: "Servidor", color: "#3b82f6", icon: "🌱" },
-  LEADER_144: { label: "Líder 144", color: "#8b5cf6", icon: "🌿" },
-  LEADER_12: { label: "Líder 12", color: "#10b981", icon: "🌳" },
-};
-
-const LEADER_STATUS_MAP = {
-  ACTIVE: { label: "Activo", color: "#10b981", icon: "✅" },
-  SUSPENDED: { label: "Suspendido", color: "#f59e0b", icon: "⏸️" },
-  INACTIVE: { label: "Inactivo", color: "#6b7280", icon: "⏹️" },
-};
+console.log("LEADERS PAGE UPDATED - NO CALENDAR");
 
 const LeadersPage = () => {
-  // ========== AUTH ==========
-  const auth = useAuth();
-  const { 
-    user, 
-    loading: authLoading, 
-    hasAnyRole,
-    isAuthenticated 
-  } = auth;
-
-  // ========== STATE ==========
-  const [allLeaders, setAllLeaders] = useState([]);
-  const [filteredLeaders, setFilteredLeaders] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-
-  // Filtros
-  const [selectedStatus, setSelectedStatus] = useState("ALL");
-  const [selectedType, setSelectedType] = useState("ALL");
-  const [searchText, setSearchText] = useState("");
-
-  // Modales
-  const [showPromoteModal, setShowPromoteModal] = useState(false);
-  const [showStatisticsModal, setShowStatisticsModal] = useState(false);
-  const [showVerifyAllModal, setShowVerifyAllModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [selectedLeader, setSelectedLeader] = useState(null);
-  const [verificationResult, setVerificationResult] = useState(null);
-  const [statisticsData, setStatisticsData] = useState(null);
-
-  // Estado para modal de confirmación personalizado
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState(null);
-  const [confirmMessage, setConfirmMessage] = useState("");
-  const [confirmTitle, setConfirmTitle] = useState("");
-
-  // UI State
-  const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
-  const [activeFiltersInfo, setActiveFiltersInfo] = useState({});
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // ========== PERMISOS BASADOS EN ROLES ==========
-  const canPerformCrud = hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE"]);
-  const isPastor = hasAnyRole(["ROLE_PASTORES"]);
-  const isDespliegue = hasAnyRole(["ROLE_DESPLIEGUE"]);
-
-  // Estado para controlar qué acciones están disponibles
-  const [userPermissions, setUserPermissions] = useState({
-    canCreate: false,
-    canEdit: false,
-    canDelete: false,
-    canSuspend: false,
-    canVerify: false,
-    canPromote: false,
-    canExport: true, // Todos pueden exportar
-    canViewStatistics: true, // Todos pueden ver estadísticas
-    canReactivateSuspended: false,
-  });
-
-  // ========== ACTUALIZAR PERMISOS BASADOS EN ROLES ==========
-  useEffect(() => {
-    setUserPermissions({
-      canCreate: canPerformCrud,
-      canEdit: canPerformCrud,
-      canDelete: canPerformCrud,
-      canSuspend: canPerformCrud,
-      canVerify: canPerformCrud,
-      canPromote: canPerformCrud,
-      canReactivateSuspended: canPerformCrud,
-      canExport: true,
-      canViewStatistics: true,
-    });
-
-    log("Permisos actualizados:", { 
-      canPerformCrud, 
-      isPastor,
-      isDespliegue,
-      user: user?.username
-    });
-  }, [canPerformCrud, isPastor, isDespliegue, user]);
-
-  // ========== DARK MODE DETECTION ==========
-  useEffect(() => {
-    try {
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-      ).matches;
-      const savedMode = localStorage.getItem("darkMode");
-      const htmlHasDarkClass =
-        document.documentElement.classList.contains("dark-mode") ||
-        document.documentElement.classList.contains("dark");
-
-      setIsDarkMode(savedMode === "true" || htmlHasDarkClass || prefersDark);
-
-      const observer = new MutationObserver(() => {
-        setIsDarkMode(
-          document.documentElement.classList.contains("dark-mode") ||
-            document.documentElement.classList.contains("dark"),
-        );
-      });
-
-      observer.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class"],
-      });
-
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const handleChange = (e) => {
-        if (localStorage.getItem("darkMode") === null) {
-          setIsDarkMode(e.matches);
-        }
-      };
-      mediaQuery.addEventListener("change", handleChange);
-
-      return () => {
-        observer.disconnect();
-        mediaQuery.removeEventListener("change", handleChange);
-      };
-    } catch (error) {
-      logError("Error detectando dark mode:", error);
-    }
-  }, []);
-
-  // ========== THEME COLORS ==========
-  const theme = {
-    bg: isDarkMode ? "#0f172a" : "#f9fafb",
-    bgSecondary: isDarkMode ? "#1e293b" : "#ffffff",
-    text: isDarkMode ? "#f3f4f6" : "#1f2937",
-    textSecondary: isDarkMode ? "#9ca3af" : "#6b7280",
-    border: isDarkMode ? "#334155" : "#e5e7eb",
-    errorBg: isDarkMode ? "#7f1d1d" : "#fee2e2",
-    errorBorder: "#ef4444",
-    errorText: isDarkMode ? "#fecaca" : "#991b1b",
-    successBg: isDarkMode ? "#14532d" : "#d1fae5",
-    successBorder: "#10b981",
-    successText: isDarkMode ? "#a7f3d0" : "#065f46",
+  const { user, hasAnyRole } = useAuth();
+  
+  const LEADER_TYPE_CONFIG = {
+    SERVANT: { 
+      label: "Servidor", 
+      color: "indigo", 
+      icon: <Star size={20} />,
+      gradient: "from-blue-500/20 to-indigo-600/20",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      accent: "bg-blue-600",
+      shadow: "shadow-blue-500/20"
+    },
+    LEADER_144: { 
+      label: "Líder 144", 
+      color: "violet", 
+      icon: <Users size={20} />,
+      gradient: "from-amber-500/20 to-orange-600/20",
+      iconColor: "text-amber-600 dark:text-amber-400",
+      accent: "bg-amber-500",
+      shadow: "shadow-amber-500/20"
+    },
+    LEADER_12: { 
+      label: "Líder 12", 
+      color: "emerald", 
+      icon: <Award size={20} />,
+      gradient: "from-green-500/20 to-emerald-600/20",
+      iconColor: "text-green-600 dark:text-green-400",
+      accent: "bg-green-600",
+      shadow: "shadow-green-500/20"
+    },
   };
 
-  // ========== LOAD LEADERS ==========
+  const LEADER_STATUS_CONFIG = {
+    ACTIVE: { 
+      label: "Activo", 
+      textColor: "text-emerald-700 dark:text-emerald-400", 
+      bgColor: "bg-emerald-50 dark:bg-emerald-900/30", 
+      dotColor: "bg-emerald-500",
+      border: "border-emerald-200 dark:border-emerald-800/50"
+    },
+    SUSPENDED: { 
+      label: "Suspendido", 
+      textColor: "text-amber-700 dark:text-amber-400", 
+      bgColor: "bg-amber-50 dark:bg-amber-900/30", 
+      dotColor: "bg-amber-500",
+      border: "border-amber-200 dark:border-amber-800/50"
+    },
+    INACTIVE: { 
+      label: "Inactivo", 
+      textColor: "text-slate-500 dark:text-slate-400", 
+      bgColor: "bg-slate-100 dark:bg-slate-800", 
+      dotColor: "bg-slate-400",
+      border: "border-slate-200 dark:border-slate-700"
+    },
+  };
+
+  const [allLeaders, setAllLeaders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState("grid"); // grid, list
+  
+  const [filters, setFilters] = useState({
+    status: "ALL",
+    type: "ALL"
+  });
+
+  const [modals, setModals] = useState({
+    promote: false,
+    stats: false,
+    detail: false
+  });
+  
+  const [selectedLeader, setSelectedLeader] = useState(null);
+  const [statsData, setStatsData] = useState(null);
+
+  const canManage = hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE"]);
+
   const loadLeaders = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    setSuccessMessage("");
-
-    try {
-      log("Cargando líderes");
-
-      const leaders = await apiService.getLeaders();
-      log("Líderes cargados", { count: leaders?.length || 0 });
-
-      if (!leaders || leaders.length === 0) {
-        log("No hay líderes disponibles");
-        setAllLeaders([]);
-        return;
-      }
-
-      const processedLeaders = leaders.map((leader) => ({
-        ...leader,
-        memberName: getDisplayName(
-          escapeHtml(leader.memberName || "Sin nombre"),
-        ),
-        leaderTypeIcon: LEADER_TYPE_MAP[leader.leaderType]?.icon || "👤",
-        leaderTypeLabel:
-          LEADER_TYPE_MAP[leader.leaderType]?.label || leader.leaderType,
-        statusIcon: LEADER_STATUS_MAP[leader.status]?.icon || "•",
-        statusLabel: LEADER_STATUS_MAP[leader.status]?.label || leader.status,
-        promotionDateFormatted: leader.promotionDate
-          ? new Date(leader.promotionDate).toLocaleDateString("es-CO")
-          : "-",
-        suspensionDateFormatted: leader.suspensionDate
-          ? new Date(leader.suspensionDate).toLocaleDateString("es-CO")
-          : null,
-        lastVerificationFormatted: leader.lastVerificationDate
-          ? new Date(leader.lastVerificationDate).toLocaleDateString("es-CO")
-          : "Nunca",
-      }));
-
-      log("Líderes procesados", { count: processedLeaders.length });
-      setAllLeaders(processedLeaders);
-
-      // Si hay un líder seleccionado, actualizar su data
-      if (selectedLeader) {
-        const updated = processedLeaders.find(
-          (l) => l.id === selectedLeader.id,
-        );
-        if (updated) setSelectedLeader(updated);
-      }
-
-      logUserAction("load_leaders", {
-        leaderCount: processedLeaders.length,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (err) {
-      logError("Error cargando líderes:", err);
-      setError("Error al cargar la lista de líderes");
-
-      logSecurityEvent("leaders_load_error", {
-        errorType: "api_error",
-        timestamp: new Date().toISOString(),
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedLeader]);
-
-  // ========== APPLY FILTERS ==========
-  const applyFilters = useCallback(() => {
-    try {
-      let filtered = [...allLeaders];
-
-      if (selectedStatus !== "ALL") {
-        filtered = filtered.filter(
-          (leader) => leader.status === selectedStatus,
-        );
-      }
-
-      if (selectedType !== "ALL") {
-        filtered = filtered.filter(
-          (leader) => leader.leaderType === selectedType,
-        );
-      }
-
-      if (searchText.trim()) {
-        const search = searchText.toLowerCase().trim();
-        filtered = filtered.filter(
-          (leader) =>
-            leader.memberName?.toLowerCase().includes(search) ||
-            leader.memberDocument?.toLowerCase().includes(search) ||
-            leader.memberEmail?.toLowerCase().includes(search) ||
-            leader.cellGroupCode?.toLowerCase().includes(search),
-        );
-      }
-
-      filtered.sort((a, b) => {
-        const statusOrder = { ACTIVE: 1, SUSPENDED: 2, INACTIVE: 3 };
-        const orderA = statusOrder[a.status] || 99;
-        const orderB = statusOrder[b.status] || 99;
-
-        if (orderA !== orderB) return orderA - orderB;
-
-        return new Date(b.promotionDate || 0) - new Date(a.promotionDate || 0);
-      });
-
-      log("Filtros aplicados", { count: filtered.length });
-      setFilteredLeaders(filtered);
-    } catch (error) {
-      logError("Error aplicando filtros:", error);
-      setFilteredLeaders(allLeaders);
-    }
-  }, [allLeaders, selectedStatus, selectedType, searchText]);
-
-  // ========== INIT LOAD ==========
-  useEffect(() => {
-    loadLeaders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ========== APPLY FILTERS ON CHANGE ==========
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
-
-  // ========== DETECT ACTIVE FILTERS ==========
-  useEffect(() => {
-    try {
-      const filtersActive =
-        selectedStatus !== "ALL" ||
-        selectedType !== "ALL" ||
-        searchText.trim() !== "";
-
-      setHasFiltersApplied(filtersActive);
-
-      if (filtersActive) {
-        const info = {};
-        if (selectedStatus !== "ALL")
-          info.status =
-            LEADER_STATUS_MAP[selectedStatus]?.label || selectedStatus;
-        if (selectedType !== "ALL")
-          info.type = LEADER_TYPE_MAP[selectedType]?.label || selectedType;
-        if (searchText.trim()) info.search = validateSearchText(searchText);
-
-        setActiveFiltersInfo(info);
-      } else {
-        setActiveFiltersInfo({});
-      }
-    } catch (error) {
-      logError("Error detectando filtros activos:", error);
-    }
-  }, [selectedStatus, selectedType, searchText]);
-
-  // ========== OPEN LEADER DETAIL ==========
-  const handleRowClick = useCallback((leader) => {
-    setSelectedLeader(leader);
-    setShowDetailModal(true);
-
-    logUserAction("open_leader_detail", {
-      leaderId: leader.id,
-      timestamp: new Date().toISOString(),
-    });
-  }, []);
-
-  // ========== VERIFY ALL LEADERS ==========
-  const handleVerifyAll = useCallback(async () => {
-    // Verificar permiso
-    if (!userPermissions.canVerify) {
-      setError("No tienes permiso para verificar líderes");
-      return;
-    }
-
     try {
       setLoading(true);
       setError("");
-      log("Verificando todos los líderes activos");
-
-      const result = await apiService.verifyAllLeaders();
-      log("Resultado de verificación", result);
-
-      setVerificationResult(result);
-      setShowVerifyAllModal(true);
-
-      await loadLeaders();
-
-      logUserAction("verify_all_leaders", {
-        totalVerified: result.totalVerified,
-        suspended: result.suspended,
-        timestamp: new Date().toISOString(),
-      });
+      const data = await apiService.getLeaders();
+      setAllLeaders(data || []);
     } catch (err) {
-      logError("Error en verificación masiva:", err);
-      setError("Error al verificar líderes");
+      setError("No se pudieron sincronizar los líderes");
     } finally {
       setLoading(false);
     }
-  }, [loadLeaders, userPermissions.canVerify]);
+  }, []);
 
-  // ========== REACTIVATE SUSPENDED ==========
-  const handleReactivateSuspended = useCallback(async () => {
-    // Verificar permiso
-    if (!userPermissions.canReactivateSuspended) {
-      setError("No tienes permiso para reactivar líderes");
-      return;
+  const loadStats = useCallback(async () => {
+    try {
+       const stats = await apiService.getLeaderStatistics();
+       setStatsData(stats);
+    } catch (error) {
+       console.error("Error cargando Stats:", error);
     }
+  }, []);
 
-    // Mostrar modal de confirmación personalizado
-    setConfirmTitle("⚠️ Reactivar Líderes Suspendidos");
-    setConfirmMessage(
-      "¿Estás seguro de que deseas reactivar a TODOS los líderes suspendidos por asistencias?\n\n" +
-      "Esta acción:\n" +
-      "• Reactivará automáticamente a los líderes que cumplan los requisitos\n" +
-      "• Verificará que tengan las asistencias necesarias (mínimo 75% en los últimos 3 meses)\n" +
-      "• Los líderes que no cumplan con el mínimo de asistencias permanecerán suspendidos\n" +
-      "• Se registrará la fecha de reactivación\n\n" +
-      "Esta operación no se puede deshacer automáticamente.\n\n" +
-      "¿Deseas continuar?"
-    );
-    setConfirmAction(() => async () => {
-      try {
-        setLoading(true);
-        setError("");
-        log("Intentando reactivar líderes suspendidos");
+  useEffect(() => {
+    loadLeaders();
+    loadStats();
+  }, [loadLeaders, loadStats]);
 
-        const result = await apiService.reactivateSuspendedLeaders();
-
-        if (result.reactivated > 0) {
-          const namesList = result.reactivatedLeaves 
-            ? result.reactivatedLeaders.map(l => l.memberName).join(', ')
-            : '';
-          
-          setSuccessMessage(
-            `✅ ${result.reactivated} líder(es) reactivado(s) exitosamente${namesList ? `: ${namesList}` : ''}`
-          );
-        } else {
-          setSuccessMessage(
-            "✅ No se encontraron líderes suspendidos que cumplan requisitos",
-          );
-        }
-
-        await loadLeaders();
-
-        logUserAction("reactivate_suspended", {
-          reactivated: result.reactivated,
-          timestamp: new Date().toISOString(),
-        });
-
-        setTimeout(() => setSuccessMessage(""), 5000);
-      } catch (err) {
-        logError("Error reactivando suspendidos:", err);
-        setError("Error al reactivar líderes");
-      } finally {
-        setLoading(false);
-      }
+  const filteredLeaders = useMemo(() => {
+    return allLeaders.filter(l => {
+      const name = l.memberName || "";
+      const doc = l.memberDocument || "";
+      const matchesSearch = !searchTerm || 
+        name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        doc.includes(searchTerm);
+      const matchesStatus = filters.status === "ALL" || l.status === filters.status;
+      const matchesType = filters.type === "ALL" || l.leaderType === filters.type;
+      return matchesSearch && matchesStatus && matchesType;
     });
-    
-    setShowConfirmModal(true);
-  }, [loadLeaders, userPermissions.canReactivateSuspended]);
+  }, [allLeaders, searchTerm, filters]);
 
-  // ========== SHOW STATISTICS ==========
-  const handleShowStatistics = useCallback(async () => {
-    try {
-      setLoading(true);
-      log("Cargando estadísticas de liderazgo");
-
-      const stats = await apiService.getLeaderStatistics();
-      log("Estadísticas recibidas", stats);
-
-      const dataWithContext = {
-        ...stats,
-        hasFilters: hasFiltersApplied,
-        filtersInfo: activeFiltersInfo,
-        currentViewCount: filteredLeaders.length,
-        totalCount: allLeaders.length,
-      };
-
-      setStatisticsData(dataWithContext);
-      setShowStatisticsModal(true);
-
-      logUserAction("view_leader_statistics", {
-        timestamp: new Date().toISOString(),
-      });
-    } catch (err) {
-      logError("Error cargando estadísticas:", err);
-      setError("Error al cargar estadísticas");
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    hasFiltersApplied,
-    activeFiltersInfo,
-    filteredLeaders.length,
-    allLeaders.length,
-  ]);
-
-  // ========== ACCIONES INDIVIDUALES (usadas por ModalLeaderDetail) ==========
-  const handleSuspendLeader = useCallback(
-    async (leaderId, memberName) => {
-      // Verificar permiso
-      if (!userPermissions.canSuspend) {
-        setError("No tienes permiso para suspender líderes");
-        return;
-      }
-
-      try {
-        const reason = window.prompt(
-          `Ingrese el motivo para suspender a ${memberName}:`,
-          "Incumplimiento de requisitos",
-        );
-
-        if (reason === null) return;
-        if (!reason.trim()) {
-          alert("Debe ingresar un motivo para la suspensión");
-          return;
-        }
-
-        setLoading(true);
-        log("Suspendiendo líder", { leaderId, reason });
-
-        await apiService.suspendLeader(leaderId, reason.trim());
-        setSuccessMessage(`✅ Líder ${memberName} suspendido exitosamente`);
-
-        await loadLeaders();
-        setTimeout(() => setSuccessMessage(""), 5000);
-      } catch (err) {
-        logError("Error suspendiendo líder:", err);
-        setError(`Error al suspender líder: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadLeaders, userPermissions.canSuspend],
-  );
-
-  const handleUnsuspendLeader = useCallback(
-    async (leaderId, memberName) => {
-      // Verificar permiso
-      if (!userPermissions.canSuspend) {
-        setError("No tienes permiso para reactivar líderes suspendidos");
-        return;
-      }
-
-      try {
-        if (
-          !window.confirm(
-            `¿Está seguro de reactivar a ${memberName}? Se verificará que cumpla los requisitos.`,
-          )
-        ) {
-          return;
-        }
-
-        setLoading(true);
-        log("Reactivando líder suspendido", { leaderId });
-
-        await apiService.unsuspendLeader(leaderId);
-        setSuccessMessage(`✅ Líder ${memberName} reactivado exitosamente`);
-
-        await loadLeaders();
-        setTimeout(() => setSuccessMessage(""), 5000);
-      } catch (err) {
-        logError("Error reactivando líder:", err);
-
-        // ✅ Mostrar el mensaje del backend directamente si es un 400
-        const msg = err.message || "";
-        if (msg.includes("No cumple requisitos") || msg.includes("diezmos")) {
-          setError(`⚠️ No se puede reactivar a ${memberName}: ${msg}`);
-        } else {
-          setError(`Error al reactivar líder: ${msg}`);
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadLeaders, userPermissions.canSuspend],
-  );
-
-  const handleDeactivateLeader = useCallback(
-    async (leaderId, memberName) => {
-      // Verificar permiso
-      if (!userPermissions.canDelete) {
-        setError("No tienes permiso para desactivar líderes");
-        return;
-      }
-
-      try {
-        const reason = window.prompt(
-          `Ingrese el motivo para desactivar a ${memberName} (permanente):`,
-          "Renuncia / Traslado",
-        );
-
-        if (reason === null) return;
-        if (!reason.trim()) {
-          alert("Debe ingresar un motivo para la desactivación");
-          return;
-        }
-
-        if (
-          !window.confirm(
-            `⚠️ Esta acción es irreversible. ¿Desactivar permanentemente a ${memberName}?`,
-          )
-        ) {
-          return;
-        }
-
-        setLoading(true);
-        log("Desactivando líder", { leaderId, reason });
-
-        await apiService.deactivateLeader(leaderId, reason.trim());
-        setSuccessMessage(`✅ Líder ${memberName} desactivado exitosamente`);
-
-        await loadLeaders();
-        setTimeout(() => setSuccessMessage(""), 5000);
-      } catch (err) {
-        logError("Error desactivando líder:", err);
-        setError(`Error al desactivar líder: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadLeaders, userPermissions.canDelete],
-  );
-
-  const handleReactivateLeader = useCallback(
-    async (leaderId, memberName) => {
-      // Verificar permiso
-      if (!userPermissions.canEdit) {
-        setError("No tienes permiso para reactivar líderes inactivos");
-        return;
-      }
-
-      try {
-        if (
-          !window.confirm(
-            `¿Reactivar a ${memberName}? Se verificará que cumpla los requisitos actuales.`,
-          )
-        ) {
-          return;
-        }
-
-        setLoading(true);
-        log("Reactivando líder inactivo", { leaderId });
-
-        await apiService.reactivateLeader(leaderId);
-        setSuccessMessage(`✅ Líder ${memberName} reactivado exitosamente`);
-
-        await loadLeaders();
-        setTimeout(() => setSuccessMessage(""), 5000);
-      } catch (err) {
-        logError("Error reactivando líder inactivo:", err);
-        setError(`Error al reactivar líder: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadLeaders, userPermissions.canEdit],
-  );
-
-  const handleVerifyLeader = useCallback(
-    async (leaderId, memberName) => {
-      // Verificar permiso
-      if (!userPermissions.canVerify) {
-        setError("No tienes permiso para verificar líderes");
-        return;
-      }
-
-      try {
-        setLoading(true);
-        log("Verificando líder específico", { leaderId });
-
-        const result = await apiService.verifyLeader(leaderId);
-
-        if (result.wasSuspended) {
-          setSuccessMessage(
-            `⚠️ ${memberName} fue suspendido automáticamente por no cumplir requisitos`,
-          );
-        } else {
-          setSuccessMessage(
-            `✅ ${memberName} verificado, cumple todos los requisitos`,
-          );
-        }
-
-        await loadLeaders();
-        setTimeout(() => setSuccessMessage(""), 5000);
-      } catch (err) {
-        logError("Error verificando líder:", err);
-        setError(`Error al verificar líder: ${err.message}`);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loadLeaders, userPermissions.canVerify],
-  );
-
-  // ========== EDITAR LÍDER ==========
-  const handleEditLeader = useCallback(
-    async (leaderId, fields) => {
-      // Verificar permiso
-      if (!userPermissions.canEdit) {
-        setError("No tienes permiso para editar líderes");
-        return;
-      }
-
-      log("Editando líder", { leaderId, fields });
-
-      await apiService.updateLeader(
-        leaderId,
-        fields.leaderType || null,
-        fields.cellGroupCode !== undefined ? fields.cellGroupCode : null,
-        fields.notes !== undefined ? fields.notes : null,
-      );
-
-      setSuccessMessage("✅ Líder actualizado exitosamente");
-      await loadLeaders();
-      setTimeout(() => setSuccessMessage(""), 5000);
-
-      logUserAction("edit_leader", {
-        leaderId,
-        fields,
-        timestamp: new Date().toISOString(),
-      });
-    },
-    [loadLeaders, userPermissions.canEdit],
-  );
-
-  // ========== ELIMINAR LÍDER ==========
-  const handleDeleteLeader = useCallback(
-    async (leaderId, memberName) => {
-      // Verificar permiso
-      if (!userPermissions.canDelete) {
-        setError("No tienes permiso para eliminar líderes");
-        return;
-      }
-
-      log("Eliminando líder", { leaderId, memberName });
-
-      // Lanzar la llamada — si falla, el error burbujea al modal para mostrarlo
-      await apiService.deleteLeader(leaderId);
-
-      setSuccessMessage(`✅ Líder ${memberName} eliminado exitosamente`);
-
-      // Cerrar modal y limpiar selección antes de recargar
-      setShowDetailModal(false);
-      setSelectedLeader(null);
-
-      await loadLeaders();
-      setTimeout(() => setSuccessMessage(""), 5000);
-
-      logUserAction("delete_leader", {
-        leaderId,
-        memberName,
-        timestamp: new Date().toISOString(),
-      });
-    },
-    [loadLeaders, userPermissions.canDelete],
-  );
-
-  // ========== EXPORT PDF ==========
-  const handleExportPDF = useCallback(() => {
-    try {
-      log("Generando PDF de líderes");
-
-      const dataForPDF = hasFiltersApplied ? filteredLeaders : allLeaders;
-
-      const active = dataForPDF.filter((l) => l.status === "ACTIVE");
-      const suspended = dataForPDF.filter((l) => l.status === "SUSPENDED");
-      const inactive = dataForPDF.filter((l) => l.status === "INACTIVE");
-
-      const data = {
-        leaders: dataForPDF,
-        title: hasFiltersApplied
-          ? "Reporte de Líderes (Filtrados)"
-          : "Reporte General de Líderes",
-        type:
-          selectedType !== "ALL"
-            ? LEADER_TYPE_MAP[selectedType]?.label
-            : "Todos los Tipos",
-        status:
-          selectedStatus !== "ALL"
-            ? LEADER_STATUS_MAP[selectedStatus]?.label
-            : "Todos los Estados",
-        date: new Date().toLocaleDateString("es-CO"),
-        activeCount: active.length,
-        suspendedCount: suspended.length,
-        inactiveCount: inactive.length,
-        totalCount: dataForPDF.length,
-        hasFilters: hasFiltersApplied,
-        filtersInfo: activeFiltersInfo,
-        byType: {
-          SERVANT: dataForPDF.filter((l) => l.leaderType === "SERVANT").length,
-          LEADER_144: dataForPDF.filter((l) => l.leaderType === "LEADER_144")
-            .length,
-          LEADER_12: dataForPDF.filter((l) => l.leaderType === "LEADER_12")
-            .length,
-        },
-      };
-
-      generateLeadersPDF(data);
-
-      logUserAction("export_leaders_pdf", {
-        hasFilters: hasFiltersApplied,
-        count: dataForPDF.length,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (err) {
-      logError("Error generando PDF:", err);
-      setError("Error al generar PDF");
-    }
-  }, [
-    hasFiltersApplied,
-    filteredLeaders,
-    allLeaders,
-    selectedType,
-    selectedStatus,
-    activeFiltersInfo,
-  ]);
-
-  // ========== RENDER HELPERS ==========
-  const renderStatusBadge = (status) => {
-    const statusInfo = LEADER_STATUS_MAP[status] || {
-      label: status,
-      icon: "•",
-      color: "#6b7280",
+  const handleExportPDF = () => {
+    const data = {
+      leaders: filteredLeaders,
+      title: "Censo de Liderazgo Ministerial",
+      totalCount: filteredLeaders.length,
+      date: new Date().toLocaleDateString()
     };
-
-    return (
-      <span
-        className="leaders-page__status-badge"
-        style={{
-          backgroundColor: isDarkMode
-            ? `${statusInfo.color}20`
-            : `${statusInfo.color}10`,
-          color: statusInfo.color,
-          borderColor: isDarkMode
-            ? `${statusInfo.color}40`
-            : `${statusInfo.color}30`,
-        }}
-      >
-        {statusInfo.icon} {statusInfo.label}
-      </span>
-    );
+    generateLeadersPDF(data);
   };
 
-  const renderTypeBadge = (type) => {
-    const typeInfo = LEADER_TYPE_MAP[type] || {
-      label: type,
-      icon: "👤",
-      color: "#3b82f6",
-    };
+  const handleVerifyAll = async () => {
+    if (!canManage) return;
+    try {
+      setLoading(true);
+      const result = await apiService.verifyAllLeaders();
+      setSuccessMessage(`✅ Verificación completada: ${result.suspended} suspendidos.`);
+      loadLeaders();
+      setTimeout(() => setSuccessMessage(""), 5000);
+    } catch (err) {
+      setError("Error en verificación masiva");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return (
-      <span
-        className="leaders-page__type-badge"
-        style={{
-          backgroundColor: isDarkMode
-            ? `${typeInfo.color}20`
-            : `${typeInfo.color}10`,
-          color: typeInfo.color,
-          borderColor: isDarkMode
-            ? `${typeInfo.color}40`
-            : `${typeInfo.color}30`,
-        }}
-      >
-        {typeInfo.icon} {typeInfo.label}
-      </span>
-    );
+  // Handlers ModalLeaderDetail
+  const handleVerifyLeader = async (id, memberName) => {
+    setActionLoading(true);
+    try {
+      await apiService.verifyLeader(id);
+      await loadLeaders();
+      setSelectedLeader(prev => prev ? {...prev, lastVerificationDate: new Date().toISOString()} : null);
+    } catch (e) {
+      console.error(e);
+      throw e;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSuspendLeader = async (id, memberName) => {
+    const reason = window.prompt(`Motivo de suspensión para ${memberName}:`);
+    if(!reason) return;
+    setActionLoading(true);
+    try {
+      await apiService.suspendLeader(id, reason);
+      await loadLeaders();
+      setSelectedLeader(prev => prev ? {...prev, status: 'SUSPENDED', suspensionReason: reason} : null);
+    } catch(e) {
+      throw e;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnsuspendLeader = async (id, memberName) => {
+    setActionLoading(true);
+    try {
+      await apiService.unsuspendLeader(id);
+      await loadLeaders();
+      setSelectedLeader(prev => prev ? {...prev, status: 'ACTIVE'} : null);
+    } catch(e) {
+      throw e;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeactivateLeader = async (id, memberName) => {
+    const reason = window.prompt(`Motivo de desactivación para ${memberName}:`);
+    if(!reason) return;
+    setActionLoading(true);
+    try {
+      await apiService.deactivateLeader(id, reason);
+      await loadLeaders();
+      setSelectedLeader(prev => prev ? {...prev, status: 'INACTIVE', deactivationReason: reason} : null);
+    } catch(e) {
+      throw e;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReactivateLeader = async (id, memberName) => {
+    setActionLoading(true);
+    try {
+      await apiService.reactivateLeader(id);
+      await loadLeaders();
+      setSelectedLeader(prev => prev ? {...prev, status: 'ACTIVE'} : null);
+    } catch(e) {
+      throw e;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleEditLeader = async (id, payload) => {
+    setActionLoading(true);
+    try {
+      await apiService.updateLeader(id, payload.leaderType, payload.cellGroupCode, payload.notes);
+      await loadLeaders();
+      const updated = await apiService.getLeaderById(id);
+      setSelectedLeader(updated);
+    } catch(e) {
+      throw e; 
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteLeader = async (id) => {
+    setActionLoading(true);
+    try {
+      await apiService.deleteLeader(id);
+      await loadLeaders();
+      setModals({...modals, detail: false});
+    } catch(e) {
+      throw e;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openStatsModal = async () => {
+    await loadStats();
+    let statsPayload = statsData || { totalLeaders: 0, activeLeaders: 0, byType: {} };
+    if (filters.status !== 'ALL' || filters.type !== 'ALL' || searchTerm) {
+      statsPayload = {
+         ...statsPayload,
+         hasFilters: true,
+         currentViewCount: filteredLeaders.length,
+         totalCount: allLeaders.length,
+         filtersInfo: {
+            status: filters.status !== 'ALL' ? LEADER_STATUS_CONFIG[filters.status].label : null,
+            type: filters.type !== 'ALL' ? LEADER_TYPE_CONFIG[filters.type].label : null,
+            search: searchTerm || null
+         }
+      };
+    }
+    setStatsData(statsPayload);
+    setModals({...modals, stats: true});
   };
 
   return (
-    <div
-      className="leaders-page"
-      style={{
-        backgroundColor: theme.bg,
-        color: theme.text,
-        transition: "all 0.3s ease",
-      }}
-    >
-      <div className="leaders-page-container">
-        {/* HEADER con información de usuario */}
-        <div className="leaders-page__header">
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem'
-          }}>
-            <h1>👥 Gestión de Líderes</h1>
-            {user && (
-              <div 
-                className="user-role-badge"
-                style={{
-                  backgroundColor: isDarkMode ? '#2d3748' : '#e2e8f0',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '20px',
-                  fontSize: '0.9rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  flexWrap: 'wrap'
-                }}
-              >
-                <span>👤 {user.username || user.name}</span>
-                <span style={{
-                  backgroundColor: canPerformCrud ? '#48bb78' : '#4299e1',
-                  color: 'white',
-                  padding: '0.2rem 0.5rem',
-                  borderRadius: '12px',
-                  fontSize: '0.8rem',
-                  fontWeight: 'bold'
-                }}>
-                  {canPerformCrud ? '🔓 Admin' : '👁️ Visor'}
-                </span>
-                {user.roles && user.roles.length > 0 && (
-                  <span style={{
-                    fontSize: '0.8rem',
-                    color: isDarkMode ? '#a0aec0' : '#4a5568'
-                  }}>
-                    ({user.roles.map(r => typeof r === 'string' ? r : r.name).join(', ')})
-                  </span>
-                )}
-              </div>
-            )}
+    <div className="max-w-7xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-6 duration-1000 p-4 md:p-8">
+      
+      {/* ── TOP HEADER ── */}
+      <div className="bg-white dark:bg-slate-900 p-8 md:p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl shadow-blue-500/5 flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-bl-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-1000 pointer-events-none" />
+        
+        <div className="space-y-4 relative z-10">
+          <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400 font-black text-xs uppercase tracking-[0.4em]">
+            <Crown size={16} className="animate-pulse" /> Gobierno & Visión
           </div>
-          <p>
-            Promueve, verifica y administra líderes (Servidores, Líderes 144 y Líderes 12)
-          </p>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-slate-900 dark:text-white leading-tight">
+            Gestión de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Liderazgo</span>
+          </h1>
+          <div className="flex items-center gap-4">
+            <div className="bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-2xl flex items-center gap-2 border border-emerald-100 dark:border-emerald-800/50">
+              <Users size={18} className="text-emerald-500" />
+              <span className="text-emerald-700 dark:text-emerald-400 font-bold text-sm tracking-tight">{allLeaders.length} Líderes en Total</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest">
+              <Zap size={14} className="text-amber-500" /> Sistema de Auditoría Activo
+            </div>
+          </div>
         </div>
 
-        {/* CONTROLES */}
-        <div className="leaders-page__controls">
-          <div className="leaders-page__controls-grid">
-            {/* Búsqueda */}
-            <div className="leaders-page__filter-item">
-              <label>🔍 Buscar</label>
-              <input
-                type="text"
-                placeholder="Nombre, documento, email, célula..."
-                value={searchText}
-                onChange={(e) =>
-                  setSearchText(validateSearchText(e.target.value))
-                }
-                maxLength="100"
-                style={{
-                  backgroundColor: theme.bgSecondary,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              />
-            </div>
-
-            {/* Filtro por Estado */}
-            <div className="leaders-page__filter-item">
-              <label>📌 Estado</label>
-              <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-                style={{
-                  backgroundColor: theme.bgSecondary,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              >
-                <option value="ALL">
-                  Todos los Estados ({allLeaders.length})
-                </option>
-                <option value="ACTIVE">
-                  ✅ Activos (
-                  {allLeaders.filter((l) => l.status === "ACTIVE").length})
-                </option>
-                <option value="SUSPENDED">
-                  ⏸️ Suspendidos (
-                  {allLeaders.filter((l) => l.status === "SUSPENDED").length})
-                </option>
-                <option value="INACTIVE">
-                  ⏹️ Inactivos (
-                  {allLeaders.filter((l) => l.status === "INACTIVE").length})
-                </option>
-              </select>
-            </div>
-
-            {/* Filtro por Tipo */}
-            <div className="leaders-page__filter-item">
-              <label>✨ Tipo</label>
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value)}
-                style={{
-                  backgroundColor: theme.bgSecondary,
-                  color: theme.text,
-                  borderColor: theme.border,
-                }}
-              >
-                <option value="ALL">Todos los Tipos</option>
-                <option value="SERVANT">
-                  🌱 Servidores (
-                  {allLeaders.filter((l) => l.leaderType === "SERVANT").length})
-                </option>
-                <option value="LEADER_144">
-                  🌿 Líderes 144 (
-                  {
-                    allLeaders.filter((l) => l.leaderType === "LEADER_144")
-                      .length
-                  }
-                  )
-                </option>
-                <option value="LEADER_12">
-                  🌳 Líderes 12 (
-                  {
-                    allLeaders.filter((l) => l.leaderType === "LEADER_12")
-                      .length
-                  }
-                  )
-                </option>
-              </select>
-            </div>
-          </div>
-
-          {/* BOTONES DE ACCIÓN - Condicionales según permisos */}
-          <div className="leaders-page__actions">
-            {userPermissions.canPromote && (
-              <button
-                className="leaders-page__btn leaders-page__btn--primary"
-                onClick={() => setShowPromoteModal(true)}
-                title="Promover miembro a líder"
-              >
-                🌟 Promover
-              </button>
-            )}
-
-            {userPermissions.canViewStatistics && (
-              <button
-                className="leaders-page__btn leaders-page__btn--secondary"
-                onClick={handleShowStatistics}
-                title="Ver estadísticas de liderazgo"
-                disabled={loading}
-              >
-                📊 Estadísticas {hasFiltersApplied && "🔍"}
-              </button>
-            )}
-
-            {userPermissions.canExport && (
-              <button
-                className="leaders-page__btn leaders-page__btn--export"
-                onClick={handleExportPDF}
-                title="Exportar a PDF"
-                disabled={loading}
-              >
-                📄 PDF {hasFiltersApplied && "🔍"}
-              </button>
-            )}
-
-            {userPermissions.canVerify && (
-              <button
-                className="leaders-page__btn leaders-page__btn--verify-all"
-                onClick={handleVerifyAll}
-                title="Verificar todos los líderes activos"
-                disabled={loading}
-              >
-                🔄 Verificar Todos
-              </button>
-            )}
-
-            {userPermissions.canReactivateSuspended && (
-              <button
-                className="leaders-page__btn leaders-page__btn--reactivate-all"
-                onClick={handleReactivateSuspended}
-                title="Intentar reactivar suspendidos"
-                disabled={loading}
-              >
-                ▶️ Reactivar Suspendidos
-              </button>
-            )}
-
-            <button
-              className="leaders-page__btn leaders-page__btn--refresh"
-              onClick={loadLeaders}
-              disabled={loading}
-              title="Recargar datos"
+        <div className="flex flex-wrap gap-4 relative z-10">
+          <button 
+            onClick={handleExportPDF}
+            className="flex items-center gap-3 px-6 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] font-black text-sm hover:bg-slate-100 dark:hover:bg-slate-700 hover:shadow-xl hover:-translate-y-1 transition-all group/btn"
+          >
+            <FileText size={20} className="group-hover/btn:rotate-12 transition-transform" /> Exportar Censo
+          </button>
+          <button 
+            onClick={openStatsModal}
+            className="flex items-center gap-3 px-6 py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-[1.5rem] font-black text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/60 hover:shadow-xl hover:-translate-y-1 transition-all group/btn"
+          >
+            <BarChart3 size={20} className="group-hover/btn:scale-110 transition-transform" /> Analíticas
+          </button>
+          {canManage && (
+            <button 
+              onClick={() => setModals({ ...modals, promote: true })}
+              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-[1.5rem] font-black text-sm shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-1 active:scale-95 transition-all group/btn"
             >
-              🔄 Recargar
+              <UserPlus size={20} className="group-hover/btn:scale-110 transition-transform" /> Promover Líder
             </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── KPI GRID ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        {Object.entries(LEADER_TYPE_CONFIG).map(([type, config]) => {
+          const count = allLeaders.filter(l => l.leaderType === type).length;
+          return (
+            <div key={type} className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 relative group hover:border-blue-300 dark:hover:border-blue-900/50 hover:shadow-2xl hover:shadow-blue-500/5 transition-all duration-500 overflow-hidden">
+              <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${config.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-2xl -mr-10 -mt-10`} />
+              
+              <div className="flex items-center justify-between relative z-10">
+                <div className="space-y-2">
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">{config.label}</p>
+                  <h3 className="text-4xl font-black text-slate-900 dark:text-white flex items-baseline gap-1">
+                    {count}
+                    <span className="text-xs font-bold text-slate-400 tracking-tighter ml-1">MIEMBROS</span>
+                  </h3>
+                </div>
+                <div className={`w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center ${config.iconColor} shadow-xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500`}>
+                  {config.icon}
+                </div>
+              </div>
+              <div className="mt-6 w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${config.accent} transition-all duration-1000 ease-out delay-300`} 
+                  style={{ width: `${allLeaders.length > 0 ? (count / allLeaders.length) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── MAIN CONTENT CARD ── */}
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl shadow-blue-500/5 overflow-hidden">
+        
+        {/* Filtering Bar */}
+        <div className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-950/20">
+          <div className="relative flex-1 w-full group">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 group-focus-within:scale-110 transition-all" size={20} />
+            <input 
+              type="text" 
+              placeholder="Buscar por nombre, apellido o documento..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-14 md:h-16 pl-14 pr-8 bg-white dark:bg-slate-900 rounded-[1.5rem] font-bold text-sm outline-none border border-slate-200 dark:border-slate-800 focus:border-blue-400 dark:focus:border-blue-600 focus:ring-8 focus:ring-blue-50 dark:focus:ring-blue-900/10 transition-all text-slate-800 dark:text-slate-100 shadow-sm"
+            />
+          </div>
+          
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl shadow-inner">
+              <button 
+                onClick={() => setViewMode("grid")}
+                className={`p-3 rounded-xl transition-all ${viewMode === "grid" ? "bg-white dark:bg-slate-700 shadow-md text-blue-600 dark:text-blue-400 scale-105" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                <LayoutGrid size={20} />
+              </button>
+              <button 
+                onClick={() => setViewMode("list")}
+                className={`p-3 rounded-xl transition-all ${viewMode === "list" ? "bg-white dark:bg-slate-700 shadow-md text-blue-600 dark:text-blue-400 scale-105" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                <List size={20} />
+              </button>
+            </div>
+            {canManage && (
+              <button 
+                onClick={handleVerifyAll}
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-4 bg-slate-900 dark:bg-slate-700 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-black dark:hover:bg-slate-600 disabled:opacity-50 hover:shadow-xl hover:-translate-y-1 transition-all whitespace-nowrap active:scale-95"
+              >
+                <ShieldAlert size={18} className="text-amber-500" /> Auditoría Global
+              </button>
+            )}
           </div>
         </div>
 
-        {/* MENSAJE DE INFORMACIÓN DE PERMISOS */}
-        {!authLoading && !canPerformCrud && isAuthenticated() && (
-          <div 
-            className="permissions-info"
-            style={{
-              backgroundColor: isDarkMode ? '#1e3a8a20' : '#dbeafe',
-              color: isDarkMode ? '#93c5fd' : '#1e40af',
-              border: `1px solid ${isDarkMode ? '#3b82f6' : '#bfdbfe'}`,
-              marginTop: '1rem',
-              padding: '0.75rem',
-              borderRadius: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.9rem'
-            }}
-          >
-            <span>👁️</span>
-            <span>
-              Estás en modo <strong>solo lectura</strong>. 
-              Los roles <strong>PASTORES</strong> y <strong>DESPLIEGUE</strong> tienen permisos completos (crear, editar, eliminar, suspender, verificar).
-            </span>
-          </div>
-        )}
-
-        {/* INFORMACIÓN DE FILTROS */}
-        <div className="leaders-page__filter-info">
-          <p>
-            Mostrando <strong>{filteredLeaders.length}</strong> de{" "}
-            <strong>{allLeaders.length}</strong> líderes
-            {hasFiltersApplied && " (🔍 Con filtros aplicados)"}
-          </p>
+        {/* Extended Filters */}
+        <div className="px-8 py-5 flex flex-col sm:flex-row gap-6 border-b border-slate-100 dark:border-slate-800/50 bg-white dark:bg-slate-900">
+           <div className="flex flex-col gap-2 flex-1">
+             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1 flex items-center gap-2">
+               <Activity size={12} /> Filtrar por Estado
+             </span>
+             <select 
+               value={filters.status}
+               onChange={(e) => setFilters({...filters, status: e.target.value})}
+               className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl px-5 py-3 text-sm font-bold outline-none text-slate-800 dark:text-slate-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+             >
+               <option value="ALL">Todos los Estados</option>
+               {Object.entries(LEADER_STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+             </select>
+           </div>
+           <div className="flex flex-col gap-2 flex-1">
+             <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1 flex items-center gap-2">
+               <Crown size={12} /> Nivel de Jerarquía
+             </span>
+             <select 
+               value={filters.type}
+               onChange={(e) => setFilters({...filters, type: e.target.value})}
+               className="bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl px-5 py-3 text-sm font-bold outline-none text-slate-800 dark:text-slate-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all appearance-none cursor-pointer"
+             >
+               <option value="ALL">Cualquier Nivel</option>
+               {Object.entries(LEADER_TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+             </select>
+           </div>
         </div>
 
-        {/* MENSAJES */}
-        {error && (
-          <div
-            className="leaders-page__error"
-            style={{
-              backgroundColor: theme.errorBg,
-              borderColor: theme.errorBorder,
-              color: theme.errorText,
-            }}
-          >
-            ❌ {error}
-          </div>
-        )}
-
+        {/* Message Alert */}
         {successMessage && (
-          <div
-            className="leaders-page__success"
-            style={{
-              backgroundColor: theme.successBg,
-              borderColor: theme.successBorder,
-              color: theme.successText,
-            }}
-          >
-            {successMessage}
+          <div className="mx-8 mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50 rounded-2xl text-emerald-700 dark:text-emerald-400 font-bold text-sm flex items-center gap-3 animate-in fade-in zoom-in duration-300">
+            <CheckCircle2 size={18} /> {successMessage}
           </div>
         )}
 
-        {/* CONTENIDO PRINCIPAL */}
+        {/* Empty States / Loading / Content */}
         {loading ? (
-          <div className="leaders-page__loading" style={{ color: theme.text }}>
-            ⏳ Cargando líderes...
+          <div className="p-24 text-center space-y-6">
+            <div className="relative mx-auto w-16 h-16">
+              <RefreshCcw size={64} className="text-blue-500 animate-spin opacity-20" />
+              <ShieldCheck size={32} className="absolute inset-0 m-auto text-blue-600 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-lg font-black text-slate-800 dark:text-white">Sincronizando archivos maestro</p>
+              <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest animate-pulse">Verificando credenciales de acceso...</p>
+            </div>
           </div>
         ) : filteredLeaders.length === 0 ? (
-          <div className="leaders-page__empty">
-            <p>👥 No hay líderes que coincidan con los filtros</p>
-            {allLeaders.length === 0 && (
-              <p className="leaders-page__empty-hint">
-                💡 Promueve el primer líder usando el botón "Promover"
-              </p>
-            )}
+          <div className="p-24 text-center flex flex-col items-center">
+            <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 rounded-[2rem] flex items-center justify-center mb-8 border border-slate-100 dark:border-slate-700 shadow-inner">
+              <Ghost size={48} className="text-slate-300 dark:text-slate-600" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tighter">Sin coincidencias en el radar</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium max-w-xs leading-relaxed">Prueba ajustando los filtros de búsqueda o el nivel de jerarquía para encontrar lo que buscas.</p>
+            <button onClick={() => { setSearchTerm(""); setFilters({status: "ALL", type: "ALL"}); }} className="mt-8 text-blue-600 dark:text-blue-400 font-black text-xs uppercase tracking-widest hover:underline">Reiniciar Filtros</button>
+          </div>
+        ) : viewMode === "grid" ? (
+          <div className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 bg-slate-50/50 dark:bg-slate-950/20">
+            {filteredLeaders.map((leader, idx) => {
+              const typeCfg = LEADER_TYPE_CONFIG[leader.leaderType];
+              const statusCfg = LEADER_STATUS_CONFIG[leader.status];
+              return (
+              <div 
+                key={leader.id}
+                onClick={() => { setSelectedLeader(leader); setModals({...modals, detail: true}); }}
+                className="group relative bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-800 hover:shadow-[0_20px_50px_rgba(59,130,246,0.1)] transition-all duration-500 cursor-pointer overflow-hidden animate-in fade-in slide-in-from-bottom-4"
+                style={{ animationDelay: `${idx * 50}ms` }}
+              >
+                {/* Decorative Elements */}
+                <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${typeCfg.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-700 pointer-events-none rounded-bl-[4rem]`} />
+                <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none group-hover:scale-150 transition-transform duration-1000" />
+                
+                <div className="flex items-start justify-between mb-8 relative">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${typeCfg.gradient} flex items-center justify-center ${typeCfg.iconColor} font-black text-2xl shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
+                    {leader.memberName?.[0]?.toUpperCase()}
+                  </div>
+                  <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2 ${statusCfg.bgColor} ${statusCfg.textColor} border ${statusCfg.border} shadow-sm group-hover:-translate-y-1 transition-transform`}>
+                    <span className={`inline-block w-2 h-2 rounded-full ${statusCfg.dotColor} animate-pulse shadow-glow`} />
+                    {statusCfg.label}
+                  </div>
+                </div>
+
+                <div className="space-y-2 relative">
+                  <h4 className="text-xl font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors line-clamp-1 tracking-tighter">
+                    {getDisplayName(leader.memberName)}
+                  </h4>
+                  <div className="flex items-center gap-2.5 text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/50 w-fit px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700 group-hover:border-blue-200 dark:group-hover:border-blue-900 transition-colors">
+                     <span className={typeCfg.iconColor}>{typeCfg.icon}</span>
+                     {typeCfg.label}
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4 relative">
+                  <div className="flex items-center justify-between text-sm font-bold text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-2 uppercase text-[10px] tracking-widest"><Phone size={14} className="text-blue-400" /> Móvil</span>
+                    <span className="text-slate-800 dark:text-slate-200">{leader.memberPhone || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm font-bold text-slate-500 dark:text-slate-400">
+                    <span className="flex items-center gap-2 uppercase text-[10px] tracking-widest"><Clock size={14} className="text-blue-400" /> Promoción</span>
+                    <span className="text-slate-800 dark:text-slate-200">{new Date(leader.promotionDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center gap-2 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-500">
+                  <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Ver Perfil Completo</span>
+                  <ChevronRight size={14} className="text-blue-600 font-bold" />
+                </div>
+              </div>
+            )})}
           </div>
         ) : (
-          <div className="leaders-page__table-container">
-            <table className="leaders-page__table">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] border-collapse">
               <thead>
-                <tr>
-                  <th className="leaders-page__col-member">Líder</th>
-                  <th className="leaders-page__col-type">Tipo</th>
-                  <th className="leaders-page__col-status">Estado</th>
-                  <th className="leaders-page__col-group">Célula</th>
-                  <th className="leaders-page__col-date">Promoción</th>
-                  <th className="leaders-page__col-verified">Verificado</th>
+                <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                  <th className="px-8 py-6 text-left text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em]">Líder & Credencial</th>
+                  <th className="px-8 py-6 text-left text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em]">Rango de Gobierno</th>
+                  <th className="px-8 py-6 text-left text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em]">Estado Actual</th>
+                  <th className="px-8 py-6 text-left text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em]">Historial Auditoría</th>
+                  <th className="px-8 py-6 text-right text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-[0.2em]">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
-                {filteredLeaders.map((leader) => (
-                  <tr
-                    key={leader.id}
-                    className={`leaders-page__row leaders-page__row--${leader.status.toLowerCase()} leaders-page__row--clickable`}
-                    style={{
-                      backgroundColor: isDarkMode ? "#1a2332" : "#fff",
-                      borderColor: theme.border,
-                    }}
-                    onClick={() => handleRowClick(leader)}
-                    title="Click para ver detalles"
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                {filteredLeaders.map((leader, idx) => {
+                  const typeCfg = LEADER_TYPE_CONFIG[leader.leaderType];
+                  const statusCfg = LEADER_STATUS_CONFIG[leader.status];
+                  return (
+                  <tr 
+                    key={leader.id} 
+                    className="group hover:bg-slate-50/80 dark:hover:bg-blue-900/10 transition-all cursor-pointer" 
+                    onClick={() => { setSelectedLeader(leader); setModals({...modals, detail: true}); }}
                   >
-                    {/* Miembro */}
-                    <td className="leaders-page__col-member">
-                      <div className="leaders-page__member-info">
-                        <span className="leaders-page__avatar">👤</span>
-                        <div className="leaders-page__member-details">
-                          <span className="leaders-page__member-name">
-                            {leader.memberName}
-                          </span>
-                          <span className="leaders-page__member-meta">
-                            {leader.memberDocument || "Sin documento"}
-                          </span>
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-5">
+                        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${typeCfg.gradient} flex items-center justify-center ${typeCfg.iconColor} font-black text-lg shrink-0 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+                          {leader.memberName?.[0]?.toUpperCase()}
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-base font-black text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors tracking-tight">{getDisplayName(leader.memberName)}</p>
+                          <p className="text-xs font-bold text-slate-400 dark:text-slate-500 tracking-tight">{leader.memberEmail || 'Sin dirección de correo'}</p>
                         </div>
                       </div>
                     </td>
-
-                    {/* Tipo */}
-                    <td className="leaders-page__col-type">
-                      {renderTypeBadge(leader.leaderType)}
+                    <td className="px-8 py-6">
+                      <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <span className={typeCfg.iconColor}>{typeCfg.icon}</span>
+                        <span className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-tighter">{typeCfg.label}</span>
+                      </div>
                     </td>
-
-                    {/* Estado */}
-                    <td className="leaders-page__col-status">
-                      {renderStatusBadge(leader.status)}
-                    </td>
-
-                    {/* Célula */}
-                    <td className="leaders-page__col-group">
-                      {leader.cellGroupCode || "-"}
-                    </td>
-
-                    {/* Fecha Promoción */}
-                    <td className="leaders-page__col-date">
-                      {leader.promotionDateFormatted}
-                    </td>
-
-                    {/* Última Verificación */}
-                    <td className="leaders-page__col-verified">
-                      <span
-                        className="leaders-page__verified-badge"
-                        style={{
-                          backgroundColor: leader.lastVerificationDate
-                            ? isDarkMode
-                              ? "#10b98120"
-                              : "#d1fae5"
-                            : isDarkMode
-                              ? "#6b728020"
-                              : "#f3f4f6",
-                          color: leader.lastVerificationDate
-                            ? "#10b981"
-                            : "#6b7280",
-                        }}
-                      >
-                        {leader.lastVerificationDate
-                          ? `✅ ${leader.lastVerificationFormatted}`
-                          : "⏳ Nunca"}
+                    <td className="px-8 py-6">
+                      <span className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest ${statusCfg.bgColor} ${statusCfg.textColor} border ${statusCfg.border} shadow-sm`}>
+                        <span className={`w-2 h-2 rounded-full ${statusCfg.dotColor} shadow-glow`} />
+                        {statusCfg.label}
                       </span>
                     </td>
+                    <td className="px-8 py-6">
+                      <div className="flex flex-col gap-1">
+                        <p className="text-sm font-black text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                          {leader.lastVerificationDate 
+                            ? <><ShieldCheck size={16} className="text-emerald-500"/> {new Date(leader.lastVerificationDate).toLocaleDateString()}</> 
+                            : <><AlertTriangle size={16} className="text-amber-500 animate-pulse"/> Pendiente</>}
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tighter">Último Reporte de Guardia</p>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <button className="p-3 text-slate-300 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-2xl transition-all active:scale-90 shadow-sm border border-transparent hover:border-blue-100">
+                        <MoreVertical size={20} />
+                      </button>
+                    </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* ========== MODALES ========== */}
-
-      {/* Modal Detalle de Líder - Pasamos permisos */}
-      <ModalLeaderDetail
-        isOpen={showDetailModal}
-        onClose={() => {
-          setShowDetailModal(false);
-          setSelectedLeader(null);
-        }}
-        leader={selectedLeader}
-        isDarkMode={isDarkMode}
-        loading={loading}
-        permissions={userPermissions}
-        onVerify={handleVerifyLeader}
-        onSuspend={handleSuspendLeader}
-        onUnsuspend={handleUnsuspendLeader}
-        onDeactivate={handleDeactivateLeader}
-        onReactivate={handleReactivateLeader}
-        onEdit={handleEditLeader}
-        onDelete={handleDeleteLeader}
-      />
-
-      {/* Modal Promover - Solo visible si tiene permiso */}
-      {userPermissions.canPromote && (
-        <ModalPromoteLeader
-          isOpen={showPromoteModal}
-          onClose={() => setShowPromoteModal(false)}
-          onPromoteSuccess={() => {
-            setShowPromoteModal(false);
-            loadLeaders();
-          }}
+      {/* Modals Section */}
+      {modals.promote && (
+        <ModalPromoteLeader 
+          onClose={() => setModals({ ...modals, promote: false })} 
+          onSuccess={() => { setModals({ ...modals, promote: false }); loadLeaders(); }}
+        />
+      )}
+      {modals.stats && statsData && (
+        <ModalLeaderStatistics 
+          onClose={() => setModals({ ...modals, stats: false })} 
+          stats={statsData}
+        />
+      )}
+      {modals.detail && selectedLeader && (
+        <ModalLeaderDetail 
+          isOpen={modals.detail}
+          leader={selectedLeader}
+          loading={actionLoading}
+          onClose={() => { setModals({...modals, detail: false}); setSelectedLeader(null); }}
+          onVerify={handleVerifyLeader}
+          onSuspend={handleSuspendLeader}
+          onUnsuspend={handleUnsuspendLeader}
+          onDeactivate={handleDeactivateLeader}
+          onReactivate={handleReactivateLeader}
+          onEdit={handleEditLeader}
+          onDelete={handleDeleteLeader}
         />
       )}
 
-      {/* Modal Estadísticas */}
-      <ModalLeaderStatistics
-        isOpen={showStatisticsModal}
-        onClose={() => setShowStatisticsModal(false)}
-        data={statisticsData}
-        isDarkMode={isDarkMode}
-      />
-
-      {/* Modal de Confirmación Personalizado */}
-      {showConfirmModal && (
-        <div 
-          className="leaders-page__modal-overlay"
-          onClick={() => setShowConfirmModal(false)}
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }}
-        >
-          <div 
-            className="leaders-page__modal"
-            onClick={e => e.stopPropagation()}
-            style={{
-              backgroundColor: theme.bgSecondary,
-              borderRadius: '12px',
-              maxWidth: '500px',
-              width: '90%',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              border: `1px solid ${theme.border}`
-            }}
-          >
-            <div 
-              className="leaders-page__modal-header"
-              style={{
-                padding: '1.5rem',
-                borderBottom: `1px solid ${theme.border}`,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <h2 style={{ margin: 0, color: theme.text }}>
-                {confirmTitle || 'Confirmar Acción'}
-              </h2>
-              <button
-                onClick={() => setShowConfirmModal(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '1.5rem',
-                  cursor: 'pointer',
-                  color: theme.textSecondary
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div 
-              className="leaders-page__modal-body"
-              style={{
-                padding: '1.5rem',
-                color: theme.text,
-                whiteSpace: 'pre-line',
-                lineHeight: '1.6'
-              }}
-            >
-              {confirmMessage}
-            </div>
-            
-            <div 
-              className="leaders-page__modal-footer"
-              style={{
-                padding: '1.5rem',
-                borderTop: `1px solid ${theme.border}`,
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '1rem'
-              }}
-            >
-              <button
-                className="leaders-page__btn"
-                onClick={() => setShowConfirmModal(false)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: 'transparent',
-                  color: theme.text,
-                  cursor: 'pointer'
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                className="leaders-page__btn leaders-page__btn--primary"
-                onClick={async () => {
-                  setShowConfirmModal(false);
-                  if (confirmAction) {
-                    await confirmAction();
-                  }
-                }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
-                  border: 'none',
-                  backgroundColor: '#ef4444',
-                  color: 'white',
-                  cursor: 'pointer',
-                  fontWeight: 'bold'
-                }}
-              >
-                Sí, Reactivar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Verificación Masiva */}
-      {showVerifyAllModal && verificationResult && (
-        <div className="leaders-page__modal-overlay">
-          <div
-            className="leaders-page__modal"
-            style={{ backgroundColor: theme.bgSecondary }}
-          >
-            <div className="leaders-page__modal-header">
-              <h2>🔍 Resultado de Verificación Masiva</h2>
-              <button onClick={() => setShowVerifyAllModal(false)}>✕</button>
-            </div>
-            <div className="leaders-page__modal-body">
-              <p>✅ Verificación completada:</p>
-              <ul>
-                <li>
-                  <strong>Total verificados:</strong>{" "}
-                  {verificationResult.totalVerified}
-                </li>
-                <li>
-                  <strong>Aún válidos:</strong> {verificationResult.stillValid}
-                </li>
-                <li>
-                  <strong>Suspendidos:</strong> {verificationResult.suspended}
-                </li>
-              </ul>
-
-              {verificationResult.suspendedLeaders?.length > 0 && (
-                <>
-                  <h3>Líderes suspendidos automáticamente:</h3>
-                  <ul>
-                    {verificationResult.suspendedLeaders.map((item, idx) => (
-                      <li key={idx}>
-                        <strong>{item.memberName}</strong>: {item.reason}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
-            <div className="leaders-page__modal-footer">
-              <button
-                className="leaders-page__btn leaders-page__btn--primary"
-                onClick={() => setShowVerifyAllModal(false)}
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Floating Action Hint */}
+      <div className="text-center text-slate-400 dark:text-slate-600 text-[10px] font-black uppercase tracking-[0.3em] py-8">
+        Base de Datos de Liderazgo Ministerial — David Vision 2026
+      </div>
     </div>
   );
 };

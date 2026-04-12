@@ -1,663 +1,410 @@
-// ============================================
-// CellGroupsPage.jsx — Gestión de Células (refactorizado)
-// • Filas clickeables → ModalCellDetail (info + miembros + agregar)
-// • PDF de listado con filtros → cellGroupsPdfGenerator
-// ============================================
+// CellGroupsPage.jsx — fixes:
+// 1. openStats() fusiona allCells → data.cells llega al modal
+// 2. Eliminado className duplicado en botón de métricas
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import apiService from '../apiService';
 import { generateCellGroupsPDF } from '../services/cellGroupsPdfGenerator';
-import { logSecurityEvent, logUserAction } from '../utils/securityLogger';
 import nameHelper from '../services/nameHelper';
 import ModalCreateCell from '../components/ModalCreateCell';
 import ModalCellStatistics from '../components/ModalCellStatistics';
 import ModalCellDetail from '../components/ModalCellDetail';
-import '../css/CellGroupspage.css';
 import ModalLeaderDetail from '../components/ModalLeaderDetail';
+import { 
+  Home, Users, MapPin, MoreHorizontal, Search, Plus,
+  FileDown, BarChart3, ShieldCheck, Clock, TrendingUp,
+  LayoutGrid, List, RefreshCw, AlertTriangle, ChevronRight,
+  ShieldAlert, Calendar, CheckCircle2, X
+} from 'lucide-react';
 
 const { getDisplayName } = nameHelper;
 
-const DEBUG = process.env.REACT_APP_DEBUG === 'true';
-const log      = (msg, d) => DEBUG && console.log(`[CellGroupsPage] ${msg}`, d || '');
-const logError = (msg, e) => console.error(`[CellGroupsPage] ${msg}`, e);
-
-const escapeHtml = (text) => {
-  if (!text || typeof text !== 'string') return '';
-  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-  return text.replace(/[&<>"']/g, m => map[m]);
+const CELL_STATUS_CONFIG = {
+  ACTIVE:               { label:'Activa',            colorClass:'text-emerald-600 dark:text-emerald-400', bgClass:'bg-emerald-50 dark:bg-emerald-500/10',  borderClass:'border-emerald-100 dark:border-emerald-500/20', dotClass:'bg-emerald-500', icon:<ShieldCheck size={12}/> },
+  INCOMPLETE_LEADERSHIP:{ label:'Liderazgo Parcial', colorClass:'text-amber-600 dark:text-amber-400',   bgClass:'bg-amber-50 dark:bg-amber-500/10',    borderClass:'border-amber-100 dark:border-amber-500/20',   dotClass:'bg-amber-500',  icon:<AlertTriangle size={12}/> },
+  SUSPENDED:            { label:'Suspendida',         colorClass:'text-rose-600 dark:text-rose-400',     bgClass:'bg-rose-50 dark:bg-rose-500/10',      borderClass:'border-rose-100 dark:border-rose-500/20',     dotClass:'bg-rose-500',   icon:<ShieldAlert size={12}/> },
+  INACTIVE:             { label:'Inactiva',           colorClass:'text-slate-600 dark:text-slate-400',   bgClass:'bg-slate-50 dark:bg-slate-500/10',    borderClass:'border-slate-200 dark:border-slate-500/20',   dotClass:'bg-slate-400',  icon:<MoreHorizontal size={12}/> },
 };
 
-const validateSearchText = (text) => {
-  if (!text || typeof text !== 'string') return '';
-  return text.length > 100 ? text.substring(0, 100) : text.trim();
+const DISTRICT_CONFIG = {
+  PASTORES: { label:'Pastores',    colorClass:'text-indigo-600 dark:text-indigo-400',  bgClass:'bg-indigo-50 dark:bg-indigo-500/10',   borderClass:'border-indigo-100 dark:border-indigo-500/20' },
+  D1:       { label:'Distrito 1',  colorClass:'text-blue-600 dark:text-blue-400',      bgClass:'bg-blue-50 dark:bg-blue-500/10',       borderClass:'border-blue-100 dark:border-blue-500/20' },
+  D2:       { label:'Distrito 2',  colorClass:'text-emerald-600 dark:text-emerald-400',bgClass:'bg-emerald-50 dark:bg-emerald-500/10', borderClass:'border-emerald-100 dark:border-emerald-500/20' },
+  D3:       { label:'Distrito 3',  colorClass:'text-amber-600 dark:text-amber-400',    bgClass:'bg-amber-50 dark:bg-amber-500/10',     borderClass:'border-amber-100 dark:border-amber-500/20' },
 };
-
-// ── Constantes ────────────────────────────────────────────────────────────────
-
-const CELL_STATUS_MAP = {
-  ACTIVE: {
-    label: 'Activa', color: '#10b981', bgColor: '#d1fae5',
-    darkColor: '#34d399', darkBg: '#064e3b', icon: '✅',
-    description: 'Célula activa con todos los líderes completos',
-  },
-  INCOMPLETE_LEADERSHIP: {
-    label: 'Liderazgo Incompleto', color: '#f59e0b', bgColor: '#fed7aa',
-    darkColor: '#fbbf24', darkBg: '#78350f', icon: '⚠️',
-    description: 'Falta algún líder o alguno no está activo',
-  },
-  INACTIVE: {
-    label: 'Inactiva', color: '#6b7280', bgColor: '#e5e7eb',
-    darkColor: '#9ca3af', darkBg: '#1f2937', icon: '⏹️',
-    description: 'Célula desactivada manualmente',
-  },
-  SUSPENDED: {
-    label: 'Suspendida', color: '#ef4444', bgColor: '#fee2e2',
-    darkColor: '#f87171', darkBg: '#7f1d1d', icon: '⏸️',
-    description: 'Célula suspendida temporalmente',
-  },
-};
-
-const DISTRICT_MAP = {
-  PASTORES: { label: 'Pastores',    color: '#8b5cf6' },
-  D1:       { label: 'Distrito 1',  color: '#3b82f6' },
-  D2:       { label: 'Distrito 2',  color: '#10b981' },
-  D3:       { label: 'Distrito 3',  color: '#f59e0b' },
-};
-
-// ── Componente ────────────────────────────────────────────────────────────────
 
 const CellGroupsPage = () => {
+  const [allCells, setAllCells]               = useState([]);
+  const [loading, setLoading]                 = useState(true);
+  const [error, setError]                     = useState('');
+  const [successMessage, setSuccessMessage]   = useState('');
+  const [searchTerm, setSearchTerm]           = useState('');
+  const [viewMode, setViewMode]               = useState('grid');
+  const [filters, setFilters]                 = useState({ status:'ALL', district:'ALL', incompleteOnly:false });
+  const [modals, setModals]                   = useState({ create:false, stats:false, detail:false, verify:false, leader:false });
+  const [selectedCell, setSelectedCell]       = useState(null);
+  const [selectedLeader, setSelectedLeader]   = useState(null);
+  const [statsData, setStatsData]             = useState(null);
+  const [, setVerificationResult] = useState(null);
 
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [allCells, setAllCells]         = useState([]);
-  const [filteredCells, setFilteredCells] = useState([]);
-  const [loading, setLoading]           = useState(false);
-  const [error, setError]               = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-
-  // Filtros
-  const [selectedStatus,    setSelectedStatus]    = useState('ALL');
-  const [selectedDistrict,  setSelectedDistrict]  = useState('ALL');
-  const [searchText,        setSearchText]         = useState('');
-  const [showIncompleteOnly, setShowIncompleteOnly] = useState(false);
-
-  // Modales
-  const [showCreateModal,     setShowCreateModal]     = useState(false);
-  const [showStatisticsModal, setShowStatisticsModal] = useState(false);
-  const [statisticsData,      setStatisticsData]      = useState(null);
-  const [showVerifyAllModal,  setShowVerifyAllModal]  = useState(false);
-  const [verificationResult,  setVerificationResult]  = useState(null);
-
-  // Modal de detalle de célula (nuevo)
-  const [selectedCell, setSelectedCell] = useState(null);
-
-  const [selectedLeader, setSelectedLeader]       = useState(null);
-const [isLeaderDetailOpen, setIsLeaderDetailOpen] = useState(false);
-
-  // Filtros info
-  const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
-  const [activeFiltersInfo,  setActiveFiltersInfo]  = useState({});
-
-  // Dark mode
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // ── Dark mode detection ─────────────────────────────────────────────────────
-  useEffect(() => {
+  const loadCells = useCallback(async () => {
     try {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const savedMode   = localStorage.getItem('darkMode');
-      const htmlDark    = document.documentElement.classList.contains('dark-mode') ||
-                          document.documentElement.classList.contains('dark');
-      setIsDarkMode(savedMode === 'true' || htmlDark || prefersDark);
-
-      const observer = new MutationObserver(() => {
-        setIsDarkMode(
-          document.documentElement.classList.contains('dark-mode') ||
-          document.documentElement.classList.contains('dark')
-        );
-      });
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-
-      const mq = window.matchMedia('(prefers-color-scheme: dark)');
-      const handler = (e) => { if (!localStorage.getItem('darkMode')) setIsDarkMode(e.matches); };
-      mq.addEventListener('change', handler);
-
-      return () => { observer.disconnect(); mq.removeEventListener('change', handler); };
-    } catch (e) { logError('Error detectando dark mode:', e); }
+      setLoading(true);
+      const data = await apiService.getCells();
+      setAllCells(data || []);
+    } catch (err) {
+      setError('No se pudieron sincronizar las células');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const theme = {
-    bg:          isDarkMode ? '#0f172a' : '#f9fafb',
-    bgSecondary: isDarkMode ? '#1e293b' : '#ffffff',
-    text:        isDarkMode ? '#f3f4f6' : '#1f2937',
-    textSecondary: isDarkMode ? '#9ca3af' : '#6b7280',
-    border:      isDarkMode ? '#334155' : '#e5e7eb',
-    errorBg:     isDarkMode ? '#7f1d1d' : '#fee2e2',
-    errorBorder: '#ef4444',
-    errorText:   isDarkMode ? '#fecaca' : '#991b1b',
-    successBg:   isDarkMode ? '#14532d' : '#d1fae5',
-    successBorder: '#10b981',
-    successText: isDarkMode ? '#a7f3d0' : '#065f46',
+  useEffect(() => { loadCells(); }, [loadCells]);
+
+  const filteredCells = useMemo(() => {
+    return allCells
+      .filter(c => {
+        const matchesSearch    = !searchTerm || c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.mainLeaderName?.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus    = filters.status   === 'ALL' || c.status   === filters.status;
+        const matchesDistrict  = filters.district === 'ALL' || c.district === filters.district;
+        const matchesIncomplete= !filters.incompleteOnly || !c.hasAllLeadersActive;
+        return matchesSearch && matchesStatus && matchesDistrict && matchesIncomplete;
+      })
+      .sort((a, b) => (a.status === 'ACTIVE' ? -1 : 1));
+  }, [allCells, searchTerm, filters]);
+
+  const handleExportPDF = () => {
+    generateCellGroupsPDF(filteredCells, filters, filters.status !== 'ALL', { total: filteredCells.length });
   };
 
-  // ── Cargar células ─────────────────────────────────────────────────────────
-  const loadCells = useCallback(async () => {
-    setLoading(true); setError(''); setSuccessMessage('');
+  const handleVerifyAll = async () => {
     try {
-      log('Cargando células');
-      const cells = await apiService.getCells();
-      if (!cells || cells.length === 0) { setAllCells([]); return; }
-
-      const processed = cells.map(cell => ({
-        ...cell,
-        name:            escapeHtml(cell.name || 'Sin nombre'),
-        mainLeaderName:  getDisplayName(escapeHtml(cell.mainLeaderName  || 'Sin asignar')),
-        groupLeaderName: getDisplayName(escapeHtml(cell.groupLeaderName || 'Sin asignar')),
-        hostName:        getDisplayName(escapeHtml(cell.hostName        || 'Sin asignar')),
-        timoteoName:     getDisplayName(escapeHtml(cell.timoteoName     || 'Sin asignar')),
-        statusIcon:      CELL_STATUS_MAP[cell.status]?.icon  || '•',
-        statusLabel:     CELL_STATUS_MAP[cell.status]?.label || cell.status,
-        statusColor:     isDarkMode
-          ? CELL_STATUS_MAP[cell.status]?.darkColor
-          : CELL_STATUS_MAP[cell.status]?.color,
-        districtLabel:   cell.district ? DISTRICT_MAP[cell.district]?.label || cell.district : 'Sin distrito',
-        districtColor:   cell.district ? DISTRICT_MAP[cell.district]?.color : '#6b7280',
-        meetingTimeFormatted: cell.meetingTime
-          ? new Date(`2000-01-01T${cell.meetingTime}`).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
-          : 'No definido',
-        occupancyPercentage: cell.maxCapacity
-          ? Math.round((cell.currentMemberCount || 0) / cell.maxCapacity * 100)
-          : 0,
-        creationDateFormatted: cell.creationDate
-          ? new Date(cell.creationDate).toLocaleDateString('es-CO')
-          : '-',
-      }));
-
-      setAllCells(processed);
-      logUserAction('load_cells', { cellCount: processed.length, timestamp: new Date().toISOString() });
-
-    } catch (err) {
-      logError('Error cargando células:', err);
-      setError('Error al cargar la lista de células');
-      logSecurityEvent('cells_load_error', { errorType: 'api_error', timestamp: new Date().toISOString() });
-    } finally {
-      setLoading(false);
-    }
-  }, [isDarkMode]);
-
-  // ── Aplicar filtros ────────────────────────────────────────────────────────
-  const applyFilters = useCallback(() => {
-    try {
-      let filtered = [...allCells];
-      if (selectedStatus !== 'ALL')   filtered = filtered.filter(c => c.status === selectedStatus);
-      if (selectedDistrict !== 'ALL') filtered = filtered.filter(c => c.district === selectedDistrict);
-      if (showIncompleteOnly)         filtered = filtered.filter(c => !c.hasAllLeadersActive);
-      if (searchText.trim()) {
-        const q = searchText.toLowerCase().trim();
-        filtered = filtered.filter(c =>
-          c.name?.toLowerCase().includes(q) ||
-          c.mainLeaderName?.toLowerCase().includes(q) ||
-          c.groupLeaderName?.toLowerCase().includes(q) ||
-          c.hostName?.toLowerCase().includes(q) ||
-          c.timoteoName?.toLowerCase().includes(q) ||
-          c.meetingAddress?.toLowerCase().includes(q)
-        );
-      }
-      filtered.sort((a, b) => {
-        const order = { ACTIVE: 1, INCOMPLETE_LEADERSHIP: 2, SUSPENDED: 3, INACTIVE: 4 };
-        const diff  = (order[a.status] || 99) - (order[b.status] || 99);
-        return diff !== 0 ? diff : (a.name || '').localeCompare(b.name || '');
-      });
-      setFilteredCells(filtered);
-    } catch (e) {
-      logError('Error aplicando filtros:', e);
-      setFilteredCells(allCells);
-    }
-  }, [allCells, selectedStatus, selectedDistrict, showIncompleteOnly, searchText]);
-
-  useEffect(() => { loadCells(); }, [loadCells]);
-  useEffect(() => { applyFilters(); }, [applyFilters]);
-
-  // ── Detectar filtros activos ────────────────────────────────────────────────
-  useEffect(() => {
-    const active = selectedStatus !== 'ALL' || selectedDistrict !== 'ALL' ||
-                   showIncompleteOnly || searchText.trim() !== '';
-    setHasFiltersApplied(active);
-    if (active) {
-      const info = {};
-      if (selectedStatus !== 'ALL')  info.status    = CELL_STATUS_MAP[selectedStatus]?.label || selectedStatus;
-      if (selectedDistrict !== 'ALL') info.district  = DISTRICT_MAP[selectedDistrict]?.label  || selectedDistrict;
-      if (showIncompleteOnly)         info.incomplete = 'Solo liderazgo incompleto';
-      if (searchText.trim())          info.search     = validateSearchText(searchText);
-      setActiveFiltersInfo(info);
-    } else {
-      setActiveFiltersInfo({});
-    }
-  }, [selectedStatus, selectedDistrict, showIncompleteOnly, searchText]);
-
-  // ── Verificar todas ────────────────────────────────────────────────────────
-  const handleVerifyAll = useCallback(async () => {
-    setLoading(true); setError('');
-    try {
+      setLoading(true);
       const result = await apiService.verifyAllCells();
       setVerificationResult(result);
-      setShowVerifyAllModal(true);
-      await loadCells();
-      logUserAction('verify_all_cells', { totalVerified: result.totalVerified, timestamp: new Date().toISOString() });
+      setSuccessMessage(`Auditoría exitosa. Líderes suspendidos reportados: ${result?.totalSuspended || 0}`);
+      setTimeout(() => setSuccessMessage(''), 6000);
+      loadCells();
     } catch (err) {
-      logError('Error en verificación masiva:', err);
-      setError('Error al verificar células');
+      setError('Error en verificación sistémica');
     } finally {
       setLoading(false);
     }
-  }, [loadCells]);
+  };
 
-  // ── Estadísticas ───────────────────────────────────────────────────────────
-  const handleShowStatistics = useCallback(async () => {
-    setLoading(true);
+  // ✅ FIX: fusiona allCells en data para que el modal pueda calcular el censo
+  const openStats = async () => {
     try {
+      setLoading(true);
       const stats = await apiService.getCellStatistics();
-      setStatisticsData({
+      setStatsData({
         ...stats,
-        hasFilters: hasFiltersApplied,
-        filtersInfo: activeFiltersInfo,
-        currentViewCount: filteredCells.length,
-        totalCount: allCells.length,
+        cells: allCells,   // ← array de CellGroupDTO ya cargado en la página
       });
-      setShowStatisticsModal(true);
-      logUserAction('view_cell_statistics', { timestamp: new Date().toISOString() });
+      setModals(m => ({ ...m, stats: true }));
     } catch (err) {
-      logError('Error cargando estadísticas:', err);
-      setError('Error al cargar estadísticas');
+      setError('Error cargando métricas');
     } finally {
       setLoading(false);
     }
-  }, [hasFiltersApplied, activeFiltersInfo, filteredCells.length, allCells.length]);
-
-  // ── Exportar PDF del listado ────────────────────────────────────────────────
-  const handleExportPDF = useCallback(() => {
-    try {
-      const data   = hasFiltersApplied ? filteredCells : allCells;
-      const stats  = {
-        total:      data.length,
-        active:     data.filter(c => c.status === 'ACTIVE').length,
-        incomplete: data.filter(c => c.status === 'INCOMPLETE_LEADERSHIP').length,
-        suspended:  data.filter(c => c.status === 'SUSPENDED').length,
-        inactive:   data.filter(c => c.status === 'INACTIVE').length,
-      };
-      generateCellGroupsPDF(data, activeFiltersInfo, hasFiltersApplied, stats);
-      logUserAction('export_cells_pdf', { hasFilters: hasFiltersApplied, count: data.length, timestamp: new Date().toISOString() });
-    } catch (err) {
-      logError('Error generando PDF:', err);
-      setError('Error al generar PDF');
-    }
-  }, [hasFiltersApplied, filteredCells, allCells, activeFiltersInfo]);
-
-  // ── Render mini status badge ────────────────────────────────────────────────
-  const renderStatusBadge = (status) => {
-    const si = CELL_STATUS_MAP[status] || { label: status, icon: '•', color: '#6b7280', darkColor: '#9ca3af' };
-    const color = isDarkMode ? si.darkColor : si.color;
-    const bg    = isDarkMode ? `${si.darkBg}80` : si.bgColor;
-    return (
-      <span
-        className="cells-page__status-badge"
-        style={{ backgroundColor: bg, color, borderColor: color }}
-        title={si.description}
-      >
-        {si.icon} {si.label}
-      </span>
-    );
   };
 
-  // ── Render barra de ocupación ───────────────────────────────────────────────
-  const renderOccupancyBar = (cell) => {
-    const pct = cell.occupancyPercentage || 0;
-    const barColor = pct >= 90 ? '#ef4444' : pct >= 75 ? '#f59e0b' : '#10b981';
-    return (
-      <div className="cells-page__occupancy">
-        <div className="cells-page__occupancy-bar">
-          <div className="cells-page__occupancy-fill" style={{ width: `${pct}%`, backgroundColor: barColor }} />
-        </div>
-        <span className="cells-page__occupancy-text">
-          {cell.currentMemberCount || 0} / {cell.maxCapacity || '∞'}
-        </span>
-      </div>
-    );
-  };
-
-  // ── Main render ────────────────────────────────────────────────────────────
   return (
-    <div className="cells-page" style={{ backgroundColor: theme.bg, color: theme.text, transition: 'all 0.3s ease' }}>
-      <div className="cells-page-container">
+    <div className="max-w-7xl mx-auto space-y-8 md:space-y-12 pb-24 animate-in fade-in p-4 md:p-6 lg:p-8">
 
-        {/* HEADER */}
-        <div className="cells-page__header">
-          <h1>🏠 Gestión de grupos Célulares</h1>
-          <p>Administra los grupos célulares, sus líderes y miembros. Toca una fila para ver el detalle.</p>
-        </div>
-
-        {/* CONTROLES */}
-        <div className="cells-page__controls">
-          <div className="cells-page__controls-grid">
-            {/* Búsqueda */}
-            <div className="cells-page__filter-item">
-              <label>🔍 Buscar</label>
-              <input
-                type="text"
-                placeholder="Nombre, líder, dirección..."
-                value={searchText}
-                onChange={e => setSearchText(validateSearchText(e.target.value))}
-                maxLength="100"
-                style={{ backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border }}
-              />
+      {/* ALERTS */}
+      {(error || successMessage) && (
+        <div className={`mb-8 p-6 rounded-[2rem] flex items-center justify-between animate-shake border-2 ${error ? 'bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20 text-rose-600 dark:text-rose-400' : 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400'}`}>
+          <div className="flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${error ? 'bg-rose-500/20' : 'bg-emerald-500/20'}`}>
+              {error ? <ShieldAlert className="w-5 h-5"/> : <CheckCircle2 className="w-5 h-5"/>}
             </div>
-
-            {/* Filtro Estado */}
-            <div className="cells-page__filter-item">
-              <label>📌 Estado</label>
-              <select
-                value={selectedStatus}
-                onChange={e => setSelectedStatus(e.target.value)}
-                style={{ backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border }}
-              >
-                <option value="ALL">Todos los Estados ({allCells.length})</option>
-                <option value="ACTIVE">✅ Activas ({allCells.filter(c => c.status === 'ACTIVE').length})</option>
-                <option value="INCOMPLETE_LEADERSHIP">⚠️ Liderazgo Incompleto ({allCells.filter(c => c.status === 'INCOMPLETE_LEADERSHIP').length})</option>
-                <option value="SUSPENDED">⏸️ Suspendidas ({allCells.filter(c => c.status === 'SUSPENDED').length})</option>
-                <option value="INACTIVE">⏹️ Inactivas ({allCells.filter(c => c.status === 'INACTIVE').length})</option>
-              </select>
-            </div>
-
-            {/* Filtro Distrito */}
-            <div className="cells-page__filter-item">
-              <label>📍 Distrito</label>
-              <select
-                value={selectedDistrict}
-                onChange={e => setSelectedDistrict(e.target.value)}
-                style={{ backgroundColor: theme.bgSecondary, color: theme.text, borderColor: theme.border }}
-              >
-                <option value="ALL">Todos los Distritos</option>
-                {Object.entries(DISTRICT_MAP).map(([k, { label }]) => (
-                  <option key={k} value={k}>
-                    {label} ({allCells.filter(c => c.district === k).length})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <span className="font-black text-[10px] md:text-xs uppercase tracking-widest leading-relaxed max-w-[80%]">{error || successMessage}</span>
           </div>
-
-          {/* Checkbox + botones */}
-          <div className="cells-page__filters-row">
-            <label className="cells-page__checkbox">
-              <input
-                type="checkbox"
-                checked={showIncompleteOnly}
-                onChange={e => setShowIncompleteOnly(e.target.checked)}
-              />
-              <span>⚠️ Solo liderazgo incompleto</span>
-            </label>
-
-            <div className="cells-page__actions">
-              <button
-                className="cells-page__btn cells-page__btn--primary"
-                onClick={() => setShowCreateModal(true)}
-              >
-                ➕ Nuevo Altar
-              </button>
-
-              <button
-                className="cells-page__btn cells-page__btn--secondary"
-                onClick={handleShowStatistics}
-                disabled={loading}
-              >
-                📊 Estadísticas {hasFiltersApplied && '🔍'}
-              </button>
-
-              <button
-                className="cells-page__btn cells-page__btn--export"
-                onClick={handleExportPDF}
-                disabled={loading}
-                title={hasFiltersApplied ? 'Exportar células filtradas a PDF' : 'Exportar todas las células a PDF'}
-              >
-                📄 PDF {hasFiltersApplied && '🔍'}
-              </button>
-
-              <button
-                className="cells-page__btn cells-page__btn--verify-all"
-                onClick={handleVerifyAll}
-                disabled={loading}
-              >
-                🔄 Verificar Todas
-              </button>
-
-              <button
-                className="cells-page__btn cells-page__btn--refresh"
-                onClick={loadCells}
-                disabled={loading}
-              >
-                🔄 Recargar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Contador de registros */}
-        <div className="cells-page__filter-info">
-          <p>
-            Mostrando <strong>{filteredCells.length}</strong> de <strong>{allCells.length}</strong> células
-            {hasFiltersApplied && ' (🔍 Con filtros aplicados)'}
-          </p>
-        </div>
-
-        {/* Mensajes */}
-        {error && (
-          <div className="cells-page__error" style={{ backgroundColor: theme.errorBg, borderColor: theme.errorBorder, color: theme.errorText }}>
-            ❌ {error}
-          </div>
-        )}
-        {successMessage && (
-          <div className="cells-page__success" style={{ backgroundColor: theme.successBg, borderColor: theme.successBorder, color: theme.successText }}>
-            {successMessage}
-          </div>
-        )}
-
-        {/* TABLA */}
-        {loading ? (
-          <div className="cells-page__loading" style={{ color: theme.text }}>⏳ Cargando células...</div>
-        ) : filteredCells.length === 0 ? (
-          <div className="cells-page__empty">
-            <p>🏠 No hay células que coincidan con los filtros</p>
-            {allCells.length === 0 && (
-              <p className="cells-page__empty-hint">
-                💡 Crea la primera célula usando el botón "Nueva Célula"
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="cells-page__table-container">
-            <table className="cells-page__table">
-              <thead>
-                <tr>
-                  <th className="cells-page__col-name">Célula</th>
-                  <th className="cells-page__col-status">Estado</th>
-                  <th className="cells-page__col-leadership">Liderazgo</th>
-                  <th className="cells-page__col-district">Distrito</th>
-                  <th className="cells-page__col-meeting">Reunión</th>
-                  <th className="cells-page__col-occupancy">Ocupación</th>
-                  <th className="cells-page__col-multiplication">Multiplicación</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCells.map(cell => (
-                  <tr
-                    key={cell.id}
-                    className={`cells-page__row cells-page__row--${cell.status?.toLowerCase()} cells-page__row--clickable`}
-                    style={{ backgroundColor: isDarkMode ? '#1a2332' : '#fff', borderColor: theme.border, cursor: 'pointer' }}
-                    onClick={() => setSelectedCell(cell)}
-                    title={`Ver detalle de ${cell.name}`}
-                  >
-                    {/* Nombre */}
-                    <td className="cells-page__col-name">
-                      <div className="cells-page__cell-info">
-                        <span className="cells-page__cell-icon">🏠</span>
-                        <div className="cells-page__cell-details">
-                          <span className="cells-page__cell-name">{cell.name}</span>
-                          <span className="cells-page__cell-meta" style={{ color: theme.textSecondary }}>
-                            {cell.mainLeaderName}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Estado */}
-                    <td className="cells-page__col-status">
-                      {renderStatusBadge(cell.status)}
-                    </td>
-
-                    {/* Liderazgo */}
-                    <td className="cells-page__col-leadership">
-                      {cell.hasAllLeadersActive ? (
-                        <span className="cells-page__leadership-badge cells-page__leadership-badge--complete">✅ Completo</span>
-                      ) : (
-                        <span className="cells-page__leadership-badge cells-page__leadership-badge--incomplete">
-                          ⚠️ {cell.missingOrInactiveLeaders?.length || 0} problema(s)
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Distrito */}
-                    <td className="cells-page__col-district">
-                      <span
-                        className="cells-page__district-badge"
-                        style={{
-                          backgroundColor: isDarkMode ? `${cell.districtColor}20` : `${cell.districtColor}10`,
-                          color: cell.districtColor,
-                          borderColor: `${cell.districtColor}30`,
-                        }}
-                      >
-                        {cell.districtLabel}
-                      </span>
-                    </td>
-
-                    {/* Reunión */}
-                    <td className="cells-page__col-meeting">
-                      <div className="cells-page__meeting-info">
-                        <span className="cells-page__meeting-day">{cell.meetingDay || 'N/A'}</span>
-                        <span className="cells-page__meeting-time" style={{ color: theme.textSecondary }}>
-                          {cell.meetingTimeFormatted}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Ocupación */}
-                    <td className="cells-page__col-occupancy">
-                      {renderOccupancyBar(cell)}
-                    </td>
-
-                    {/* Multiplicación */}
-                    <td className="cells-page__col-multiplication">
-                      {cell.isMultiplying ? (
-                        <span className="cells-page__multiplying-badge">🌱 En multiplicación</span>
-                      ) : (
-                        <span className="cells-page__multiplication-count" style={{ color: theme.textSecondary }}>
-                          {cell.multiplicationCount || 0} {cell.multiplicationCount === 1 ? 'vez' : 'veces'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── MODALES ── */}
-
-      <ModalCreateCell
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onCreateSuccess={() => { setShowCreateModal(false); loadCells(); }}
-      />
-
-      <ModalCellStatistics
-        isOpen={showStatisticsModal}
-        onClose={() => setShowStatisticsModal(false)}
-        data={statisticsData}
-        isDarkMode={isDarkMode}
-      />
-
-      {/* Modal de detalle (click en fila) */}
-      <ModalCellDetail
-  isOpen={!!selectedCell}
-  cell={selectedCell}
-  onClose={() => setSelectedCell(null)}
-  onCellChanged={() => { loadCells(); }}
-  onOpenLeaderDetail={async (leaderId) => {
-    try {
-      const leader = await apiService.getLeaderById(leaderId);
-      setSelectedLeader(leader);
-      setIsLeaderDetailOpen(true);
-    } catch (err) {
-      console.error('Error cargando líder:', err);
-    }
-  }}
-/>
-
-<ModalLeaderDetail
-  isOpen={isLeaderDetailOpen}
-  leader={selectedLeader}
-  onClose={() => {
-    setIsLeaderDetailOpen(false);
-    setSelectedLeader(null);
-  }}
-  onLeaderChanged={() => {
-    loadCells();
-    setIsLeaderDetailOpen(false);
-    setSelectedLeader(null);
-  }}
-/>
-
-      {/* Modal verificación masiva */}
-      {showVerifyAllModal && verificationResult && (
-        <div className="cells-page__modal-overlay">
-          <div className="cells-page__modal" style={{ backgroundColor: theme.bgSecondary }}>
-            <div className="cells-page__modal-header">
-              <h2>🔍 Resultado de Verificación Masiva</h2>
-              <button onClick={() => setShowVerifyAllModal(false)}>✕</button>
-            </div>
-            <div className="cells-page__modal-body">
-              <p>✅ Verificación completada:</p>
-              <ul>
-                <li><strong>Total verificadas:</strong> {verificationResult.totalVerified}</li>
-                <li><strong>Cambiaron de estado:</strong> {verificationResult.statusChanged}</li>
-              </ul>
-              {verificationResult.changedCells?.length > 0 && (
-                <>
-                  <h3>Células que cambiaron de estado:</h3>
-                  <ul>
-                    {verificationResult.changedCells.map((item, idx) => (
-                      <li key={idx}>
-                        <strong>{item.cellName}</strong>: {item.previousStatus} → {item.newStatus}
-                        {item.reasons?.length > 0 && (
-                          <ul className="cells-page__reasons-list">
-                            {item.reasons.map((r, i) => <li key={i}>{r}</li>)}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-            </div>
-            <div className="cells-page__modal-footer">
-              <button className="cells-page__btn cells-page__btn--primary" onClick={() => setShowVerifyAllModal(false)}>
-                Cerrar
-              </button>
-            </div>
-          </div>
+          <button onClick={() => { setError(''); setSuccessMessage(''); }} className="p-2.5 bg-white/50 dark:bg-white/10 hover:bg-white dark:hover:bg-white/20 rounded-xl transition-all shrink-0">
+            <X className="w-4 h-4"/>
+          </button>
         </div>
       )}
+
+      {/* HEADER */}
+      <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-8 md:gap-10">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
+              <Home size={22} strokeWidth={2.5}/>
+            </div>
+            <div className="text-[10px] sm:text-xs font-black text-indigo-500 uppercase tracking-[0.3em] sm:tracking-[0.4em]">Red de Cuidado Familiar</div>
+          </div>
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter text-slate-900 dark:text-white leading-none">
+            Grupos de <span className="text-indigo-600 dark:text-indigo-500">Altar</span>
+          </h1>
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-2">
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <Users size={14} className="text-emerald-500"/> {allCells.length} hogares
+            </p>
+            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"/>
+            <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <ShieldCheck size={14} className="text-indigo-500"/> Cobertura Total
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3 sm:gap-4">
+          <button
+            onClick={handleExportPDF}
+            className="group flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 sm:px-8 py-3.5 sm:py-5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 shadow-sm whitespace-nowrap"
+          >
+            <FileDown size={18} className="group-hover:translate-y-0.5 transition-transform"/>
+            <span className="hidden sm:inline">Exportar Planilla</span><span className="sm:hidden">Exportar</span>
+          </button>
+
+          {/* ✅ FIX: eliminado className duplicado */}
+          <button
+            onClick={openStats}
+            className="flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 sm:px-8 py-3.5 sm:py-5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-[2rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all border border-indigo-100 dark:border-indigo-800/30 whitespace-nowrap"
+          >
+            <BarChart3 size={18}/>
+            <span className="hidden sm:inline">Panel de Métricas</span><span className="sm:hidden">Métricas</span>
+          </button>
+
+          <button
+            onClick={() => setModals(m => ({ ...m, create: true }))}
+            className="flex w-full sm:w-auto justify-center items-center gap-2 px-6 sm:px-10 py-3.5 sm:py-5 bg-indigo-600 text-white rounded-[2rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all whitespace-nowrap"
+          >
+            <Plus size={18} strokeWidth={3}/> Aperturar Altar
+          </button>
+        </div>
+      </div>
+
+      {/* SEARCH & CONTROLS */}
+      <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+          <div className="flex flex-col lg:flex-row items-center gap-4 md:gap-6">
+            <div className="relative flex-1 group w-full">
+              <Search className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-all" size={20}/>
+              <input
+                type="text"
+                placeholder="Identificar grupo por nombre..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full h-14 md:h-16 pl-12 md:pl-16 pr-6 bg-slate-50 dark:bg-slate-950/50 rounded-[1.5rem] font-medium text-sm outline-none border border-transparent focus:border-indigo-200 dark:focus:border-indigo-800 focus:ring-4 focus:ring-indigo-50 dark:focus:ring-indigo-900/20 transition-all text-slate-800 dark:text-slate-100"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 w-full lg:w-auto justify-between lg:justify-end overflow-x-auto no-scrollbar pb-2 lg:pb-0">
+              <div className="flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-[1.2rem] shrink-0">
+                <button onClick={() => setViewMode('grid')} className={`flex items-center justify-center p-2.5 sm:px-4 sm:py-2.5 rounded-[1rem] transition-all text-[10px] font-bold uppercase tracking-widest ${viewMode==='grid'?'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400':'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                  <LayoutGrid size={18}/> <span className="hidden sm:inline ml-2">Rejilla</span>
+                </button>
+                <button onClick={() => setViewMode('list')} className={`flex items-center justify-center p-2.5 sm:px-4 sm:py-2.5 rounded-[1rem] transition-all text-[10px] font-bold uppercase tracking-widest ${viewMode==='list'?'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400':'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}>
+                  <List size={18}/> <span className="hidden sm:inline ml-2">Listado</span>
+                </button>
+              </div>
+
+              <button onClick={handleVerifyAll} className="flex items-center gap-2 px-4 py-3 bg-slate-800 dark:bg-slate-700 text-white rounded-[1.2rem] font-bold text-[10px] uppercase tracking-widest hover:bg-slate-900 dark:hover:bg-slate-600 transition-all shrink-0 active:scale-95 shadow-sm whitespace-nowrap">
+                <ShieldAlert size={16} className="text-amber-500"/> <span className="hidden sm:inline">Auditoría Masiva</span>
+              </button>
+
+              <button onClick={loadCells} className="p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 rounded-[1.2rem] hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all shrink-0 active:rotate-180 duration-500" aria-label="Recargar">
+                <RefreshCw size={20} className={loading ? 'animate-spin' : ''}/>
+              </button>
+            </div>
+          </div>
+
+          {/* FILTERS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 pt-4 md:pt-6 border-t border-slate-100 dark:border-slate-800">
+            <div className="space-y-1.5 flex flex-col">
+              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-widest ml-1">Estado de Célula</span>
+              <select value={filters.status} onChange={e => setFilters({...filters, status:e.target.value})} className="w-full h-12 px-4 bg-white dark:bg-slate-800 rounded-xl font-medium text-sm outline-none border border-slate-200 dark:border-slate-700 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all">
+                <option value="ALL">Visualizar Todos</option>
+                {Object.entries(CELL_STATUS_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5 flex flex-col">
+              <span className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-widest ml-1">Cobertura (Distrito)</span>
+              <select value={filters.district} onChange={e => setFilters({...filters, district:e.target.value})} className="w-full h-12 px-4 bg-white dark:bg-slate-800 rounded-xl font-medium text-sm outline-none border border-slate-200 dark:border-slate-700 focus:border-indigo-500 text-slate-800 dark:text-slate-200 transition-all">
+                <option value="ALL">Toda la Jurisdicción</option>
+                {Object.entries(DISTRICT_CONFIG).map(([key, cfg]) => <option key={key} value={key}>{cfg.label}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center sm:justify-start lg:justify-center mt-2 sm:mt-6">
+              <label className="flex items-center gap-3 cursor-pointer group bg-slate-50 dark:bg-slate-800/50 px-4 md:px-6 py-2.5 md:py-3 rounded-[1rem] md:rounded-2xl border border-slate-100 dark:border-slate-700 hover:border-amber-300 dark:hover:border-amber-500/50 transition-all w-full sm:w-auto">
+                <div className="relative">
+                  <input type="checkbox" checked={filters.incompleteOnly} onChange={e => setFilters({...filters, incompleteOnly:e.target.checked})} className="sr-only peer"/>
+                  <div className="w-10 h-5 md:w-11 md:h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-amber-500 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 md:after:h-5 md:after:w-5 after:transition-all peer-checked:after:translate-x-5"/>
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">Alertas de Liderazgo</span>
+              </label>
+            </div>
+            <div className="flex items-center sm:justify-end mt-2 sm:mt-6">
+              <div className="px-4 md:px-6 py-2.5 md:py-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-[1rem] md:rounded-2xl border border-indigo-100 dark:border-indigo-800/50 w-full sm:w-auto text-center">
+                <span className="text-[10px] sm:text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">{filteredCells.length} Resultados</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div>
+        {loading && filteredCells.length === 0 ? (
+          <div className="p-20 text-center space-y-4">
+            <RefreshCw size={40} className="mx-auto text-indigo-500 animate-spin"/>
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Sincronizando Células...</p>
+          </div>
+        ) : filteredCells.length === 0 ? (
+          <div className="px-4 md:px-0">
+            <div className="bg-white dark:bg-slate-900 rounded-[2rem] p-16 md:p-24 text-center border border-slate-200 dark:border-slate-800">
+              <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle size={32} className="text-slate-400"/>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Sin Coincidencias</h3>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">Prueba ajustando los filtros o borra tu búsqueda.</p>
+            </div>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+            {filteredCells.map(cell => {
+              const status   = CELL_STATUS_CONFIG[cell.status] || CELL_STATUS_CONFIG.INACTIVE;
+              const district = DISTRICT_CONFIG[cell.district]  || { colorClass:'text-slate-600 dark:text-slate-400', bgClass:'bg-slate-50 dark:bg-slate-800', borderClass:'border-slate-200 dark:border-slate-700' };
+              const occupancy= Math.round(((cell.currentMemberCount||0) / (cell.maxCapacity||12)) * 100);
+              return (
+                <div
+                  key={cell.id}
+                  onClick={() => { setSelectedCell(cell); setModals(m => ({ ...m, detail:true })); }}
+                  className="group relative bg-white dark:bg-slate-900 rounded-[2.5rem] md:rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-200 dark:hover:border-indigo-800 hover:-translate-y-1 transition-all duration-300 overflow-hidden cursor-pointer flex flex-col"
+                >
+                  <div className="p-6 md:p-8 space-y-6 md:space-y-8 flex-1">
+                    <div className="flex items-center justify-between">
+                      <div className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${status.bgClass} ${status.colorClass} ${status.borderClass} border`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${status.dotClass} animate-pulse`}/>
+                        {status.label}
+                      </div>
+                      <div className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl ${district.bgClass} ${district.colorClass} ${district.borderClass} border font-bold text-[10px] tracking-widest uppercase`}>
+                        {district.label || cell.district}
+                      </div>
+                    </div>
+                    <div className="space-y-1 md:space-y-2">
+                      <h3 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-tight line-clamp-2">{cell.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-500 group-hover:bg-indigo-500 group-hover:text-white shrink-0 transition-colors">
+                          <ShieldCheck size={12}/>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-tight truncate">{getDisplayName(cell.mainLeaderName)}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <TrendingUp size={14} className={occupancy>90?'text-amber-500':'text-emerald-500'}/>
+                          <span>Aforo</span>
+                        </div>
+                        <span className={occupancy>90?'text-amber-500 font-black':'text-indigo-600 dark:text-indigo-400 font-black'}>{occupancy}%</span>
+                      </div>
+                      <div className="w-full h-2 md:h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200 dark:border-slate-700/50">
+                        <div className={`h-full transition-all duration-700 rounded-full shadow-sm ${occupancy>90?'bg-amber-500':'bg-indigo-500'}`} style={{ width:`${Math.min(occupancy,100)}%` }}/>
+                      </div>
+                    </div>
+                    <div className="pt-6 md:pt-8 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400">
+                        <Calendar size={16} className="text-slate-400 dark:text-slate-500"/> <span className="truncate">{cell.meetingDay}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-400 truncate">
+                        <MapPin size={16} className="text-slate-400 dark:text-slate-500 shrink-0"/> <span className="truncate">{cell.meetingAddress}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-2 md:p-3 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                    <div className="w-full bg-white dark:bg-slate-800 p-3 md:p-4 rounded-[1.5rem] md:rounded-[2rem] text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center justify-between shadow-sm border border-slate-100 dark:border-slate-700">
+                      <span>Ver Detalles</span>
+                      <ChevronRight size={18} strokeWidth={2.5}/>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px]">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Grupo Altar</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Liderazgo</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Estado</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Distrito</th>
+                    <th className="px-6 py-4 text-right text-xs font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Censo / Cap.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-700/50">
+                  {filteredCells.map(cell => {
+                    const status   = CELL_STATUS_CONFIG[cell.status] || CELL_STATUS_CONFIG.INACTIVE;
+                    const district = DISTRICT_CONFIG[cell.district]  || { label:cell.district, bgClass:'bg-slate-100 dark:bg-slate-800', colorClass:'text-slate-600 dark:text-slate-400', borderClass:'border-transparent' };
+                    return (
+                      <tr key={cell.id} onClick={() => { setSelectedCell(cell); setModals(m => ({ ...m, detail:true })); }} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors cursor-pointer group">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-[1rem] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg border border-indigo-100 dark:border-indigo-800/50 group-hover:scale-105 transition-transform shrink-0">
+                              {cell.name?.[0]?.toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{cell.name}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <Clock size={12} className="text-slate-400"/>
+                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{cell.meetingDay} • {cell.meetingTime}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck size={16} className="text-slate-400 dark:text-slate-500"/>
+                            <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">{getDisplayName(cell.mainLeaderName)}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold tracking-wide ${status.bgClass} ${status.colorClass} border ${status.borderClass}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${status.dotClass}`}/>
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-block px-3 py-1 rounded-lg text-xs font-bold tracking-wide border ${district.bgClass} ${district.colorClass} ${district.borderClass}`}>{district.label}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 font-bold text-slate-900 dark:text-white">
+                            <TrendingUp size={14} className="text-emerald-500"/>
+                            <span className="text-base">{cell.currentMemberCount}</span>
+                            <span className="text-slate-400 dark:text-slate-500 font-medium text-sm">/ {cell.maxCapacity || '--'}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* MODALS */}
+      <ModalCreateCell isOpen={modals.create} onClose={() => setModals(m => ({ ...m, create:false }))} onCreateSuccess={loadCells}/>
+      <ModalCellStatistics isOpen={modals.stats} onClose={() => setModals(m => ({ ...m, stats:false }))} data={statsData}/>
+      <ModalCellDetail
+        isOpen={modals.detail}
+        cell={selectedCell}
+        onClose={() => setModals(m => ({ ...m, detail:false }))}
+        onCellChanged={loadCells}
+        onOpenLeaderDetail={async id => {
+          const leader = await apiService.getLeaderById(id);
+          setSelectedLeader(leader);
+          setModals(m => ({ ...m, leader:true }));
+        }}
+      />
+      <ModalLeaderDetail isOpen={modals.leader} leader={selectedLeader} onClose={() => setModals(m => ({ ...m, leader:false }))} onLeaderChanged={loadCells}/>
     </div>
   );
 };

@@ -1,956 +1,332 @@
-// 👥 MembersPage MEJORADO - CON FILTROS AVANZADOS Y GENERADOR PDF
-// ✅ Filtros por: Género, Distrito, Líder
-// ✅ Botón limpiar filtros
-// ✅ Generar PDF del resultado filtrado
-// ✅ Diseño responsive mantenido
-// ✅ ACTUALIZADO: Click en nombre para ver detalle, acciones en modal
-// ✅ IMPLEMENTADO: nameHelper para transformar nombres de pastores solo en vista
-
-import React, { useState, useEffect, useRef, memo, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiService from "../apiService";
-import { useAuth } from "../context/AuthContext";
+import nameHelper from "../services/nameHelper";
+import { 
+  Search, 
+  Filter, 
+  UserPlus, 
+  Download, 
+  RefreshCw,
+  Mail, 
+  Phone, 
+  MapPin, 
+  History,
+  FileText,
+  ChevronDown,
+  Users,
+  Star,
+  ShieldCheck,
+} from 'lucide-react';
+
 import { MemberDetailModal } from "../components/MemberDetailModal";
-import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal";
+import { ModalAddMember } from "../components/ModalAddMember";
 import { generateMembersPDF } from "../services/generateMembersPDF";
-import nameHelper from "../services/nameHelper"; // ✅ Importar el helper
-import "../css/Memberspageresponsive.css";
 
-// Extraer funciones del helper
-const { getDisplayName, transformArrayForDisplay } = nameHelper;
+const { getDisplayName } = nameHelper;
 
-// ========== COMPONENTES REUTILIZABLES MEMOIZADOS ==========
-
-const FormInput = memo(({ label, gridColumn, ...props }) => (
-  <div className="members-page__form-group" style={{ gridColumn }}>
-    <label className="members-page__form-label">{label}</label>
-    <input className="members-page__form-input" {...props} />
-  </div>
-));
-
-FormInput.displayName = "FormInput";
-
-const FormSelect = memo(({ label, options, gridColumn, ...props }) => (
-  <div className="members-page__form-group" style={{ gridColumn }}>
-    <label className="members-page__form-label">{label}</label>
-    <select className="members-page__form-select" {...props}>
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
-  </div>
-));
-
-FormSelect.displayName = "FormSelect";
-
-// ========== COMPONENTE DE FILTROS ==========
-const FilterPanel = memo(
-  ({
-    filters,
-    onFilterChange,
-    onClearFilters,
-    genderOptions,
-    districtOptions,
-    leaders,
-    onExportPDF,
-    resultsCount,
-  }) => {
-    return (
-      <div className="members-page__filters-panel">
-        <div className="members-page__filters-header">
-          <h3>🔍 Filtros Avanzados</h3>
-          <button
-            onClick={onClearFilters}
-            className="members-page__btn-clear-filters"
-            title="Limpiar todos los filtros"
-          >
-            ✕ Limpiar
-          </button>
-        </div>
-
-        <div className="members-page__filters-grid">
-          {/* Filtro Género */}
-          <div className="members-page__filter-item">
-            <label className="members-page__filter-label">👤 Género</label>
-            <select
-              value={filters.gender}
-              onChange={(e) => onFilterChange("gender", e.target.value)}
-              className="members-page__filter-select"
-            >
-              <option value="">Todos</option>
-              {genderOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filtro Distrito */}
-          <div className="members-page__filter-item">
-            <label className="members-page__filter-label">📍 Distrito</label>
-            <select
-              value={filters.district}
-              onChange={(e) => onFilterChange("district", e.target.value)}
-              className="members-page__filter-select"
-            >
-              <option value="">Todos</option>
-              <option value="D1">Distrito 1</option>
-              <option value="D2">Distrito 2</option>
-              <option value="D3">Distrito 3</option>
-              <option value="PASTORES">Pastores</option>
-            </select>
-          </div>
-
-          {/* Filtro Líder */}
-          <div className="members-page__filter-item">
-            <label className="members-page__filter-label">👨‍💼 Líder</label>
-            <select
-              value={filters.leader}
-              onChange={(e) => onFilterChange("leader", e.target.value)}
-              className="members-page__filter-select"
-            >
-              <option value="">Todos</option>
-              {leaders.map((leader) => (
-                <option key={leader.id} value={leader.id}>
-                  {getDisplayName(leader.name)} {/* ✅ Usar helper aquí */}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Estado de filtros */}
-          <div className="members-page__filter-info">
-            <span className="members-page__filter-badge">
-              📊 {resultsCount} resultado(s)
-            </span>
-          </div>
-        </div>
-
-        {/* Botón Exportar PDF */}
-        {resultsCount > 0 && (
-          <button
-            onClick={onExportPDF}
-            className="members-page__btn-export-pdf"
-            title="Descargar PDF con los resultados"
-          >
-            📄 Exportar a PDF
-          </button>
-        )}
-      </div>
-    );
-  },
-);
-
-FilterPanel.displayName = "FilterPanel";
-
-// ========== COMPONENTE PRINCIPAL ==========
-export const MembersPage = () => {
-  // ========== STATE ==========
-  const { hasAnyRole } = useAuth();
+const MembersPage = () => {
   const [allMembers, setAllMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [formError, setFormError] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
-
-  // ========== FILTROS AVANZADOS ==========
-  const [filters, setFilters] = useState({
-    gender: "",
-    district: "",
-    leader: "",
-  });
-
-  const [pagination, setPagination] = useState({
-    currentPage: 0,
-    pageSize: 10,
-    totalElements: 0,
-    totalPages: 0,
-  });
-
+  const [filters, setFilters] = useState({ gender: "ALL", district: "ALL" });
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [enrollmentHistory, setEnrollmentHistory] = useState([]);
-  const [historyMemberName, setHistoryMemberName] = useState("");
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [memberToEdit, setMemberToEdit] = useState(null);
 
-  const formRef = useRef(null);
-  const errorRef = useRef(null);
-
-  // ========== LEADER SEARCH STATE ==========
-  const [leaderSearchTerm, setLeaderSearchTerm] = useState("");
-  const [filteredLeaders, setFilteredLeaders] = useState([]);
-  const [showLeaderDropdown, setShowLeaderDropdown] = useState(false);
-  const [selectedLeader, setSelectedLeader] = useState(null);
-
-  // ========== FORM DATA ==========
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    documentType: "",
-    document: "",
-    gender: "",
-    maritalStatus: "",
-    city: "",
-    profession: "",
-    birthdate: "",
-    employmentStatus: "",
-    leader: null,
-    district: "",
-  });
-
-  // ========== API FUNCTIONS ==========
-  // ✅ ARREGLADO: Envuelto en useCallback para dependencia correcta
-  const fetchAllMembers = useCallback(async () => {
+  const loadMembers = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
-      const response = await apiService.getAllMembers();
-      setAllMembers(response || []);
-      fetchMembers(0);
+      const data = await apiService.getAllMembers();
+      const list = Array.isArray(data) ? data : (data?.content || []);
+      setAllMembers(list);
     } catch (err) {
-      setError(err.message);
+      console.error("Error cargando miembros:", err);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
-  // ========== HOOKS ==========
-  useEffect(() => {
-    fetchAllMembers();
-  }, [fetchAllMembers]);
+  useEffect(() => { loadMembers(); }, [loadMembers]);
 
-  useEffect(() => {
-    if (formError && errorRef.current) {
-      setTimeout(() => {
-        errorRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }, 100);
-    }
-  }, [formError]);
-
-  const fetchMembers = async (page = 0) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiService.getMembers(page, 10);
-
-      setPagination({
-        currentPage: response.currentPage || 0,
-        pageSize: response.pageSize || 10,
-        totalElements: response.totalElements || 0,
-        totalPages: response.totalPages || 0,
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ========== FORM HANDLERS ==========
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleLeaderSearch = (value) => {
-    setLeaderSearchTerm(value);
-    setShowLeaderDropdown(true);
-
-    if (value.trim() === "") {
-      setFilteredLeaders([]);
-      return;
-    }
-
-    const filtered = allMembers.filter(
-      (member) =>
-        member.name?.toLowerCase().includes(value.toLowerCase()) ||
-        member.email?.toLowerCase().includes(value.toLowerCase()),
-    );
-    setFilteredLeaders(filtered.slice(0, 5));
-  };
-
-  // ✅ ACTUALIZADO: Usar getDisplayName para mostrar, pero guardar nombre original
-  const handleSelectLeader = (leader) => {
-    setSelectedLeader(leader);
-    setFormData((prev) => ({
-      ...prev,
-      leader: { id: leader.id, name: leader.name }, // Guardar nombre ORIGINAL para backend
-    }));
-
-    // Mostrar nombre transformado en el input
-    setLeaderSearchTerm(getDisplayName(leader.name));
-    setShowLeaderDropdown(false);
-    setFilteredLeaders([]);
-  };
-
-  const handleClearLeader = () => {
-    setSelectedLeader(null);
-    setFormData((prev) => ({
-      ...prev,
-      leader: null,
-    }));
-    setLeaderSearchTerm("");
-    setFilteredLeaders([]);
-  };
-
-  // ✅ IMPORTANTE: El formulario envía nombres ORIGINALES al backend
-  // ========== FORM SUBMIT HANDLER (Versión mejorada) ==========
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setFormError(null);
-
-    try {
-      const memberData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        documentType: formData.documentType,
-        document: formData.document,
-        gender: formData.gender,
-        maritalStatus: formData.maritalStatus,
-        city: formData.city,
-        profession: formData.profession,
-        birthdate: formData.birthdate,
-        employmentStatus: formData.employmentStatus,
-        leader: formData.leader,
-        district: formData.district,
-      };
-
-      if (editingId) {
-        await apiService.updateMember(editingId, memberData);
-
-        // Mostrar alert inmediatamente
-        alert("✅ Miembro actualizado");
-
-        // Luego actualizar datos
-        await fetchAllMembers();
-      } else {
-        await apiService.createMember(memberData);
-
-        // Mostrar alert inmediatamente
-        alert("✅ Miembro creado exitosamente");
-
-        // Luego actualizar datos
-        await fetchAllMembers();
-      }
-
-      resetForm();
-    } catch (err) {
-      setFormError(err.message);
-      alert("❌ Error: " + err.message);
-    }
-  };
-
-  const handleEdit = (member) => {
-    setFormData({
-      name: member.name || "", // Nombre ORIGINAL
-      email: member.email || "",
-      phone: member.phone || "",
-      address: member.address || "",
-      documentType: member.documentType || "",
-      document: member.document || "",
-      gender: member.gender || "",
-      maritalStatus: member.maritalStatus || "",
-      city: member.city || "",
-      profession: member.profession || "",
-      birthdate: member.birthdate || "",
-      employmentStatus: member.employmentStatus || "",
-      leader: member.leader || null, // Nombre ORIGINAL del líder
-      district: member.district || "",
+  const filteredMembers = useMemo(() => {
+    return allMembers.filter(m => {
+      const fullName = (m.name || `${m.firstName || ''} ${m.lastName || ''}`).trim();
+      const matchesSearch = !searchTerm || 
+        fullName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (m.document && String(m.document).includes(searchTerm));
+      
+      const matchesGender = filters.gender === "ALL" || m.gender === filters.gender;
+      const matchesDistrict = filters.district === "ALL" || m.district === filters.district;
+      
+      return matchesSearch && matchesGender && matchesDistrict;
     });
+  }, [allMembers, searchTerm, filters]);
 
-    if (member.leader) {
-      setSelectedLeader(member.leader);
-      // Mostrar nombre transformado en el input
-      setLeaderSearchTerm(getDisplayName(member.leader.name));
-    }
+  const stats = useMemo(() => {
+    const men = allMembers.filter(m => {
+      const g = (m.gender || '').toUpperCase();
+      return g.startsWith('M') || g.includes('HOMBRE');
+    }).length;
+    
+    const women = allMembers.filter(m => {
+      const g = (m.gender || '').toUpperCase();
+      return g.startsWith('F') || g.includes('MUJER');
+    }).length;
 
-    setEditingId(member.id);
-    setShowForm(true);
-    setFormError(null);
-    setShowDetailModal(false);
+    return { total: allMembers.length, men, women };
+  }, [allMembers]);
 
-    setTimeout(() => {
-      if (formRef.current) {
-        formRef.current.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
-      }
-    }, 100);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("¿Estás seguro de eliminar este miembro?")) return;
-
-    try {
-      await apiService.deleteMember(id);
-      alert("✅ Miembro eliminado");
-      setShowDetailModal(false);
-      fetchAllMembers();
-    } catch (err) {
-      alert("❌ Error: " + err.message);
-    }
-  };
-
-  const handleViewDetails = (member) => {
-    setSelectedMember(member);
-    setShowDetailModal(true);
-  };
-
-  const handleViewEnrollment = async (id, memberName) => {
-    try {
-      const response = await apiService.getMemberEnrollmentHistory(id);
-      const history = response || [];
-
-      if (!Array.isArray(history) || history.length === 0) {
-        alert("📭 Este miembro no tiene inscripciones registradas");
-        return;
-      }
-
-      setEnrollmentHistory(history);
-      setHistoryMemberName(memberName);
-      setShowHistoryModal(true);
-    } catch (err) {
-      alert("❌ Error: " + err.message);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      email: "",
-      phone: "",
-      address: "",
-      documentType: "",
-      document: "",
-      gender: "",
-      maritalStatus: "",
-      city: "",
-      profession: "",
-      birthdate: "",
-      employmentStatus: "",
-      leader: null,
-      district: "",
-    });
-    setSelectedLeader(null);
-    setLeaderSearchTerm("");
-    setFilteredLeaders([]);
-    setEditingId(null);
-    setShowForm(false);
-    setFormError(null);
-  };
-
-  // ========== FILTROS ==========
-  const handleFilterChange = (filterName, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [filterName]: value,
-    }));
-  };
-
-  const handleClearFilters = () => {
-    setFilters({
-      gender: "",
-      district: "",
-      leader: "",
-    });
-    setSearchTerm("");
-  };
-
-  // ========== LÓGICA DE FILTRADO ==========
-
-  // Devuelve true si `memberId` está en la subjerarquía de `leaderId`
-  const isDescendantOf = (memberId, leaderId, membersArray) => {
-    // Construye un mapa id → member para lookup O(1)
-    const byId = new Map(membersArray.map((m) => [m.id, m]));
-
-    // Sube por la cadena de líderes del miembro hasta llegar al líder buscado
-    const visited = new Set(); // evita loops infinitos si hay datos corruptos
-    let current = byId.get(memberId);
-
-    while (current?.leader) {
-      if (visited.has(current.id)) break; // protección contra ciclos
-      visited.add(current.id);
-
-      if (current.leader.id === leaderId) return true;
-      current = byId.get(current.leader.id);
-    }
-    return false;
-  };
-
-  const applyFilters = (membersArray) => {
-    return membersArray.filter((member) => {
-      // Filtro por búsqueda de texto (nombre/documento) ← CAMBIA EL COMENTARIO
-      const matchesSearch =
-        !searchTerm.trim() ||
-        member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.document?.toLowerCase().includes(searchTerm.toLowerCase()); // ← CAMBIA email por document
-
-      // Filtro por género
-      const matchesGender = !filters.gender || member.gender === filters.gender;
-
-      // Filtro por distrito
-      const matchesDistrict =
-        !filters.district || member.district === filters.district;
-
-      // Filtro por líder
-      // (jerarquía completa):
-      const matchesLeader =
-        !filters.leader ||
-        member.leader?.id === Number(filters.leader) ||
-        isDescendantOf(member.id, Number(filters.leader), allMembers);
-
-      return matchesSearch && matchesGender && matchesDistrict && matchesLeader;
-    });
-  };
-
-  const sortByName = (membersArray) => {
-    return [...membersArray].sort((a, b) => {
-      const nameA = (a.name || "").toLowerCase().trim();
-      const nameB = (b.name || "").toLowerCase().trim();
-      return nameA.localeCompare(nameB, "es", { numeric: true });
-    });
-  };
-
-  const filteredMembers = applyFilters(allMembers);
-  const displayMembers = sortByName(filteredMembers);
-
-  const isSearching = searchTerm.trim() !== "";
-  const isFiltering =
-    filters.gender || filters.district || filters.leader || isSearching;
-
-  const canEdit = hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION"]);
-
-  // ========== OBTENER LÍDERES ÚNICOS ==========
-  const uniqueLeaders = Array.from(
-    new Map(
-      allMembers.filter((m) => m.leader).map((m) => [m.leader.id, m.leader]),
-    ).values(),
-  );
-
-  const genderOptions = [
-    { value: "MASCULINO", label: "Masculino" },
-    { value: "FEMENINO", label: "Femenino" },
-  ];
-
-  // ========== EXPORTAR PDF ==========
   const handleExportPDF = () => {
-    if (displayMembers.length === 0) {
-      alert("❌ No hay datos para exportar");
-      return;
-    }
-
-    try {
-      const filterSummary = [];
-      if (searchTerm) filterSummary.push(`Búsqueda: ${searchTerm}`);
-      if (filters.gender) filterSummary.push(`Género: ${filters.gender}`);
-      if (filters.district) filterSummary.push(`Distrito: ${filters.district}`);
-      if (filters.leader) {
-        const leader = allMembers.find((m) => m.id === Number(filters.leader));
-        filterSummary.push(`Líder: ${getDisplayName(leader?.name)}`); // ✅ Usar helper
-      }
-
-      // Crear copia de los miembros con nombres transformados para el PDF
-      const membersForPDF = transformArrayForDisplay(displayMembers, [
-        "name",
-        "leader.name",
-      ]);
-
-      generateMembersPDF(membersForPDF, filterSummary);
-    } catch (err) {
-      alert("❌ Error al generar PDF: " + err.message);
-    }
+    const summary = [];
+    if (searchTerm) summary.push(`Búsqueda: ${searchTerm}`);
+    if (filters.district !== 'ALL') summary.push(`Distrito: ${filters.district}`);
+    if (filters.gender !== 'ALL') summary.push(`Género: ${filters.gender}`);
+    
+    generateMembersPDF(filteredMembers, summary, "Listado_Membresia");
   };
 
   return (
-    <div className="members-page">
-      <div className="members-page-container">
-        {/* ========== HEADER ========== */}
-        <div className="members-page__header">
-          <div className="members-page__header-content">
-            <h1>👥 Miembros</h1>
-            <p>
-              {isFiltering
-                ? `${displayMembers.length} resultado(s) - Filtrado`
-                : `Total: ${pagination.totalElements} miembros`}
-            </p>
-          </div>
-          {canEdit && (
-            <button
-              onClick={() => {
-                resetForm();
-                setShowForm(!showForm);
-              }}
-              className="members-page__btn-add"
-            >
-              {showForm ? "Cancelar" : "+ Agregar"}
-            </button>
-          )}
-        </div>
-
-        {/* ========== ERROR MESSAGE ========== */}
-        {error && <div className="members-page__error">{error}</div>}
-
-        {/* ========== FORM ========== */}
-        {showForm && canEdit && (
-          <div ref={formRef} className="members-page__form-container">
-            <h2 className="members-page__form-title">
-              {editingId ? "✏️ Editar" : "➕ Nuevo"}
-            </h2>
-
-            {formError && (
-              <div ref={errorRef} className="members-page__form-error">
-                <strong>❌ Error:</strong>
-                <p>{formError}</p>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="members-page__form">
-              {/* ✅ El formulario trabaja con nombres ORIGINALES */}
-              <FormInput
-                label="Nombre Completo *"
-                type="text"
-                name="name"
-                placeholder="Nombre"
-                value={formData.name} // Nombre ORIGINAL
-                onChange={handleInputChange}
-                required
-                gridColumn="1 / -1"
-              />
-
-              <FormInput
-                label="Email *"
-                type="email"
-                name="email"
-                placeholder="email@ejemplo.com"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-              />
-
-              <FormInput
-                label="Teléfono"
-                type="tel"
-                name="phone"
-                placeholder="Teléfono"
-                value={formData.phone}
-                onChange={handleInputChange}
-              />
-
-              {/* ========== LEADER SEARCH ========== */}
-              <div className="members-page__leader-search">
-                <label className="members-page__form-label">Líder</label>
-                <div className="members-page__leader-input-wrapper">
-                  <input
-                    type="text"
-                    className="members-page__form-input"
-                    placeholder="Buscar líder..."
-                    value={leaderSearchTerm} // Nombre TRANSFORMADO para mostrar
-                    onChange={(e) => handleLeaderSearch(e.target.value)}
-                    onFocus={() =>
-                      leaderSearchTerm && setShowLeaderDropdown(true)
-                    }
-                  />
-
-                  {selectedLeader && (
-                    <button
-                      type="button"
-                      className="members-page__leader-clear"
-                      onClick={handleClearLeader}
-                      title="Limpiar selección"
-                    >
-                      ✕
-                    </button>
-                  )}
-
-                  {showLeaderDropdown && filteredLeaders.length > 0 && (
-                    <div className="members-page__leader-dropdown">
-                      {filteredLeaders.map((leader) => (
-                        <button
-                          key={leader.id}
-                          type="button"
-                          className="members-page__leader-option"
-                          onClick={() => handleSelectLeader(leader)}
-                        >
-                          <div className="members-page__leader-option-name">
-                            {getDisplayName(leader.name)}{" "}
-                            {/* ✅ Mostrar nombre transformado */}
-                          </div>
-                          <div className="members-page__leader-option-email">
-                            {leader.email}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {selectedLeader && (
-                  <div className="members-page__leader-selected">
-                    <p>✅ {getDisplayName(selectedLeader.name)}</p>{" "}
-                    {/* ✅ Mostrar nombre transformado */}
+    <div className="max-w-[1600px] mx-auto p-4 md:p-10 lg:p-14 space-y-12 animate-in fade-in duration-700">
+      
+      {/* ─────────────────────────────────────────────
+          HERO HEADER: Membresía Central
+      ───────────────────────────────────────────── */}
+      <div className="relative p-10 md:p-16 lg:p-20 bg-white dark:bg-[#0f172a] rounded-[3rem] md:rounded-[4.5rem] border border-slate-200 dark:border-white/10 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] overflow-hidden group">
+         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none group-hover:bg-indigo-500/10 transition-all duration-1000" />
+         
+         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-12 relative z-10">
+            <div className="space-y-6 md:space-y-8 max-w-2xl">
+               <div className="flex items-center gap-4">
+                  <div className="h-0.5 w-12 bg-indigo-600 rounded-full" />
+                  <span className="text-indigo-600 dark:text-indigo-400 font-black text-xs uppercase tracking-[0.4em]">Altar Ministerial</span>
+               </div>
+               <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[ -0.05em] text-slate-950 dark:text-white leading-[0.85]">
+                  Membresía <br />
+                  <span className="bg-gradient-to-r from-indigo-600 to-indigo-400 bg-clip-text text-transparent">General</span>
+               </h1>
+               <div className="flex flex-wrap items-center gap-4">
+                  <div className="px-6 py-2.5 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center gap-3 border border-white/5 backdrop-blur-md">
+                     <Users className="text-indigo-500" size={18} />
+                     <span className="text-[11px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">{stats.total} Integrantes en Red</span>
                   </div>
-                )}
-              </div>
+                  <div className="px-6 py-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center gap-3 border border-emerald-500/20">
+                     <ShieldCheck size={18} />
+                     <span className="text-[11px] font-black uppercase tracking-widest">Verificación Global Activa</span>
+                  </div>
+               </div>
+            </div>
 
-              <FormSelect
-                label="Distrito"
-                name="district"
-                value={formData.district}
-                onChange={handleInputChange}
-                options={[
-                  { value: "", label: "Seleccionar" },
-                  { value: "D1", label: "Distrito 1" },
-                  { value: "D2", label: "Distrito 2" },
-                  { value: "D3", label: "Distrito 3" },
-                  { value: "PASTORES", label: "Pastores" },
-                ]}
-              />
-
-              <FormSelect
-                label="Tipo de Documento"
-                name="documentType"
-                value={formData.documentType}
-                onChange={handleInputChange}
-                options={[
-                  { value: "", label: "Seleccionar" },
-                  { value: "C.C.", label: "Cedula" },
-                  { value: "T.I.", label: "Tarjeta de identidad" },
-                  { value: "Pasaporte", label: "Pasaporte" },
-                  { value: "C.E.", label: "Cedula de Extranjeria" },
-                  { value: "Otro", label: "Otro" },
-                ]}
-              />
-
-              <FormInput
-                label="Número de Documento"
-                type="text"
-                name="document"
-                placeholder="Número"
-                value={formData.document}
-                onChange={handleInputChange}
-              />
-
-              <FormSelect
-                label="Género"
-                name="gender"
-                value={formData.gender}
-                onChange={handleInputChange}
-                options={[
-                  { value: "", label: "Seleccionar" },
-                  { value: "MASCULINO", label: "Masculino" },
-                  { value: "FEMENINO", label: "Femenino" },
-                ]}
-              />
-
-              <FormSelect
-                label="Estado Civil"
-                name="maritalStatus"
-                value={formData.maritalStatus}
-                onChange={handleInputChange}
-                options={[
-                  { value: "", label: "Seleccionar" },
-                  { value: "SOLTERO", label: "Soltero" },
-                  { value: "CASADO", label: "Casado" },
-                  { value: "UNION LIBRE", label: "Union Libre" },
-                  { value: "DIVORCIADO", label: "Divorciado" },
-                  { value: "SEPARADO", label: "Separado" },
-                  { value: "VIUDO", label: "Viudo" },
-                ]}
-              />
-
-              <FormInput
-                label="Dirección"
-                type="text"
-                name="address"
-                placeholder="Dirección"
-                value={formData.address}
-                onChange={handleInputChange}
-                gridColumn="1 / -1"
-              />
-
-              <FormInput
-                label="Ciudad"
-                type="text"
-                name="city"
-                placeholder="Ciudad"
-                value={formData.city}
-                onChange={handleInputChange}
-              />
-
-              <FormInput
-                label="Profesión"
-                type="text"
-                name="profession"
-                placeholder="Profesión"
-                value={formData.profession}
-                onChange={handleInputChange}
-              />
-
-              <FormInput
-                label="Fecha de Nacimiento"
-                type="date"
-                name="birthdate"
-                value={formData.birthdate}
-                onChange={handleInputChange}
-              />
-
-              <FormSelect
-                label="Estado Laboral"
-                name="employmentStatus"
-                value={formData.employmentStatus}
-                onChange={handleInputChange}
-                options={[
-                  { value: "", label: "Seleccionar" },
-                  { value: "EMPLEADO", label: "Empleado" },
-                  { value: "DESEMPLEADO", label: "Desempleado" },
-                  { value: "INDEPENDIENTE", label: "Independiente" },
-                  { value: "ESTUDIANTE", label: "Estudiante" },
-                  { value: "NO LABORA", label: "No Labora" },
-                  { value: "PENSIONADO", label: "Pensionado" },
-                ]}
-              />
-
-              <button type="submit" className="members-page__form-submit">
-                {editingId ? "✏️ Actualizar" : "➕ Crear"}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* ========== SEARCH BAR ========== */}
-        <div className="members-page__search-container">
-          <input
-            type="text"
-            className="members-page__search-input"
-            placeholder="🔍 Buscar por nombre o documento..." // ← CAMBIA ESTO
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        {/* ========== FILTROS PANEL ========== */}
-        <FilterPanel
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onClearFilters={handleClearFilters}
-          genderOptions={genderOptions}
-          districtOptions={[
-            { value: "D1", label: "Distrito 1" },
-            { value: "D2", label: "Distrito 2" },
-            { value: "D3", label: "Distrito 3" },
-            { value: "PASTORES", label: "Pastores" },
-          ]}
-          leaders={uniqueLeaders}
-          onExportPDF={handleExportPDF}
-          resultsCount={displayMembers.length}
-        />
-
-        {/* ========== TABLE ========== */}
-        {loading ? (
-          <div className="members-page__loading">⏳ Cargando...</div>
-        ) : displayMembers.length === 0 ? (
-          <div className="members-page__empty">
-            {isFiltering
-              ? "❌ Sin resultados con estos filtros"
-              : "📭 No hay miembros"}
-          </div>
-        ) : (
-          <div className="members-page__table-container">
-            <table className="members-page__table">
-              <thead>
-                <tr>
-                  <th>Nombre</th>
-                  <th>Teléfono</th>
-                  <th>Género</th>
-                  <th>Distrito</th>
-                  <th>Líder</th>
-                  <th className="members-page__email-column-header">Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {displayMembers.map((member) => (
-                  <tr
-                    key={member.id}
-                    onClick={() => handleViewDetails(member)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <td>
-                      <strong className="members-page__member-name-clickable">
-                        {getDisplayName(member.name)}{" "}
-                        {/* ✅ Usar helper aquí */}
-                      </strong>
-                    </td>
-                    <td>{member.phone || "-"}</td>
-                    <td>
-                      <span className="members-page__gender-badge">
-                        {member.gender === "MASCULINO" ? "👨" : "👩"}{" "}
-                        {member.gender === "MASCULINO" ? "M" : "F"}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="members-page__district-badge">
-                        {member.district || "-"}
-                      </span>
-                    </td>
-                    <td>
-                      {member.leader ? (
-                        <span className="members-page__leader-badge">
-                          {getDisplayName(member.leader.name)}{" "}
-                          {/* ✅ Usar helper aquí */}
-                        </span>
-                      ) : (
-                        <span className="members-page__no-leader">—</span>
-                      )}
-                    </td>
-                    <td className="members-page__email-column">
-                      {member.email}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ========== MODALS ========== */}
-        <EnrollmentHistoryModal
-          isOpen={showHistoryModal}
-          history={enrollmentHistory}
-          memberName={historyMemberName}
-          onClose={() => setShowHistoryModal(false)}
-        />
-
-        {showDetailModal && selectedMember && (
-          <MemberDetailModal
-            member={selectedMember}
-            onClose={() => {
-              setShowDetailModal(false);
-              setSelectedMember(null);
-            }}
-            onUpdated={() => fetchAllMembers()}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onViewEnrollment={handleViewEnrollment}
-            canEdit={canEdit}
-            getDisplayName={getDisplayName} // ✅ Pasar la función al modal
-          />
-        )}
+            <div className="flex flex-col sm:flex-row items-stretch lg:items-center gap-6 w-full xl:w-auto">
+               <div className="flex items-center gap-12 px-10 py-8 bg-slate-50 dark:bg-black/20 rounded-[2.5rem] border-2 border-slate-100 dark:border-white/5 shadow-inner">
+                  <div className="text-center">
+                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">Hombres</p>
+                     <p className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.men}</p>
+                  </div>
+                  <div className="w-px h-12 bg-slate-200 dark:bg-white/10" />
+                  <div className="text-center">
+                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2 text-rose-500/70">Mujeres</p>
+                     <p className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.women}</p>
+                  </div>
+               </div>
+               
+               <button 
+                  onClick={() => { setMemberToEdit(null); setIsAddMemberModalOpen(true); }}
+                  className="px-12 py-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/30 transition-all hover:-translate-y-2 active:scale-95 flex flex-col items-center justify-center gap-2 group"
+               >
+                  <UserPlus className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                  <span>Nuevo Registro</span>
+               </button>
+            </div>
+         </div>
       </div>
+
+      {/* ─────────────────────────────────────────────
+          SEARCH & FILTERS: Operaciones de Datos
+      ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
+         
+         <div className="lg:col-span-4 space-y-3">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Motor de Búsqueda Biográfica</label>
+            <div className="relative group">
+               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={24} />
+               <input 
+                  type="text" 
+                  placeholder="Nombre o Documento..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full h-18 pl-18 pr-8 bg-white dark:bg-[#1a2332] rounded-[2rem] border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-base transition-all shadow-sm"
+               />
+            </div>
+         </div>
+
+         <div className="lg:col-span-3 space-y-3">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Filtro de Cobertura</label>
+            <div className="relative">
+               <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-500" size={20} />
+               <select 
+                  value={filters.district}
+                  onChange={(e) => setFilters({...filters, district: e.target.value})}
+                  className="w-full h-18 pl-16 pr-10 bg-white dark:bg-[#1a2332] rounded-[2rem] border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm appearance-none cursor-pointer"
+               >
+                  <option value="ALL">TODOS LOS DISTRITOS</option>
+                  <option value="D1">JURISDICCIÓN D1</option>
+                  <option value="D2">JURISDICCIÓN D2</option>
+                  <option value="D3">JURISDICCIÓN D3</option>
+               </select>
+               <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+            </div>
+         </div>
+
+         <div className="lg:col-span-2 space-y-3">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Género</label>
+            <div className="relative">
+               <Filter className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-500" size={20} />
+               <select 
+                  value={filters.gender}
+                  onChange={(e) => setFilters({...filters, gender: e.target.value})}
+                  className="w-full h-18 pl-16 pr-10 bg-white dark:bg-[#1a2332] rounded-[2rem] border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm appearance-none cursor-pointer"
+               >
+                  <option value="ALL">TODOS</option>
+                  <option value="MASCULINO">MASCULINO</option>
+                  <option value="FEMENINO">FEMENINO</option>
+               </select>
+               <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+            </div>
+         </div>
+
+         <div className="lg:col-span-3 flex gap-4 h-18 pb-0.5">
+            <button 
+               onClick={() => { setIsRefreshing(true); loadMembers(); }}
+               className="h-full w-18 bg-white dark:bg-[#1a2332] border-2 border-slate-100 dark:border-white/5 rounded-[2rem] flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-500 transition-all active:scale-95 shadow-sm"
+            >
+               <RefreshCw className={`${isRefreshing ? 'animate-spin' : ''}`} size={24} />
+            </button>
+            <button 
+               onClick={handleExportPDF}
+               className="h-full flex-1 bg-slate-900 dark:bg-indigo-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-black dark:hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/10 active:scale-95"
+            >
+               <Download size={18} /> Exportar Listado
+            </button>
+         </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────
+          MEMBERS GRID: Galería de Integrantes
+      ───────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
+         {loading ? (
+            [...Array(8)].map((_, i) => (
+               <div key={i} className="h-96 bg-white dark:bg-[#1a2332] rounded-[3rem] border-2 border-slate-100 dark:border-white/5 animate-pulse" />
+            ))
+         ) : filteredMembers.map((member) => {
+            const mName = (member.name || `${member.firstName || ''} ${member.lastName || ''}`).trim();
+            const dispName = getDisplayName(mName);
+            const initials = dispName.split(' ').map(n => n?.[0]).join('').substring(0,2).toUpperCase() || 'U';
+            const isFemale = (member.gender || '').toUpperCase() === 'F' || (member.gender || '').toUpperCase() === 'FEMENINO';
+
+            return (
+               <div key={member.id} className="group relative bg-white dark:bg-[#1a2332] rounded-[3rem] border-2 border-slate-100 dark:border-white/5 hover:border-indigo-500 transition-all duration-500 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 overflow-hidden flex flex-col h-full animate-in slide-in-from-bottom-4 duration-500">
+                  <div className="p-8 pb-4 flex-1">
+                     <div className="flex items-start justify-between mb-8">
+                        <div className="w-20 h-20 rounded-[1.8rem] bg-indigo-50 dark:bg-black/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-3xl font-black shadow-inner border border-indigo-100 dark:border-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
+                           {initials}
+                        </div>
+                        <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/5 shadow-sm ${isFemale ? 'bg-rose-500/10 text-rose-600' : 'bg-blue-500/10 text-blue-600'}`}>
+                           {isFemale ? '♀ Femenino' : '♂ Masculino'}
+                        </div>
+                     </div>
+
+                     <div className="space-y-4">
+                        <div>
+                           <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight leading-tight line-clamp-2 group-hover:text-indigo-600 transition-colors">{dispName}</h3>
+                           <div className="flex items-center gap-2 mt-2 opacity-60">
+                              <Star size={12} className="text-amber-500" />
+                              <span className="text-[10px] font-bold uppercase tracking-widest">Miembro Activo</span>
+                           </div>
+                        </div>
+
+                        <div className="space-y-2 pt-4 border-t border-slate-50 dark:border-white/5">
+                           <div className="flex items-center gap-3 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+                              <Mail size={16} className="shrink-0" />
+                              <span className="text-[11px] font-bold truncate">{member.email || 'Email no registrado'}</span>
+                           </div>
+                           <div className="flex items-center gap-3 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">
+                              <Phone size={16} className="shrink-0" />
+                              <span className="text-[11px] font-bold tracking-widest">{member.phone || 'Teléfono no disp.'}</span>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="p-8 pt-0 mt-auto">
+                     <div className="flex items-center justify-between gap-4 p-5 bg-slate-50 dark:bg-black/20 rounded-[2rem] border border-slate-100 dark:border-white/5 group-hover:bg-white dark:group-hover:bg-indigo-900/20 transition-all duration-500">
+                        <div className="flex gap-2">
+                           <button onClick={() => setSelectedMember(member)} className="p-3 bg-white dark:bg-slate-800 text-slate-400 hover:text-indigo-600 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110"><FileText size={18} /></button>
+                           <button className="p-3 bg-white dark:bg-slate-800 text-slate-400 hover:text-emerald-600 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110"><History size={18} /></button>
+                        </div>
+                        <button onClick={() => setSelectedMember(member)} className="h-12 px-6 bg-slate-900 dark:bg-indigo-600 text-white rounded-[1.2rem] font-black text-[9px] uppercase tracking-widest shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all">Gestionar</button>
+                     </div>
+                  </div>
+               </div>
+            );
+         })}
+      </div>
+
+      {filteredMembers.length === 0 && !loading && (
+         <div className="py-40 text-center space-y-8 bg-white dark:bg-[#0f172a] rounded-[4rem] border-2 border-slate-100 dark:border-white/5 shadow-2xl shadow-slate-500/5 px-10">
+            <div className="w-32 h-32 bg-slate-100 dark:bg-white/5 rounded-[3rem] flex items-center justify-center mx-auto text-slate-400 group animate-pulse">
+               <Search className="w-16 h-16 group-hover:scale-110 transition-transform" />
+            </div>
+            <div className="space-y-3 max-w-lg mx-auto">
+               <h3 className="text-3xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Sin Coincidencias Centrales</h3>
+               <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-relaxed">El término de búsqueda "{searchTerm}" no arrojó registros en la base de datos pastoral.</p>
+            </div>
+            <button onClick={() => { setSearchTerm(""); setFilters({ gender: "ALL", district: "ALL" }); }} className="px-12 py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/20 hover:bg-indigo-500 transition-all h-16">
+               Reiniciar Paneles de Datos
+            </button>
+         </div>
+      )}
+
+      {/* MODALS */}
+      {selectedMember && (
+        <MemberDetailModal
+          member={selectedMember}
+          onClose={() => setSelectedMember(null)}
+          onUpdated={loadMembers}
+          onEdit={(m) => {
+            setMemberToEdit(m);
+            setIsAddMemberModalOpen(true);
+          }}
+          onDelete={async (id) => {
+            try {
+              await apiService.deleteMember(id);
+              loadMembers();
+              setSelectedMember(null);
+            } catch (err) {
+              console.error("Error al eliminar miembro:", err);
+            }
+          }}
+        />
+      )}
+
+      <ModalAddMember
+        isOpen={isAddMemberModalOpen}
+        onClose={() => setIsAddMemberModalOpen(false)}
+        onSave={() => loadMembers()}
+        initialData={memberToEdit}
+        isEditing={!!memberToEdit}
+        allMembers={allMembers}
+      />
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.1); border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+      `}} />
     </div>
   );
 };

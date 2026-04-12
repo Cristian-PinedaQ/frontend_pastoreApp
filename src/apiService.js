@@ -2198,12 +2198,33 @@ class ApiService {
     }
   }
 
+  /**
+   * Obtener estadísticas globales de asistencia (consolidadas)
+   * GET /api/v1/attendance-cell-group/statistics/global
+   */
   async getCellAttendanceGlobalStats() {
     try {
-      log('📊 [getCellAttendanceGlobalStats] Obteniendo estadísticas globales');
-      return this.request('/attendance-cell-group/statistics/global');
+      log('📊 [getCellAttendanceGlobalStats] Obteniendo resumen consolidado global');
+      return await this.request('/attendance-cell-group/statistics/global');
     } catch (error) {
       logError('❌ [getCellAttendanceGlobalStats] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener todas las asistencias de un mes para todas las células
+   * Usado para la agregación local en las estadísticas globales
+   * GET /api/v1/attendance-cell-group/month/{year}/{month}
+   */
+  async getMonthAttendances(year, month) {
+    try {
+      validateNumber(year, 'year', 2020);
+      validateNumber(month, 'month', 1, 12);
+      log('📅 [getMonthAttendances] Consultando detalle de red:', year, '/', month);
+      return await this.request(`/attendance-cell-group/month/${year}/${month}`);
+    } catch (error) {
+      logError('❌ [getMonthAttendances] Error:', error.message);
       throw error;
     }
   }
@@ -4096,12 +4117,12 @@ async getWorshipEventById(id) {
 
 // Dentro de la clase ApiService en apiService.js
 
+// En apiService.js, asegúrate de tener este método (ya lo tienes al final):
+
 async getGlobalSummaryByDate(date) {
   try {
     validateString(date, 'date', 10, 10);
     log('🌐 [getGlobalSummaryByDate] Obteniendo resumen masivo para:', date);
-    
-    // Llamada al nuevo endpoint que crearemos en el backend
     return await this.request(`/attendance-cell-group/summary/all-cells/date/${date}`);
   } catch (error) {
     logError('❌ [getGlobalSummaryByDate] Error:', error.message);

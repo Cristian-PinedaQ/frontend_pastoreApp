@@ -1,183 +1,171 @@
-// ✅ ModalLessonAttendanceDetail.jsx - CON DARK MODE Y SELECTOR DE PARTICIPACIÓN
-// Modal para ver asistencias por lección con tabla intuitiva
-// ✅ ARREGLADO: loadData envuelto en useCallback para dependencias
+// ============================================
+// ModalLessonAttendanceDetail.jsx - TAILWIND EDITION
+// Diseño Tailwind moderno + lógica defensiva completa
+// ============================================
 
 import React, { useState, useEffect, useCallback } from 'react';
 import apiService from '../apiService';
+import {
+  X,
+  Plus,
+  Calendar,
+  UserCircle2,
+  ClipboardCheck,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  GraduationCap,
+} from 'lucide-react';
 
-const ModalLessonAttendanceDetail = ({ 
-  isOpen, 
-  onClose, 
-  lesson, 
-  enrollment,
-  onAttendanceRecorded 
+const PARTICIPATION_OPTIONS = [
+  { value: 'NO_PARTICIPA',           label: '🤐 No participa' },
+  { value: 'POCA_PARTICIPACION',     label: '👌 Poca participación' },
+  { value: 'EXCELENTE_PARTICIPACION',label: '🌟 Excelente participación' },
+];
+
+const PARTICIPATION_LABEL = {
+  NO_PARTICIPA:            '🤐 No participa',
+  POCA_PARTICIPACION:      '👌 Poca',
+  EXCELENTE_PARTICIPACION: '🌟 Excelente',
+};
+
+const ModalLessonAttendanceDetail = ({
+  isOpen,
+  onClose,
+  // Acepta props tanto como objeto completo o solo ID (compatibilidad total)
+  lesson: lessonProp,
+  enrollment: enrollmentProp,
+  enrollmentId: enrollmentIdProp,
+  lessonId: lessonIdProp,
+  onAttendanceRecorded,
 }) => {
-  const [attendances, setAttendances] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [recordingId, setRecordingId] = useState(null);
+  // ── Estado ──────────────────────────────────────────────────────────────
+  const [attendances, setAttendances]       = useState([]);
+  const [students, setStudents]             = useState([]);
+  const [currentLesson, setCurrentLesson]   = useState(null);
+  const [currentEnrollment, setCurrentEnrollment] = useState(null);
+
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                   = useState('');
+  const [recordingId, setRecordingId]       = useState(null);
+
+  // Estados de participación por estudiante
+  const [participationScores, setParticipationScores]             = useState({});
+  const [showParticipationSelect, setShowParticipationSelect]     = useState({});
+
+  // ── Dark mode (mismo mecanismo que el original) ──────────────────────────
   const [isDarkMode, setIsDarkMode] = useState(false);
-  
-  // Estados para participación
-  const [participationScores, setParticipationScores] = useState({});
-  const [showParticipationSelect, setShowParticipationSelect] = useState({});
 
-  // ========== DARK MODE ==========
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const savedMode = localStorage.getItem('darkMode');
-    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
-
-    setIsDarkMode(
-      savedMode === 'true' || htmlHasDarkClass || prefersDark
-    );
-
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      if (localStorage.getItem('darkMode') === null) {
-        setIsDarkMode(e.matches);
-      }
+    const checkDark = () => {
+      setIsDarkMode(
+        document.documentElement.classList.contains('dark-mode') ||
+        document.documentElement.classList.contains('dark')
+      );
     };
-    mediaQuery.addEventListener('change', handleChange);
-
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener('change', handleChange);
-    };
+    checkDark();
+    const observer = new MutationObserver(checkDark);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
   }, []);
 
-  // Tema
-  const theme = {
-    bg: isDarkMode ? '#0f172a' : '#ffffff',
-    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
-    bgLight: isDarkMode ? '#1a2332' : '#f8f9fa',
-    text: isDarkMode ? '#f1f5f9' : '#1f2937',
-    textSecondary: isDarkMode ? '#cbd5e1' : '#6b7280',
-    textTertiary: isDarkMode ? '#94a3b8' : '#9ca3af',
-    border: isDarkMode ? '#334155' : '#e5e7eb',
-    header: isDarkMode
-      ? 'linear-gradient(135deg, #1e40af 0%, #059669 100%)'
-      : 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
-    hover: isDarkMode ? '#334155' : '#f9fafb',
-    success: isDarkMode ? '#064e3b' : '#d1fae5',
-    successText: isDarkMode ? '#86efac' : '#065f46',
-    warning: isDarkMode ? '#78350f' : '#fef3c7',
-    warningText: isDarkMode ? '#fcd34d' : '#92400e',
-    error: isDarkMode ? '#7f1d1d' : '#fee2e2',
-    errorText: isDarkMode ? '#fca5a5' : '#991b1b',
-    info: isDarkMode ? '#1e3a8a' : '#e0e7ff',
-    infoText: isDarkMode ? '#93c5fd' : '#3730a3',
-  };
+  // ── Carga defensiva de datos ─────────────────────────────────────────────
+  const loadContent = useCallback(async () => {
+    // Extraer IDs de cualquier fuente posible
+    const eId = enrollmentProp?.id || enrollmentIdProp;
+    const lId = lessonProp?.id || lessonIdProp;
 
-  const PARTICIPATION_OPTIONS = [
-    { value: 'NO_PARTICIPA', label: '🤐 No participa' },
-    { value: 'POCA_PARTICIPACION', label: '👌 Poca participación' },
-    { value: 'EXCELENTE_PARTICIPACION', label: '🌟 Excelente participación' },
-  ];
+    if (!eId || !lId) {
+      console.warn('⚠️ [ModalLessonAttendanceDetail] IDs faltantes:', { eId, lId });
+      return;
+    }
 
-  // ✅ ARREGLADO: Envolver loadData en useCallback
-  const loadData = useCallback(async () => {
-  setLoading(true);
-  setError('');
-  setParticipationScores({});
-  setShowParticipationSelect({});
+    setLoading(true);
+    setError('');
+    setParticipationScores({});
+    setShowParticipationSelect({});
 
-  try {
-    // ── Estudiantes via getEnrollmentById que SÍ trae status ──
-    let studentsData = [];
     try {
-      const enrollmentData = await apiService.getEnrollmentById(enrollment.id);
-      const allStudents = enrollmentData?.studentEnrollments || [];
-      studentsData = allStudents.filter(s => s.status !== 'CANCELLED'); // ✅ filtro
-    } catch (err) {
-      try {
-        const raw = await apiService.getStudentEnrollmentsByEnrollment(enrollment.id);
-        studentsData = (raw || []).filter(s => s.status !== 'CANCELLED');
-      } catch (err2) {
-        setError('No se pudo cargar la lista de estudiantes');
+      // Resolver objetos completos si faltan
+      let activeLesson = lessonProp;
+      let activeEnrollment = enrollmentProp;
+
+      if (!activeLesson) {
+        try { activeLesson = await apiService.getLessonById(lId); }
+        catch (err) { console.error('Error cargando lección:', err); }
       }
-    }
+      if (!activeEnrollment) {
+        try { activeEnrollment = await apiService.getEnrollmentById(eId); }
+        catch (err) { console.error('Error cargando cohorte:', err); }
+      }
 
-    // ── Asistencias ──
-    let attendancesData = [];
-    try {
-      attendancesData = await apiService.getAttendancesByLesson(lesson.id);
+      setCurrentLesson(activeLesson);
+      setCurrentEnrollment(activeEnrollment);
+
+      // Cargar estudiantes y asistencias en paralelo
+      const [enrollmentData, attData] = await Promise.all([
+        apiService.getEnrollmentById(eId),
+        apiService.getAttendancesByLesson(lId).catch(() => []),
+      ]);
+
+      // Filtrar cancelados (misma lógica que el original)
+      const allStudents = enrollmentData?.studentEnrollments || [];
+      const activeStudents = allStudents.filter((s) => s.status !== 'CANCELLED');
+
+      setStudents(activeStudents);
+      setAttendances(attData || []);
+
+      if (activeStudents.length === 0) {
+        setError('No hay estudiantes activos inscritos en esta cohorte.');
+      }
     } catch (err) {
-      attendancesData = [];
+      console.error('❌ Error en loadContent:', err);
+      setError('Error al sincronizar datos académicos: ' + err.message);
+    } finally {
+      setLoading(false);
     }
+  }, [lessonProp, enrollmentProp, enrollmentIdProp, lessonIdProp]);
 
-    setStudents(studentsData);
-    setAttendances(attendancesData || []);
-
-    if (studentsData.length === 0) {
-      setError('No hay estudiantes inscritos en esta cohorte');
-    }
-  } catch (err) {
-    setError('Error al cargar la información de la lección: ' + err.message);
-  } finally {
-    setLoading(false);
-  }
-}, [lesson.id, enrollment.id]);
-
+  // ── Ciclo de vida ─────────────────────────────────────────────────────────
   useEffect(() => {
-    if (isOpen && lesson?.id && enrollment?.id) {
-      loadData();
+    if (isOpen) {
+      loadContent();
+    } else {
+      // Limpiar al cerrar para evitar datos "fantasma"
+      setStudents([]);
+      setAttendances([]);
+      setCurrentLesson(null);
+      setCurrentEnrollment(null);
+      setError('');
     }
-  }, [isOpen, lesson?.id, enrollment?.id, loadData]);
+  }, [isOpen, loadContent]);
 
-  const getStudentAttendance = (studentEnrollmentId) => {
-    return attendances.find(a => a.studentEnrollmentId === studentEnrollmentId);
-  };
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const getStudentAttendance = (studentEnrollmentId) =>
+    attendances.find((a) => a.studentEnrollmentId === studentEnrollmentId);
 
-  const handleParticipationChange = (studentEnrollmentId, value) => {
-    setParticipationScores(prev => ({
-      ...prev,
-      [studentEnrollmentId]: value
-    }));
-  };
+  // ── Registrar asistencia rápida ───────────────────────────────────────────
+  const handleQuickAttendance = async (studentEnrollmentId, present = true) => {
+    const lId = currentLesson?.id || lessonIdProp;
+    if (!lId) return;
 
-  const toggleParticipationSelect = (studentEnrollmentId) => {
-    setShowParticipationSelect(prev => ({
-      ...prev,
-      [studentEnrollmentId]: !prev[studentEnrollmentId]
-    }));
-  };
-
-  const handleQuickAttendance = async (studentEnrollmentId, studentName, present = true) => {
     try {
       setRecordingId(studentEnrollmentId);
 
-      // ✅ Después — usa sessionStorage (igual que apiService) y prioriza .username
-const userData = apiService.getCurrentUser() || {};
-const recordedBy = userData.username || userData.name || 'Admin';
+      const userData = apiService.getCurrentUser() || {};
+      const score = participationScores[studentEnrollmentId] || 'POCA_PARTICIPACION';
 
-      const selectedScore = participationScores[studentEnrollmentId] || 'POCA_PARTICIPACION';
-
-      const attendanceData = {
+      await apiService.recordAttendance({
         studentEnrollmentId,
-        lessonId: lesson.id,
+        lessonId: lId,
         present,
-        recordedBy,
-        score: selectedScore
-      };
+        recordedBy: userData.username || userData.name || 'Admin',
+        score,
+      });
 
-      await apiService.recordAttendance(attendanceData);
-      
-      await loadData();
-      
-      if (onAttendanceRecorded) {
-        onAttendanceRecorded();
-      }
+      await loadContent();
+      if (onAttendanceRecorded) onAttendanceRecorded();
     } catch (err) {
       setError('Error al registrar la asistencia: ' + err.message);
     } finally {
@@ -187,542 +175,228 @@ const recordedBy = userData.username || userData.name || 'Admin';
 
   if (!isOpen) return null;
 
-  const presentCount = attendances.filter(a => a.present).length;
+  // ── Estadísticas ──────────────────────────────────────────────────────────
+  const presentCount = attendances.filter((a) => a.present).length;
   const totalStudents = students.length;
-  const attendancePercentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+  const attendancePercentage = totalStudents > 0
+    ? Math.round((presentCount / totalStudents) * 100)
+    : 0;
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
-        animation: 'fadeIn 0.3s ease-in-out',
-        transition: 'background-color 300ms ease-in-out',
-      }}
+      className="fixed inset-0 z-[1100] flex items-center justify-center p-4 sm:p-6 md:p-10 bg-slate-900/80 backdrop-blur-xl"
+      style={{ animation: 'mlad-fadein 0.25s ease' }}
       onClick={onClose}
     >
       <div
-        style={{
-          backgroundColor: theme.bg,
-          color: theme.text,
-          borderRadius: '12px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          maxWidth: '1000px',
-          width: '95%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          animation: 'slideInUp 0.3s ease-in-out',
-          transition: 'all 300ms ease-in-out',
-        }}
+        className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden max-h-[90vh]"
+        style={{ animation: 'mlad-zoomin 0.3s cubic-bezier(0.16,1,0.3,1)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          style={{
-            background: theme.header,
-            color: 'white',
-            padding: '24px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            borderRadius: '12px 12px 0 0',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, margin: 0 }}>
-              📖 {lesson?.lessonName || 'Lección'}
-            </h2>
-            <p style={{
-              fontSize: '13px',
-              color: 'rgba(255, 255, 255, 0.9)',
-              margin: '6px 0 0 0',
-            }}>
-              {lesson?.lessonDate && new Date(lesson.lessonDate).toLocaleDateString('es-CO')}
-              {' • '}
-              Cohorte: {enrollment?.cohortName || 'Sin cohorte'}
-            </p>
+        {/* ── HEADER ── */}
+        <div className="p-7 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-br from-indigo-600 to-violet-700 text-white relative overflow-hidden shrink-0">
+          <div className="absolute -top-16 -right-16 w-48 h-48 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="flex items-center gap-5 z-10">
+            <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20 shrink-0">
+              <ClipboardCheck size={28} strokeWidth={2.5} />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <div className="text-[10px] font-black uppercase tracking-widest opacity-70">Registro de Asistencia</div>
+              <h3 className="text-2xl font-black tracking-tight truncate">
+                {currentLesson?.lessonName || lessonProp?.lessonName || 'Detalle de Lección'}
+              </h3>
+              <div className="flex flex-wrap items-center gap-3 text-xs font-bold opacity-80 uppercase tracking-wide">
+                <span className="flex items-center gap-1.5">
+                  <Calendar size={13} />
+                  {(currentLesson?.lessonDate || lessonProp?.lessonDate)
+                    ? new Date(currentLesson?.lessonDate || lessonProp?.lessonDate).toLocaleDateString()
+                    : 'Cargando...'}
+                </span>
+                <span className="opacity-40">•</span>
+                <span className="flex items-center gap-1.5">
+                  <GraduationCap size={13} />
+                  {currentEnrollment?.cohortName || enrollmentProp?.cohortName || 'Cargando...'}
+                </span>
+              </div>
+            </div>
           </div>
           <button
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: 0,
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '6px',
-              transition: 'background-color 0.2s',
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            className="absolute top-5 right-5 w-10 h-10 flex items-center justify-center bg-black/20 hover:bg-black/40 rounded-2xl transition-all z-20"
           >
-            ✕
+            <X size={20} strokeWidth={2.5} />
           </button>
         </div>
 
-        {/* Stats */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: '12px',
-            padding: '16px 24px',
-            backgroundColor: theme.bgLight,
-            borderBottom: `1px solid ${theme.border}`,
-            transition: 'all 300ms ease-in-out',
-          }}
-        >
+        {/* ── STATS ── */}
+        <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50 dark:bg-slate-950/40 border-b border-slate-100 dark:border-slate-800 shrink-0">
           {[
-            { label: 'Presentes', value: presentCount, color: '#10b981' },
-            { label: 'Total', value: totalStudents, color: theme.text },
-            { label: 'Porcentaje', value: `${attendancePercentage}%`, color: theme.text },
-          ].map((stat, idx) => (
-            <div
-              key={idx}
-              style={{
-                backgroundColor: theme.bg,
-                padding: '12px',
-                borderRadius: '8px',
-                border: `2px solid ${theme.border}`,
-                textAlign: 'center',
-                transition: 'all 300ms ease-in-out',
-              }}
-            >
-              <p style={{
-                margin: 0,
-                fontSize: '12px',
-                color: theme.textSecondary,
-                fontWeight: 600,
-              }}>
-                {stat.label}
-              </p>
-              <p style={{
-                margin: '4px 0 0 0',
-                fontSize: '24px',
-                fontWeight: 700,
-                color: stat.color,
-              }}>
-                {stat.value}
-              </p>
+            { label: 'Presentes', value: presentCount, color: 'text-emerald-500' },
+            { label: 'Matrícula', value: totalStudents, color: 'text-indigo-500' },
+            { label: 'Quórum', value: `${attendancePercentage}%`, color: 'text-violet-500' },
+          ].map((s, i) => (
+            <div key={i} className="py-4 px-3 text-center">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">{s.label}</p>
+              <p className={`text-2xl font-black tracking-tighter ${s.color}`}>{s.value}</p>
             </div>
           ))}
         </div>
 
-        {/* Progress Bar */}
-        <div style={{ padding: '0 24px 16px', backgroundColor: theme.bg }}>
-          <div
-            style={{
-              height: '8px',
-              backgroundColor: theme.border,
-              borderRadius: '4px',
-              overflow: 'hidden',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                background: 'linear-gradient(90deg, #2563eb, #10b981)',
-                width: `${attendancePercentage}%`,
-                transition: 'width 0.3s ease',
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Body */}
-        <div
-          style={{
-            flex: 1,
-            padding: 0,
-            overflowY: 'auto',
-            backgroundColor: theme.bg,
-          }}
-        >
+        {/* ── BODY ── */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-8 mlad-scrollbar bg-white dark:bg-slate-900">
           {error && (
-            <div
-              style={{
-                backgroundColor: theme.error,
-                color: theme.errorText,
-                padding: '12px 24px',
-                margin: '16px 24px',
-                borderRadius: '8px',
-                borderLeft: `4px solid ${isDarkMode ? '#dc2626' : '#ef4444'}`,
-                fontSize: '14px',
-              }}
-            >
-              ❌ {error}
+            <div className="mb-6 flex items-center gap-3 p-4 bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 rounded-2xl text-rose-600 dark:text-rose-400">
+              <AlertCircle size={18} className="shrink-0" />
+              <p className="text-xs font-black uppercase tracking-wide">{error}</p>
             </div>
           )}
 
           {loading ? (
-            <div
-              style={{
-                padding: '40px 24px',
-                textAlign: 'center',
-                color: theme.textSecondary,
-              }}
-            >
-              ⏳ Cargando estudiantes y asistencias...
+            <div className="py-20 flex flex-col items-center justify-center gap-4 text-slate-400">
+              <RefreshCw size={36} className="animate-spin" />
+              <p className="text-[10px] font-black uppercase tracking-widest">Sincronizando Registros...</p>
             </div>
           ) : students.length === 0 ? (
-            <div
-              style={{
-                padding: '40px 24px',
-                textAlign: 'center',
-                color: theme.textSecondary,
-              }}
-            >
-              <p>📚 No hay estudiantes inscritos en esta cohorte</p>
+            <div className="py-20 text-center">
+              <UserCircle2 size={40} className="mx-auto text-slate-200 dark:text-slate-700 mb-4" />
+              <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Sin estudiantes</p>
+              <p className="text-xs text-slate-400 font-semibold mt-1">No hay estudiantes activos en esta cohorte.</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '14px',
-                }}
-              >
-                <thead
-                  style={{
-                    backgroundColor: theme.bgSecondary,
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 5,
-                  }}
-                >
-                  <tr>
-                    {['Estudiante', 'Estado', 'Participación', 'Acción'].map((header, idx) => (
-                      <th
-                        key={idx}
-                        style={{
-                          padding: '14px',
-                          textAlign: 'left',
-                          fontWeight: 600,
-                          color: theme.text,
-                          borderBottom: `2px solid ${theme.border}`,
-                          transition: 'all 300ms ease-in-out',
-                        }}
-                      >
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((student) => {
-                    const att = getStudentAttendance(student.id);
-                    const isRecording = recordingId === student.id;
-                    const studentName = student.memberName || student.name || `Estudiante ${student.memberId || student.id}`;
-                    const showParticipation = showParticipationSelect[student.id];
-                    const selectedParticipation = participationScores[student.id];
+            <div className="space-y-3">
+              {students.map((student, idx) => {
+                const att = getStudentAttendance(student.id);
+                const isRec = recordingId === student.id;
+                const name = student.memberName || student.name || `Estudiante ${student.memberId || student.id}`;
+                const showParticipation = showParticipationSelect[student.id];
+                const selectedScore = participationScores[student.id];
 
-                    return (
-                      <tr
-                        key={student.id}
-                        style={{
-                          backgroundColor: att
-                            ? theme.success
-                            : showParticipation
-                            ? theme.warning
-                            : 'transparent',
-                          transition: 'background-color 200ms',
-                          borderBottom: `1px solid ${theme.border}`,
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!att && !showParticipation) {
-                            e.currentTarget.style.backgroundColor = theme.hover;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!att && !showParticipation) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          } else if (att) {
-                            e.currentTarget.style.backgroundColor = theme.success;
-                          } else if (showParticipation) {
-                            e.currentTarget.style.backgroundColor = theme.warning;
-                          }
-                        }}
-                      >
-                        {/* Estudiante */}
-                        <td
-                          style={{
-                            padding: '14px',
-                            color: theme.text,
+                return (
+                  <div
+                    key={student.id}
+                    className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-2xl border transition-all duration-200
+                      ${att
+                        ? 'bg-emerald-50/50 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/20'
+                        : showParticipation
+                          ? 'bg-amber-50/50 dark:bg-amber-500/5 border-amber-100 dark:border-amber-500/20'
+                          : 'bg-slate-50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-700'
+                      }`}
+                    style={{ animationDelay: `${idx * 30}ms` }}
+                  >
+                    {/* Nombre */}
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg shrink-0 transition-all
+                        ${att
+                          ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                          : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-100 dark:border-slate-700'
+                        }`}>
+                        {name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none truncate">
+                          {name}
+                        </h4>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">ID: #{student.id}</p>
+                      </div>
+                    </div>
+
+                    {/* Controles */}
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                      {att ? (
+                        /* Estudiante ya registrado */
+                        <div className="flex items-center gap-3">
+                          <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide
+                            ${att.present ? 'bg-emerald-500 text-white shadow-sm' : 'bg-rose-500 text-white shadow-sm'}`}>
+                            {att.present ? <CheckCircle2 size={12} strokeWidth={3} /> : <XCircle size={12} strokeWidth={3} />}
+                            {att.present ? 'Presente' : 'Ausente'}
+                          </span>
+                          {att.score && (
+                            <span className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-xs font-black rounded-xl border border-indigo-100 dark:border-indigo-800">
+                              {PARTICIPATION_LABEL[att.score] || att.score}
+                            </span>
+                          )}
+                          {att.recordedBy && (
+                            <span className="text-[10px] text-slate-400 italic font-semibold hidden md:block">por {att.recordedBy}</span>
+                          )}
+                        </div>
+                      ) : showParticipation ? (
+                        /* Selector de participación + botón confirmar */
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            className="h-10 px-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-300 outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer transition-all appearance-none"
+                            value={selectedScore || 'POCA_PARTICIPACION'}
+                            onChange={(e) => setParticipationScores((prev) => ({ ...prev, [student.id]: e.target.value }))}
+                            autoFocus
+                          >
+                            {PARTICIPATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                          <button
+                            onClick={() => handleQuickAttendance(student.id, true)}
+                            disabled={isRec || !selectedScore}
+                            className="flex items-center gap-1.5 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 text-white rounded-xl text-xs font-black uppercase tracking-wide transition-all active:scale-95 disabled:cursor-not-allowed shadow-sm"
+                          >
+                            {isRec ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle2 size={13} strokeWidth={3} />}
+                            {isRec ? 'Guardando...' : 'Confirmar'}
+                          </button>
+                          <button
+                            onClick={() => setShowParticipationSelect((prev) => ({ ...prev, [student.id]: false }))}
+                            className="p-2.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-xl hover:bg-slate-200 transition-all"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        /* Botón para iniciar registro */
+                        <button
+                          onClick={() => {
+                            // Si no hay score guardado, poner uno por defecto
+                            if (!participationScores[student.id]) {
+                              setParticipationScores((prev) => ({ ...prev, [student.id]: 'POCA_PARTICIPACION' }));
+                            }
+                            setShowParticipationSelect((prev) => ({ ...prev, [student.id]: true }));
                           }}
+                          disabled={isRec}
+                          className="flex items-center gap-2 px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '18px' }}>👤</span>
-                            <span style={{ fontWeight: 500 }}>{studentName}</span>
-                          </div>
-                        </td>
-
-                        {/* Estado */}
-                        <td style={{ padding: '14px' }}>
-                          {att ? (
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                backgroundColor: theme.successText === '#065f46' ? '#065f46' : '#d1fae5',
-                                color: theme.successText === '#065f46' ? '#86efac' : '#065f46',
-                              }}
-                            >
-                              {att.present ? '✅ Presente' : '❌ Ausente'}
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                backgroundColor: theme.warningText === '#fcd34d' ? '#78350f' : '#fef3c7',
-                                color: theme.warningText === '#fcd34d' ? '#fcd34d' : '#92400e',
-                              }}
-                            >
-                              ⏳ Sin registrar
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Participación */}
-                        <td style={{ padding: '14px' }}>
-                          {att ? (
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                backgroundColor: theme.info,
-                                color: theme.infoText,
-                              }}
-                            >
-                              {att.score === 'NO_PARTICIPA' && '🤐 No participa'}
-                              {att.score === 'POCA_PARTICIPACION' && '👌 Poca'}
-                              {att.score === 'EXCELENTE_PARTICIPACION' && '🌟 Excelente'}
-                            </span>
-                          ) : showParticipation ? (
-                            <select
-                              value={selectedParticipation || ''}
-                              onChange={(e) => handleParticipationChange(student.id, e.target.value)}
-                              style={{
-                                padding: '6px 8px',
-                                border: `1.5px solid #2563eb`,
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                backgroundColor: theme.bg,
-                                color: theme.text,
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                                transition: 'all 0.2s',
-                              }}
-                              autoFocus
-                            >
-                              <option value="">Seleccionar...</option>
-                              {PARTICIPATION_OPTIONS.map(opt => (
-                                <option key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span style={{ color: theme.textTertiary }}>-</span>
-                          )}
-                        </td>
-
-                        {/* Acción */}
-                        <td
-                          style={{
-                            padding: '14px',
-                            textAlign: 'right',
-                          }}
-                        >
-                          {att ? (
-                            <span
-                              style={{
-                                fontSize: '12px',
-                                color: '#059669',
-                                fontWeight: 500,
-                              }}
-                            >
-                              ✅ {att.recordedBy || 'Registrado'}
-                            </span>
-                          ) : showParticipation ? (
-                            <button
-                              onClick={() => handleQuickAttendance(student.id, studentName, true)}
-                              disabled={isRecording || !selectedParticipation}
-                              style={{
-                                padding: '8px 12px',
-                                background: selectedParticipation
-                                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                  : 'linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: isRecording || !selectedParticipation ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.2s',
-                                opacity: isRecording || !selectedParticipation ? 0.6 : 1,
-                                whiteSpace: 'nowrap',
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isRecording && selectedParticipation) {
-                                  e.target.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)';
-                                  e.target.style.transform = 'translateY(-2px)';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.boxShadow = 'none';
-                                e.target.style.transform = 'translateY(0)';
-                              }}
-                              title={selectedParticipation ? "Registrar asistencia" : "Selecciona participación"}
-                            >
-                              {isRecording ? '⏳' : '✅ Registrar'}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => toggleParticipationSelect(student.id)}
-                              disabled={isRecording}
-                              style={{
-                                padding: '8px 12px',
-                                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '6px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: isRecording ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.2s',
-                                opacity: isRecording ? 0.6 : 1,
-                                whiteSpace: 'nowrap',
-                              }}
-                              onMouseEnter={(e) => {
-                                if (!isRecording) {
-                                  e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
-                                  e.target.style.transform = 'translateY(-2px)';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                e.target.style.boxShadow = 'none';
-                                e.target.style.transform = 'translateY(0)';
-                              }}
-                            >
-                              {isRecording ? '⏳' : '➕ Registrar'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          <Plus size={13} strokeWidth={3} /> Registrar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-end',
-            padding: '16px 24px',
-            borderTop: `1px solid ${theme.border}`,
-            backgroundColor: theme.bgLight,
-            borderRadius: '0 0 12px 12px',
-            position: 'sticky',
-            bottom: 0,
-            zIndex: 10,
-            transition: 'all 300ms ease-in-out',
-          }}
-        >
+        {/* ── FOOTER ── */}
+        <div className="p-6 bg-slate-50 dark:bg-slate-950/40 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 shrink-0">
           <button
             onClick={onClose}
-            style={{
-              padding: '10px 20px',
-              backgroundColor: theme.bgSecondary,
-              color: theme.text,
-              border: `1px solid ${theme.border}`,
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => e.target.style.opacity = '0.8'}
-            onMouseLeave={(e) => e.target.style.opacity = '1'}
+            className="px-8 py-3.5 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-500 hover:text-indigo-600 transition-all shadow-sm active:scale-95"
           >
-            Cerrar
+            Cerrar Ventana
           </button>
           <button
-            onClick={loadData}
+            onClick={loadContent}
             disabled={loading}
-            style={{
-              padding: '10px 20px',
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              opacity: loading ? 0.6 : 1,
-            }}
-            onMouseEnter={(e) => {
-              if (!loading) {
-                e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
-                e.target.style.transform = 'translateY(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.boxShadow = 'none';
-              e.target.style.transform = 'translateY(0)';
-            }}
+            className="flex items-center gap-2 px-8 py-3.5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
           >
-            🔄 Recargar
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Actualizar
           </button>
         </div>
-
-        <style>{`
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-          @keyframes slideInUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-          }
-        `}</style>
       </div>
+
+      <style>{`
+        @keyframes mlad-fadein { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes mlad-zoomin { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .mlad-scrollbar::-webkit-scrollbar { width: 6px; }
+        .mlad-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .mlad-scrollbar::-webkit-scrollbar-thumb { background: rgb(203 213 225 / 0.5); border-radius: 10px; }
+        .dark .mlad-scrollbar::-webkit-scrollbar-thumb { background: rgb(51 65 85 / 0.6); }
+        select { -webkit-appearance: none; appearance: none; }
+      `}</style>
     </div>
   );
 };

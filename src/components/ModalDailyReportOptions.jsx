@@ -1,9 +1,13 @@
 // ============================================
-// ModalDailyReportOptions.jsx - CON MODO OSCURO
-// Modal para opciones de reporte + Dark Mode
+// ModalDailyReportOptions.jsx - ELITE MODERN
+// Modal para opciones de reporte + Dark Mode nativo
 // ============================================
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { 
+  X, Calendar, DollarSign, BarChart3, List, Users, 
+  FileText, Check, LayoutGrid
+} from 'lucide-react';
 
 // 🔐 Debug condicional
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -50,22 +54,8 @@ const CONCEPT_MAP = {
   'CELL_GROUP_OFFERING': '🏘️ Ofrenda Grupo de Célula',
 };
 
-// ========== DETECTAR PREFERENCIA DE MODO OSCURO ==========
-const detectSystemDarkMode = () => {
-  if (typeof window === 'undefined') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-};
-
 const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, financesData, dateRange }) => {
   const [reportType, setReportType] = useState('summary');
-  const [darkMode, setDarkMode] = useState(false);
-
-  // ========== INICIALIZAR MODO OSCURO ==========
-  useEffect(() => {
-    const prefersDark = detectSystemDarkMode();
-    setDarkMode(prefersDark);
-    log('Sistema prefiere:', prefersDark ? 'OSCURO' : 'CLARO');
-  }, []);
 
   // ========== VALIDAR PROPS ==========
   useEffect(() => {
@@ -87,13 +77,6 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
       logError('Error validando props:', error);
     }
   }, [isOpen, onClose, onConfirm, financesData]);
-
-  // ========== REPORT TYPE CHANGE ==========
-  useEffect(() => {
-    if (isOpen) {
-      log('reportType cambió a:', reportType);
-    }
-  }, [reportType, isOpen]);
 
   // ========== CALCULATE DAILY STATS ==========
   const dailyStats = useMemo(() => {
@@ -130,7 +113,6 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
         }
       });
 
-      log('Stats calculado', { totalRecords: stats.totalRecords, totalAmount: stats.totalAmount });
       return stats;
     } catch (error) {
       logError('Error calculando stats:', error);
@@ -150,7 +132,6 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
         logError('onConfirm no es una función válida');
         return;
       }
-
       if (!reportType || typeof reportType !== 'string') {
         logError('reportType inválido:', reportType);
         return;
@@ -164,41 +145,9 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
     }
   }, [onConfirm, reportType]);
 
-  // ========== HANDLE CLOSE ==========
-  const handleClose = useCallback(() => {
-    try {
-      if (onClose && typeof onClose === 'function') {
-        onClose();
-      }
-    } catch (error) {
-      logError('Error en handleClose:', error);
-    }
-  }, [onClose]);
-
-  // ========== HANDLE REPORT TYPE CHANGE ==========
-  const handleReportTypeChange = useCallback((value) => {
-    try {
-      if (value === 'summary' || value === 'members') {
-        log('Tipo de reporte seleccionado:', value);
-        setReportType(value);
-      }
-    } catch (error) {
-      logError('Error cambiando reportType:', error);
-    }
-  }, []);
-
-  // ========== TOGGLE DARK MODE ==========
-  const toggleDarkMode = useCallback(() => {
-    setDarkMode(prev => {
-      const newMode = !prev;
-      log('Modo oscuro toggled a:', newMode);
-      return newMode;
-    });
-  }, []);
-
+  // ========== DETERMINE REPORT TITLE AND DATE ==========
   if (!isOpen) return null;
 
-  // ========== DETERMINE REPORT TITLE AND DATE ==========
   const isRangeReport = !!(dateRange && typeof dateRange === 'string');
   const reportTitle = isRangeReport ? 'Reporte de Ingresos' : 'Reporte Diario de Ingresos';
 
@@ -214,108 +163,113 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
   }
 
   let selectedDateFormatted = '';
-try {
-  if (selectedDate && typeof selectedDate === 'string') {
-    // ✅ Parseamos manualmente para evitar desfase de zona horaria.
-    // new Date("YYYY-MM-DD") interpreta como UTC 00:00, lo que en Colombia
-    // (UTC-5) retrocede al día anterior. Separando las partes y usando
-    // new Date(year, month, day), la fecha se trata como LOCAL.
-    const [year, month, day] = selectedDate.split('T')[0].split('-').map(Number);
-    const dateObj = new Date(year, month - 1, day); // mes es 0-indexed
-    if (!isNaN(dateObj.getTime())) {
-      selectedDateFormatted = dateObj.toLocaleDateString('es-CO', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+  try {
+    if (selectedDate && typeof selectedDate === 'string') {
+      const [year, month, day] = selectedDate.split('T')[0].split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      if (!isNaN(dateObj.getTime())) {
+        selectedDateFormatted = dateObj.toLocaleDateString('es-CO', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
     }
+  } catch (error) {
+    logError('Error formateando selectedDate:', error);
+    selectedDateFormatted = selectedDate || 'Sin fecha';
   }
-} catch (error) {
-  logError('Error formateando selectedDate:', error);
-  selectedDateFormatted = selectedDate || 'Sin fecha';
-}
 
   return (
-    <div 
-      className={`modal-overlay-daily-report ${darkMode ? 'dark-mode' : ''}`}
-      onClick={handleClose}
-    >
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300" onClick={onClose}>
       <div 
-        className="modal-container-daily-report" 
+        className="bg-slate-50 dark:bg-slate-900 rounded-[2rem] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300 border border-slate-200 dark:border-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER CON TOGGLE DARK MODE */}
-        <div className="modal-header-daily-report">
-          <h2>{reportTitle}</h2>
-          <div className="header-controls">
-            <button 
-              className="btn-dark-mode-toggle" 
-              onClick={toggleDarkMode}
-              aria-label="Cambiar a modo oscuro"
-              title={darkMode ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-            >
-              {darkMode ? '☀️' : '🌙'}
-            </button>
-            <button 
-              className="modal-close-btn-daily" 
-              onClick={handleClose} 
-              aria-label="Cerrar modal"
-            >
-              ✕
-            </button>
-          </div>
+        {/* HEADER */}
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/50 p-6 z-10 shrink-0 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <FileText className="w-5 h-5" />
+            </div>
+            {reportTitle}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* BODY */}
-        <div className="modal-body-daily-report">
-          {/* Fecha del reporte */}
-          <div className="modal-date-info-daily-report">
-            <h3>📆 Período del Reporte</h3>
-            <p>{escapeHtml(displayDate)}</p>
-          </div>
-
-          {/* Fecha Seleccionada */}
-          {selectedDateFormatted && (
-            <div className="date-info-daily">
-              <p className="date-selected">
-                📆 Fecha Seleccionada: <strong>{escapeHtml(selectedDateFormatted)}</strong>
-              </p>
-            </div>
-          )}
-
-          {/* Resumen Rápido */}
-          <div className="quick-summary-daily">
-            <div className="summary-card-daily">
-              <div className="summary-icon-daily">💰</div>
-              <div className="summary-content-daily">
-                <p className="summary-label-daily">Total Recaudado</p>
-                <p className="summary-value-daily">
-                  $ {(dailyStats.totalAmount || 0).toLocaleString('es-CO')}
-                </p>
-              </div>
-            </div>
-
-            <div className="summary-card-daily">
-              <div className="summary-icon-daily">📊</div>
-              <div className="summary-content-daily">
-                <p className="summary-label-daily">Total Registros</p>
-                <p className="summary-value-daily">{dailyStats.totalRecords}</p>
-              </div>
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+          
+          {/* FECHA INFO */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="flex-1 bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-start gap-4">
+               <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5" />
+               </div>
+               <div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Período del reporte</p>
+                  <p className="font-medium text-slate-800 dark:text-white text-sm">
+                    {escapeHtml(displayDate)}
+                  </p>
+                  {selectedDateFormatted && (
+                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1 capitalize">
+                      {escapeHtml(selectedDateFormatted)}
+                    </p>
+                  )}
+               </div>
             </div>
           </div>
 
-          {/* Desglose por Concepto */}
+          {/* RESUMEN RÁPIDO */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+               <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                     <DollarSign className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Recaudado</span>
+               </div>
+               <div className="text-3xl font-bold text-slate-800 dark:text-white mt-1">
+                 ${(dailyStats.totalAmount || 0).toLocaleString('es-CO')}
+               </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+               <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                     <BarChart3 className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Registros</span>
+               </div>
+               <div className="text-3xl font-bold text-slate-800 dark:text-white mt-1">
+                 {dailyStats.totalRecords}
+               </div>
+            </div>
+          </div>
+
+          {/* DESGLOSE POR CONCEPTO */}
           {Object.keys(dailyStats.byConcept).length > 0 && (
-            <div className="concept-breakdown-daily">
-              <h3>Desglose por Concepto</h3>
-              <div className="concepts-grid-daily">
+            <div className="mb-8">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3 uppercase tracking-wider pl-1">Desglose por Concepto</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {Object.entries(dailyStats.byConcept).map(([key, value]) => (
-                  <div key={key} className="concept-item-daily">
-                    <p className="concept-name-daily">{CONCEPT_MAP[key] || key}</p>
-                    <p className="concept-count-daily">{value.count} registros</p>
-                    <p className="concept-amount-daily">
-                      $ {(value.total || 0).toLocaleString('es-CO')}
+                  <div key={key} className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 leading-tight">
+                        {CONCEPT_MAP[key] || key}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {value.count} registros
+                      </p>
+                    </div>
+                    <p className="font-bold text-indigo-600 dark:text-indigo-400 mt-2 text-base">
+                      ${(value.total || 0).toLocaleString('es-CO')}
                     </p>
                   </div>
                 ))}
@@ -324,670 +278,139 @@ try {
           )}
 
           {/* OPCIONES DE REPORTE */}
-          <div className="report-options-section-daily">
-            <h3 className="report-options-title-daily">Tipo de Reporte</h3>
-            <p className="report-options-subtitle-daily">Selecciona cómo deseas ver los datos en el PDF</p>
-
-            {/* OPCIÓN 1: SOLO RESUMEN */}
-            <div className="report-option-wrapper-daily">
-              <label className={`report-option-label-daily ${reportType === 'summary' ? 'active-daily' : ''}`}>
-                <div className="radio-wrapper-daily">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-1 uppercase tracking-wider pl-1">Tipo de Reporte a Generar</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 pl-1">Selecciona el nivel de detalle que deseas ver en el PDF.</p>
+            
+            <div className="space-y-3">
+              {/* OPCIÓN 1: SOLO RESUMEN */}
+              <label 
+                className={`flex gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                  reportType === 'summary' 
+                    ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 dark:border-indigo-500' 
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700'
+                }`}
+              >
+                <div className="shrink-0 pt-1">
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    reportType === 'summary' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {reportType === 'summary' && <Check className="w-3.5 h-3.5 text-white" />}
+                  </div>
                   <input
                     type="radio"
                     name="reportType"
                     value="summary"
                     checked={reportType === 'summary'}
-                    onChange={(e) => handleReportTypeChange(e.target.value)}
-                    className="radio-input-daily"
+                    onChange={(e) => setReportType(e.target.value)}
+                    className="sr-only"
                   />
-                  <span className="radio-checkmark-daily"></span>
                 </div>
-                <div className="option-info-daily">
-                  <h4>📋 Solo Resumen</h4>
-                  <p>Mostrar solo totales por categoría</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <LayoutGrid className={`w-5 h-5 ${reportType === 'summary' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+                    <span className={`font-semibold ${reportType === 'summary' ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>Solo Resumen</span>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Muestra únicamente los totales agrupados por categoría. Ideal para una vista rápida y ejecutiva.
+                  </p>
                 </div>
               </label>
-            </div>
 
-            {/* OPCIÓN 2: CON MIEMBROS */}
-            <div className="report-option-wrapper-daily">
-              <label className={`report-option-label-daily ${reportType === 'members' ? 'active-daily' : ''}`}>
-                <div className="radio-wrapper-daily">
+              {/* OPCIÓN 2: CON MIEMBROS */}
+              <label 
+                className={`flex gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                  reportType === 'members' 
+                    ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10 dark:border-indigo-500' 
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700'
+                }`}
+              >
+                <div className="shrink-0 pt-1">
+                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                    reportType === 'members' ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-600'
+                  }`}>
+                    {reportType === 'members' && <Check className="w-3.5 h-3.5 text-white" />}
+                  </div>
                   <input
                     type="radio"
                     name="reportType"
                     value="members"
                     checked={reportType === 'members'}
-                    onChange={(e) => handleReportTypeChange(e.target.value)}
-                    className="radio-input-daily"
+                    onChange={(e) => setReportType(e.target.value)}
+                    className="sr-only"
                   />
-                  <span className="radio-checkmark-daily"></span>
                 </div>
-                <div className="option-info-daily">
-                  <h4>👥 Con Lista de Miembros</h4>
-                  <p>Incluir tabla detallada de todos los aportes</p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <List className={`w-5 h-5 ${reportType === 'members' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}`} />
+                    <span className={`font-semibold ${reportType === 'members' ? 'text-indigo-900 dark:text-indigo-300' : 'text-slate-700 dark:text-slate-300'}`}>Reporte Detallado</span>
+                  </div>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Incluye el resumen y una tabla detallada con cada aportante individualmente.
+                  </p>
                 </div>
               </label>
             </div>
           </div>
 
-          {/* PREVISUALIZACIÓN SI SELECCIONA CON MIEMBROS */}
+          {/* PREVISUALIZACIÓN DE TABLA */}
           {reportType === 'members' && dailyStats.finances && dailyStats.finances.length > 0 && (
-            <div className="preview-section-daily">
-              <h3>Previsualización ({dailyStats.finances.length} registros)</h3>
-              <div className="table-scroll-daily">
-                <table className="members-preview-table">
-                  <thead>
-                    <tr>
-                      <th>Miembro</th>
-                      <th>Concepto</th>
-                      <th>Monto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dailyStats.finances.map((finance, idx) => (
-                      <tr key={idx}>
-                        <td>{escapeHtml(finance.memberName || 'Sin nombre')}</td>
-                        <td>{CONCEPT_MAP[finance.concept] || escapeHtml(finance.concept)}</td>
-                        <td>$ {(validateAmount(finance.amount) || 0).toLocaleString('es-CO')}</td>
+            <div className="mt-6 animate-in slide-in-from-top-4 duration-300">
+              <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3 uppercase tracking-wider pl-1 flex items-center gap-2">
+                <Users className="w-4 h-4 text-slate-500" />
+                Previsualización ({dailyStats.finances.length} registros)
+              </h3>
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto max-h-[300px]">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10 backdrop-blur-sm">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Miembro</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Concepto</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 dark:text-slate-300 text-right">Monto</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                      {dailyStats.finances.map((finance, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/80 transition-colors">
+                          <td className="px-4 py-3 text-slate-800 dark:text-slate-300 font-medium">
+                            {escapeHtml(finance.memberName || 'Sin nombre')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">
+                               {CONCEPT_MAP[finance.concept] || escapeHtml(finance.concept)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right font-bold text-indigo-600 dark:text-indigo-400">
+                            ${(validateAmount(finance.amount) || 0).toLocaleString('es-CO')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
+
         </div>
 
         {/* FOOTER */}
-        <div className="modal-footer-daily-report">
-          <button className="btn-cancel-daily" onClick={handleClose} aria-label="Cancelar">
-            ✕ Cancelar
+        <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-200 dark:bg-slate-900 dark:border-slate-800 flex flex-col-reverse sm:flex-row justify-end gap-3 shrink-0 rounded-b-[2rem]">
+          <button
+            onClick={onClose}
+            className="px-6 py-3 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 transition-all text-sm w-full sm:w-auto text-center"
+          >
+            Cancelar
           </button>
           <button
-            className="btn-generate-daily"
             onClick={handleConfirm}
-            disabled={false}
-            aria-label="Generar PDF"
+            className="px-8 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all text-sm w-full sm:w-auto text-center flex items-center justify-center gap-2"
           >
-            📄 Generar PDF ({reportType === 'summary' ? 'Resumen' : 'Con Miembros'})
+            <FileText className="w-4 h-4" />
+            Generar PDF ({reportType === 'summary' ? 'Resumen' : 'Detallado'})
           </button>
         </div>
-
-        <style>{`
-          /* ========== CSS VARIABLES POR TEMA ========== */
-          .modal-overlay-daily-report {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f9fafb;
-            --bg-tertiary: #ecfdf5;
-            --text-primary: #1f2937;
-            --text-secondary: #666666;
-            --text-tertiary: #999999;
-            --border-color: #e5e7eb;
-            --border-light: #a7f3d0;
-            --accent-primary: #059669;
-            --accent-secondary: #10b981;
-            --overlay-bg: rgba(0, 0, 0, 0.5);
-            --card-hover-bg: #f0fdf4;
-            --header-start: #059669;
-            --header-end: #10b981;
-            --summary-bg: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-            --summary-border: #a7f3d0;
-            --summary-text: #065f46;
-          }
-
-          .modal-overlay-daily-report.dark-mode {
-            --bg-primary: #1a1a1a;
-            --bg-secondary: #2d2d2d;
-            --bg-tertiary: #0d4a3b;
-            --text-primary: #f5f5f5;
-            --text-secondary: #b0b0b0;
-            --text-tertiary: #808080;
-            --border-color: #404040;
-            --border-light: #1a5d4a;
-            --accent-primary: #10b981;
-            --accent-secondary: #34d399;
-            --overlay-bg: rgba(0, 0, 0, 0.8);
-            --card-hover-bg: #0f3d2f;
-            --header-start: #059669;
-            --header-end: #10b981;
-            --summary-bg: linear-gradient(135deg, #0d4a3b 0%, #1a5d4a 100%);
-            --summary-border: #1a5d4a;
-            --summary-text: #86efac;
-          }
-
-          /* ========== OVERLAY ========== */
-          .modal-overlay-daily-report {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--overlay-bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 20px;
-            animation: fadeInDaily 0.3s ease-in-out;
-          }
-
-          /* ========== CONTAINER ========== */
-          .modal-container-daily-report {
-            background: var(--bg-primary);
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 650px;
-            max-height: 90vh;
-            overflow-y: auto;
-            animation: slideInUpDaily 0.3s ease-in-out;
-            display: flex;
-            flex-direction: column;
-            color: var(--text-primary);
-            transition: all 0.3s ease;
-          }
-
-          /* ========== HEADER ========== */
-          .modal-header-daily-report {
-            background: linear-gradient(135deg, var(--header-start) 0%, var(--header-end) 100%);
-            color: white;
-            padding: 20px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-radius: 12px 12px 0 0;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-          }
-
-          .modal-header-daily-report h2 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 700;
-          }
-
-          .header-controls {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-          }
-
-          .btn-dark-mode-toggle {
-            background: rgba(255, 255, 255, 0.15);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-            padding: 8px 12px;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-          }
-
-          .btn-dark-mode-toggle:hover {
-            background-color: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
-            transform: scale(1.05);
-          }
-
-          .modal-close-btn-daily {
-            background: none;
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            padding: 0;
-            width: 36px;
-            height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            transition: background-color 0.2s;
-          }
-
-          .modal-close-btn-daily:hover {
-            background-color: rgba(255, 255, 255, 0.2);
-          }
-
-          /* ========== BODY ========== */
-          .modal-body-daily-report {
-            flex: 1;
-            padding: 24px;
-            overflow-y: auto;
-            background: var(--bg-primary);
-          }
-
-          /* ========== FECHA ========== */
-          .modal-date-info-daily-report {
-            margin-bottom: 20px;
-          }
-
-          .modal-date-info-daily-report h3 {
-            margin: 0 0 8px;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-          }
-
-          .modal-date-info-daily-report p {
-            margin: 0;
-            font-size: 13px;
-            color: var(--text-secondary);
-          }
-
-          .date-info-daily {
-            background: var(--summary-bg);
-            border: 1px solid var(--summary-border);
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            transition: all 0.2s ease;
-          }
-
-          .date-selected {
-            margin: 0;
-            font-size: 14px;
-            color: var(--summary-text);
-            font-weight: 500;
-          }
-
-          /* ========== RESUMEN RÁPIDO ========== */
-          .quick-summary-daily {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 24px;
-          }
-
-          .summary-card-daily {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            padding: 16px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            transition: all 0.2s;
-          }
-
-          .summary-card-daily:hover {
-            border-color: var(--accent-secondary);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
-            background: var(--card-hover-bg);
-          }
-
-          .summary-icon-daily {
-            font-size: 28px;
-          }
-
-          .summary-content-daily {
-            flex: 1;
-          }
-
-          .summary-label-daily {
-            margin: 0;
-            font-size: 11px;
-            color: var(--text-tertiary);
-            font-weight: 600;
-            text-transform: uppercase;
-          }
-
-          .summary-value-daily {
-            margin: 4px 0 0;
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--accent-primary);
-          }
-
-          /* ========== DESGLOSE POR CONCEPTO ========== */
-          .concept-breakdown-daily {
-            margin-bottom: 24px;
-          }
-
-          .concept-breakdown-daily h3 {
-            margin: 0 0 12px;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-          }
-
-          .concepts-grid-daily {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 12px;
-          }
-
-          .concept-item-daily {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            transition: all 0.2s;
-          }
-
-          .concept-item-daily:hover {
-            border-color: var(--accent-secondary);
-            background: var(--card-hover-bg);
-          }
-
-          .concept-name-daily {
-            margin: 0 0 4px;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-primary);
-          }
-
-          .concept-count-daily {
-            margin: 0;
-            font-size: 11px;
-            color: var(--text-tertiary);
-          }
-
-          .concept-amount-daily {
-            margin: 6px 0 0;
-            font-size: 13px;
-            font-weight: 700;
-            color: var(--accent-primary);
-          }
-
-          /* ========== OPCIONES DE REPORTE ========== */
-          .report-options-section-daily {
-            background: var(--bg-secondary);
-            border: 2px solid var(--border-color);
-            padding: 20px;
-            border-radius: 12px;
-            margin-bottom: 24px;
-            transition: all 0.2s ease;
-          }
-
-          .report-options-title-daily {
-            margin: 0 0 8px;
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-primary);
-          }
-
-          .report-options-subtitle-daily {
-            margin: 0 0 16px;
-            font-size: 12px;
-            color: var(--text-secondary);
-          }
-
-          /* ========== OPCIÓN INDIVIDUAL ========== */
-          .report-option-wrapper-daily {
-            margin-bottom: 12px;
-          }
-
-          .report-option-label-daily {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 16px;
-            border: 2px solid var(--border-color);
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: var(--bg-primary);
-          }
-
-          .report-option-label-daily:hover {
-            border-color: var(--accent-secondary);
-            background: var(--card-hover-bg);
-          }
-
-          .report-option-label-daily.active-daily {
-            border-color: var(--accent-primary);
-            background: var(--bg-tertiary);
-            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.15);
-          }
-
-          /* ========== RADIO BUTTON PERSONALIZADO ========== */
-          .radio-wrapper-daily {
-            position: relative;
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
-          }
-
-          .radio-input-daily {
-            opacity: 0;
-            width: 100%;
-            height: 100%;
-            cursor: pointer;
-            margin: 0;
-            padding: 0;
-          }
-
-          .radio-checkmark-daily {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 24px;
-            height: 24px;
-            background-color: var(--bg-primary);
-            border: 2px solid var(--border-color);
-            border-radius: 50%;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-          .radio-input-daily:checked + .radio-checkmark-daily {
-            border-color: var(--accent-primary);
-            background-color: var(--accent-primary);
-          }
-
-          .radio-input-daily:checked + .radio-checkmark-daily:after {
-            content: '✓';
-            color: white;
-            font-weight: bold;
-            font-size: 14px;
-          }
-
-          .option-info-daily {
-            flex: 1;
-          }
-
-          .option-info-daily h4 {
-            margin: 0;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
-          }
-
-          .option-info-daily p {
-            margin: 4px 0 0;
-            font-size: 12px;
-            color: var(--text-secondary);
-          }
-
-          /* ========== PREVISUALIZACIÓN ========== */
-          .preview-section-daily {
-            margin-bottom: 20px;
-            background: var(--bg-secondary);
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-          }
-
-          .preview-section-daily h3 {
-            margin: 0 0 12px;
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-primary);
-          }
-
-          .table-scroll-daily {
-            overflow-x: auto;
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-          }
-
-          .members-preview-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 11px;
-            background: var(--bg-primary);
-          }
-
-          .members-preview-table thead {
-            background: var(--summary-bg);
-            position: sticky;
-            top: 0;
-          }
-
-          .members-preview-table th {
-            padding: 8px;
-            text-align: left;
-            font-weight: 600;
-            color: var(--summary-text);
-            border-bottom: 1px solid var(--summary-border);
-          }
-
-          .members-preview-table td {
-            padding: 8px;
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-primary);
-          }
-
-          .members-preview-table tbody tr:hover {
-            background: var(--card-hover-bg);
-          }
-
-          /* ========== FOOTER ========== */
-          .modal-footer-daily-report {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            padding: 16px 24px;
-            border-top: 1px solid var(--border-color);
-            background: var(--bg-secondary);
-            border-radius: 0 0 12px 12px;
-            position: sticky;
-            bottom: 0;
-          }
-
-          .btn-cancel-daily,
-          .btn-generate-daily {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-          }
-
-          .btn-cancel-daily {
-            background: var(--border-color);
-            color: var(--text-primary);
-          }
-
-          .btn-cancel-daily:hover {
-            background: var(--border-light);
-            opacity: 0.8;
-          }
-
-          .btn-generate-daily {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-            color: white;
-          }
-
-          .btn-generate-daily:hover {
-            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
-            transform: translateY(-2px);
-          }
-
-          .btn-generate-daily:active {
-            transform: translateY(0);
-          }
-
-          /* ========== ANIMACIONES ========== */
-          @keyframes fadeInDaily {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-
-          @keyframes slideInUpDaily {
-            from {
-              transform: translateY(20px);
-              opacity: 0;
-            }
-            to {
-              transform: translateY(0);
-              opacity: 1;
-            }
-          }
-
-          /* ========== SCROLLBAR PERSONALIZADO ========== */
-          .modal-container-daily-report::-webkit-scrollbar {
-            width: 8px;
-          }
-
-          .modal-container-daily-report::-webkit-scrollbar-track {
-            background: var(--bg-secondary);
-          }
-
-          .modal-container-daily-report::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-          }
-
-          .modal-container-daily-report::-webkit-scrollbar-thumb:hover {
-            background: var(--accent-secondary);
-          }
-
-          /* ========== RESPONSIVE ========== */
-          @media (max-width: 640px) {
-            .modal-body-daily-report {
-              padding: 16px;
-            }
-
-            .modal-footer-daily-report {
-              flex-direction: column;
-            }
-
-            .btn-cancel-daily,
-            .btn-generate-daily {
-              width: 100%;
-            }
-
-            .quick-summary-daily {
-              grid-template-columns: 1fr;
-            }
-
-            .report-option-label-daily {
-              flex-direction: column;
-              text-align: center;
-            }
-
-            .radio-wrapper-daily {
-              margin: 0 auto;
-            }
-
-            .header-controls {
-              gap: 4px;
-            }
-
-            .btn-dark-mode-toggle,
-            .modal-close-btn-daily {
-              width: 32px;
-              height: 32px;
-              font-size: 16px;
-            }
-          }
-        `}</style>
       </div>
     </div>
   );

@@ -1,14 +1,36 @@
 // ============================================
-// UsersPage.jsx - VERSIÓN SEGURA CON DARK MODE
+// UsersPage.jsx - ELITE MODERN EDITION
 // ============================================
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useConfirmation } from "../context/ConfirmationContext";
 import authService from "../services/authService";
 import { logError } from "../utils/securityLogger";
 import { throttle } from "lodash";
+import { 
+  UserPlus, 
+  Users, 
+  Search, 
+  ShieldCheck, 
+  Mail, 
+  Key, 
+  Eye, 
+  EyeOff, 
+  Edit3, 
+  Trash2, 
+  RefreshCw, 
+  ChevronRight, 
+  Filter, 
+  CheckCircle2, 
+  XCircle, 
+  MoreVertical,
+  AlertCircle,
+  Save,
+  X,
+  Info
+} from "lucide-react";
 
-// ✅ ERROR_MESSAGES constante
 const ERROR_MESSAGES = {
   UNAUTHORIZED: "No tienes permisos para acceder a esta página",
   VALIDATION_ERROR: "Datos inválidos. Por favor verifica los campos",
@@ -18,137 +40,60 @@ const ERROR_MESSAGES = {
   NOT_FOUND: "El usuario no fue encontrado",
 };
 
-// ✅ ROLES ACTUALIZADOS según RoleName.java del backend
 const ROLE_OPTIONS = [
-  { value: "PASTORES", label: "🐑 Pastores", icon: "🐑", color: "#4f46e5" },
-  { value: "CONEXION", label: "🔗 Conexión", icon: "🔗", color: "#06b6d4" },
-  { value: "CIMIENTO", label: "🏗️ Cimiento", icon: "🪨", color: "#854d0e" },
-  { value: "ESENCIA", label: "✨ Esencia", icon: "🪴", color: "#a21caf" },
-  { value: "DESPLIEGUE", label: "🚀 Despliegue", icon: "🚀", color: "#059669" },
-  { value: "ECONOMICO", label: "💰 Económico", icon: "💰", color: "#b45309" },
-  { value: "LIDER", label: "⚔️ Líder", icon: "⭐", color: "#b91c1c" },
-  { value: "PROFESORES", label: "📚 Profesores", icon: "✏️", color: "#1e40af" },
-  { value: "ALABANZA", label: "🎹 ALABANZA", icon: "🎼", color: "#ef31c0" },
+  { value: "PASTORES", label: "Pastores", icon: "🐑", color: "indigo" },
+  { value: "CONEXION", label: "Conexión", icon: "🔗", color: "cyan" },
+  { value: "CIMIENTO", label: "Cimiento", icon: "🏗️", color: "amber" },
+  { value: "ESENCIA", label: "Esencia", icon: "✨", color: "purple" },
+  { value: "DESPLIEGUE", label: "Despliegue", icon: "🚀", color: "emerald" },
+  { value: "ECONOMICO", label: "Económico", icon: "💰", color: "orange" },
+  { value: "LIDER", label: "Líder", icon: "⚔️", color: "red" },
+  { value: "PROFESORES", label: "Profesores", icon: "📚", color: "blue" },
+  { value: "ALABANZA", label: "Alabanza", icon: "🎹", color: "pink" },
 ];
 
-// ✅ Mapa de colores para cada rol
-const ROLE_COLORS = {
-  PASTORES: "#4f46e5",
-  CONEXION: "#06b6d4",
-  CIMIENTO: "#854d0e",
-  ESENCIA: "#a21caf",
-  DESPLIEGUE: "#059669",
-  ECONOMICO: "#b45309",
-  LIDER: "#b91c1c",
-  PROFESORES: "#1e40af",
-  ALABANZA: "#e41ec6",
-};
-
 const UsersPage = () => {
-  // ========== DARK MODE ==========
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // ========== ESTADO PARA MOSTRAR/OCULTAR CONTRASEÑA ==========
-  const [showPassword, setShowPassword] = useState(false);
-
-  // ========== RESPONSIVE: detectar mobile ==========
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
-
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 640);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const savedMode = localStorage.getItem("darkMode");
-    const htmlHasDarkClass =
-      document.documentElement.classList.contains("dark-mode");
-
-    setIsDarkMode(savedMode === "true" || htmlHasDarkClass || prefersDark);
-
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains("dark-mode"));
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (e) => {
-      if (localStorage.getItem("darkMode") === null) {
-        setIsDarkMode(e.matches);
-      }
-    };
-    mediaQuery.addEventListener("change", handleChange);
-
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener("change", handleChange);
-    };
-  }, []);
-
-  // Tema
-  const theme = useMemo(
-    () => ({
-      bg: isDarkMode ? "#0f172a" : "#ffffff",
-      bgSecondary: isDarkMode ? "#1e293b" : "#f9fafb",
-      bgLight: isDarkMode ? "#1a2332" : "#f5f7fa",
-      text: isDarkMode ? "#f1f5f9" : "#111827",
-      textSecondary: isDarkMode ? "#cbd5e1" : "#6b7280",
-      textTertiary: isDarkMode ? "#94a3b8" : "#9ca3af",
-      border: isDarkMode ? "#334155" : "#e5e7eb",
-      input: isDarkMode ? "#1e293b" : "#ffffff",
-      error: isDarkMode ? "#7f1d1d" : "#fee2e2",
-      errorText: isDarkMode ? "#fca5a5" : "#991b1b",
-      errorBorder: isDarkMode ? "#dc2626" : "#ef4444",
-      success: isDarkMode ? "#064e3b" : "#d1fae5",
-      successText: isDarkMode ? "#86efac" : "#065f46",
-      danger: isDarkMode ? "#dc2626" : "#ef4444",
-      dangerHover: isDarkMode ? "#b91c1c" : "#dc2626",
-      primary: isDarkMode ? "#1e40af" : "#2563eb",
-      primaryHover: isDarkMode ? "#1e3a8a" : "#1d4ed8",
-    }),
-    [isDarkMode],
-  );
-
   const { user, hasRole } = useAuth();
+  const confirm = useConfirmation();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-
-  const [selectedRole, setSelectedRole] = useState(null); // null = mostrar todos
-
+  const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
-    role: "PROFESORES", // Valor por defecto
+    role: "PROFESORES",
   });
 
-  // Función para alternar visibilidad de contraseña
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
+  // ========== SEGURIDAD & UTILIDADES ==========
+  const maskEmail = (email) => {
+    if (!email || !email.includes("@")) return "email oculto";
+    const [name, domain] = email.split("@");
+    const visibleChars = Math.max(1, Math.floor(name.length / 2));
+    const masked = name.substring(0, visibleChars) + "*".repeat(Math.max(1, name.length - visibleChars));
+    return `${masked}@${domain}`;
   };
 
-  // ✅ SEGURIDAD: Validación de contraseña fuerte
+  const escapeHtml = (text) => {
+    if (!text || typeof text !== "string") return "";
+    const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+    return text.replace(/[&<>"']/g, (m) => map[m]);
+  };
+
   const validatePassword = (password) => {
     const errors = [];
     if (password.length < 12) errors.push("Mínimo 12 caracteres");
     if (!/[A-Z]/.test(password)) errors.push("Debe contener mayúscula");
     if (!/[a-z]/.test(password)) errors.push("Debe contener minúscula");
     if (!/[0-9]/.test(password)) errors.push("Debe contener número");
-    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
-      errors.push("Debe contener carácter especial");
-    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) errors.push("Debe contener carácter especial");
     return { valid: errors.length === 0, errors };
   };
 
@@ -157,46 +102,17 @@ const UsersPage = () => {
     return validatePassword(formData.password);
   }, [formData.password]);
 
-  // ✅ Lista filtrada por rol
-  const filteredUsers = useMemo(() => {
-    if (!selectedRole) return users;
-    return users.filter((usr) => usr.roles?.some((r) => r === selectedRole));
-  }, [users, selectedRole]);
+  const handleError = useCallback((errorCode, context = "") => {
+    logError({ code: errorCode, context, timestamp: new Date().toISOString(), userId: user?.id });
+    setError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.SERVER_ERROR);
+  }, [user?.id]);
 
-  // ✅ Contador de usuarios por rol (para las badges)
-  const roleCount = useMemo(() => {
-    return ROLE_OPTIONS.reduce((acc, role) => {
-      acc[role.value] = users.filter((usr) =>
-        usr.roles?.includes(role.value),
-      ).length;
-      return acc;
-    }, {});
-  }, [users]);
-
-  // ✅ SEGURIDAD: Logger seguro sin exponer detalles
-  const handleError = useCallback(
-    (errorCode, context = "") => {
-      logError({
-        code: errorCode,
-        context,
-        timestamp: new Date().toISOString(),
-        userId: user?.id,
-      });
-      setError(ERROR_MESSAGES[errorCode] || ERROR_MESSAGES.SERVER_ERROR);
-    },
-    [user?.id],
-  );
-
-  // ✅ Cargar usuarios
   const loadUsers = useCallback(async () => {
     setLoading(true);
     setError("");
     setSuccess("");
-
     try {
       const response = await authService.getAllUsers();
-
-      // ✅ Sanitizar datos antes de mostrar
       const sanitizedUsers = response.map((usr) => ({
         id: usr.id,
         username: escapeHtml(usr.username),
@@ -205,14 +121,7 @@ const UsersPage = () => {
         enabled: usr.enabled,
         createdAt: usr.createdAt,
       }));
-
       setUsers(sanitizedUsers);
-
-      if (sanitizedUsers.length === 0) {
-        setSuccess("ℹ️ No hay usuarios registrados aún");
-      } else {
-        setSuccess(`✅ ${sanitizedUsers.length} usuario(s) cargado(s)`);
-      }
     } catch (err) {
       handleError("SERVER_ERROR", "loadUsers");
     } finally {
@@ -220,1307 +129,539 @@ const UsersPage = () => {
     }
   }, [handleError]);
 
-  // ✅ SEGURIDAD: Solo PASTORES pueden acceder
   useEffect(() => {
-    if (!hasRole("PASTORES")) {
-      setError(ERROR_MESSAGES.UNAUTHORIZED);
-      return;
-    }
-    loadUsers();
+    if (hasRole("PASTORES")) loadUsers();
   }, [hasRole, loadUsers]);
 
-  /**
-   * ✅ SEGURIDAD: Enmascarar email en la UI
-   */
-  const maskEmail = (email) => {
-    if (!email || !email.includes("@")) return "email oculto";
+  // ========== FILTRADO ==========
+  const filteredUsers = useMemo(() => {
+    return users.filter((usr) => {
+      const matchesRole = !selectedRole || usr.roles?.includes(selectedRole);
+      const matchesSearch = !searchQuery || 
+        usr.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        usr.email.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesRole && matchesSearch;
+    });
+  }, [users, selectedRole, searchQuery]);
 
-    const [name, domain] = email.split("@");
+  const roleCounts = useMemo(() => {
+    return ROLE_OPTIONS.reduce((acc, role) => {
+      acc[role.value] = users.filter((usr) => usr.roles?.includes(role.value)).length;
+      return acc;
+    }, {});
+  }, [users]);
 
-    const visibleChars = Math.max(1, Math.floor(name.length / 2));
-
-    const masked =
-      name.substring(0, visibleChars) +
-      "*".repeat(Math.max(1, name.length - visibleChars));
-
-    return `${masked}@${domain}`;
-  };
-
-  /**
-   * ✅ SEGURIDAD: Escapar HTML
-   */
-  const escapeHtml = (text) => {
-    if (!text || typeof text !== "string") return "";
-
-    const map = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;",
-    };
-
-    return text.replace(/[&<>"']/g, (m) => map[m]);
-  };
-
-  /**
-   * ✅ SEGURIDAD: Validación de entrada
-   */
-  const validateFormData = () => {
-    const errors = [];
-
-    if (!/^[a-zA-Z0-9._-]{3,50}$/.test(formData.username)) {
-      errors.push(
-        "Usuario solo puede contener letras, números, ., _, - (3-50 caracteres)",
-      );
-    }
-
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.email)) {
-      errors.push("Email inválido");
-    }
-
-    if (!editingId && !formData.password) {
-      errors.push("Contraseña requerida");
-    }
-
-    if (formData.password) {
-      const pwdValidation = validatePassword(formData.password);
-      if (!pwdValidation.valid) {
-        errors.push(...pwdValidation.errors);
-      }
-    }
-
-    return errors;
-  };
-
-  /**
-   * ✅ SEGURIDAD: Manejo seguro del formulario
-   */
+  // ========== ACCIONES ==========
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
-
-    const validationErrors = validateFormData();
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join(". "));
-      return;
-    }
-
+    
     setLoading(true);
-
     try {
       if (editingId) {
-        await authService.updateUser(
-          editingId,
-          formData.username,
-          formData.email,
-          formData.password,
-        );
-        setSuccess("✅ Usuario actualizado");
+        await authService.updateUser(editingId, formData.username, formData.email, formData.password);
+        setSuccess("Usuario actualizado con éxito");
       } else {
-        await authService.register(
-          formData.username,
-          formData.email,
-          formData.password,
-          formData.role, // Envía el rol exacto según RoleName.java
-        );
-        setSuccess("✅ Usuario registrado");
+        await authService.register(formData.username, formData.email, formData.password, formData.role);
+        setSuccess("Nuevo usuario registrado correctamente");
       }
-
-      setFormData({
-        username: "",
-        email: "",
-        password: "",
-        role: "PROFESORES",
-      });
-      setEditingId(null);
-      setShowForm(false);
-      setShowPassword(false);
+      handleCancel();
       await loadUsers();
     } catch (err) {
-      const status = err?.status || err?.response?.status;
-      const message = err?.message || err?.response?.data?.message;
-
-      if (status === 409) {
-        setError(message || ERROR_MESSAGES.CONFLICT);
-      } else if (status === 400) {
-        setError(message || ERROR_MESSAGES.VALIDATION_ERROR);
-      } else if (status === 404) {
-        setError(ERROR_MESSAGES.NOT_FOUND);
-      } else if (status === 403) {
-        setError(ERROR_MESSAGES.UNAUTHORIZED);
-      } else {
-        setError(message || ERROR_MESSAGES.SERVER_ERROR);
-      }
+      setError(err?.message || ERROR_MESSAGES.SERVER_ERROR);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * ✅ SEGURIDAD: Edit con throttling
-   */
-  const throttledHandleEdit = throttle(async (userId) => {
+  const handleEdit = async (userId) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError("");
-
       const userData = await authService.getUserById(userId);
-
       setFormData({
         username: userData.username || "",
         email: maskEmail(userData.email) || "",
         password: "",
         role: userData.roles?.[0] || "PROFESORES",
       });
-
       setEditingId(userId);
       setShowForm(true);
-      setShowPassword(false);
-      setSuccess("Cargado para editar");
     } catch (err) {
       handleError("SERVER_ERROR", "handleEdit");
     } finally {
       setLoading(false);
     }
-  }, 1000);
+  };
 
-  const handleEdit = (userId) => throttledHandleEdit(userId);
-
-  /**
-   * ✅ SEGURIDAD: Delete con confirmación y throttling
-   */
-  const throttledHandleDelete = throttle(async (userId, username) => {
-    if (
-      !window.confirm(
-        `⚠️ ¿Eliminar a "${escapeHtml(username)}"? Esta acción es permanente.`,
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-      setSuccess("");
-
-      await authService.deleteUser(userId);
-      setSuccess(`✅ Usuario eliminado`);
-      await loadUsers();
-    } catch (err) {
-      if (err.code === "NOT_FOUND") {
-        handleError("NOT_FOUND", "handleDelete");
-      } else {
-        handleError("SERVER_ERROR", "handleDelete");
+  const handleDelete = throttle(async (userId, username) => {
+    const isConfirmed = await confirm({
+      title: '¿Eliminar Usuario?',
+      message: `Esta acción eliminará permanentemente a "${username}". No se puede deshacer.`,
+      type: 'danger',
+      confirmLabel: 'Eliminar permanentemente',
+      onConfirm: async () => {
+        await authService.deleteUser(userId);
+        setSuccess("Usuario eliminado");
+        await loadUsers();
       }
-    } finally {
-      setLoading(false);
-    }
+    });
   }, 2000);
 
-  const handleDelete = (userId, username) =>
-    throttledHandleDelete(userId, username);
-
   const handleCancel = () => {
-    setFormData({
-      username: "",
-      email: "",
-      password: "",
-      role: "PROFESORES",
-    });
+    setFormData({ username: "", email: "", password: "", role: "PROFESORES" });
     setEditingId(null);
     setShowForm(false);
     setShowPassword(false);
     setError("");
-    setSuccess("");
   };
 
-  useEffect(() => {
-    return () => {
-      throttledHandleEdit.cancel();
-      throttledHandleDelete.cancel();
-    };
-  }, [throttledHandleEdit, throttledHandleDelete]);
-
-  // ✅ Función para obtener el estilo de un rol
-  const getRoleStyle = (role) => {
-    const color = ROLE_COLORS[role] || theme.primary;
-    return {
-      backgroundColor: color,
-      color: "white",
-      padding: "0.25rem 0.75rem",
-      borderRadius: "0.25rem",
-      fontSize: "0.75rem",
-      fontWeight: "600",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "0.25rem",
-    };
-  };
-
-  // ✅ Función para obtener el ícono de un rol
-  const getRoleIcon = (role) => {
-    const option = ROLE_OPTIONS.find((r) => r.value === role);
-    return option?.icon || "🔘";
-  };
-
-  // ✅ SEGURIDAD: Verificar permisos
-  // ⚠️ Este bloque SOLO muestra el error de acceso — nada más aquí
   if (!hasRole("PASTORES")) {
     return (
-      <div
-        style={{
-          maxWidth: "1200px",
-          margin: "0 auto",
-          padding: "1.5rem",
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: theme.bg,
-            borderRadius: "0.5rem",
-            padding: "2rem",
-            border: `1px solid ${theme.border}`,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: theme.error,
-              color: theme.errorText,
-              padding: "1.5rem",
-              borderRadius: "0.5rem",
-              border: `1px solid ${theme.errorBorder}`,
-            }}
-          >
-            <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>
-              ❌ Acceso Denegado
-            </h2>
-            <p style={{ color: theme.errorText, margin: "0.5rem 0 0 0" }}>
-              No tienes permisos para acceder a esta página.
-            </p>
-          </div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+        <div className="w-24 h-24 bg-red-50 dark:bg-red-500/10 rounded-[2.5rem] flex items-center justify-center mb-6 border border-red-100 dark:border-red-500/20">
+          <ShieldCheck className="w-12 h-12 text-red-500" />
         </div>
+        <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-4">Acceso Denegado</h2>
+        <p className="text-slate-500 dark:text-slate-400 max-w-md font-medium leading-relaxed">
+          Lo sentimos, esta sección es de uso exclusivo para el equipo pastoral. Por favor, contacta al administrador si crees que esto es un error.
+        </p>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        maxWidth: "1200px",
-        margin: "0 auto",
-        backgroundColor: theme.bg,
-        color: theme.text,
-        transition: "all 300ms ease-in-out",
-      }}
-    >
-      <div style={{ padding: "1.5rem" }}>
-        {/* ========== ENCABEZADO ========== */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: "1.5rem",
-            gap: "1rem",
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: "2rem", fontWeight: "bold", margin: 0 }}>
-              👥 Gestión de Usuarios
-            </h1>
-            <p
-              style={{
-                color: theme.textSecondary,
-                fontSize: "0.875rem",
-                margin: "0.5rem 0 0 0",
-              }}
-            >
-              Administra usuarios y roles del sistema ({ROLE_OPTIONS.length}{" "}
-              roles disponibles)
-            </p>
-          </div>
-          <button
-            style={{
-              backgroundColor: showForm ? "transparent" : theme.primary,
-              color: showForm ? theme.text : "white",
-              padding: "0.5rem 1.5rem",
-              borderRadius: "0.5rem",
-              border: `1px solid ${showForm ? theme.border : theme.primary}`,
-              cursor: "pointer",
-              fontWeight: "600",
-              transition: "all 300ms ease-in-out",
-              opacity: loading ? 0.6 : 1,
-            }}
-            onClick={() => {
-              setShowForm(!showForm);
-              setEditingId(null);
-              setFormData({
-                username: "",
-                email: "",
-                password: "",
-                role: "PROFESORES",
-              });
-              setShowPassword(false);
-            }}
-            disabled={loading}
-            title={showForm ? "Cancelar formulario" : "Crear nuevo usuario"}
-          >
-            {showForm ? "❌ Cancelar" : "➕ Nuevo Usuario"}
-          </button>
+    <div className="max-w-[1400px] mx-auto p-4 md:p-8 animate-fade-in">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
+        <div className="space-y-2">
+          <h1 className="text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-4">
+            <div className="h-12 w-2 bg-indigo-600 rounded-full"></div>
+            Gestión de Usuarios
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 flex items-center gap-2 font-medium ml-6">
+            <Users className="w-4 h-4 opacity-70" />
+            Administración completa de accesos y roles institucionales
+          </p>
         </div>
 
-        {/* ========== ALERTAS ========== */}
-        {error && (
-          <div
-            style={{
-              backgroundColor: theme.error,
-              color: theme.errorText,
-              padding: "1rem",
-              borderRadius: "0.5rem",
-              marginBottom: "1.5rem",
-              border: `1px solid ${theme.errorBorder}`,
-            }}
+        {!showForm && (
+          <button 
+            onClick={() => setShowForm(true)}
+            className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-700 hover:from-indigo-500 hover:to-violet-600 text-white rounded-[2rem] font-black shadow-xl shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-1 active:scale-95 whitespace-nowrap"
           >
-            <strong>Error:</strong> {error}
-          </div>
+            <UserPlus className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+            Nuevo Usuario
+          </button>
         )}
+      </div>
 
-        {success && (
-          <div
-            style={{
-              backgroundColor: theme.success,
-              color: theme.successText,
-              padding: "1rem",
-              borderRadius: "0.5rem",
-              marginBottom: "1.5rem",
-              border: `1px solid ${isDarkMode ? "#10b981" : "#6ee7b7"}`,
-            }}
-          >
-            {success}
-          </div>
-        )}
+      {/* FEEDBACK MESSAGES */}
+      {error && (
+        <div className="mb-8 p-6 bg-red-50 dark:bg-red-500/10 border-l-4 border-red-500 rounded-2xl flex items-center gap-4 animate-shake">
+          <AlertCircle className="w-6 h-6 text-red-500 shrink-0" />
+          <p className="text-red-700 dark:text-red-400 font-bold">{error}</p>
+          <button onClick={() => setError("")} className="ml-auto text-red-400 hover:text-red-600 transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+      )}
+      {success && (
+        <div className="mb-8 p-6 bg-emerald-50 dark:bg-emerald-500/10 border-l-4 border-emerald-500 rounded-2xl flex items-center gap-4 animate-scale-in">
+          <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
+          <p className="text-emerald-700 dark:text-emerald-400 font-bold">{success}</p>
+          <button onClick={() => setSuccess("")} className="ml-auto text-emerald-400 hover:text-emerald-600 transition-colors"><X className="w-5 h-5" /></button>
+        </div>
+      )}
 
-        {/* ========== FORMULARIO ========== */}
-        {showForm && (
-          <div
-            style={{
-              backgroundColor: theme.bg,
-              borderRadius: "0.5rem",
-              padding: "1.5rem",
-              marginBottom: "1.5rem",
-              border: `1px solid ${theme.border}`,
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-            }}
-          >
-            <h2
-              style={{
-                fontSize: "1.25rem",
-                fontWeight: "bold",
-                marginBottom: "1.5rem",
-                color: theme.text,
-                margin: 0,
-              }}
-            >
-              {editingId ? "✏️ Editar Usuario" : "🆕 Crear Nuevo Usuario"}
-            </h2>
-
-            <form
-              onSubmit={handleSubmit}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                gap: "1rem",
-              }}
-            >
-              {/* Usuario */}
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.875rem",
-                    fontWeight: "600",
-                    color: theme.text,
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Usuario *
-                </label>
-                <input
-                  type="text"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  placeholder="ejemplo: johndoe"
-                  required
-                  disabled={loading}
-                  minLength="3"
-                  maxLength="50"
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 1rem",
-                    border: `1px solid ${theme.border}`,
-                    borderRadius: "0.5rem",
-                    backgroundColor: theme.input,
-                    color: theme.text,
-                    fontSize: "0.875rem",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <small
-                  style={{
-                    color: theme.textSecondary,
-                    display: "block",
-                    marginTop: "0.25rem",
-                  }}
-                >
-                  3-50 caracteres
-                </small>
+      {/* FORM SECTION (GLASS) */}
+      {showForm && (
+        <div className="mb-12 bg-white dark:bg-slate-900/60 backdrop-blur-2xl border border-slate-200 dark:border-slate-800 rounded-[3rem] p-8 lg:p-12 shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-bl-[10rem] -mr-16 -mt-16 pointer-events-none group-hover:bg-indigo-500/15 transition-all duration-700"></div>
+          
+          <div className="relative z-10">
+            <div className="flex justify-between items-center mb-10">
+              <div>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {editingId ? 'Editar Perfil' : 'Registro de Usuario'}
+                </h2>
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mt-2">Configura las credenciales de acceso</p>
               </div>
+              <button 
+                onClick={handleCancel}
+                className="w-12 h-12 bg-slate-100 dark:bg-slate-800 flex items-center justify-center rounded-2xl text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition-all shadow-sm"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
 
-              {/* Email */}
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.875rem",
-                    fontWeight: "600",
-                    color: theme.text,
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  placeholder="john@ejemplo.com"
-                  required
-                  disabled={loading}
-                  maxLength="150"
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 1rem",
-                    border: `1px solid ${theme.border}`,
-                    borderRadius: "0.5rem",
-                    backgroundColor: theme.input,
-                    color: theme.text,
-                    fontSize: "0.875rem",
-                    boxSizing: "border-box",
-                  }}
-                />
-                <small
-                  style={{
-                    color: theme.textSecondary,
-                    display: "block",
-                    marginTop: "0.25rem",
-                  }}
-                >
-                  Email válido y único
-                </small>
-              </div>
-
-              {/* Contraseña con botón para mostrar/ocultar */}
-              <div style={{ gridColumn: "1 / -1" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.875rem",
-                      fontWeight: "600",
-                      color: theme.text,
-                    }}
-                  >
-                    Contraseña * {editingId && "(opcional)"}
-                  </label>
-                  <small
-                    style={{
-                      color: theme.textSecondary,
-                      display: "block",
-                      marginTop: "0.25rem",
-                    }}
-                  >
-                    Mínimo 12 caracteres: mayúscula, minúscula, número, carácter
-                    especial
-                  </small>
-                  {passwordValidation && !passwordValidation.valid && (
-                    <ul
-                      style={{
-                        marginTop: "0.5rem",
-                        fontSize: "0.75rem",
-                        color: theme.errorText,
-                        paddingLeft: "1rem",
-                      }}
-                    >
-                      {passwordValidation.errors.map((err, i) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                    </ul>
-                  )}
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* USERNAME */}
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4">Nombre de Usuario</label>
+                <div className="relative group/field">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/field:text-indigo-500 transition-colors">
+                    <UserPlus className="w-5 h-5" />
+                  </div>
+                  <input 
+                    type="text" 
+                    required 
+                    value={formData.username}
+                    onChange={(e) => setFormData({...formData, username: e.target.value})}
+                    placeholder="ej: john_doe"
+                    className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-3xl text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium"
+                  />
                 </div>
-                <div style={{ position: "relative" }}>
-                  <input
+              </div>
+
+              {/* EMAIL */}
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4">Correo Electrónico</label>
+                <div className="relative group/field">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/field:text-indigo-500 transition-colors">
+                    <Mail className="w-5 h-5" />
+                  </div>
+                  <input 
+                    type="email" 
+                    required 
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    placeholder="john@raizdedavid.org"
+                    className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-3xl text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* PASSWORD */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center ml-4">
+                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Contraseña</label>
+                  {editingId && <span className="text-[10px] font-black bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">Opcional</span>}
+                </div>
+                <div className="relative group/field">
+                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/field:text-indigo-500 transition-colors">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <input 
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    placeholder={
-                      editingId
-                        ? "Dejar en blanco si no deseas cambiar"
-                        : "Contraseña segura"
-                    }
-                    required={!editingId}
-                    disabled={loading}
-                    minLength="12"
-                    maxLength="100"
-                    style={{
-                      width: "100%",
-                      padding: "0.5rem 3rem 0.5rem 1rem",
-                      border: `1px solid ${theme.border}`,
-                      borderRadius: "0.5rem",
-                      backgroundColor: theme.input,
-                      color: theme.text,
-                      fontSize: "0.875rem",
-                      boxSizing: "border-box",
-                    }}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    placeholder={editingId ? "Actualizar contraseña..." : "Mín. 12 caracteres..."}
+                    className={`w-full pl-14 pr-14 py-4 bg-slate-50 dark:bg-slate-800/50 border rounded-3xl text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium ${passwordValidation && !passwordValidation.valid ? 'border-red-300 dark:border-red-900/50' : 'border-slate-100 dark:border-slate-700'}`}
                   />
-                  <button
+                  <button 
                     type="button"
-                    onClick={togglePasswordVisibility}
-                    style={{
-                      position: "absolute",
-                      right: "0.5rem",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      backgroundColor: "transparent",
-                      border: "none",
-                      color: theme.textSecondary,
-                      cursor: "pointer",
-                      padding: "0.25rem",
-                      borderRadius: "0.25rem",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      opacity: loading ? 0.6 : 1,
-                    }}
-                    disabled={loading}
-                    title={
-                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-                    }
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-slate-400 hover:text-indigo-500 transition-colors"
                   >
-                    {showPassword ? "👀" : "🙈"}
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
-                <small
-                  style={{
-                    color: theme.textSecondary,
-                    display: "block",
-                    marginTop: "0.25rem",
-                  }}
-                >
-                  Mínimo 12 caracteres: mayúscula, minúscula, número, carácter
-                  especial
-                </small>
+                {passwordValidation && !passwordValidation.valid && (
+                  <div className="px-4 py-3 bg-red-50 dark:bg-red-500/5 rounded-2xl border border-red-100 dark:border-red-500/10">
+                    <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Requisitos de seguridad:</p>
+                    <ul className="text-xs text-red-400 grid grid-cols-2 gap-x-4 list-disc list-inside">
+                      {passwordValidation.errors.map((err, i) => <li key={i} className="truncate">{err}</li>)}
+                    </ul>
+                  </div>
+                )}
               </div>
 
-              {/* ✅ ROL - ACTUALIZADO según RoleName.java */}
-              {!editingId && (
-                <div style={{ gridColumn: "1 / -1" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "0.875rem",
-                      fontWeight: "600",
-                      color: theme.text,
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    Rol *
-                  </label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) =>
-                      setFormData({ ...formData, role: e.target.value })
-                    }
-                    disabled={loading}
-                    style={{
-                      width: "100%",
-                      padding: "0.5rem 1rem",
-                      border: `1px solid ${theme.border}`,
-                      borderRadius: "0.5rem",
-                      backgroundColor: theme.input,
-                      color: theme.text,
-                      fontSize: "0.875rem",
-                      boxSizing: "border-box",
-                      borderColor: ROLE_COLORS[formData.role] || theme.border,
-                    }}
-                  >
+              {/* ROLE SELECTION */}
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4">Rol en el Sistema</label>
+                {!editingId ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {ROLE_OPTIONS.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.icon} {role.label}
-                      </option>
+                      <button
+                        key={role.value}
+                        type="button"
+                        onClick={() => setFormData({...formData, role: role.value})}
+                        className={`flex items-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all ${
+                          formData.role === role.value 
+                            ? `bg-${role.color}-600 border-${role.color}-600 text-white shadow-lg` 
+                            : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400'
+                        }`}
+                      >
+                        <span className="text-base">{role.icon}</span>
+                        <span className="truncate">{role.label}</span>
+                      </button>
                     ))}
-                  </select>
-                  {formData.role && (
-                    <small
-                      style={{
-                        color:
-                          ROLE_COLORS[formData.role] || theme.textSecondary,
-                        display: "block",
-                        marginTop: "0.25rem",
-                      }}
-                    >
-                      {
-                        ROLE_OPTIONS.find((r) => r.value === formData.role)
-                          ?.icon
-                      }{" "}
-                      Rol seleccionado: {formData.role}
-                    </small>
-                  )}
-                </div>
-              )}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-xl">
+                        {ROLE_OPTIONS.find(r => r.value === formData.role)?.icon || '👤'}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rol asignado</p>
+                        <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{formData.role}</p>
+                      </div>
+                    </div>
+                    <Info className="w-5 h-5 text-slate-300 dark:text-slate-600" />
+                  </div>
+                )}
+              </div>
 
-              {/* Botones */}
-              <div
-                style={{
-                  gridColumn: "1 / -1",
-                  display: "flex",
-                  gap: "1rem",
-                  justifyContent: "flex-end",
-                }}
-              >
-                <button
-                  type="submit"
-                  style={{
-                    backgroundColor: theme.primary,
-                    color: "white",
-                    padding: "0.5rem 1.5rem",
-                    borderRadius: "0.5rem",
-                    border: "none",
-                    cursor: "pointer",
-                    fontWeight: "600",
-                    opacity: loading ? 0.6 : 1,
-                  }}
+              <div className="md:col-span-2 pt-6 flex flex-col sm:flex-row gap-4">
+                <button 
+                  type="submit" 
                   disabled={loading}
+                  className="flex-[2] py-5 bg-indigo-600 dark:bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-indigo-500/25 transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-3"
                 >
-                  {loading ? "⏳ Guardando..." : "💾 Guardar"}
+                  {loading ? <RefreshCw className="w-6 h-6 animate-spin" /> : <Save className="w-6 h-6" />}
+                  {editingId ? "Actualizar Usuario" : "Finalizar Registro"}
                 </button>
-                <button
-                  type="button"
-                  style={{
-                    backgroundColor: "transparent",
-                    color: theme.text,
-                    padding: "0.5rem 1.5rem",
-                    borderRadius: "0.5rem",
-                    border: `1px solid ${theme.border}`,
-                    cursor: "pointer",
-                    fontWeight: "600",
-                    opacity: loading ? 0.6 : 1,
-                  }}
+                <button 
+                  type="button" 
                   onClick={handleCancel}
-                  disabled={loading}
+                  className="flex-1 py-5 border-2 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 rounded-[2rem] font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95"
                 >
                   Cancelar
                 </button>
               </div>
             </form>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ========== TABLA DE USUARIOS ========== */}
-        {!showForm && (
-          <div
-            style={{
-              backgroundColor: theme.bg,
-              borderRadius: "0.5rem",
-              padding: "1.5rem",
-              border: `1px solid ${theme.border}`,
-              boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
-            }}
-          >
-            {/* ── HEADER ── */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1rem",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: "bold",
-                  margin: 0,
-                  color: theme.text,
-                }}
-              >
-                📋 Lista de Usuarios ({filteredUsers.length}
-                {selectedRole ? ` de ${users.length}` : ""})
-              </h2>
-              <button
-                onClick={loadUsers}
-                disabled={loading}
-                style={{
-                  backgroundColor: theme.bgSecondary,
-                  color: theme.text,
-                  padding: "0.5rem 1rem",
-                  borderRadius: "0.5rem",
-                  border: `1px solid ${theme.border}`,
-                  cursor: "pointer",
-                  fontWeight: "600",
-                  opacity: loading ? 0.6 : 1,
-                }}
-                title="Recargar usuarios"
-              >
-                🔄 Recargar
-              </button>
+      {/* FILTERS & LIST SECTION */}
+      {!showForm && (
+        <div className="space-y-8">
+          {/* SEARCH & REFRESH */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-grow group">
+              <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                <Search className="w-5 h-5" />
+              </div>
+              <input 
+                type="text" 
+                placeholder="Filtrar por nombre o email..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-16 pr-8 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all shadow-sm shadow-slate-100/50 dark:shadow-none"
+              />
             </div>
-
-            {/* ── BARRA DE FILTROS POR ROL ── */}
-            {isMobile ? (
-              /* ── MOBILE: select ── */
-              <div
-                style={{
-                  marginBottom: "1.25rem",
-                  padding: "0.75rem",
-                  backgroundColor: theme.bgSecondary,
-                  borderRadius: "0.5rem",
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "0.75rem",
-                    fontWeight: "600",
-                    color: theme.textSecondary,
-                    marginBottom: "0.4rem",
-                  }}
-                >
-                  Filtrar por rol
-                </label>
-                <select
-                  value={selectedRole || ""}
-                  onChange={(e) =>
-                    setSelectedRole(e.target.value || null)
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem 1rem",
-                    border: `2px solid ${selectedRole ? ROLE_COLORS[selectedRole] : theme.border}`,
-                    borderRadius: "0.5rem",
-                    backgroundColor: theme.input,
-                    color: theme.text,
-                    fontSize: "0.875rem",
-                    fontWeight: "600",
-                    boxSizing: "border-box",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value="">👥 Todos ({users.length})</option>
-                  {ROLE_OPTIONS.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.icon} {role.value} ({roleCount[role.value] || 0})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              /* ── DESKTOP: pills ── */
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "0.5rem",
-                  marginBottom: "1.25rem",
-                  padding: "0.75rem",
-                  backgroundColor: theme.bgSecondary,
-                  borderRadius: "0.5rem",
-                  border: `1px solid ${theme.border}`,
-                }}
-              >
-                {/* Botón "Todos" */}
-                <button
-                  onClick={() => setSelectedRole(null)}
-                  style={{
-                    padding: "0.35rem 0.85rem",
-                    borderRadius: "999px",
-                    border: `2px solid ${!selectedRole ? theme.primary : theme.border}`,
-                    backgroundColor: !selectedRole
-                      ? theme.primary
-                      : "transparent",
-                    color: !selectedRole ? "white" : theme.textSecondary,
-                    fontWeight: "600",
-                    fontSize: "0.8rem",
-                    cursor: "pointer",
-                    transition: "all 200ms",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.35rem",
-                  }}
-                >
-                  👥 Todos
-                  <span
-                    style={{
-                      backgroundColor: !selectedRole
-                        ? "rgba(255,255,255,0.3)"
-                        : theme.border,
-                      color: !selectedRole ? "white" : theme.textSecondary,
-                      borderRadius: "999px",
-                      padding: "0 0.45rem",
-                      fontSize: "0.7rem",
-                      fontWeight: "700",
-                    }}
-                  >
-                    {users.length}
-                  </span>
-                </button>
-
-                {/* Botones por cada rol */}
-                {ROLE_OPTIONS.map((role) => {
-                  const isActive = selectedRole === role.value;
-                  const count = roleCount[role.value] || 0;
-                  return (
-                    <button
-                      key={role.value}
-                      onClick={() =>
-                        setSelectedRole(isActive ? null : role.value)
-                      }
-                      style={{
-                        padding: "0.35rem 0.85rem",
-                        borderRadius: "999px",
-                        border: `2px solid ${isActive ? role.color : theme.border}`,
-                        backgroundColor: isActive ? role.color : "transparent",
-                        color: isActive ? "white" : theme.textSecondary,
-                        fontWeight: "600",
-                        fontSize: "0.8rem",
-                        cursor: "pointer",
-                        transition: "all 200ms",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                        opacity: count === 0 ? 0.45 : 1,
-                      }}
-                      title={`Filtrar por ${role.label}`}
-                    >
-                      {role.icon} {role.value}
-                      <span
-                        style={{
-                          backgroundColor: isActive
-                            ? "rgba(255,255,255,0.3)"
-                            : theme.border,
-                          color: isActive ? "white" : theme.textSecondary,
-                          borderRadius: "999px",
-                          padding: "0 0.45rem",
-                          fontSize: "0.7rem",
-                          fontWeight: "700",
-                        }}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Indicador de filtro activo */}
-            {selectedRole && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  marginBottom: "1rem",
-                  fontSize: "0.8rem",
-                  color: ROLE_COLORS[selectedRole],
-                }}
-              >
-                <span>
-                  {ROLE_OPTIONS.find((r) => r.value === selectedRole)?.icon}{" "}
-                  Mostrando usuarios con rol <strong>{selectedRole}</strong> —{" "}
-                  {filteredUsers.length} resultado(s)
-                </span>
-                <button
-                  onClick={() => setSelectedRole(null)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: theme.textSecondary,
-                    fontSize: "0.75rem",
-                    textDecoration: "underline",
-                    padding: 0,
-                  }}
-                >
-                  ✕ Limpiar filtro
-                </button>
-              </div>
-            )}
-
-            {loading ? (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "2rem",
-                  color: theme.textSecondary,
-                }}
-              >
-                <p>⏳ Cargando usuarios...</p>
-              </div>
-            ) : filteredUsers.length > 0 ? (
-              <div style={{ overflowX: "auto" }}>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                  }}
-                >
-                  <thead
-                    style={{
-                      backgroundColor: theme.bgSecondary,
-                      borderBottom: `1px solid ${theme.border}`,
-                    }}
-                  >
-                    <tr>
-                      <th
-                        style={{
-                          padding: "0.75rem",
-                          textAlign: "left",
-                          color: theme.text,
-                          fontWeight: "600",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        Usuario
-                      </th>
-                      <th
-                        style={{
-                          padding: "0.75rem",
-                          textAlign: "left",
-                          color: theme.text,
-                          fontWeight: "600",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        Email
-                      </th>
-                      <th
-                        style={{
-                          padding: "0.75rem",
-                          textAlign: "left",
-                          color: theme.text,
-                          fontWeight: "600",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        Roles
-                      </th>
-                      <th
-                        style={{
-                          padding: "0.75rem",
-                          textAlign: "left",
-                          color: theme.text,
-                          fontWeight: "600",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        Estado
-                      </th>
-                      <th
-                        style={{
-                          padding: "0.75rem",
-                          textAlign: "center",
-                          color: theme.text,
-                          fontWeight: "600",
-                          fontSize: "0.875rem",
-                        }}
-                      >
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map((usr) => (
-                      <tr
-                        key={usr.id}
-                        style={{
-                          borderBottom: `1px solid ${theme.border}`,
-                          transition: "background-color 200ms",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.backgroundColor =
-                            theme.bgSecondary)
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.backgroundColor =
-                            "transparent")
-                        }
-                      >
-                        <td
-                          style={{
-                            padding: "0.75rem",
-                            color: theme.text,
-                            fontWeight: "500",
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          {usr.username}
-                        </td>
-                        <td
-                          style={{
-                            padding: "0.75rem",
-                            color: theme.text,
-                            fontSize: "0.75rem",
-                          }}
-                        >
-                          {usr.email}
-                        </td>
-                        <td
-                          style={{
-                            padding: "0.75rem",
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          {usr.roles && usr.roles.length > 0 ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: "0.5rem",
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              {usr.roles.map((role) => (
-                                <span
-                                  key={role}
-                                  style={getRoleStyle(role)}
-                                  title={`Rol: ${role}`}
-                                >
-                                  {getRoleIcon(role)} {role}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span style={{ color: theme.textTertiary }}>
-                              Sin rol
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          style={{
-                            padding: "0.75rem",
-                            fontSize: "0.875rem",
-                          }}
-                        >
-                          {usr.enabled ? (
-                            <span
-                              style={{
-                                backgroundColor: theme.success,
-                                color: theme.successText,
-                                padding: "0.25rem 0.75rem",
-                                borderRadius: "0.25rem",
-                                fontSize: "0.75rem",
-                                fontWeight: "600",
-                              }}
-                            >
-                              ✅ Activo
-                            </span>
-                          ) : (
-                            <span
-                              style={{
-                                backgroundColor: theme.error,
-                                color: theme.errorText,
-                                padding: "0.25rem 0.75rem",
-                                borderRadius: "0.25rem",
-                                fontSize: "0.75rem",
-                                fontWeight: "600",
-                              }}
-                            >
-                              ❌ Inactivo
-                            </span>
-                          )}
-                        </td>
-                        <td
-                          style={{
-                            padding: "0.75rem",
-                            textAlign: "center",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "0.5rem",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <button
-                              onClick={() => handleEdit(usr.id)}
-                              disabled={loading}
-                              style={{
-                                backgroundColor: "#f59e0b",
-                                color: "white",
-                                padding: "0.25rem 0.5rem",
-                                borderRadius: "0.25rem",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: "0.875rem",
-                                opacity: loading ? 0.6 : 1,
-                              }}
-                              title="Editar usuario"
-                            >
-                              ✏️
-                            </button>
-                            <button
-                              onClick={() => handleDelete(usr.id, usr.username)}
-                              disabled={loading}
-                              style={{
-                                backgroundColor: theme.danger,
-                                color: "white",
-                                padding: "0.25rem 0.5rem",
-                                borderRadius: "0.25rem",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: "0.875rem",
-                                opacity: loading ? 0.6 : 1,
-                              }}
-                              title="Eliminar usuario"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "2rem",
-                  color: theme.textSecondary,
-                }}
-              >
-                <p style={{ fontSize: "1rem", marginBottom: "1rem" }}>
-                  {selectedRole
-                    ? `${ROLE_OPTIONS.find((r) => r.value === selectedRole)?.icon} No hay usuarios con rol "${selectedRole}".`
-                    : "👤 No hay usuarios registrados aún."}
-                </p>
-                {selectedRole ? (
-                  <button
-                    onClick={() => setSelectedRole(null)}
-                    style={{
-                      backgroundColor: "transparent",
-                      color: theme.primary,
-                      border: `1px solid ${theme.primary}`,
-                      padding: "0.5rem 1.5rem",
-                      borderRadius: "0.5rem",
-                      cursor: "pointer",
-                      fontWeight: "600",
-                    }}
-                  >
-                    👥 Ver todos los usuarios
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => setShowForm(true)}
-                    style={{
-                      backgroundColor: theme.primary,
-                      color: "white",
-                      padding: "0.5rem 1.5rem",
-                      borderRadius: "0.5rem",
-                      border: "none",
-                      cursor: "pointer",
-                      fontWeight: "600",
-                    }}
-                  >
-                    ➕ Crear el primer usuario
-                  </button>
-                )}
-              </div>
-            )}
+            <button 
+              onClick={loadUsers}
+              disabled={loading}
+              className="px-6 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-all shadow-sm active:scale-95 disabled:opacity-50"
+              title="Recargar lista"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
-        )}
 
-        {/* ========== INFORMACIÓN ========== */}
-        <div
-          style={{
-            marginTop: "1.5rem",
-            padding: "1.5rem",
-            backgroundColor: theme.bgSecondary,
-            borderRadius: "0.5rem",
-            border: `1px solid ${theme.border}`,
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "1rem",
-              fontWeight: "bold",
-              color: theme.text,
-              marginBottom: "1rem",
-              margin: 0,
-            }}
-          >
-            ℹ️ Información de Permisos
-          </h3>
-          <ul
-            style={{
-              listStyle: "none",
-              padding: 0,
-              margin: 0,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-              gap: "1rem",
-            }}
-          >
-            <li style={{ color: theme.textSecondary }}>
-              <strong style={{ color: theme.text }}>Usuarios mostrados:</strong>{" "}
-              <span>{filteredUsers.length}</span>
-            </li>
-            <li style={{ color: theme.textSecondary }}>
-              <strong style={{ color: theme.text }}>Rol actual:</strong>{" "}
-              <span>{user?.roles?.join(", ") || "Sin rol"}</span>
-            </li>
-            <li style={{ color: theme.textSecondary }}>
-              <strong style={{ color: theme.text }}>Roles disponibles:</strong>{" "}
-              <span>{ROLE_OPTIONS.length}</span>
-            </li>
-            <li style={{ color: theme.textSecondary }}>
-              <strong style={{ color: theme.text }}>Seguridad:</strong>{" "}
-              <span>✅ Validación backend</span>
-            </li>
-          </ul>
-          <div
-            style={{
-              marginTop: "1rem",
-              padding: "0.5rem",
-              backgroundColor: theme.bg,
-              borderRadius: "0.25rem",
-              fontSize: "0.75rem",
-              color: theme.textSecondary,
-              border: `1px dashed ${theme.border}`,
-            }}
-          >
-            <strong>Roles en el sistema:</strong>{" "}
-            {ROLE_OPTIONS.map((r) => r.label).join(" • ")}
+          {/* ROLE PILLS (HORIZONTAL SCROLL) */}
+          <div className="relative group">
+            <div className="flex items-center gap-3 overflow-x-auto pb-4 px-2 no-scrollbar scroll-smooth">
+              <button 
+                onClick={() => setSelectedRole(null)}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full border-2 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all shadow-sm ${
+                  !selectedRole 
+                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
+                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-400'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                Todos
+                <span className={`px-2 py-0.5 rounded-lg text-[10px] ${!selectedRole ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800'}`}>{users.length}</span>
+              </button>
+              
+              {ROLE_OPTIONS.map(role => {
+                const isActive = selectedRole === role.value;
+                const count = roleCounts[role.value] || 0;
+                return (
+                  <button 
+                    key={role.value}
+                    onClick={() => setSelectedRole(isActive ? null : role.value)}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-full border-2 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all shadow-sm ${
+                      isActive 
+                        ? `bg-${role.color}-600 border-${role.color}-600 text-white shadow-lg` 
+                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-400'
+                    }`}
+                  >
+                    <span>{role.icon}</span>
+                    {role.label}
+                    <span className={`px-2 py-0.5 rounded-lg text-[10px] ${isActive ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800'}`}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {/* GRADIENTS FOR SCROLL HINT */}
+            <div className="absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-slate-50 dark:from-slate-950 pointer-events-none"></div>
+          </div>
+
+          {/* USERS LIST (CARDS) */}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-24 space-y-4">
+              <div className="w-16 h-16 border-4 border-indigo-600/10 border-t-indigo-600 rounded-full animate-spin"></div>
+              <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Sincronizando Usuarios...</p>
+            </div>
+          ) : filteredUsers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+              {filteredUsers.map((usr) => {
+                const mainRole = usr.roles?.[0] || 'SIN_ROL';
+                const roleConfig = ROLE_OPTIONS.find(r => r.value === mainRole) || { color: 'slate', icon: '👤' };
+                
+                return (
+                  <div 
+                    key={usr.id} 
+                    className="group relative bg-white dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-[3.5rem] p-8 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/5 transition-all duration-300 flex flex-col justify-between overflow-hidden"
+                  >
+                    {/* GLASS DECORATION */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-bl-[8rem] -mr-8 -mt-8 pointer-events-none group-hover:scale-110 transition-transform duration-700"></div>
+
+                    <div className="relative">
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-[2rem] flex items-center justify-center text-3xl shadow-inner group-hover:scale-105 transition-transform duration-500">
+                            {roleConfig.icon}
+                          </div>
+                          <div>
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white leading-tight">
+                              {usr.username}
+                            </h3>
+                            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-tighter">ID: {usr.id}</p>
+                          </div>
+                        </div>
+                        <div className="relative group/menu">
+                          <button className="p-2 text-slate-400 hover:text-indigo-600 transition-colors">
+                            <MoreVertical className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 mb-8">
+                        <div className="flex items-center gap-3 text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/50 group-hover:border-indigo-100 dark:group-hover:border-indigo-900/30 transition-colors">
+                          <Mail className="w-4 h-4 shrink-0 text-indigo-400" />
+                          <span className="font-medium truncate">{usr.email}</span>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2">
+                          {usr.roles?.map(roleValue => {
+                            const r = ROLE_OPTIONS.find(opt => opt.value === roleValue);
+                            return (
+                              <span 
+                                key={roleValue} 
+                                className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-sm ${
+                                  r ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-500/20' : 'bg-slate-50 text-slate-400 border-slate-200'
+                                }`}
+                              >
+                                {r?.icon} {roleValue}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative flex justify-between items-center pt-6 border-t border-slate-100 dark:border-slate-800/50">
+                      <div className="flex items-center gap-2">
+                        {usr.enabled ? (
+                          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase rounded-full border border-emerald-100 dark:border-emerald-500/20 shadow-sm">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Activo
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase rounded-full border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <XCircle className="w-3 h-3" />
+                            Inactivo
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleEdit(usr.id)}
+                          className="w-10 h-10 flex items-center justify-center bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                          title="Editar"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(usr.id, usr.username)}
+                          className="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 bg-slate-50/50 dark:bg-slate-900/20 rounded-[4rem] border-4 border-dashed border-slate-100 dark:border-slate-800/40 text-center px-6">
+              <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl relative">
+                <Users className="w-12 h-12 text-slate-300 dark:text-slate-600" />
+                <div className="absolute -right-2 -bottom-2 w-8 h-8 bg-indigo-500 rounded-full flex items-center justify-center text-white border-4 border-white dark:border-slate-900">
+                  <ChevronRight className="w-4 h-4 rotate-90" />
+                </div>
+              </div>
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-3">Sin resultados</h3>
+              <p className="text-slate-500 dark:text-slate-400 max-w-sm font-medium leading-relaxed">
+                {searchQuery || selectedRole 
+                  ? "No encontramos usuarios que coincidan con los filtros aplicados. Intenta ajustar tu búsqueda." 
+                  : "Aún no hay usuarios registrados en la base de datos."}
+              </p>
+              {(searchQuery || selectedRole) && (
+                <button 
+                  onClick={() => {setSearchQuery(""); setSelectedRole(null);}}
+                  className="mt-8 px-8 py-3 bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-full font-bold hover:border-indigo-500 transition-all active:scale-95"
+                >
+                  Limpiar todos los filtros
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* FOOTER INFO */}
+          <div className="mt-16 p-8 bg-white/30 dark:bg-slate-900/30 backdrop-blur-md rounded-[3rem] border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider leading-none mb-1">Capa de Seguridad Activa</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium italic">Acceso restringido auditado por el equipo pastoral</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-center gap-6">
+              <div className="text-center">
+                <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none">{users.length}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Registrados</p>
+              </div>
+              <div className="w-px h-10 bg-slate-200 dark:bg-slate-800"></div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none">{ROLE_OPTIONS.length}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Categorías</p>
+              </div>
+              <div className="w-px h-10 bg-slate-200 dark:bg-slate-800"></div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 leading-none">V1.0</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Protocolo</p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+      `}} />
     </div>
   );
 };

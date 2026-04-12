@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import { useConfirmation } from './context/ConfirmationContext';
 import apiService from './apiService';
 
 /**
@@ -41,6 +42,7 @@ export const useFetch = (fetchFn) => {
  * Maneja lista, crear, editar, eliminar
  */
 export const useCrud = (apiMethods) => {
+  const confirm = useConfirmation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -97,19 +99,26 @@ export const useCrud = (apiMethods) => {
 
   // Eliminar
   const remove = useCallback(async (id) => {
-    if (!window.confirm('¿Estás seguro?')) return;
-    try {
-      setLoading(true);
-      await apiMethods.delete(id);
-      setItems(prev => prev.filter(item => item.id !== id));
-      return true;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, [apiMethods]);
+    await confirm({
+      title: "¿Estás seguro?",
+      message: "Esta acción no se puede deshacer y el registro será eliminado permanentemente.",
+      type: "danger",
+      confirmLabel: "Eliminar Registro",
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await apiMethods.delete(id);
+          setItems(prev => prev.filter(item => item.id !== id));
+          return true;
+        } catch (err) {
+          setError(err.message);
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
+  }, [apiMethods, confirm]);
 
   return {
     items,

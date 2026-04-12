@@ -1,44 +1,62 @@
 // ============================================
-// CounselingPage.jsx - Módulo de Consejerías Pastorales
-// ✅ Fila clickeable → abre detalle
-// ✅ Botones de acción dentro del modal de detalle
-// ✅ Tabla limpia sin columna de acciones
-// ✅ Tarjetas responsive en móvil
-// ✅ Estado IN_PROGRESS: iniciar sesión en tiempo real
-// ✅ Modal de sesión activa con contexto histórico del miembro
+// CounselingPage.jsx - ELITE MODERN EDITION
 // ============================================
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import apiService from "../apiService";
-import "../css/CounselingPage.css";
-
-const DEBUG = process.env.REACT_APP_DEBUG === "true";
-const log = (msg, data) => { if (DEBUG) console.log(`[CounselingPage] ${msg}`, data || ""); };
-const logError = (msg, err) => console.error(`[CounselingPage] ${msg}`, err);
+import { useConfirmation } from "../context/ConfirmationContext";
+import {
+  Users,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  FileText,
+  BarChart3,
+  MoreVertical,
+  History,
+  UserCheck,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  MapPin,
+  ClipboardList,
+  Target,
+  Bell,
+  Activity,
+  User,
+  Phone,
+  Mail,
+  Zap,
+  RefreshCw,
+  Download,
+  Ghost,
+  ShieldCheck,
+  Edit3,
+} from "lucide-react";
 
 // ============================================================
 // CONSTANTES
 // ============================================================
 const COUNSELING_STATUS = {
-  SCHEDULED:    { label: "Programada",   color: "scheduled",    icon: "📅" },
-  RESCHEDULED:  { label: "Reprogramada", color: "rescheduled",  icon: "🔄" },
-  IN_PROGRESS:  { label: "En curso",     color: "inprogress",   icon: "▶️" },
-  COMPLETED:    { label: "Completada",   color: "completed",    icon: "✅" },
-  CANCELLED:    { label: "Cancelada",    color: "cancelled",    icon: "❌" },
-  NO_SHOW:      { label: "No asistió",   color: "noshow",       icon: "👻" },
+  SCHEDULED:   { label: "Programada",   color: "indigo",  icon: Calendar    },
+  RESCHEDULED: { label: "Reprogramada", color: "violet",  icon: RefreshCw   },
+  IN_PROGRESS: { label: "En curso",     color: "emerald", icon: Activity    },
+  COMPLETED:   { label: "Completada",   color: "sky",     icon: CheckCircle2 },
+  CANCELLED:   { label: "Cancelada",    color: "rose",    icon: XCircle     },
+  NO_SHOW:     { label: "No asistió",   color: "amber",   icon: Ghost       },
 };
 
 const COUNSELING_TOPICS = {
-  SPIRITUAL:    "🙏 Espiritual",
-  FAMILY:       "👨‍👩‍👧 Familiar",
-  MARITAL:      "💑 Matrimonial",
-  GRIEF:        "🕊️ Duelo",
-  FINANCIAL:    "💰 Finanzas",
-  PERSONAL:     "🧠 Personal",
-  VOCATIONAL:   "🌟 Vocacional",
-  ADDICTION:    "🔗 Adicciones",
-  PREMARITAL:   "💍 Prematrimonial",
-  OTHER:        "📋 Otro",
+  SPIRITUAL: "🙏 Espiritual",
+  FAMILY:    "👨‍👩‍👧‍👦 Familiar",
+  MARRIAGE:  "💍 Matrimonial",
+  EMOTIONAL: "🧠 Emocional",
+  FINANCIAL: "💰 Financiero",
+  YOUTH:     "🎈 Juvenil",
+  OTHER:     "🏷️ Otro",
 };
 
 const EMPTY_SESSION_FORM = {
@@ -72,8 +90,10 @@ const formatDateTime = (dt) => {
 
 const formatDate = (dt) => {
   if (!dt) return "-";
-  try { return parseLocalDate(dt).toLocaleDateString("es-CO"); } // ✅
-  catch { return dt; }
+  try {
+    const d = new Date(dt);
+    return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+  } catch { return dt; }
 };
 
 const toLocalDatetimeInput = (iso) => {
@@ -81,22 +101,16 @@ const toLocalDatetimeInput = (iso) => {
   return iso.length >= 16 ? iso.slice(0, 16) : iso;
 };
 
-// Agregar esta función helper al inicio del archivo
-const parseLocalDate = (str) => {
-  if (!str) return null;
-  // Si es solo fecha "YYYY-MM-DD", parsear sin conversión UTC
-  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-    const [y, m, d] = str.split("-").map(Number);
-    return new Date(y, m - 1, d);
-  }
-  // Si ya trae hora/timezone, new Date es seguro
-  return new Date(str);
-};
+// ============================================================
+// MODAL: Confirmación personalizada  ← NUEVO (reemplaza window.confirm)
+// ============================================================
+// ModalConfirm was removed - using centralized useConfirmation
 
 // ============================================================
-// MODAL: Agendar / Editar sesión  (sin cambios)
+// MODAL: Agendar / Editar sesión
 // ============================================================
 function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, isEditing }) {
+  const confirm = useConfirmation();
   const [form, setForm] = useState(EMPTY_SESSION_FORM);
   const [memberSearch, setMemberSearch] = useState("");
   const [saving, setSaving] = useState(false);
@@ -126,7 +140,7 @@ function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, i
     ? members.filter(m =>
         m.name?.toLowerCase().includes(memberSearch.toLowerCase()) ||
         m.document?.toLowerCase().includes(memberSearch.toLowerCase())
-      ).slice(0, 10)
+      ).slice(0, 8)
     : [];
 
   const handleMemberSelect = (m) => {
@@ -135,8 +149,24 @@ function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, i
   };
 
   const handleSubmit = async () => {
-    if (!form.memberId)    return alert("Selecciona un miembro");
-    if (!form.scheduledAt) return alert("La fecha y hora son obligatorias");
+    if (!form.memberId) {
+      await confirm({
+        title: "Dato Requerido",
+        message: "Por favor, selecciona un miembro para agendar la sesión.",
+        type: "warning",
+        confirmLabel: "Entendido"
+      });
+      return;
+    }
+    if (!form.scheduledAt) {
+      await confirm({
+        title: "Dato Requerido",
+        message: "La fecha y hora son obligatorias para programar la cita.",
+        type: "warning",
+        confirmLabel: "Entendido"
+      });
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -147,76 +177,113 @@ function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, i
         topic:           form.topic,
         objectives:      form.objectives || null,
       });
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
-      <div className="cp-modal" onClick={e => e.stopPropagation()}>
-        <div className="cp-modal__header">
-          <h2>{isEditing ? "✏️ Editar Sesión" : "📅 Agendar Sesión"}</h2>
-          <button className="cp-modal__close" onClick={onClose}>✕</button>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[3rem] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-8 pb-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
+              {isEditing ? <FileText className="w-6 h-6" /> : <Calendar className="w-6 h-6" />}
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                {isEditing ? "Editar Sesión" : "Agendar Sesión"}
+              </h2>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                {isEditing ? "Modificar detalles de la consejería" : "Programar nueva cita pastoral"}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
+            <XCircle className="w-6 h-6 text-slate-400" />
+          </button>
         </div>
-        <div className="cp-modal__body">
-          <div className="cp-form-group">
-            <label>👤 Miembro *</label>
-            <input
-              type="text"
-              placeholder="Buscar por nombre o documento..."
-              value={memberSearch}
-              onChange={e => { setMemberSearch(e.target.value); setForm(f => ({ ...f, memberId: "" })); }}
-            />
+
+        <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+          {/* Miembro */}
+          <div className="space-y-2 relative">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Miembro *</label>
+            <div className="relative">
+              <User className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por nombre o documento..."
+                value={memberSearch}
+                onChange={e => {
+                  setMemberSearch(e.target.value);
+                  if (form.memberId) setForm(f => ({ ...f, memberId: "" }));
+                }}
+                className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent focus:border-indigo-500 rounded-3xl text-sm font-bold transition-all outline-none"
+              />
+            </div>
             {filteredMembers.length > 0 && !form.memberId && (
-              <div className="cp-member-dropdown">
+              <div className="absolute z-10 w-full top-full mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl shadow-xl overflow-hidden max-h-48 overflow-y-auto backdrop-blur-xl">
                 {filteredMembers.map(m => (
-                  <div key={m.id} className="cp-member-option" onClick={() => handleMemberSelect(m)}>
-                    <span className="cp-member-option__name">{m.name}</span>
-                    <span className="cp-member-option__doc">{m.document}</span>
-                  </div>
+                  <button
+                    key={m.id}
+                    className="w-full text-left px-6 py-4 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors flex flex-col group"
+                    onClick={() => handleMemberSelect(m)}
+                  >
+                    <span className="text-sm font-black text-slate-900 dark:text-white group-hover:text-indigo-600 transition-colors">{m.name}</span>
+                    <span className="text-[10px] font-bold text-slate-400 group-hover:text-indigo-400 uppercase tracking-widest">{m.document}</span>
+                  </button>
                 ))}
               </div>
             )}
             {form.memberId && (
-              <span className="cp-selected-member">✅ Miembro seleccionado (ID: {form.memberId})</span>
+              <div className="flex items-center gap-2 mt-2 ml-4">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Miembro Seleccionado</span>
+              </div>
             )}
           </div>
 
-          <div className="cp-form-row">
-            <div className="cp-form-group">
-              <label>📅 Fecha y Hora *</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Fecha y Hora *</label>
               <input
                 type="datetime-local"
                 value={form.scheduledAt}
                 onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))}
+                className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent focus:border-indigo-500 rounded-3xl text-sm font-bold transition-all outline-none"
               />
             </div>
-            <div className="cp-form-group">
-              <label>⏱️ Duración (min)</label>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Duración (minutos)</label>
               <input
                 type="number"
                 min="15"
                 value={form.durationMinutes}
                 onChange={e => setForm(f => ({ ...f, durationMinutes: e.target.value }))}
+                className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent focus:border-indigo-500 rounded-3xl text-sm font-bold transition-all outline-none"
               />
             </div>
           </div>
 
-          <div className="cp-form-row">
-            <div className="cp-form-group">
-              <label>📍 Lugar</label>
-              <input
-                type="text"
-                placeholder="Ej: Oficina pastoral"
-                value={form.location}
-                onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                maxLength={255}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Lugar</label>
+              <div className="relative">
+                <MapPin className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Ej: Oficina Pastoral"
+                  value={form.location}
+                  onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                  className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent focus:border-indigo-500 rounded-3xl text-sm font-bold transition-all outline-none"
+                />
+              </div>
             </div>
-            <div className="cp-form-group">
-              <label>🏷️ Tema</label>
-              <select value={form.topic} onChange={e => setForm(f => ({ ...f, topic: e.target.value }))}>
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Tema Central</label>
+              <select
+                value={form.topic}
+                onChange={e => setForm(f => ({ ...f, topic: e.target.value }))}
+                className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent focus:border-indigo-500 rounded-3xl text-sm font-bold transition-all outline-none cursor-pointer appearance-none"
+              >
                 {Object.entries(COUNSELING_TOPICS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
@@ -224,20 +291,32 @@ function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, i
             </div>
           </div>
 
-          <div className="cp-form-group">
-            <label>🎯 Objetivos de la sesión</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">Objetivos de la sesión</label>
             <textarea
               rows={3}
-              placeholder="Describe los objetivos principales de esta sesión..."
+              placeholder="Describe los propósitos principales de este encuentro..."
               value={form.objectives}
               onChange={e => setForm(f => ({ ...f, objectives: e.target.value }))}
+              className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent focus:border-indigo-500 rounded-3xl text-sm font-bold transition-all outline-none resize-none"
             />
           </div>
         </div>
-        <div className="cp-modal__footer">
-          <button className="cp-btn cp-btn--ghost" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="cp-btn cp-btn--primary" onClick={handleSubmit} disabled={saving}>
-            {saving ? "⏳ Guardando..." : isEditing ? "💾 Actualizar" : "📅 Agendar"}
+
+        <div className="p-8 bg-slate-50 dark:bg-slate-900/50 flex gap-4">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex-1 py-4 bg-indigo-600 text-white rounded-3xl font-black text-sm uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-600/20"
+          >
+            {saving ? "Guardando..." : "Confirmar"}
           </button>
         </div>
       </div>
@@ -246,85 +325,128 @@ function ModalScheduleSession({ isOpen, onClose, onSave, initialData, members, i
 }
 
 // ============================================================
-// MODAL: Completar sesión  (sin cambios)
+// MODAL: Completar sesión
 // ============================================================
 function ModalCompleteSession({ isOpen, onClose, onSave, session }) {
+  const confirm = useConfirmation();
   const [form, setForm] = useState(EMPTY_COMPLETE_FORM);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (isOpen) setForm(EMPTY_COMPLETE_FORM); }, [isOpen]);
+  useEffect(() => {
+    if (isOpen) {
+      setForm({
+        ...EMPTY_COMPLETE_FORM,
+        // FIX: usar session?.notes aunque sea string vacío
+        notes: session?.notes ?? "",
+      });
+    }
+  }, [isOpen, session]);
+
   if (!isOpen || !session) return null;
 
   const handleSubmit = async () => {
-    if (!form.notes.trim()) return alert("Las notas son obligatorias para completar la sesión");
+    if (!form.notes.trim()) {
+      await confirm({
+        title: "Campo Requerido",
+        message: "Las notas y conclusiones son obligatorias para cerrar el expediente de la sesión.",
+        type: "warning",
+        confirmLabel: "Entendido"
+      });
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
         notes:            form.notes,
         followUpRequired: form.followUpRequired,
         followUpNotes:    form.followUpNotes || null,
-        followUpDate:     form.followUpDate || null,
+        followUpDate:     form.followUpDate  || null,
       });
     } finally { setSaving(false); }
   };
 
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
-      <div className="cp-modal" onClick={e => e.stopPropagation()}>
-        <div className="cp-modal__header cp-modal__header--complete">
-          <h2>✅ Completar Sesión</h2>
-          <button className="cp-modal__close" onClick={onClose}>✕</button>
-        </div>
-        <div className="cp-modal__body">
-          <div className="cp-session-info-box">
-            <strong>{session.memberName}</strong>
-            <span>{formatDateTime(session.scheduledAt)}</span>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-emerald-950/40 backdrop-blur-sm animate-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-xl rounded-[3rem] shadow-2xl border-4 border-emerald-500/10 overflow-hidden">
+        <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-500/20">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">Cerrar Sesión</h2>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">{session.memberName}</p>
+            </div>
           </div>
-          <div className="cp-form-group">
-            <label>📝 Notas de la sesión *</label>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+            <XCircle className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-8 space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Conclusiones y Notas Pastorales *</label>
             <textarea
-              rows={4}
-              placeholder="Describe lo que se trabajó en la sesión, observaciones, avances..."
+              rows={5}
+              placeholder="Resume los puntos clave, acuerdos y guianza espiritual brindada..."
               value={form.notes}
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800 border border-transparent focus:border-emerald-500 rounded-3xl text-sm font-bold transition-all outline-none resize-none"
             />
           </div>
-          <div className="cp-form-group cp-form-group--checkbox">
-            <label>
+
+          <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl space-y-4">
+            <label className="flex items-center gap-4 cursor-pointer group">
+              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${form.followUpRequired ? "border-emerald-500 bg-emerald-500" : "border-slate-300 dark:border-slate-600"}`}>
+                {form.followUpRequired && <CheckCircle2 className="w-4 h-4 text-white" />}
+              </div>
               <input
                 type="checkbox"
+                className="hidden"
                 checked={form.followUpRequired}
                 onChange={e => setForm(f => ({ ...f, followUpRequired: e.target.checked }))}
               />
-              🔔 Requiere seguimiento
+              <span className="text-sm font-black text-slate-700 dark:text-slate-300 group-hover:text-emerald-500 transition-colors uppercase tracking-widest">
+                Requiere Seguimiento Pastoral
+              </span>
             </label>
+
+            {form.followUpRequired && (
+              <div className="space-y-4 pt-2 animate-in slide-in-from-top-2 duration-300">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Notas de seguimiento</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Especifique qué aspectos verificar en el futuro..."
+                    value={form.followUpNotes}
+                    onChange={e => setForm(f => ({ ...f, followUpNotes: e.target.value }))}
+                    className="w-full px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold transition-all outline-none resize-none focus:border-emerald-500"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Próxima fecha sugerida</label>
+                  <input
+                    type="datetime-local"
+                    value={form.followUpDate}
+                    onChange={e => setForm(f => ({ ...f, followUpDate: e.target.value }))}
+                    className="w-full px-6 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold transition-all outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+            )}
           </div>
-          {form.followUpRequired && (
-            <>
-              <div className="cp-form-group">
-                <label>📋 Notas de seguimiento</label>
-                <textarea
-                  rows={2}
-                  placeholder="Qué se debe verificar o continuar en la próxima sesión..."
-                  value={form.followUpNotes}
-                  onChange={e => setForm(f => ({ ...f, followUpNotes: e.target.value }))}
-                />
-              </div>
-              <div className="cp-form-group">
-                <label>📅 Fecha de seguimiento</label>
-                <input
-                  type="datetime-local"
-                  value={form.followUpDate}
-                  onChange={e => setForm(f => ({ ...f, followUpDate: e.target.value }))}
-                />
-              </div>
-            </>
-          )}
         </div>
-        <div className="cp-modal__footer">
-          <button className="cp-btn cp-btn--ghost" onClick={onClose} disabled={saving}>Cancelar</button>
-          <button className="cp-btn cp-btn--complete" onClick={handleSubmit} disabled={saving}>
-            {saving ? "⏳ Guardando..." : "✅ Completar Sesión"}
+
+        <div className="p-8 flex gap-4">
+          <button onClick={onClose} disabled={saving} className="flex-1 py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">
+            Volver
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex-[2] py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-3xl font-black text-sm uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-emerald-500/30"
+          >
+            {saving ? "Finalizando..." : "Confirmar Finalización"}
           </button>
         </div>
       </div>
@@ -333,9 +455,513 @@ function ModalCompleteSession({ isOpen, onClose, onSave, session }) {
 }
 
 // ============================================================
-// MODAL: Cancelar sesión  (sin cambios)
+// MODAL: Sesión Activa (Misión Control)
+// ============================================================
+function ModalActiveSession({ isOpen, onClose, sessionData, onComplete, onCancel, onNoShow, liveNotes, setLiveNotes }) {
+  const [activeTab, setActiveTab] = useState("current");
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab("current");
+      // FIX: usar === "" para detectar liveNotes vacío sin ignorar el string vacío intencional
+      if (liveNotes === "" && sessionData?.activeSession?.notes) {
+        setLiveNotes(sessionData.activeSession.notes);
+      }
+    }
+  }, [isOpen, sessionData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!isOpen || !sessionData) return null;
+
+  const { activeSession, previousSessions = [], pendingFollowUps = [], memberStats, totalPreviousSessions } = sessionData;
+  const hasPrevious  = previousSessions.length > 0;
+  const hasFollowUps = pendingFollowUps.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-500">
+      <div
+        className="bg-slate-50 dark:bg-slate-950 w-full max-w-6xl h-full max-h-[90vh] rounded-[3.5rem] shadow-[0_40px_100px_-15px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden relative"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Glow Effect */}
+        <div className="absolute top-0 left-1/4 w-1/2 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent"></div>
+
+        {/* HEADER */}
+        <div className="p-10 pb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative">
+          <div className="flex items-center gap-8">
+            <div className="relative">
+              <div className="w-20 h-20 bg-slate-900 rounded-[2.5rem] flex items-center justify-center text-emerald-400 shadow-2xl relative z-10">
+                <Users className="w-10 h-10" />
+              </div>
+              <div className="absolute inset-0 bg-emerald-500 rounded-[2.5rem] animate-ping opacity-20 blur-xl"></div>
+              <div className="absolute -top-2 -right-2 bg-emerald-500 text-white p-2 rounded-2xl border-4 border-slate-50 dark:border-slate-950 shadow-xl z-20">
+                <Zap className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="flex items-center gap-2 px-3 py-1 bg-emerald-500/10 text-emerald-500 text-[9px] font-black uppercase tracking-[0.2em] rounded-full border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  En Curso Ahora
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sesión #{activeSession.sessionNumber}</span>
+              </div>
+              <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{activeSession.memberName}</h2>
+              <div className="flex items-center gap-4 mt-2">
+                <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-indigo-500" />
+                  {activeSession.location || "Presencial"}
+                </span>
+                <span className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                  <History className="w-3.5 h-3.5 text-indigo-500" />
+                  Inicio: {formatDateTime(activeSession.startedAt)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="absolute top-8 right-8 p-3 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-400 hover:text-red-500 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 transition-all select-none group"
+          >
+            <XCircle className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+          </button>
+        </div>
+
+        {/* NAVIGATION TABS */}
+        <div className="px-10 flex gap-4 border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar py-2">
+          {[
+            { id: "current",   label: "Evolución Actual",  icon: ClipboardList },
+            { id: "history",   label: "Historial Clínico", icon: History,    badge: totalPreviousSessions },
+            { id: "followups", label: "Pendientes",        icon: Bell,       badge: pendingFollowUps.length, color: "rose" },
+            { id: "stats",     label: "Estadísticas",      icon: BarChart3 },
+          ].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-3 px-6 py-4 rounded-t-[2.5rem] text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap border-x border-t border-transparent translate-y-[1px] ${
+                activeTab === tab.id
+                  ? "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-indigo-600 dark:text-indigo-400"
+                  : "text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              }`}
+            >
+              <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? "text-indigo-600" : ""}`} />
+              {tab.label}
+              {tab.badge > 0 && (
+                <span className={`ml-1 px-2 py-0.5 rounded-lg text-[9px] ${tab.color === "rose" ? "bg-rose-500 text-white" : "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"}`}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* TAB CONTENT */}
+        <div className="flex-1 overflow-y-auto p-10 bg-white dark:bg-slate-900" ref={scrollRef}>
+
+          {/* TAB: Evolución Actual */}
+          {activeTab === "current" && (
+            <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="bg-slate-50 dark:bg-slate-950 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-indigo-500" /> Perfil del Miembro
+                  </h3>
+                  <div className="space-y-4">
+                    {[
+                      { label: "Documento", value: activeSession.memberDocument || "N/A", icon: FileText },
+                      { label: "Teléfono",  value: activeSession.memberPhone    || "N/A", icon: Phone    },
+                      { label: "Correo",    value: activeSession.memberEmail    || "N/A", icon: Mail     },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-center justify-between group">
+                        <span className="text-xs font-bold text-slate-500 flex items-center gap-3">
+                          <item.icon className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                          {item.label}
+                        </span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 dark:bg-slate-950 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                    <Target className="w-4 h-4 text-indigo-500" /> Métrica de Sesión
+                  </h3>
+                  <div className="space-y-4">
+                    {[
+                      { label: "Tópico Principal",   value: COUNSELING_TOPICS[activeSession.topic] || activeSession.topic, icon: Zap      },
+                      { label: "Duración Estimada",  value: `${activeSession.durationMinutes} min`,                        icon: Clock    },
+                      { label: "Posición Histórica", value: `Sesión #${activeSession.sessionNumber}`,                      icon: BarChart3 },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-center justify-between group">
+                        <span className="text-xs font-bold text-slate-500 flex items-center gap-3">
+                          <item.icon className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                          {item.label}
+                        </span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {activeSession.objectives && (
+                <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-bl-[8rem] group-hover:bg-white/10 transition-all duration-700"></div>
+                  <h3 className="text-[9px] font-black uppercase tracking-[0.3em] mb-3 opacity-70 flex items-center gap-2">
+                    <Target className="w-3.5 h-3.5" /> Objetivo Establecido
+                  </h3>
+                  <p className="text-lg font-black leading-tight tracking-tight relative z-10 italic">"{activeSession.objectives}"</p>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-emerald-500" />
+                  Bitácora de la Sesión (Notas en tiempo real)
+                </h3>
+                <textarea
+                  value={liveNotes}
+                  onChange={e => setLiveNotes(e.target.value)}
+                  placeholder="Escriba aquí los puntos clave, acuerdos y revelaciones del encuentro..."
+                  className="w-full h-48 p-8 bg-slate-50 dark:bg-slate-950/40 border-2 border-slate-100 dark:border-slate-800 focus:border-emerald-500 rounded-[2.5rem] text-sm font-bold transition-all outline-none resize-none shadow-inner"
+                />
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right mr-4 italic">Autoguardado local activado</p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: Historial */}
+          {activeTab === "history" && (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+              {!hasPrevious ? (
+                <div className="py-20 text-center flex flex-col items-center">
+                  <div className="w-24 h-24 bg-slate-100 dark:bg-slate-900 rounded-[2rem] flex items-center justify-center mb-6 text-slate-300">
+                    <History className="w-12 h-12 opacity-50" />
+                  </div>
+                  <h4 className="text-2xl font-black text-slate-900 dark:text-slate-200">Paciente sin Antecedentes</h4>
+                  <p className="text-slate-400 font-medium mt-2">Esta es la primera intervención registrada para este miembro.</p>
+                </div>
+              ) : (
+                <div className="grid gap-6">
+                  {previousSessions.map(s => (
+                    <div key={s.sessionId ?? s.id} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-8 rounded-[2rem] shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
+                      <div className="absolute top-0 right-0 w-2 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <div className="flex justify-between items-start mb-6">
+                        <div>
+                          <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-indigo-100 dark:border-indigo-500/20">
+                            Sesión #{s.sessionNumber}
+                          </span>
+                          <h4 className="text-lg font-black text-slate-900 dark:text-white mt-2 mb-1 uppercase tracking-tight">
+                            {COUNSELING_TOPICS[s.topic] || s.topic}
+                          </h4>
+                          <p className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                            <Calendar className="w-3 h-3 text-indigo-500" />
+                            {formatDate(s.scheduledAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="space-y-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+                        {s.notes && (
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Anotaciones Pastorales</span>
+                            <p className="text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed italic">"{s.notes}"</p>
+                          </div>
+                        )}
+                        {s.followUpRequired && (
+                          <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl border border-amber-100 dark:border-amber-500/20 flex items-start gap-3">
+                            <Bell className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest block mb-1">Pendiente de Seguimiento</span>
+                              <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{s.followUpNotes}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: Follow-ups */}
+          {activeTab === "followups" && (
+            <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+              {!hasFollowUps ? (
+                <div className="py-20 text-center flex flex-col items-center">
+                  <div className="w-24 h-24 bg-emerald-50 dark:bg-emerald-950/30 rounded-[2rem] flex items-center justify-center mb-6 text-emerald-500 shadow-xl shadow-emerald-500/10">
+                    <CheckCircle2 className="w-12 h-12" />
+                  </div>
+                  <h4 className="text-2xl font-black text-slate-900 dark:text-slate-200">Sin Compromisos Pendientes</h4>
+                  <p className="text-slate-400 font-medium mt-2">Todo el seguimiento pastoral ha sido evacuado correctamente.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {pendingFollowUps.map(fu => (
+                    <div
+                      key={fu.originSessionId}
+                      className={`p-8 rounded-[2rem] border relative overflow-hidden transition-all ${
+                        fu.overdue
+                          ? "bg-rose-50 dark:bg-rose-500/5 border-rose-200 dark:border-rose-900/50"
+                          : "bg-amber-50 dark:bg-amber-500/5 border-amber-200 dark:border-amber-900/50 shadow-sm shadow-amber-500/5"
+                      }`}
+                    >
+                      {fu.overdue && (
+                        <span className="absolute top-6 right-6 px-3 py-1 bg-rose-600 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg">
+                          Prioridad Alta
+                        </span>
+                      )}
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4">
+                        <History className="w-3.5 h-3.5" />
+                        Ref: Sesión #{fu.originSessionNumber}
+                      </span>
+                      <p className="text-lg font-black text-slate-800 dark:text-slate-200 leading-tight mb-4">{fu.followUpNotes}</p>
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-500 bg-white/50 dark:bg-slate-900/50 w-fit px-4 py-2 rounded-xl">
+                        <Calendar className="w-3.5 h-3.5" />
+                        Establecido para: {formatDate(fu.followUpDate)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: Estadísticas */}
+          {activeTab === "stats" && (
+            <div className="animate-in slide-in-from-right-4 duration-500 h-full flex items-center justify-center">
+              {!memberStats ? (
+                <div className="text-center opacity-40 py-20">
+                  <BarChart3 className="w-20 h-20 mx-auto mb-4" />
+                  <p className="font-black uppercase tracking-widest">Análisis no disponible todavía</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-4xl mx-auto">
+                  {[
+                    { label: "Encuentros Totales", value: memberStats.totalSessions,    icon: Users,       color: "indigo"  },
+                    { label: "Tasa Exito",          value: `${memberStats.completionRate}%`, icon: Zap,    color: "emerald" },
+                    { label: "Cancelaciones",       value: memberStats.cancelledSessions, icon: XCircle,   color: "rose"    },
+                    { label: "Incomparecencias",    value: memberStats.noShowSessions,    icon: Ghost,      color: "amber"   },
+                    { label: "Completadas",         value: memberStats.completedSessions, icon: CheckCircle2, color: "sky"  },
+                    { label: "Nivel Confianza",     value: memberStats.completionRate > 80 ? "ALTO" : "MEDIO", icon: ShieldCheck, color: "indigo" },
+                  ].map(stat => (
+                    <div key={stat.label} className="bg-slate-50 dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 text-center group hover:border-indigo-500/50 transition-all">
+                      <div className={`w-12 h-12 bg-${stat.color}-500/10 text-${stat.color}-500 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform`}>
+                        <stat.icon className="w-6 h-6" />
+                      </div>
+                      <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter mb-1">{stat.value}</p>
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ACTIVE FOOTER ACTION BAR */}
+        <div className="p-10 bg-slate-100 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 flex flex-wrap gap-4 items-center justify-between backdrop-blur-3xl">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onClose}
+              className="px-8 py-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 rounded-[2rem] font-bold text-xs uppercase tracking-widest hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-95 shadow-sm"
+            >
+              Minimizar Panel
+            </button>
+            <div className="w-px h-10 bg-slate-300 dark:bg-slate-700 mx-2"></div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] max-w-[150px] leading-relaxed">
+              Sus cambios se guardarán permanentemente al finalizar
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {/* FIX: onNoShow ahora pasa la sesión correctamente */}
+            <button
+              onClick={() => onNoShow(activeSession)}
+              className="px-6 py-4 bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-amber-500 hover:text-white transition-all active:scale-95 border border-amber-200 dark:border-amber-900/30 flex items-center gap-2"
+            >
+              <Ghost className="w-4 h-4" />
+              Ausente
+            </button>
+            <button
+              onClick={() => onCancel(activeSession)}
+              className="px-6 py-4 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all active:scale-95 border border-rose-200 dark:border-rose-900/30 flex items-center gap-2"
+            >
+              <XCircle className="w-4 h-4" />
+              Cancelar
+            </button>
+            <button
+              onClick={() => onComplete({ ...activeSession, notes: liveNotes })}
+              className="px-10 py-4 bg-indigo-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-xl shadow-indigo-600/30 flex items-center gap-3"
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              Concluir Sesión Pastoral
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MODAL: Detalle + Acciones integradas
+// ============================================================
+function ModalSessionDetail({ isOpen, onClose, session, onEdit, onComplete, onCancel, onNoShow, onPdf, onStart }) {
+  if (!isOpen || !session) return null;
+
+  const status    = COUNSELING_STATUS[session.status] || { label: session.status, color: "slate", icon: ClipboardList };
+  const isActive  = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
+  const isOngoing = session.status === "IN_PROGRESS";
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+      <div
+        className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[3rem] shadow-[0_30px_60px_-12px_rgba(0,0,0,0.3)] border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Detail Header */}
+        <div className={`p-10 pb-8 bg-gradient-to-br from-${status.color}-600 to-${status.color}-700 text-white relative flex justify-between items-start`}>
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="px-3 py-1 bg-white/20 text-white text-[9px] font-black uppercase tracking-[0.2em] rounded-lg backdrop-blur-md">
+                #ID {session.id} · Sesión #{session.sessionNumber}
+              </span>
+              <div className="flex items-center gap-1 text-[9px] font-black bg-white/10 px-3 py-1 rounded-lg uppercase tracking-widest backdrop-blur-sm">
+                <status.icon className="w-3 h-3" />
+                {status.label}
+              </div>
+            </div>
+            <h2 className="text-4xl font-black tracking-tighter leading-none mb-4">{session.memberName}</h2>
+            <p className="text-white/60 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <Calendar className="w-3.5 h-3.5 opacity-60" />
+              {formatDateTime(session.scheduledAt)}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-2xl transition-all relative z-10">
+            <XCircle className="w-7 h-7" />
+          </button>
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 -mr-12 -mt-12 rounded-full blur-3xl opacity-30"></div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-10 space-y-8 bg-slate-50 dark:bg-slate-950/20">
+          <div className="grid grid-cols-2 gap-8 p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+            <div className={`absolute left-0 top-0 w-1.5 h-full bg-${status.color}-500`}></div>
+            <div>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Información del Miembro</h4>
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <User className="w-3.5 h-3.5" /> ID: <span className="text-slate-900 dark:text-white font-black">{session.memberDocument || "-"}</span>
+                </p>
+                <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5" /> TEL: <span className="text-slate-900 dark:text-white font-black">{session.memberPhone || "-"}</span>
+                </p>
+              </div>
+            </div>
+            <div>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Detalles Técnicos</h4>
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5" /> TIEMPO: <span className="text-slate-900 dark:text-white font-black">{session.durationMinutes} min</span>
+                </p>
+                <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5" /> TEMA: <span className="text-slate-900 dark:text-white font-black">{COUNSELING_TOPICS[session.topic] || session.topic}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {session.objectives && (
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Target className="w-4 h-4" /> Objetivos de Sesión
+              </h4>
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-300 leading-relaxed italic">"{session.objectives}"</p>
+            </div>
+          )}
+
+          {session.notes && (
+            <div className="bg-emerald-50 dark:bg-emerald-500/5 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-emerald-500/20 shadow-inner">
+              <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" /> Resultado y Acuerdos
+              </h4>
+              <p className="text-sm font-black text-slate-800 dark:text-slate-200 leading-relaxed uppercase tracking-tight">{session.notes}</p>
+            </div>
+          )}
+
+          {session.cancellationReason && (
+            <div className="bg-rose-50 dark:bg-rose-500/5 p-8 rounded-[2.5rem] border border-rose-100 dark:border-rose-500/20 shadow-inner">
+              <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <XCircle className="w-4 h-4" /> Reporte de Cancelación
+              </h4>
+              <p className="text-sm font-black text-rose-800 dark:text-rose-400 leading-relaxed uppercase tracking-tight">{session.cancellationReason}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Actions Footer */}
+        <div className="p-10 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-4 items-center justify-between">
+          <button
+            onClick={() => { onPdf(session); onClose(); }}
+            className="px-6 py-4 border-2 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-500 hover:text-indigo-600 rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3"
+          >
+            <Download className="w-4 h-4" />
+            Expediente PDF
+          </button>
+
+          <div className="flex gap-3">
+            {isOngoing && (
+              <button
+                onClick={() => { onStart(session); }}
+                className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-emerald-500/20 flex items-center gap-3"
+              >
+                <Zap className="w-5 h-5" />
+                Retomar Sesión
+              </button>
+            )}
+            {isActive && (
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => { onStart(session); }}
+                  className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center gap-2"
+                >
+                  <Zap className="w-4 h-4" />
+                  Iniciar
+                </button>
+                <button
+                  onClick={() => { onEdit(session); }}
+                  className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+                >
+                  <Edit3 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => { onComplete(session); }}
+                  className="px-6 py-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all"
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={() => { onCancel(session); }}
+                  className="px-6 py-4 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all"
+                >
+                  Anular
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MODAL: Cancelar sesión
 // ============================================================
 function ModalCancelSession({ isOpen, onClose, onSave, session }) {
+  const confirm = useConfirmation();
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -343,40 +969,62 @@ function ModalCancelSession({ isOpen, onClose, onSave, session }) {
   if (!isOpen || !session) return null;
 
   const handleSubmit = async () => {
-    if (!reason.trim()) return alert("El motivo de cancelación es obligatorio");
+    if (!reason.trim()) {
+      await confirm({
+        title: "Justificación Requerida",
+        message: "El motivo de cancelación es obligatorio para anular el registro.",
+        type: "warning",
+        confirmLabel: "Entendido"
+      });
+      return;
+    }
     setSaving(true);
     try { await onSave({ cancellationReason: reason }); }
     finally { setSaving(false); }
   };
 
   return (
-    <div className="cp-modal-overlay" onClick={onClose}>
-      <div className="cp-modal cp-modal--sm" onClick={e => e.stopPropagation()}>
-        <div className="cp-modal__header cp-modal__header--cancel">
-          <h2>❌ Cancelar Sesión</h2>
-          <button className="cp-modal__close" onClick={onClose}>✕</button>
-        </div>
-        <div className="cp-modal__body">
-          <div className="cp-session-info-box cp-session-info-box--danger">
-            <strong>{session.memberName}</strong>
-            <span>{formatDateTime(session.scheduledAt)}</span>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-rose-950/40 backdrop-blur-sm animate-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[3rem] shadow-2xl border-4 border-rose-500/10 overflow-hidden">
+        <div className="p-8 pb-4 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-rose-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-rose-500/20">
+              <XCircle className="w-6 h-6" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Anular Sesión</h2>
           </div>
-          <div className="cp-form-group">
-            <label>📝 Motivo de cancelación *</label>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+            <XCircle className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="p-8 space-y-6">
+          <div className="p-6 bg-rose-50 dark:bg-rose-950/20 rounded-3xl border border-rose-100 dark:border-rose-900/40">
+            <p className="text-xs font-black text-rose-600 uppercase tracking-widest mb-1">Impacto en Agenda</p>
+            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
+              Esta acción liberará el espacio agendado para <strong>{session.memberName}</strong>.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Motivo de la cancelación *</label>
             <textarea
               rows={3}
-              placeholder="Indica el motivo por el que se cancela esta sesión..."
+              placeholder="Justifique el motivo de la anulación..."
               value={reason}
               onChange={e => setReason(e.target.value)}
-              maxLength={500}
+              className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800 border border-transparent focus:border-rose-500 rounded-3xl text-sm font-bold transition-all outline-none resize-none"
             />
-            <span className="cp-char-count">{reason.length}/500</span>
           </div>
         </div>
-        <div className="cp-modal__footer">
-          <button className="cp-btn cp-btn--ghost" onClick={onClose} disabled={saving}>Volver</button>
-          <button className="cp-btn cp-btn--danger" onClick={handleSubmit} disabled={saving}>
-            {saving ? "⏳ Cancelando..." : "❌ Confirmar Cancelación"}
+        <div className="p-8 flex gap-4">
+          <button onClick={onClose} disabled={saving} className="flex-1 py-4 text-slate-400 font-black uppercase tracking-widest text-[10px] hover:text-slate-600 transition-colors">
+            Abortar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="flex-[2] py-4 bg-rose-600 hover:bg-rose-700 text-white rounded-3xl font-black text-[11px] uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-rose-600/30"
+          >
+            {saving ? "Procesando..." : "Confirmar Anulación"}
           </button>
         </div>
       </div>
@@ -385,488 +1033,56 @@ function ModalCancelSession({ isOpen, onClose, onSave, session }) {
 }
 
 // ============================================================
-// MODAL: Sesión Activa (IN_PROGRESS) con contexto histórico  ← NUEVO
-// ============================================================
-function ModalActiveSession({ isOpen, onClose, sessionData, onComplete, onCancel, onNoShow }) {
-  const [activeTab, setActiveTab] = useState("current");
-
-  useEffect(() => {
-    if (isOpen) setActiveTab("current");
-  }, [isOpen]);
-
-  if (!isOpen || !sessionData) return null;
-
-  const { activeSession, previousSessions = [], pendingFollowUps = [], memberStats, totalPreviousSessions } = sessionData;
-
-  const hasPrevious  = previousSessions.length > 0;
-  const hasFollowUps = pendingFollowUps.length > 0;
-
-  return (
-    <div className="cp-modal-overlay" onClick={onClose}>
-      <div className="cp-modal cp-modal--active-session" onClick={e => e.stopPropagation()}>
-
-        {/* Header — barra naranja de sesión en curso */}
-        <div className="cp-active-session-header">
-          <div className="cp-active-session-header__left">
-            <span className="cp-active-pulse" />
-            <div>
-              <span className="cp-active-session-label">SESIÓN EN CURSO</span>
-              <h2>{activeSession.memberName}</h2>
-              <span className="cp-active-session-meta">
-                {COUNSELING_TOPICS[activeSession.topic] || activeSession.topic}
-                {activeSession.location ? ` · 📍 ${activeSession.location}` : ""}
-                {activeSession.startedAt ? ` · Inició ${formatDateTime(activeSession.startedAt)}` : ""}
-              </span>
-            </div>
-          </div>
-          <button className="cp-modal__close cp-modal__close--light" onClick={onClose}>✕</button>
-        </div>
-
-        {/* Tabs de navegación */}
-        <div className="cp-active-tabs">
-          <button
-            className={`cp-active-tab ${activeTab === "current" ? "cp-active-tab--active" : ""}`}
-            onClick={() => setActiveTab("current")}
-          >
-            📋 Sesión actual
-          </button>
-          <button
-            className={`cp-active-tab ${activeTab === "history" ? "cp-active-tab--active" : ""}`}
-            onClick={() => setActiveTab("history")}
-          >
-            📂 Historial
-            {hasPrevious && <span className="cp-active-tab__badge">{totalPreviousSessions}</span>}
-          </button>
-          <button
-            className={`cp-active-tab ${activeTab === "followups" ? "cp-active-tab--active" : ""}`}
-            onClick={() => setActiveTab("followups")}
-          >
-            🔔 Seguimientos
-            {hasFollowUps && <span className="cp-active-tab__badge cp-active-tab__badge--warn">{pendingFollowUps.length}</span>}
-          </button>
-          <button
-            className={`cp-active-tab ${activeTab === "stats" ? "cp-active-tab--active" : ""}`}
-            onClick={() => setActiveTab("stats")}
-          >
-            📈 Estadísticas
-          </button>
-        </div>
-
-        <div className="cp-modal__body cp-active-body">
-
-          {/* ── TAB: Sesión actual ─────────────────────────────── */}
-          {activeTab === "current" && (
-            <div className="cp-active-tab-content">
-              <div className="cp-detail-grid">
-                <div className="cp-detail-section">
-                  <h3>👤 Miembro</h3>
-                  <div className="cp-detail-row"><span>Nombre</span><strong>{activeSession.memberName}</strong></div>
-                  <div className="cp-detail-row"><span>Documento</span><strong>{activeSession.memberDocument || "-"}</strong></div>
-                  <div className="cp-detail-row"><span>Teléfono</span><strong>{activeSession.memberPhone || "-"}</strong></div>
-                  <div className="cp-detail-row"><span>Email</span><strong>{activeSession.memberEmail || "-"}</strong></div>
-                </div>
-                <div className="cp-detail-section">
-                  <h3>📅 Esta sesión</h3>
-                  <div className="cp-detail-row"><span>Agendada</span><strong>{formatDateTime(activeSession.scheduledAt)}</strong></div>
-                  <div className="cp-detail-row"><span>Iniciada</span><strong>{formatDateTime(activeSession.startedAt)}</strong></div>
-                  <div className="cp-detail-row"><span>Duración est.</span><strong>{activeSession.durationMinutes} min</strong></div>
-                  <div className="cp-detail-row"><span>Sesión N°</span><strong>#{activeSession.sessionNumber}</strong></div>
-                </div>
-              </div>
-
-              {activeSession.objectives && (
-                <div className="cp-detail-section cp-detail-section--full">
-                  <h3>🎯 Objetivos de esta sesión</h3>
-                  <p className="cp-detail-text">{activeSession.objectives}</p>
-                </div>
-              )}
-
-              {/* Alerta si hay follow-ups vencidos */}
-              {pendingFollowUps.some(f => f.overdue) && (
-                <div className="cp-active-alert cp-active-alert--warn">
-                  ⚠️ <strong>{pendingFollowUps.filter(f => f.overdue).length} seguimiento(s) vencido(s)</strong> de sesiones anteriores.
-                  <button className="cp-active-alert__link" onClick={() => setActiveTab("followups")}>
-                    Ver →
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── TAB: Historial ─────────────────────────────────── */}
-          {activeTab === "history" && (
-            <div className="cp-active-tab-content">
-              {!hasPrevious ? (
-                <div className="cp-active-empty">
-                  <span>🕊️</span>
-                  <p>Esta es la primera sesión con este miembro.</p>
-                </div>
-              ) : (
-                <div className="cp-history-list">
-                  <p className="cp-history-intro">
-                    Últimas {previousSessions.length} de {totalPreviousSessions} sesión(es) completada(s) con este miembro:
-                  </p>
-                  {previousSessions.map((s, i) => (
-                    <div key={s.sessionId} className="cp-history-card">
-                      <div className="cp-history-card__header">
-                        <span className="cp-history-card__num">Sesión #{s.sessionNumber}</span>
-                        <span className="cp-history-card__date">{formatDate(s.scheduledAt)}</span>
-                        <span className="cp-topic-badge">{COUNSELING_TOPICS[s.topic] || s.topic}</span>
-                      </div>
-
-                      {s.objectives && (
-                        <div className="cp-history-card__block">
-                          <span className="cp-history-card__block-label">🎯 Objetivos</span>
-                          <p>{s.objectives}</p>
-                        </div>
-                      )}
-
-                      {s.notes ? (
-                        <div className="cp-history-card__block cp-history-card__block--notes">
-                          <span className="cp-history-card__block-label">📝 Notas del pastor</span>
-                          <p>{s.notes}</p>
-                        </div>
-                      ) : (
-                        <p className="cp-history-card__empty">Sin notas registradas.</p>
-                      )}
-
-                      {s.followUpRequired && s.followUpNotes && (
-                        <div className="cp-history-card__block cp-history-card__block--followup">
-                          <span className="cp-history-card__block-label">🔔 Seguimiento solicitado</span>
-                          <p>{s.followUpNotes}</p>
-                          {s.followUpDate && (
-                            <span className="cp-history-card__followup-date">
-                              Fecha: {formatDateTime(s.followUpDate)}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── TAB: Follow-ups ────────────────────────────────── */}
-          {activeTab === "followups" && (
-            <div className="cp-active-tab-content">
-              {!hasFollowUps ? (
-                <div className="cp-active-empty">
-                  <span>✅</span>
-                  <p>No hay seguimientos pendientes de sesiones anteriores.</p>
-                </div>
-              ) : (
-                <div className="cp-followup-list">
-                  {pendingFollowUps.map((fu, i) => (
-                    <div
-                      key={fu.originSessionId}
-                      className={`cp-followup-card ${fu.overdue ? "cp-followup-card--overdue" : ""}`}
-                    >
-                      <div className="cp-followup-card__header">
-                        <span className="cp-followup-card__origin">
-                          De sesión #{fu.originSessionNumber} · {formatDate(fu.originSessionDate)}
-                        </span>
-                        {fu.overdue && (
-                          <span className="cp-followup-card__overdue-badge">⚠️ Vencido</span>
-                        )}
-                      </div>
-                      <p className="cp-followup-card__notes">{fu.followUpNotes}</p>
-                      {fu.followUpDate && (
-                        <span className="cp-followup-card__date">
-                          📅 Fecha sugerida: {formatDateTime(fu.followUpDate)}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── TAB: Estadísticas ──────────────────────────────── */}
-          {activeTab === "stats" && (
-            <div className="cp-active-tab-content">
-              {!memberStats ? (
-                <div className="cp-active-empty"><span>📊</span><p>Sin estadísticas disponibles.</p></div>
-              ) : (
-                <div className="cp-stats-grid">
-                  <div className="cp-stat-card cp-stat-card--total">
-                    <span className="cp-stat-card__icon">📋</span>
-                    <span className="cp-stat-card__value">{memberStats.totalSessions}</span>
-                    <span className="cp-stat-card__label">Total sesiones</span>
-                  </div>
-                  <div className="cp-stat-card cp-stat-card--completed">
-                    <span className="cp-stat-card__icon">✅</span>
-                    <span className="cp-stat-card__value">{memberStats.completedSessions}</span>
-                    <span className="cp-stat-card__label">Completadas</span>
-                  </div>
-                  <div className="cp-stat-card cp-stat-card--cancelled">
-                    <span className="cp-stat-card__icon">❌</span>
-                    <span className="cp-stat-card__value">{memberStats.cancelledSessions}</span>
-                    <span className="cp-stat-card__label">Canceladas</span>
-                  </div>
-                  <div className="cp-stat-card cp-stat-card--noshow">
-                    <span className="cp-stat-card__icon">👻</span>
-                    <span className="cp-stat-card__value">{memberStats.noShowSessions}</span>
-                    <span className="cp-stat-card__label">No asistió</span>
-                  </div>
-                  <div className="cp-stat-card cp-stat-card--rate">
-                    <span className="cp-stat-card__icon">📈</span>
-                    <span className="cp-stat-card__value">{memberStats.completionRate}%</span>
-                    <span className="cp-stat-card__label">Tasa completadas</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer de acciones */}
-        <div className="cp-modal__footer cp-modal__footer--active">
-          <button className="cp-btn cp-btn--ghost" onClick={onClose}>
-            Minimizar
-          </button>
-          <div className="cp-modal__footer-spacer" />
-          <button
-            className="cp-btn cp-btn--noshow"
-            onClick={() => { onNoShow(activeSession); onClose(); }}
-          >
-            👻 No asistió
-          </button>
-          <button
-            className="cp-btn cp-btn--danger"
-            onClick={() => { onCancel(activeSession); onClose(); }}
-          >
-            ❌ Cancelar
-          </button>
-          <button
-            className="cp-btn cp-btn--complete"
-            onClick={() => { onComplete(activeSession); onClose(); }}
-          >
-            ✅ Completar sesión
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// MODAL: Detalle de sesión + Acciones integradas  (actualizado)
-// ============================================================
-function ModalSessionDetail({ isOpen, onClose, session, onEdit, onComplete, onCancel, onNoShow, onPdf, onStart }) {
-  if (!isOpen || !session) return null;
-
-  const status   = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
-  const isActive = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
-  const isOngoing = session.status === "IN_PROGRESS";
-
-  return (
-    <div className="cp-modal-overlay" onClick={onClose}>
-      <div className="cp-modal cp-modal--detail" onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
-        <div className="cp-modal__header">
-          <div className="cp-detail-header-info">
-            <span className="cp-detail-session-num">Sesión #{session.sessionNumber}</span>
-            <h2>{session.memberName}</h2>
-          </div>
-          <button className="cp-modal__close" onClick={onClose}>✕</button>
-        </div>
-
-        {/* Status bar */}
-        <div className={`cp-detail-status-bar cp-detail-status-bar--${status.color}`}>
-          <span className="cp-detail-status-bar__badge">
-            {status.icon} {status.label}
-          </span>
-          {session.followUpRequired && (
-            <span className="cp-detail-status-bar__followup">🔔 Seguimiento pendiente</span>
-          )}
-        </div>
-
-        <div className="cp-modal__body">
-
-          {/* Grid: Miembro + Sesión */}
-          <div className="cp-detail-grid">
-            <div className="cp-detail-section">
-              <h3>👤 Miembro</h3>
-              <div className="cp-detail-row"><span>Nombre</span><strong>{session.memberName}</strong></div>
-              <div className="cp-detail-row"><span>Documento</span><strong>{session.memberDocument || "-"}</strong></div>
-              <div className="cp-detail-row"><span>Teléfono</span><strong>{session.memberPhone || "-"}</strong></div>
-              <div className="cp-detail-row"><span>Email</span><strong>{session.memberEmail || "-"}</strong></div>
-            </div>
-            <div className="cp-detail-section">
-              <h3>📅 Sesión</h3>
-              <div className="cp-detail-row"><span>Fecha</span><strong>{formatDateTime(session.scheduledAt)}</strong></div>
-              <div className="cp-detail-row"><span>Duración</span><strong>{session.durationMinutes} min</strong></div>
-              <div className="cp-detail-row"><span>Lugar</span><strong>{session.location || "-"}</strong></div>
-              <div className="cp-detail-row"><span>Tema</span><strong>{COUNSELING_TOPICS[session.topic] || session.topic}</strong></div>
-              {session.startedAt && (
-                <div className="cp-detail-row"><span>Iniciada</span><strong>{formatDateTime(session.startedAt)}</strong></div>
-              )}
-            </div>
-          </div>
-
-          {/* Objetivos */}
-          {session.objectives && (
-            <div className="cp-detail-section cp-detail-section--full">
-              <h3>🎯 Objetivos</h3>
-              <p className="cp-detail-text">{session.objectives}</p>
-            </div>
-          )}
-
-          {/* Notas */}
-          {session.notes && (
-            <div className="cp-detail-section cp-detail-section--full">
-              <h3>📝 Notas de la sesión</h3>
-              <p className="cp-detail-text">{session.notes}</p>
-            </div>
-          )}
-
-          {/* Seguimiento */}
-          {session.followUpRequired && (
-            <div className="cp-detail-section cp-detail-section--full cp-detail-section--followup">
-              <h3>🔔 Seguimiento requerido</h3>
-              {session.followUpNotes && <p className="cp-detail-text">{session.followUpNotes}</p>}
-              {session.followUpDate && (
-                <div className="cp-detail-row"><span>Fecha</span><strong>{formatDateTime(session.followUpDate)}</strong></div>
-              )}
-            </div>
-          )}
-
-          {/* Cancelación */}
-          {session.cancellationReason && (
-            <div className="cp-detail-section cp-detail-section--full cp-detail-section--cancelled">
-              <h3>❌ Motivo de cancelación</h3>
-              <p className="cp-detail-text">{session.cancellationReason}</p>
-              {session.cancelledAt && (
-                <div className="cp-detail-row"><span>Cancelada el</span><strong>{formatDateTime(session.cancelledAt)}</strong></div>
-              )}
-            </div>
-          )}
-
-          {/* Meta */}
-          <div className="cp-detail-meta">
-            <span>Creada: {formatDate(session.createdAt)}</span>
-            <span>Actualizada: {formatDate(session.updatedAt)}</span>
-          </div>
-        </div>
-
-        {/* Footer con acciones */}
-        <div className="cp-modal__footer cp-modal__footer--actions">
-
-          {/* PDF siempre disponible */}
-          <button
-            className="cp-btn cp-btn--report"
-            onClick={() => { onPdf(session); onClose(); }}
-            title="Descargar historial PDF"
-          >
-            📄 Historial PDF
-          </button>
-
-          <div className="cp-modal__footer-spacer" />
-
-          <button className="cp-btn cp-btn--ghost" onClick={onClose}>
-            Cerrar
-          </button>
-
-          {/* Sesión EN CURSO: solo mostrar botón para abrir la vista activa */}
-          {isOngoing && (
-            <button
-              className="cp-btn cp-btn--inprogress"
-              onClick={() => { onStart(session); onClose(); }}
-            >
-              ▶️ Ver sesión en curso
-            </button>
-          )}
-
-          {/* Sesión PROGRAMADA: editar, completar, no-show, cancelar */}
-          {isActive && (
-            <>
-              <button
-                className="cp-btn cp-btn--start"
-                onClick={() => { onStart(session); onClose(); }}
-                title="Iniciar sesión ahora"
-              >
-                ▶️ Iniciar sesión
-              </button>
-              <button
-                className="cp-btn cp-btn--edit"
-                onClick={() => { onEdit(session); onClose(); }}
-                title="Editar sesión"
-              >
-                ✏️ Editar
-              </button>
-              <button
-                className="cp-btn cp-btn--complete"
-                onClick={() => { onComplete(session); onClose(); }}
-                title="Completar sesión"
-              >
-                ✅ Completar
-              </button>
-              <button
-                className="cp-btn cp-btn--noshow"
-                onClick={() => { onNoShow(session); onClose(); }}
-                title="Marcar como No Asistió"
-              >
-                👻 No asistió
-              </button>
-              <button
-                className="cp-btn cp-btn--danger"
-                onClick={() => { onCancel(session); onClose(); }}
-                title="Cancelar sesión"
-              >
-                ❌ Cancelar
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================
-// COMPONENTE PRINCIPAL
+// COMPONENTE PRINCIPAL (COUNSELING PAGE)
 // ============================================================
 const CounselingPage = () => {
-  const [sessions, setSessions]             = useState([]);
-  const [filtered, setFiltered]             = useState([]);
-  const [members, setMembers]               = useState([]);
-  const [loading, setLoading]               = useState(false);
-  const [error, setError]                   = useState("");
+  const confirm = useConfirmation();
+  const [sessions, setSessions] = useState([]);
+  const [filtered, setFiltered] = useState([]);
+  const [members,  setMembers]  = useState([]);
+  const [loading,  setLoading]  = useState(false);
 
-  const [filterStatus, setFilterStatus]     = useState("ALL");
-  const [filterTopic, setFilterTopic]       = useState("ALL");
-  const [filterSearch, setFilterSearch]     = useState("");
+  // Filtros
+  const [filterStatus,   setFilterStatus]   = useState("ALL");
+  const [filterTopic,    setFilterTopic]     = useState("ALL");
+  const [filterSearch,   setFilterSearch]   = useState("");
   const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo]     = useState("");
+  const [filterDateTo,   setFilterDateTo]   = useState("");
 
-  const [showSchedule, setShowSchedule]     = useState(false);
-  const [showComplete, setShowComplete]     = useState(false);
-  const [showCancel, setShowCancel]         = useState(false);
-  const [showDetail, setShowDetail]         = useState(false);
-  const [showActive, setShowActive]         = useState(false);   // ← NUEVO
-  const [activeSession, setActiveSession]   = useState(null);
-  const [activeSessionData, setActiveSessionData] = useState(null); // ← NUEVO: datos de startSession
-  const [isEditing, setIsEditing]           = useState(false);
+  // Modales
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [showComplete, setShowComplete] = useState(false);
+  const [showCancel,   setShowCancel]   = useState(false);
+  const [showDetail,   setShowDetail]   = useState(false);
+  const [showActive,   setShowActive]   = useState(false);
+
+  const [activeSession,     setActiveSession]     = useState(null);
+  const [activeSessionData, setActiveSessionData] = useState(null);
+  const [isEditing,         setIsEditing]         = useState(false);
+  const [liveNotes,         setLiveNotes]         = useState("");
 
   const opInProgress = useRef(false);
 
-  // ── Carga de datos ─────────────────────────────────────────
+  const handleOpenDetail = useCallback((session) => {
+    setActiveSession(session);
+    setShowDetail(true);
+  }, []);
+
+  // ── LOADERS ────────────────────────────────────────────────
   const loadSessions = useCallback(async () => {
     if (opInProgress.current) return;
     opInProgress.current = true;
     setLoading(true);
-    setError("");
     try {
-      log("Cargando sesiones de consejería");
-      const data = await apiService.request("/counseling");
-      setSessions(Array.isArray(data) ? data : []);
+      const data = await apiService.getMySessions();
+      const list = Array.isArray(data) ? data : (data?.content || data?.sessions || []);
+      setSessions(list);
+      if (list.length === 0) {
+        console.warn("⚠️ Gabinete Pastoral: No se encontraron sesiones registradas.");
+      }
     } catch (err) {
-      logError("Error cargando sesiones:", err);
-      setError("Error al cargar las sesiones de consejería");
+      console.error("❌ Error cargando sesiones de consejería:", err);
+      console.log("Error al sincronizar con el Gabinete Pastoral");
     } finally {
       setLoading(false);
       opInProgress.current = false;
@@ -877,17 +1093,17 @@ const CounselingPage = () => {
     try {
       const data = await apiService.getAllMembers();
       setMembers(Array.isArray(data) ? data : []);
-    } catch (err) { logError("Error cargando miembros:", err); }
+    } catch (err) { console.error("Error cargando miembros", err); }
   }, []);
 
   useEffect(() => { loadSessions(); loadMembers(); }, [loadSessions, loadMembers]);
 
-  // ── Filtros ────────────────────────────────────────────────
-  const applyFilters = useCallback(() => {
+  // ── FILTERS ────────────────────────────────────────────────
+  useEffect(() => {
     let result = [...sessions];
     result.sort((a, b) => new Date(b.scheduledAt) - new Date(a.scheduledAt));
     if (filterStatus !== "ALL") result = result.filter(s => s.status === filterStatus);
-    if (filterTopic !== "ALL")  result = result.filter(s => s.topic === filterTopic);
+    if (filterTopic  !== "ALL") result = result.filter(s => s.topic  === filterTopic);
     if (filterSearch.trim()) {
       const q = filterSearch.toLowerCase();
       result = result.filter(s =>
@@ -900,619 +1116,561 @@ const CounselingPage = () => {
     setFiltered(result);
   }, [sessions, filterStatus, filterTopic, filterSearch, filterDateFrom, filterDateTo]);
 
-  useEffect(() => { applyFilters(); }, [applyFilters]);
-
-  const clearFilters = useCallback(async () => {
-    setFilterStatus("ALL");
-    setFilterTopic("ALL");
-    setFilterSearch("");
-    setFilterDateFrom("");
-    setFilterDateTo("");
-    await loadSessions();
-  }, [loadSessions]);
-
-  // ── Handlers de detalle → sub-modales ─────────────────────
-  const openDetail = useCallback((session) => {
-    setActiveSession(session);
-    setShowDetail(true);
-  }, []);
-
-  const handleOpenEdit = useCallback((session) => {
-    setActiveSession(session);
-    setIsEditing(true);
-    setShowSchedule(true);
-  }, []);
-
-  const handleOpenComplete = useCallback((session) => {
-    setActiveSession(session);
-    setShowComplete(true);
-  }, []);
-
-  const handleOpenCancel = useCallback((session) => {
-    setActiveSession(session);
-    setShowCancel(true);
-  }, []);
-
-  // ── INICIAR SESIÓN ← NUEVO ─────────────────────────────────
-  /**
-   * Llama a PATCH /{id}/start y abre el modal de sesión activa
-   * con el contexto histórico que devuelve el backend.
-   *
-   * Si la sesión ya está IN_PROGRESS (se reabre desde el detalle),
-   * no vuelve a llamar al backend: solo abre el modal con los datos
-   * que ya tenemos.
-   */
+  // ── INICIAR SESIÓN ─────────────────────────────────────────
   const handleStartSession = useCallback(async (session) => {
     if (opInProgress.current) return;
 
-    // Si la sesión ya está en curso, abrir el modal directamente
-    // con datos mínimos (sin historial — el historial se cargó al iniciar).
-    // Para tener historial completo, igual llamamos al endpoint de historial.
+    // Retomar sesión ya en curso (desde lista o desde detalle)
     if (session.status === "IN_PROGRESS") {
       opInProgress.current = true;
+      setShowDetail(false);
       try {
-        // Cargar historial del miembro para reconstruir el contexto
-        const historyRaw = await apiService.request(`/counseling/member/${session.memberId}/history`);
-        const currentId = session.id;
+        const historyRaw     = await apiService.request(`/counseling/member/${session.memberId}/history`);
+        const currentId      = session.id;
         const previousSessions = (Array.isArray(historyRaw) ? historyRaw : [])
           .filter(s => s.id !== currentId && s.status === "COMPLETED")
-          .slice(0, 5)
-          .map(s => ({
-            sessionId:       s.id,
-            sessionNumber:   s.sessionNumber,
-            scheduledAt:     s.scheduledAt,
-            startedAt:       s.startedAt,
-            topic:           s.topic,
-            topicDisplayName: COUNSELING_TOPICS[s.topic] || s.topic,
-            status:          s.status,
-            statusDisplayName: COUNSELING_STATUS[s.status]?.label || s.status,
-            objectives:      s.objectives,
-            notes:           s.notes,
-            followUpRequired: s.followUpRequired,
-            followUpNotes:   s.followUpNotes,
-            followUpDate:    s.followUpDate,
-          }));
-
+          .slice(0, 5);
         const pendingFollowUps = previousSessions
           .filter(s => s.followUpRequired && s.followUpNotes)
           .map(s => ({
-            originSessionId:     s.sessionId,
+            originSessionId:     s.id,
             originSessionNumber: s.sessionNumber,
             originSessionDate:   s.scheduledAt,
             followUpNotes:       s.followUpNotes,
             followUpDate:        s.followUpDate,
-            overdue:             s.followUpDate && parseLocalDate(s.followUpDate) < new Date(),
+            overdue:             s.followUpDate && new Date(s.followUpDate) < new Date(),
           }));
 
+        // FIX: también actualizar activeSession state para que complete/cancel funcionen
+        setActiveSession(session);
         setActiveSessionData({
-          activeSession:        session,
+          activeSession: session,
           totalPreviousSessions: previousSessions.length,
           previousSessions,
           pendingFollowUps,
           memberStats: null,
         });
+        setLiveNotes(session.notes || "");
         setShowActive(true);
-      } catch (err) {
-        logError("Error cargando historial para sesión en curso:", err);
-        // Aun así abrimos el modal con datos básicos
-        setActiveSessionData({ activeSession: session, previousSessions: [], pendingFollowUps: [], memberStats: null, totalPreviousSessions: 0 });
+      } catch {
+        setActiveSession(session);
+        setActiveSessionData({
+          activeSession: session,
+          previousSessions: [],
+          pendingFollowUps: [],
+          memberStats: null,
+          totalPreviousSessions: 0,
+        });
+        setLiveNotes(session.notes || "");
         setShowActive(true);
-      } finally {
-        opInProgress.current = false;
-      }
+      } finally { opInProgress.current = false; }
       return;
     }
 
-    // Si está SCHEDULED o RESCHEDULED → llamar al endpoint /start
+    // Iniciar sesión por primera vez (SCHEDULED / RESCHEDULED)
     if (session.status !== "SCHEDULED" && session.status !== "RESCHEDULED") return;
-
     opInProgress.current = true;
+    setShowDetail(false);
     try {
-      log("Iniciando sesión:", session.id);
       const data = await apiService.request(`/counseling/${session.id}/start`, { method: "PATCH" });
-      // data es un StartSessionResponse
+      // El backend devuelve StartSessionResponse con activeSession, previousSessions, etc.
+      setActiveSession(data.activeSession ?? session);
       setActiveSessionData(data);
+      setLiveNotes("");
       setShowActive(true);
-      // Actualizar la lista para reflejar IN_PROGRESS
       await loadSessions();
     } catch (err) {
-      logError("Error iniciando sesión:", err);
-      const msg = err.message || "Error al iniciar la sesión";
-      setError(msg);
-      alert(`❌ ${msg}`);
+      console.log(`Error crítico: ${err.message}`);
+      await confirm({
+        title: "Error de Sistema",
+        message: `No se pudo iniciar la sesión: ${err.message}`,
+        type: "error",
+        confirmLabel: "Cerrar"
+      });
+    } finally { opInProgress.current = false; }
+  }, [loadSessions, confirm]);
+
+
+
+  // ── ESTADÍSTICAS ───────────────────────────────────────────
+  const stats = useMemo(() => ({
+    total:      sessions.length,
+    scheduled:  sessions.filter(s => s.status === "SCHEDULED" || s.status === "RESCHEDULED").length,
+    inProgress: sessions.filter(s => s.status === "IN_PROGRESS").length,
+    completed:  sessions.filter(s => s.status === "COMPLETED").length,
+    cancelled:  sessions.filter(s => s.status === "CANCELLED" || s.status === "NO_SHOW").length,
+    rate: sessions.length
+      ? Math.round((sessions.filter(s => s.status === "COMPLETED").length / sessions.length) * 100)
+      : 0,
+  }), [sessions]);
+
+  // ── PDFs ───────────────────────────────────────────────────
+  const handleManagementPdf = async () => {
+    try {
+      await apiService.downloadCounselingManagementReportPdf();
+    } catch { 
+      await confirm({
+        title: "Falla de Exportación",
+        message: "Ocurrió un error al intentar generar el Reporte Maestro de Gestión.",
+        type: "error",
+        confirmLabel: "Entendido"
+      });
+    }
+  };
+
+  const handleMemberHistoryPdf = async (session) => {
+    try {
+      await apiService.downloadCounselingMemberHistoryPdf(session.memberId, session.memberName);
+    } catch { 
+      await confirm({
+        title: "Falla de Exportación",
+        message: "Error al intentar generar la Ficha Pastoral del miembro. Verifique su conexión.",
+        type: "error",
+        confirmLabel: "Entendido"
+      });
+    }
+  };
+
+  // ── NOSHOW: registrar incomparecencia ────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const handleNoShow = useCallback(async (session) => {
+    if (!session?.id) return;
+    
+    await confirm({
+      title: "Registrar Ausencia",
+      message: "¿Desea marcar este miembro como AUSENTE? Esta acción quedará registrada permanentemente en su historial pastoral.",
+      type: "warning",
+      confirmLabel: "Registrar Ausencia",
+      onConfirm: async () => {
+        try {
+          await apiService.post(`/counseling/sessions/${session.id}/no-show`);
+          loadSessions();
+        } catch (err) {
+          console.log("Error al registrar ausencia");
+        }
+      }
+    });
+  }, [confirm, loadSessions]);
+
+
+  // ── ACCIONES PRINCIPALES ───────────────────────────────────
+  const handleAction = useCallback(async (type, data) => {
+    if (opInProgress.current) return;
+    opInProgress.current = true;
+    try {
+      if (type === "save") {
+        if (isEditing) {
+          await apiService.updateCounselingSession(activeSession.id, data);
+        } else {
+          await apiService.scheduleSession(data);
+        }
+        await confirm({
+          title: "¡Éxito!",
+          message: "La operación se ha completado correctamente en el Gabinete Pastoral.",
+          type: "success",
+          confirmLabel: "Excelente"
+        });
+        setShowSchedule(false);
+        setIsEditing(false);
+        setActiveSession(null);
+
+      } else if (type === "complete") {
+        const tid = activeSession?.id ?? data?.id;
+        if (!tid) throw new Error("ID de sesión no reconocido");
+        await apiService.request(`/counseling/${tid}/complete`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        });
+        await confirm({
+          title: "Sesión Finalizada",
+          message: "El expediente ha sido cerrado y guardado exitosamente.",
+          type: "success",
+          confirmLabel: "Continuar"
+        });
+        setShowComplete(false);
+        setShowActive(false);
+        setActiveSession(null);
+        setActiveSessionData(null);
+        setLiveNotes("");
+
+      } else if (type === "cancel") {
+        const tid = activeSession?.id ?? data?.id;
+        if (!tid) throw new Error("ID de sesión no reconocido");
+        await apiService.request(`/counseling/${tid}/cancel`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        });
+        await confirm({
+          title: "Registro Anulado",
+          message: "La sesión ha sido cancelada y el espacio en agenda liberado.",
+          type: "info",
+          confirmLabel: "Entendido"
+        });
+        setShowCancel(false);
+        setShowActive(false);
+        setActiveSession(null);
+        setActiveSessionData(null);
+        setLiveNotes("");
+      }
+
+      setTimeout(() => loadSessions(), 300);
+    } catch (err) {
+      await confirm({
+        title: "Error en Operación",
+        message: err.message || "Ocurrió un problema al procesar su solicitud.",
+        type: "error",
+        confirmLabel: "Cerrar"
+      });
     } finally {
       opInProgress.current = false;
     }
-  }, [loadSessions]);
-
-  // ── CRUD ───────────────────────────────────────────────────
-  const handleSaveSession = useCallback(async (formData) => {
-    if (opInProgress.current) return;
-    opInProgress.current = true;
-    try {
-      if (isEditing && activeSession) {
-        await apiService.request(`/counseling/${activeSession.id}`, { method: "PUT", body: JSON.stringify(formData) });
-        alert("✅ Sesión actualizada correctamente");
-      } else {
-        await apiService.request("/counseling", { method: "POST", body: JSON.stringify(formData) });
-        alert("✅ Sesión agendada correctamente. Se enviará notificación Telegram.");
-      }
-      setShowSchedule(false);
-      setActiveSession(null);
-      setIsEditing(false);
-      opInProgress.current = false;
-      await loadSessions();
-    } catch (err) {
-      logError("Error guardando sesión:", err);
-      const msg = err.message || "Error al guardar la sesión";
-      setError(msg);
-      alert(`❌ ${msg}`);
-    } finally { opInProgress.current = false; }
-  }, [isEditing, activeSession, loadSessions]);
-
-  const handleCompleteSession = useCallback(async (formData) => {
-    if (!activeSession || opInProgress.current) return;
-    opInProgress.current = true;
-    try {
-      await apiService.request(`/counseling/${activeSession.id}/complete`, { method: "PATCH", body: JSON.stringify(formData) });
-      alert("✅ Sesión marcada como completada");
-      setShowComplete(false);
-      setShowActive(false);
-      setActiveSession(null);
-      setActiveSessionData(null);
-      opInProgress.current = false;
-      await loadSessions();
-    } catch (err) {
-      logError("Error completando sesión:", err);
-      setError(err.message || "Error al completar la sesión");
-    } finally { opInProgress.current = false; }
-  }, [activeSession, loadSessions]);
-
-  const handleCancelSession = useCallback(async (formData) => {
-    if (!activeSession || opInProgress.current) return;
-    opInProgress.current = true;
-    try {
-      await apiService.request(`/counseling/${activeSession.id}/cancel`, { method: "PATCH", body: JSON.stringify(formData) });
-      alert("✅ Sesión cancelada");
-      setShowCancel(false);
-      setShowActive(false);
-      setActiveSession(null);
-      setActiveSessionData(null);
-      opInProgress.current = false;
-      await loadSessions();
-    } catch (err) {
-      logError("Error cancelando sesión:", err);
-      setError(err.message || "Error al cancelar la sesión");
-    } finally { opInProgress.current = false; }
-  }, [activeSession, loadSessions]);
-
-  const handleNoShow = useCallback(async (session) => {
-    if (opInProgress.current) return;
-    if (!window.confirm(`¿Marcar a ${session.memberName} como NO ASISTIDO?`)) return;
-    opInProgress.current = true;
-    try {
-      await apiService.request(`/counseling/${session.id}/no-show`, { method: "PATCH" });
-      alert("✅ Sesión marcada como No Asistió");
-      setShowActive(false);
-      setActiveSessionData(null);
-      opInProgress.current = false;
-      await loadSessions();
-    } catch (err) {
-      logError("Error marcando no-show:", err);
-      setError(err.message || "Error al marcar no-show");
-    } finally { opInProgress.current = false; }
-  }, [loadSessions]);
-
-  // ── PDFs ───────────────────────────────────────────────────
-  const handleMemberHistoryPdf = useCallback(async (session) => {
-    if (opInProgress.current) return;
-    opInProgress.current = true;
-    try {
-      const token = sessionStorage.getItem("token");
-      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8080/api/v1";
-      const res = await fetch(`${API_BASE}/counseling/report/member/${session.memberId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const blob = await res.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `historial-consejeria-${session.memberName?.replace(/\s+/g, "-")}.pdf`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    } catch (err) {
-      logError("Error generando PDF:", err);
-      alert("❌ Error al generar el PDF del historial");
-    } finally { opInProgress.current = false; }
-  }, []);
-
-  const handleManagementPdf = useCallback(async () => {
-    if (opInProgress.current) return;
-    opInProgress.current = true;
-    try {
-      const year = new Date().getFullYear();
-      const token = sessionStorage.getItem("token");
-      const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:8080/api/v1";
-      const res = await fetch(`${API_BASE}/counseling/report/management?year=${year}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      const blob = await res.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `informe-gestion-consejerias-${year}.pdf`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    } catch (err) {
-      logError("Error generando PDF gestión:", err);
-      alert("❌ Error al generar el informe de gestión");
-    } finally { opInProgress.current = false; }
-  }, []);
-
-  // ── Estadísticas ───────────────────────────────────────────
-  const stats = {
-    total:          sessions.length,
-    scheduled:      sessions.filter(s => s.status === "SCHEDULED" || s.status === "RESCHEDULED").length,
-    inProgress:     sessions.filter(s => s.status === "IN_PROGRESS").length,
-    completed:      sessions.filter(s => s.status === "COMPLETED").length,
-    cancelled:      sessions.filter(s => s.status === "CANCELLED").length,
-    noShow:         sessions.filter(s => s.status === "NO_SHOW").length,
-    completionRate: sessions.length
-      ? Math.round((sessions.filter(s => s.status === "COMPLETED").length / sessions.length) * 100)
-      : 0,
-  };
+  }, [isEditing, activeSession, loadSessions, confirm]);
 
   // ── RENDER ─────────────────────────────────────────────────
   return (
-    <div className="cp-page">
-      <div className="cp-container">
+    <div className="max-w-[1500px] mx-auto p-4 md:p-10 space-y-10 animate-fade-in relative">
 
-        {/* HEADER */}
-        <div className="cp-header">
-          <div className="cp-header__text">
-            <h1>🕊️ Consejerías Pastorales</h1>
-            <p>Gestiona y programa sesiones de consejería a miembros de la iglesia</p>
+      {/* HEADER */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
+        <div className="space-y-3">
+          <h1 className="text-4xl lg:text-6xl font-black tracking-tighter text-slate-900 dark:text-white flex items-center gap-4">
+            <div className="h-12 w-3 bg-indigo-600 rounded-full"></div>
+            Gabinete Pastoral
+          </h1>
+          <p className="text-slate-500 font-black flex items-center gap-3 ml-7 uppercase tracking-[0.2em] text-[10px] dark:text-slate-400">
+            <Users className="w-5 h-5 text-indigo-500" />
+            Atención Espiritual y Consejería Familiar
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={handleManagementPdf}
+            className="flex items-center gap-3 px-8 py-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:border-indigo-500 transition-all active:scale-95 shadow-sm shadow-indigo-500/5 group"
+          >
+            <Download className="w-5 h-5 text-indigo-500 group-hover:scale-125 transition-transform" />
+            Informe Maestro
+          </button>
+          <button
+            onClick={() => { setIsEditing(false); setActiveSession(null); setShowSchedule(true); }}
+            className="flex items-center gap-3 px-10 py-5 bg-indigo-600 text-white rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-all active:scale-95 shadow-2xl shadow-indigo-600/30"
+          >
+            <Plus className="w-6 h-6" />
+            Agendar Encuentro
+          </button>
+        </div>
+      </div>
+
+      {/* STATISTICS CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: "Total Intervenciones", value: stats.total,      icon: ClipboardList, color: "indigo",  sub: "Historial acumulado"   },
+          { label: "Agenda Activa",         value: stats.scheduled,  icon: Calendar,      color: "violet",  sub: "Encuentros próximos"   },
+          { label: "En Curso Ahora",        value: stats.inProgress, icon: Activity,      color: "emerald", sub: "Sesiones pulsantes", pulse: stats.inProgress > 0 },
+          { label: "Efectividad Pastoral",  value: `${stats.rate}%`, icon: BarChart3,     color: "sky",     sub: "Tasa de conclusión"    },
+        ].map(stat => (
+          <div key={stat.label} className="bg-white dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-8 rounded-[3rem] shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
+            <div className={`absolute top-0 right-0 w-24 h-24 bg-${stat.color}-500/5 dark:bg-${stat.color}-500/10 rounded-bl-[5rem] -mr-8 -mt-8 group-hover:scale-110 transition-transform`}></div>
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4">{stat.label}</p>
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{stat.value}</h2>
+              {stat.pulse && <span className="w-3 h-3 bg-emerald-500 rounded-full animate-ping"></span>}
+            </div>
+            <p className="text-[10px] font-bold text-slate-400 mt-2 italic flex items-center gap-2">
+              <stat.icon className={`w-3.5 h-3.5 text-${stat.color}-500`} />
+              {stat.sub}
+            </p>
           </div>
-          <div className="cp-header__actions">
-            <button className="cp-btn cp-btn--report" onClick={handleManagementPdf}>
-              📊 Informe Anual
-            </button>
-            <button className="cp-btn cp-btn--primary" onClick={() => { setIsEditing(false); setActiveSession(null); setShowSchedule(true); }}>
-              ➕ Agendar Sesión
-            </button>
+        ))}
+      </div>
+
+      {/* FILTROS */}
+      <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-3xl border border-slate-200 dark:border-slate-800 p-10 rounded-[3.5rem] shadow-sm space-y-8">
+        <div className="flex items-center gap-4 ml-2">
+          <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-500">
+            <Filter className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Criterios de Localización</h3>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Refine la búsqueda del expediente pastoral</p>
           </div>
         </div>
 
-        {/* ESTADÍSTICAS */}
-        <div className="cp-stats">
-          <div className="cp-stat cp-stat--total">
-            <span className="cp-stat__icon">📋</span>
-            <div>
-              <span className="cp-stat__value">{stats.total}</span>
-              <span className="cp-stat__label">Total</span>
-            </div>
-          </div>
-          <div className="cp-stat cp-stat--scheduled">
-            <span className="cp-stat__icon">📅</span>
-            <div>
-              <span className="cp-stat__value">{stats.scheduled}</span>
-              <span className="cp-stat__label">Programadas</span>
-            </div>
-          </div>
-          {/* Tarjeta de sesiones EN CURSO — solo visible si hay alguna */}
-          {stats.inProgress > 0 && (
-            <div className="cp-stat cp-stat--inprogress">
-              <span className="cp-stat__icon">▶️</span>
-              <div>
-                <span className="cp-stat__value">{stats.inProgress}</span>
-                <span className="cp-stat__label">En curso</span>
-              </div>
-            </div>
-          )}
-          <div className="cp-stat cp-stat--completed">
-            <span className="cp-stat__icon">✅</span>
-            <div>
-              <span className="cp-stat__value">{stats.completed}</span>
-              <span className="cp-stat__label">Completadas</span>
-            </div>
-          </div>
-          <div className="cp-stat cp-stat--cancelled">
-            <span className="cp-stat__icon">❌</span>
-            <div>
-              <span className="cp-stat__value">{stats.cancelled + stats.noShow}</span>
-              <span className="cp-stat__label">Canceladas / NS</span>
-            </div>
-          </div>
-          <div className="cp-stat cp-stat--rate">
-            <span className="cp-stat__icon">📈</span>
-            <div>
-              <span className="cp-stat__value">{stats.completionRate}%</span>
-              <span className="cp-stat__label">Tasa completadas</span>
-            </div>
-          </div>
-        </div>
-
-        {/* FILTROS */}
-        <div className="cp-controls">
-          <div className="cp-controls__grid">
-            <div className="cp-filter-item">
-              <label>🔍 Buscar</label>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+          <div className="space-y-2 group">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Miembro / Documento</label>
+            <div className="relative">
+              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input
                 type="text"
-                placeholder="Nombre o documento..."
+                placeholder="Buscar paciente..."
                 value={filterSearch}
                 onChange={e => setFilterSearch(e.target.value)}
-                maxLength={100}
+                className="w-full pl-14 pr-6 py-4 bg-slate-100 dark:bg-slate-800 border-none rounded-3xl text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 dark:focus:bg-slate-950 transition-all outline-none"
               />
             </div>
-            <div className="cp-filter-item">
-              <label>🔖 Estado</label>
-              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                <option value="ALL">Todos los estados</option>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Nivel de Estado</label>
+            <div className="relative">
+              <Activity className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="w-full pl-14 pr-10 py-4 bg-slate-100 dark:bg-slate-800 border-none rounded-3xl text-sm font-black appearance-none outline-none focus:ring-4 focus:ring-indigo-500/10"
+              >
+                <option value="ALL">Histórico Completo</option>
                 {Object.entries(COUNSELING_STATUS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.icon} {v.label}</option>
+                  <option key={k} value={k}>{v.label}</option>
                 ))}
               </select>
+              <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
-            <div className="cp-filter-item">
-              <label>🏷️ Tema</label>
-              <select value={filterTopic} onChange={e => setFilterTopic(e.target.value)}>
-                <option value="ALL">Todos los temas</option>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Línea Pastoral / Tema</label>
+            <div className="relative">
+              <Zap className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={filterTopic}
+                onChange={e => setFilterTopic(e.target.value)}
+                className="w-full pl-14 pr-10 py-4 bg-slate-100 dark:bg-slate-800 border-none rounded-3xl text-sm font-black appearance-none outline-none focus:ring-4 focus:ring-indigo-500/10"
+              >
+                <option value="ALL">Cualquier Tópico</option>
                 {Object.entries(COUNSELING_TOPICS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
-            </div>
-            <div className="cp-filter-item">
-              <label>📅 Desde</label>
-              <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
-            </div>
-            <div className="cp-filter-item">
-              <label>📅 Hasta</label>
-              <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)} />
+              <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
           </div>
-          <div className="cp-controls__actions">
-            <button className="cp-btn cp-btn--ghost" onClick={clearFilters} disabled={loading}>
-              🔄 Limpiar filtros
-            </button>
+
+          <div className="space-y-2">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Fecha Inicial</label>
+            <input
+              type="date"
+              value={filterDateFrom}
+              onChange={e => setFilterDateFrom(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-100 dark:bg-slate-800 border-none rounded-3xl text-sm font-black outline-none focus:ring-4 focus:ring-indigo-500/10"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">Fecha Final</label>
+            <input
+              type="date"
+              value={filterDateTo}
+              onChange={e => setFilterDateTo(e.target.value)}
+              className="w-full px-6 py-4 bg-slate-100 dark:bg-slate-800 border-none rounded-3xl text-sm font-black outline-none focus:ring-4 focus:ring-indigo-500/10"
+            />
           </div>
         </div>
+      </div>
 
-        {/* INFO FILTROS */}
-        <div className="cp-filter-info">
-          <p>
-            Mostrando <strong>{filtered.length}</strong> de <strong>{sessions.length}</strong> sesiones
-            {filterStatus !== "ALL" && ` · ${COUNSELING_STATUS[filterStatus]?.icon} ${COUNSELING_STATUS[filterStatus]?.label}`}
-            {filterTopic !== "ALL" && ` · ${COUNSELING_TOPICS[filterTopic]}`}
-          </p>
-          <p className="cp-filter-info__hint">Toca cualquier fila para ver el detalle y acciones</p>
-        </div>
-
-        {/* ERROR */}
-        {error && (
-          <div className="cp-error">
-            ❌ {error}
-            <button onClick={() => setError("")} className="cp-error__close">✕</button>
-          </div>
-        )}
-
-        {/* CONTENIDO */}
+      {/* LISTA DE SESIONES */}
+      <div className="min-h-[400px]">
         {loading ? (
-          <div className="cp-loading">
-            <div className="cp-loading__spinner" />
-            <p>Cargando sesiones de consejería...</p>
+          <div className="py-32 flex flex-col items-center gap-6">
+            <div className="w-16 h-16 border-4 border-indigo-600/10 border-t-indigo-600 rounded-full animate-spin"></div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] animate-pulse">
+              Sincronizando Archivo Pastoral...
+            </p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="cp-empty">
-            <span className="cp-empty__icon">🕊️</span>
-            <p>{sessions.length === 0 ? "No hay sesiones de consejería registradas." : "No hay sesiones que coincidan con los filtros."}</p>
-            {sessions.length === 0 && (
-              <button className="cp-btn cp-btn--primary" onClick={() => { setIsEditing(false); setActiveSession(null); setShowSchedule(true); }}>
-                ➕ Agendar la primera sesión
-              </button>
-            )}
+          <div className="bg-white dark:bg-slate-900/40 backdrop-blur-xl p-20 rounded-[3.5rem] border border-slate-200 dark:border-slate-800 shadow-sm text-center">
+            <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800/50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+              <Search className="w-12 h-12 text-slate-300 dark:text-slate-600" />
+            </div>
+            <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Sin Correspondencia</h3>
+            <p className="text-slate-500 dark:text-slate-400 font-medium max-w-sm mx-auto leading-relaxed italic">
+              "En la paz de la justicia no se hallaron registros bajo estos criterios."
+            </p>
           </div>
         ) : (
-          <>
-            {/* ─── TABLA (desktop) ─────────────────────────────── */}
-            <div className="cp-table-container cp-table-container--desktop">
-              <table className="cp-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Miembro</th>
-                    <th>Fecha y Hora</th>
-                    <th>Tema</th>
-                    <th>Duración</th>
-                    <th>Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(session => {
-                    const status   = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
-                    const isActive  = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
-                    const isOngoing = session.status === "IN_PROGRESS";
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filtered.map(session => {
+              const status    = COUNSELING_STATUS[session.status] || { label: session.status, color: "slate", icon: ClipboardList };
+              const isOngoing = session.status === "IN_PROGRESS";
 
-                    return (
-                      <tr
-                        key={session.id}
-                        className={`cp-table__row cp-table__row--${status.color} cp-table__row--clickable${isOngoing ? " cp-table__row--ongoing" : ""}`}
-                        onClick={() => openDetail(session)}
-                        title={isOngoing ? "Sesión en curso — toca para ver" : "Toca para ver detalle y acciones"}
-                      >
-                        <td>
-                          <span className="cp-session-number">#{session.sessionNumber}</span>
-                        </td>
+              return (
+                <div
+                  key={session.id}
+                  onClick={() => handleOpenDetail(session)}
+                  className={`bg-white dark:bg-slate-900/60 backdrop-blur-2xl p-10 rounded-[3rem] border shadow-sm hover:shadow-2xl transition-all duration-500 group relative overflow-hidden cursor-pointer active:scale-95 ${
+                    isOngoing ? "ring-4 ring-emerald-500/20 border-emerald-500/30" : "border-slate-200 dark:border-slate-800"
+                  }`}
+                >
+                  <div className={`absolute top-0 right-0 w-32 h-32 bg-${status.color}-500/5 -mr-16 -mt-16 rounded-full group-hover:scale-150 transition-transform duration-700`}></div>
 
-                        <td className="cp-table__member">
-                          <div className="cp-member-cell">
-                            <div className="cp-member-avatar-wrap">
-                              <span className="cp-member-avatar">👤</span>
-                              {(isActive || isOngoing) && (
-                                <span
-                                  className={`cp-member-active-dot${isOngoing ? " cp-member-active-dot--ongoing" : ""}`}
-                                  title={isOngoing ? "En curso" : "Sesión activa"}
-                                />
-                              )}
-                            </div>
-                            <div className="cp-member-cell__info">
-                              <span className="cp-member-cell__name">{session.memberName}</span>
-                              {session.memberPhone && (
-                                <span className="cp-member-cell__phone">{session.memberPhone}</span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="cp-table__date">
-                          <div className="cp-date-cell">
-                            <span className="cp-date-cell__date">{formatDate(session.scheduledAt)}</span>
-                            <span className="cp-date-cell__time">
-                              {session.scheduledAt
-                                ? new Date(session.scheduledAt).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
-                                : "-"}
-                            </span>
-                            {session.location && <span className="cp-date-cell__loc">📍 {session.location}</span>}
-                          </div>
-                        </td>
-
-                        <td>
-                          <span className="cp-topic-badge">{COUNSELING_TOPICS[session.topic] || session.topic}</span>
-                        </td>
-
-                        <td>
-                          <span className="cp-duration">{session.durationMinutes} min</span>
-                        </td>
-
-                        <td>
-                          <div className="cp-status-cell">
-                            <span className={`cp-status-badge cp-status-badge--${status.color}`}>
-                              {status.icon} {status.label}
-                            </span>
-                            {session.followUpRequired && (
-                              <span className="cp-followup-badge" title="Requiere seguimiento">🔔</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* ─── TARJETAS (móvil) ────────────────────────────── */}
-            <div className="cp-cards cp-cards--mobile">
-              {filtered.map(session => {
-                const status   = COUNSELING_STATUS[session.status] || { label: session.status, color: "default", icon: "📋" };
-                const isActive  = session.status === "SCHEDULED" || session.status === "RESCHEDULED";
-                const isOngoing = session.status === "IN_PROGRESS";
-
-                return (
-                  <div
-                    key={session.id}
-                    className={`cp-card cp-card--${status.color}${isOngoing ? " cp-card--ongoing" : ""}`}
-                    onClick={() => openDetail(session)}
-                  >
-                    {/* Card header */}
-                    <div className="cp-card__header">
-                      <div className="cp-card__member">
-                        <span className="cp-card__avatar">👤</span>
-                        <div>
-                          <span className="cp-card__name">{session.memberName}</span>
-                          <span className="cp-session-number">#{session.sessionNumber}</span>
-                        </div>
+                  <div className="flex justify-between items-start mb-8 relative z-10">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 bg-${status.color}-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-${status.color}-500/20 group-hover:rotate-6 transition-transform duration-500`}>
+                        <status.icon className="w-7 h-7" />
                       </div>
-                      <span className={`cp-status-badge cp-status-badge--${status.color}`}>
-                        {status.icon} {status.label}
-                      </span>
-                    </div>
-
-                    {/* Card body */}
-                    <div className="cp-card__body">
-                      <div className="cp-card__row">
-                        <span>📅</span>
-                        <span>{formatDateTime(session.scheduledAt)}</span>
-                      </div>
-                      <div className="cp-card__row">
-                        <span>🏷️</span>
-                        <span>{COUNSELING_TOPICS[session.topic] || session.topic}</span>
-                      </div>
-                      {session.location && (
-                        <div className="cp-card__row">
-                          <span>📍</span>
-                          <span>{session.location}</span>
-                        </div>
-                      )}
-                      <div className="cp-card__row">
-                        <span>⏱️</span>
-                        <span>{session.durationMinutes} min</span>
+                      <div>
+                        <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none">
+                          Sesión #{session.sessionNumber}
+                        </span>
+                        <h4 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter mt-1 truncate max-w-[150px]">
+                          {session.memberName}
+                        </h4>
                       </div>
                     </div>
+                    {isOngoing
+                      ? <div className="p-2 bg-emerald-500 text-white rounded-full animate-pulse shadow-lg shadow-emerald-500/40"><Zap className="w-4 h-4" /></div>
+                      : <MoreVertical className="w-5 h-5 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                    }
+                  </div>
 
-                    {/* Card footer */}
-                    <div className="cp-card__footer">
-                      {session.followUpRequired && (
-                        <span className="cp-card__followup">🔔 Seguimiento pendiente</span>
-                      )}
-                      <span className="cp-card__tap-hint">
-                        {isOngoing
-                          ? "Sesión en curso — toca para ver →"
-                          : isActive
-                            ? "Toca para ver detalles y acciones →"
-                            : "Toca para ver detalles →"}
-                      </span>
+                  <div className="space-y-4 mb-8 relative z-10">
+                    <div className="flex items-center gap-3 text-xs font-bold text-slate-500 dark:text-slate-400">
+                      <Calendar className={`w-4 h-4 text-${status.color}-500`} />
+                      {formatDateTime(session.scheduledAt)}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs font-black text-slate-900 dark:text-slate-300 uppercase tracking-wider">
+                      <Zap className={`w-4 h-4 text-${status.color}-500`} />
+                      {COUNSELING_TOPICS[session.topic] || session.topic}
+                    </div>
+                    {session.location && (
+                      <div className="flex items-center gap-3 text-xs font-bold text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap">
+                        <MapPin className={`w-4 h-4 text-${status.color}-500`} />
+                        {session.location}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-slate-50 dark:border-slate-800 pt-6 relative z-10">
+                    <div className={`px-4 py-2 bg-${status.color}-50 dark:bg-${status.color}-500/10 text-${status.color}-600 dark:text-${status.color}-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border border-${status.color}-100 dark:border-${status.color}-500/20`}>
+                      {status.label}
+                    </div>
+                    <div className="flex items-center gap-2 group-hover:translate-x-2 transition-transform">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detalles</span>
+                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* ── MODALES ────────────────────────────────────────────── */}
+      {/* FOOTER */}
+      <div className="bg-indigo-600 p-12 rounded-[4rem] text-white flex flex-col lg:flex-row items-center justify-between gap-10 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/10 transition-all duration-1000"></div>
+        <div className="relative z-10">
+          <h3 className="text-4xl font-black tracking-tighter mb-4">Misión Pastoral Activa</h3>
+          <div className="flex flex-wrap gap-6 items-center">
+            {[
+              { label: "Consolidadas", value: stats.completed  },
+              { label: "En Curso",     value: stats.inProgress },
+              { label: "Efectividad",  value: `${stats.rate}%` },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/10">
+                <span className="text-[10px] font-black uppercase tracking-widest opacity-60">{item.label}</span>
+                <span className="text-2xl font-black">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex flex-col items-center lg:items-end gap-3 relative z-10">
+          <p className="text-xs font-black uppercase tracking-[0.4em] opacity-40">Raíz de David · Gabinete Pastoral</p>
+          <div className="h-1.5 w-32 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-white/60 animate-shimmer" style={{ width: "40%" }}></div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── MODALES ─────────────────────────────────────────── */}
+
+      {/* Confirm centralizado */}
+
       <ModalScheduleSession
         isOpen={showSchedule}
         onClose={() => { setShowSchedule(false); setActiveSession(null); setIsEditing(false); }}
-        onSave={handleSaveSession}
+        onSave={d => handleAction("save", d)}
         initialData={activeSession}
         members={members}
         isEditing={isEditing}
       />
+
       <ModalCompleteSession
         isOpen={showComplete}
         onClose={() => { setShowComplete(false); setActiveSession(null); }}
-        onSave={handleCompleteSession}
+        onSave={d => handleAction("complete", d)}
         session={activeSession}
       />
+
       <ModalCancelSession
         isOpen={showCancel}
         onClose={() => { setShowCancel(false); setActiveSession(null); }}
-        onSave={handleCancelSession}
+        onSave={d => handleAction("cancel", d)}
         session={activeSession}
       />
+
       <ModalSessionDetail
         isOpen={showDetail}
         onClose={() => { setShowDetail(false); setActiveSession(null); }}
         session={activeSession}
-        onEdit={handleOpenEdit}
-        onComplete={handleOpenComplete}
-        onCancel={handleOpenCancel}
-        onNoShow={handleNoShow}
+        onEdit={s => {
+          setIsEditing(true);
+          setActiveSession(s);
+          setShowDetail(false);
+          setShowSchedule(true);
+        }}
+        onComplete={s => {
+          setActiveSession(s);
+          setShowDetail(false);
+          setShowComplete(true);
+        }}
+        onCancel={s => {
+          setActiveSession(s);
+          setShowDetail(false);
+          setShowCancel(true);
+        }}
+        // FIX: cierra detail antes de mostrar confirm
+        onNoShow={s => {
+          setShowDetail(false);
+          handleNoShow(s);
+        }}
         onPdf={handleMemberHistoryPdf}
-        onStart={handleStartSession}
+        onStart={s => {
+          setShowDetail(false);
+          handleStartSession(s);
+        }}
       />
-      {/* Modal de sesión activa — solo cuando hay datos de start */}
+
       <ModalActiveSession
         isOpen={showActive}
         onClose={() => setShowActive(false)}
         sessionData={activeSessionData}
-        onComplete={(s) => { setActiveSession(s); setShowComplete(true); }}
-        onCancel={(s)   => { setActiveSession(s); setShowCancel(true);   }}
+        onComplete={s => {
+          setActiveSession(s);
+          setShowActive(false);
+          setShowComplete(true);
+        }}
+        onCancel={s => {
+          setActiveSession(s);
+          setShowActive(false);
+          setShowCancel(true);
+        }}
+        // FIX: usa handleNoShow en lugar de handleAction('noshow')
         onNoShow={handleNoShow}
+        liveNotes={liveNotes}
+        setLiveNotes={setLiveNotes}
       />
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes fadeIn  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+        .animate-fade-in  { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-shimmer  { animation: shimmer 2s infinite linear; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+      `}} />
     </div>
   );
 };

@@ -1,9 +1,10 @@
-// 📊 ModalFinanceStatistics.jsx - v3 CON FILTROS DE MES Y AÑO
+// 📊 ModalFinanceStatistics.jsx - ELITE MODERN
 // ✅ Filtros: Ver estadísticas por mes o comparativo anual
 // ✅ Gráficas dinámicas según filtro seleccionado
 // ✅ Genera PDF con información del filtro
 // ✅ Totalmente legible en modo oscuro
 // ✅ Números en millones correctamente formateados en gráficas
+// ✅ Convertido a Tailwind CSS y Lucide Icons
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
@@ -11,15 +12,20 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
 import { generateFilteredFinancePDF } from '../services/financepdfgenerator';
+import {
+  X, BarChart3, PieChart as PieChartIcon, LayoutList, Download, 
+  Filter, LineChart as LineChartIcon, DollarSign, Activity, CheckCircle, Clock
+} from 'lucide-react';
 
 // ========== CONSTANTES GLOBALES ==========
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 const COLORS_PALETTE = {
-  concept: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'],
-  method: ['#2563eb', '#0891b2', '#059669', '#d97706', '#7c3aed'],
+  concept: ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'],
+  method: ['#3b82f6', '#0ea5e9', '#059669', '#d97706', '#7c3aed'],
   verified: '#10b981',
   unverified: '#f59e0b',
+  line: '#6366f1'
 };
 
 // ========== FORMATTERS ==========
@@ -33,57 +39,23 @@ const formatCurrency = (value) => {
 };
 
 const formatYAxis = (value) => {
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(1)}M`;
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
   }
-  if (value >= 1) {
-    return `$${value}K`;
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}K`;
   }
   return `$${value}`;
 };
 
 const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinances = [] }) => {
   const [viewType, setViewType] = useState('bar');
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [filterType, setFilterType] = useState('all'); // 'all', 'month', 'year'
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
-  // ========== DARK MODE ==========
-  useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const savedMode = localStorage.getItem('darkMode');
-    const htmlHasDarkClass = document.documentElement.classList.contains('dark-mode');
-
-    setIsDarkMode(
-      savedMode === 'true' || htmlHasDarkClass || prefersDark
-    );
-
-    const observer = new MutationObserver(() => {
-      setIsDarkMode(document.documentElement.classList.contains('dark-mode'));
-    });
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      if (localStorage.getItem('darkMode') === null) {
-        setIsDarkMode(e.matches);
-      }
-    };
-    mediaQuery.addEventListener('change', handleChange);
-
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener('change', handleChange);
-    };
-  }, []);
 
   // ========== FILTRAR DATOS SEGÚN FILTRO SELECCIONADO ==========
   const getFilteredFinances = useMemo(() => {
@@ -173,22 +145,6 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
     return Object.values(monthData);
   }, [allFinances, selectedYear, filterType]);
 
-  // Tema
-  const theme = {
-    bg: isDarkMode ? '#0f172a' : '#ffffff',
-    bgSecondary: isDarkMode ? '#1e293b' : '#f9fafb',
-    bgLight: isDarkMode ? '#1a2332' : '#fafafa',
-    text: isDarkMode ? '#f1f5f9' : '#111827',
-    textSecondary: isDarkMode ? '#cbd5e1' : '#666666',
-    textTertiary: isDarkMode ? '#94a3b8' : '#999999',
-    border: isDarkMode ? '#334155' : '#e0e0e0',
-    header: isDarkMode
-      ? 'linear-gradient(135deg, #1e40af 0%, #0891b2 100%)'
-      : 'linear-gradient(135deg, #2563eb 0%, #0891b2 100%)',
-    card: isDarkMode ? '#1e293b' : '#ffffff',
-    gridColor: isDarkMode ? '#334155' : '#e0e0e0',
-  };
-
   // Datos para gráficas
   const conceptChartData = useMemo(() => {
     const stats = getFilteredStatistics;
@@ -200,16 +156,17 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
       'SEED_OFFERING': '🌱 Ofrenda de Semilla',
       'BUILDING_FUND': '🏗️ Fondo de Construcción',
       'FIRST_FRUITS': '🍇 Primicias',
-      'CELL_GROUP_OFFERING': '🏘️ Ofrenda grupo celular',
+      'CELL_GROUP_OFFERING': '🏘️ Ofrenda Célula',
     };
 
-    return Object.entries(stats.byConcept).map(([key, value], index) => ({
-      name: conceptMap[key] || key,
-      cantidad: value.count,
-      monto: parseFloat((value.total / 1000).toFixed(2)), // Mantenemos en miles para la gráfica
-      montoReal: value.total, // Guardamos el valor real para el tooltip
-      fill: COLORS_PALETTE.concept[index % COLORS_PALETTE.concept.length],
-    }));
+    return Object.entries(stats.byConcept)
+      .map(([key, value]) => ({
+        name: conceptMap[key] || key,
+        monto: value.total,
+        montoReal: value.total, // Para tooltip
+        cantidad: value.count,
+      }))
+      .sort((a, b) => b.monto - a.monto);
   }, [getFilteredStatistics]);
 
   const methodChartData = useMemo(() => {
@@ -218,1065 +175,516 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
 
     const methodMap = {
       'CASH': '💵 Efectivo',
-      'BANK_TRANSFER': '🏦 Transferencia Bancaria',
+      'TRANSFER': '📱 Transferencia',
     };
 
-    return Object.entries(stats.byMethod).map(([key, value], index) => ({
-      name: methodMap[key] || key,
-      cantidad: value.count,
-      monto: parseFloat((value.total / 1000).toFixed(2)), // Mantenemos en miles para la gráfica
-      montoReal: value.total, // Guardamos el valor real para el tooltip
-      fill: COLORS_PALETTE.method[index % COLORS_PALETTE.method.length],
-    }));
+    return Object.entries(stats.byMethod)
+      .map(([key, value]) => ({
+        name: methodMap[key] || key,
+        monto: value.total,
+        montoReal: value.total, // Para tooltip
+        cantidad: value.count,
+      }))
+      .sort((a, b) => b.monto - a.monto);
   }, [getFilteredStatistics]);
 
-  const verificationData = useMemo(() => {
+  const verifiedChartData = useMemo(() => {
     const stats = getFilteredStatistics;
     if (!stats) return [];
-
     return [
-      {
-        name: '✅ Verificados',
-        value: stats.verifiedCount,
-        monto: stats.verifiedAmount,
-        fill: COLORS_PALETTE.verified,
-      },
-      {
-        name: '⏳ Pendientes',
-        value: stats.unverifiedCount,
-        monto: stats.unverifiedAmount,
-        fill: COLORS_PALETTE.unverified,
-      },
+      { name: 'Verificados', value: stats.verifiedAmount, real: stats.verifiedAmount, count: stats.verifiedCount },
+      { name: 'Por Verificar', value: stats.unverifiedAmount, real: stats.unverifiedAmount, count: stats.unverifiedCount },
     ];
   }, [getFilteredStatistics]);
 
-  const handleExportFilteredPDF = useCallback(() => {
-    try {
-      const filterInfo = {
-        filterType: filterType,
-        selectedMonth: selectedMonth,
-        selectedYear: selectedYear,
-        filteredFinances: getFilteredFinances,
-        totalStats: getFilteredStatistics,
-        conceptChartData: conceptChartData,
-        methodChartData: methodChartData,
-        verificationData: verificationData,
-        monthlyComparison: filterType === 'year' ? monthlyComparisonData : [],
-      };
+  // Handle Export PDF
+  const handleExportFilteredPDF = () => {
+    const stats = getFilteredStatistics;
+    let filterDescription = 'Evolución Histórica (Todos los registros)';
 
-      generateFilteredFinancePDF(filterInfo);
-    } catch (err) {
-      console.error('Error generando PDF:', err);
-      alert('Error al generar PDF: ' + err.message);
+    if (filterType === 'month') {
+      filterDescription = `Mes: ${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`;
+    } else if (filterType === 'year') {
+      filterDescription = `Año: ${selectedYear} (Resumen anual y comparativa por meses)`;
     }
-  }, [
-    filterType,
-    selectedMonth,
-    selectedYear,
-    getFilteredFinances,
-    getFilteredStatistics,
-    conceptChartData,
-    methodChartData,
-    verificationData,
-    monthlyComparisonData,
-  ]);
+
+    generateFilteredFinancePDF(
+      stats,
+      conceptChartData,
+      methodChartData,
+      verifiedChartData,
+      filterDescription,
+      filterType === 'year' ? monthlyComparisonData : []
+    );
+  };
+
+  // Customs tooltips
+  const CustomTooltipBar = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg text-sm">
+          <p className="font-bold text-slate-800 dark:text-white mb-2 pb-2 border-b border-slate-100 dark:border-slate-700">{label}</p>
+          <div className="flex justify-between gap-4 mb-1 text-slate-600 dark:text-slate-300">
+             <span>Monto Total:</span>
+             <span className="font-semibold">{formatCurrency(payload[0].payload.montoReal)}</span>
+          </div>
+          <div className="flex justify-between gap-4 text-slate-600 dark:text-slate-300">
+             <span>Registros:</span>
+             <span className="font-semibold">{payload[0].payload.cantidad}</span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const CustomTooltipPie = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg text-sm">
+          <p className="font-bold text-slate-800 dark:text-white mb-2 pb-2 border-b border-slate-100 dark:border-slate-700">{payload[0].name}</p>
+          <div className="flex justify-between gap-4 mb-1 text-slate-600 dark:text-slate-300">
+             <span>Monto Total:</span>
+             <span className="font-semibold">{formatCurrency(payload[0].payload.real)}</span>
+          </div>
+          <div className="flex justify-between gap-4 text-slate-600 dark:text-slate-300">
+             <span>Registros:</span>
+             <span className="font-semibold">{payload[0].payload.count}</span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const CustomTooltipLine = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg text-sm">
+          <p className="font-bold text-slate-800 dark:text-white mb-2 pb-2 border-b border-slate-100 dark:border-slate-700">{label} {selectedYear}</p>
+          <div className="flex justify-between gap-4 mb-1 text-slate-600 dark:text-slate-300">
+             <span>Recaudo:</span>
+             <span className="font-semibold">{formatCurrency(payload[0].value)}</span>
+          </div>
+          <div className="flex justify-between gap-4 text-slate-600 dark:text-slate-300">
+             <span>Aportes:</span>
+             <span className="font-semibold">{payload[0].payload.count}</span>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
 
   if (!isOpen) return null;
 
-  const displayStats = getFilteredStatistics;
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        padding: '20px',
-        animation: 'fadeIn 0.3s ease-in-out',
-        transition: 'background-color 300ms ease-in-out',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          backgroundColor: theme.bg,
-          color: theme.text,
-          borderRadius: '12px',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-          width: '100%',
-          maxWidth: '1200px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          animation: 'slideInUp 0.3s ease-in-out',
-          transition: 'all 300ms ease-in-out',
-          overflow: 'hidden',
-        }}
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-in fade-in duration-300" onClick={onClose}>
+      <div 
+        className="bg-slate-50 dark:bg-slate-900 rounded-[2rem] w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 duration-300 border border-slate-200 dark:border-slate-800"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER - Sticky */}
-        <div
-          style={{
-            background: theme.header,
-            color: 'white',
-            padding: '24px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            borderRadius: '12px 12px 0 0',
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
-            flexShrink: 0,
-          }}
-        >
-          <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>
-            📊 Estadísticas Financieras
-            {filterType === 'month' && ` - ${MONTH_NAMES[selectedMonth - 1]} ${selectedYear}`}
-            {filterType === 'year' && ` - Año ${selectedYear}`}
+        {/* HEADER */}
+        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/50 p-6 z-10 shrink-0 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            Estadísticas Financieras
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'white',
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: 0,
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '6px',
-              transition: 'background-color 0.2s',
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 rounded-full transition-colors"
           >
-            ✕
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* FILTROS - Sticky */}
-        <div
-          style={{
-            padding: '16px 24px',
-            backgroundColor: theme.bgLight,
-            borderBottom: `1px solid ${theme.border}`,
-            display: 'flex',
-            gap: '20px',
-            alignItems: 'flex-end',
-            flexWrap: 'wrap',
-            transition: 'all 300ms ease-in-out',
-            flexShrink: 0,
-          }}
-        >
-          {/* Filtro de Tipo */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: theme.textSecondary,
-            }}>
-              📅 Filtro
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {['all', 'month', 'year'].map(type => (
-                <button
-                  key={type}
-                  onClick={() => setFilterType(type)}
-                  style={{
-                    padding: '8px 16px',
-                    border: `1.5px solid ${filterType === type ? 'transparent' : theme.border}`,
-                    backgroundColor: filterType === type ? '#2563eb' : theme.card,
-                    color: filterType === type ? 'white' : theme.text,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (filterType !== type) e.target.style.backgroundColor = theme.bgSecondary;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (filterType !== type) e.target.style.backgroundColor = theme.card;
-                  }}
+        {/* CONTENIDO DESLIZABLE */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 space-y-6">
+          
+          {/* SECCIÓN DE FILTROS */}
+          <div className="bg-white dark:bg-slate-800 rounded-[1.5rem] p-5 md:p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+             <div className="flex items-center gap-3 w-full md:w-auto">
+               <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-900/50 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                  <Filter className="w-5 h-5" />
+               </div>
+               <div className="flex-1 md:flex-none">
+                 <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Período</p>
+                 <select
+                   value={filterType}
+                   onChange={e => setFilterType(e.target.value)}
+                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                 >
+                   <option value="all">Historico (Todo)</option>
+                   <option value="year">Anual</option>
+                   <option value="month">Mensual</option>
+                 </select>
+               </div>
+             </div>
+
+             <div className="flex items-center gap-3 w-full md:w-auto">
+               {filterType !== 'all' && (
+                 <div className="flex-1 md:flex-none animate-in fade-in zoom-in-95">
+                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Año</p>
+                   <select
+                     value={selectedYear}
+                     onChange={e => setSelectedYear(Number(e.target.value))}
+                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                   >
+                     {years.map(y => <option key={y} value={y}>{y}</option>)}
+                   </select>
+                 </div>
+               )}
+
+               {filterType === 'month' && (
+                 <div className="flex-1 md:flex-none animate-in fade-in zoom-in-95">
+                   <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Mes</p>
+                   <select
+                     value={selectedMonth}
+                     onChange={e => setSelectedMonth(Number(e.target.value))}
+                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-sm font-medium text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                   >
+                     {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                   </select>
+                 </div>
+               )}
+             </div>
+          </div>
+
+          {getFilteredStatistics.totalRecords === 0 ? (
+            <div className="bg-white dark:bg-slate-800 rounded-[1.5rem] p-12 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center mb-4">
+                 <Activity className="w-8 h-8 text-slate-400" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">No hay datos para este período</h3>
+              <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-sm">
+                No se encontraron registros financieros en el rango seleccionado. Intenta cambiar el filtro de fecha.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* TARJETAS RESUMEN */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:border-indigo-300 dark:hover:border-indigo-700">
+                  <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3">
+                    <DollarSign className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Monto Total</p>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white truncate" title={formatCurrency(getFilteredStatistics.totalAmount)}>
+                    {formatCurrency(getFilteredStatistics.totalAmount)}
+                  </p>
+                </div>
+                
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:border-emerald-300 dark:hover:border-emerald-700">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3">
+                    <CheckCircle className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Verificado</p>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white truncate" title={formatCurrency(getFilteredStatistics.verifiedAmount)}>
+                    {formatCurrency(getFilteredStatistics.verifiedAmount)}
+                  </p>
+                </div>
+                
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:border-amber-300 dark:hover:border-amber-700">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-3">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Por Verificar</p>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white truncate" title={formatCurrency(getFilteredStatistics.unverifiedAmount)}>
+                    {formatCurrency(getFilteredStatistics.unverifiedAmount)}
+                  </p>
+                </div>
+                
+                <div className="bg-white dark:bg-slate-800 p-5 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:border-slate-300 dark:hover:border-slate-600">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-900/50 text-slate-600 dark:text-slate-400 flex items-center justify-center mb-3">
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Registros</p>
+                  <p className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">
+                    {getFilteredStatistics.totalRecords}
+                  </p>
+                </div>
+              </div>
+
+              {/* TABS DE VISTA */}
+              <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl w-full sm:w-auto self-start border border-slate-200 dark:border-slate-700/50 my-6">
+                <button 
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    viewType === 'bar' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                  onClick={() => setViewType('bar')}
                 >
-                  {type === 'all' && 'Todos'}
-                  {type === 'month' && 'Por Mes'}
-                  {type === 'year' && 'Por Año'}
+                  <BarChart3 className="w-4 h-4" /> BARRAS
                 </button>
-              ))}
-            </div>
-          </div>
+                <button 
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    viewType === 'pie' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                  onClick={() => setViewType('pie')}
+                >
+                  <PieChartIcon className="w-4 h-4" /> PASTEL
+                </button>
+                <button 
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    viewType === 'table' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                  onClick={() => setViewType('table')}
+                >
+                  <LayoutList className="w-4 h-4" /> TABLA
+                </button>
+              </div>
 
-          {/* Selector de Año */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: theme.textSecondary,
-            }}>
-              📆 Año
-            </label>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                border: `1px solid ${theme.border}`,
-                backgroundColor: theme.card,
-                color: theme.text,
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >
-              {years.map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-          </div>
+              {/* SECCIÓN DE GRÁFICOS */}
+              {(viewType === 'bar' || viewType === 'pie') && (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
-          {/* Selector de Mes */}
-          {filterType === 'month' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: theme.textSecondary,
-              }}>
-                📅 Mes
-              </label>
-              <select
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: `1px solid ${theme.border}`,
-                  backgroundColor: theme.card,
-                  color: theme.text,
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                {MONTH_NAMES.map((month, idx) => (
-                  <option key={idx + 1} value={idx + 1}>{month}</option>
-                ))}
-              </select>
-            </div>
+                  {/* CONCEPTOS */}
+                  <div className="bg-white dark:bg-slate-800 p-6 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                       <BarChart3 className="w-4 h-4 text-indigo-500" />
+                       Distribución por Concepto
+                    </h3>
+                    <div className="h-64 sm:h-80 w-full relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        {viewType === 'bar' ? (
+                          <BarChart data={conceptChartData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                            <XAxis 
+                              dataKey="name" 
+                              tickFormatter={(val) => val.split(' ')[1] || val} 
+                              fontSize={11} 
+                              tick={{fill: '#888888'}} 
+                              axisLine={{ stroke: '#888888', strokeOpacity: 0.2 }}
+                            />
+                            <YAxis 
+                              tickFormatter={formatYAxis} 
+                              fontSize={11} 
+                              tick={{fill: '#888888'}} 
+                              axisLine={{ stroke: '#888888', strokeOpacity: 0.2 }}
+                            />
+                            <Tooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
+                            <Bar dataKey="monto" radius={[8, 8, 0, 0]}>
+                              {conceptChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS_PALETTE.concept[index % COLORS_PALETTE.concept.length]} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        ) : (
+                          <PieChart>
+                            <Tooltip content={<CustomTooltipPie />} />
+                            <Legend wrapperStyle={{ fontSize: '12px' }} />
+                            <Pie
+                              data={conceptChartData}
+                              dataKey="monto"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              innerRadius="40%"
+                              outerRadius="80%"
+                              paddingAngle={2}
+                            >
+                              {conceptChartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS_PALETTE.concept[index % COLORS_PALETTE.concept.length]} />
+                              ))}
+                            </Pie>
+                          </PieChart>
+                        )}
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6">
+                    {/* VERIFICADOS VS NO VERIFICADOS */}
+                     <div className="bg-white dark:bg-slate-800 p-6 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+                       <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-emerald-500" />
+                          Estado de Verificación
+                       </h3>
+                       <div className="h-48 w-full relative">
+                         <ResponsiveContainer width="100%" height="100%">
+                           <PieChart>
+                             <Tooltip content={<CustomTooltipPie />} />
+                             <Legend wrapperStyle={{ fontSize: '12px' }} />
+                             <Pie
+                               data={verifiedChartData}
+                               dataKey="value"
+                               nameKey="name"
+                               cx="50%"
+                               cy="50%"
+                               outerRadius="80%"
+                             >
+                               <Cell fill={COLORS_PALETTE.verified} />
+                               <Cell fill={COLORS_PALETTE.unverified} />
+                             </Pie>
+                           </PieChart>
+                         </ResponsiveContainer>
+                       </div>
+                     </div>
+
+                    {/* METODO DE PAGO */}
+                     <div className="bg-white dark:bg-slate-800 p-6 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+                       <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-blue-500" />
+                          Métodos de Pago
+                       </h3>
+                       <div className="h-48 w-full relative">
+                         <ResponsiveContainer width="100%" height="100%">
+                           {viewType === 'bar' ? (
+                             <BarChart data={methodChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }} layout="vertical">
+                               <CartesianGrid strokeDasharray="3 3" horizontal={false} strokeOpacity={0.1} />
+                               <XAxis type="number" tickFormatter={formatYAxis} fontSize={11} tick={{fill: '#888888'}} />
+                               <YAxis dataKey="name" type="category" tickFormatter={(val) => val.split(' ')[1] || val} fontSize={11} width={80} tick={{fill: '#888888'}} />
+                               <Tooltip content={<CustomTooltipBar />} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
+                               <Bar dataKey="monto" radius={[0, 8, 8, 0]}>
+                                 {methodChartData.map((entry, index) => (
+                                   <Cell key={`cell-${index}`} fill={COLORS_PALETTE.method[index % COLORS_PALETTE.method.length]} />
+                                 ))}
+                               </Bar>
+                             </BarChart>
+                           ) : (
+                             <PieChart>
+                               <Tooltip content={<CustomTooltipPie />} />
+                               <Legend wrapperStyle={{ fontSize: '12px' }} align="right" verticalAlign="middle" layout="vertical" />
+                               <Pie
+                                 data={methodChartData}
+                                 dataKey="monto"
+                                 nameKey="name"
+                                 cx="30%"
+                                 cy="50%"
+                                 innerRadius="40%"
+                                 outerRadius="80%"
+                                 paddingAngle={2}
+                               >
+                                 {methodChartData.map((entry, index) => (
+                                   <Cell key={`cell-${index}`} fill={COLORS_PALETTE.method[index % COLORS_PALETTE.method.length]} />
+                                 ))}
+                               </Pie>
+                             </PieChart>
+                           )}
+                         </ResponsiveContainer>
+                       </div>
+                     </div>
+                  </div>
+
+                  {/* GRÁFICA LINEAL ANUAL */}
+                  {filterType === 'year' && (
+                    <div className="bg-white dark:bg-slate-800 p-6 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col xl:col-span-2">
+                       <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-6 uppercase tracking-wider flex items-center gap-2">
+                          <LineChartIcon className="w-4 h-4 text-indigo-500" />
+                          Evolución Mensual {selectedYear}
+                       </h3>
+                       <div className="h-72 w-full relative">
+                         <ResponsiveContainer width="100%" height="100%">
+                           <LineChart data={monthlyComparisonData} margin={{ top: 10, right: 10, left: 20, bottom: 20 }}>
+                             <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                             <XAxis dataKey="month" fontSize={11} tick={{fill: '#888888'}} axisLine={{ stroke: '#888888', strokeOpacity: 0.2 }} />
+                             <YAxis tickFormatter={formatYAxis} fontSize={11} tick={{fill: '#888888'}} axisLine={{ stroke: '#888888', strokeOpacity: 0.2 }} />
+                             <Tooltip content={<CustomTooltipLine />} />
+                             <Line 
+                               type="monotone" 
+                               dataKey="total" 
+                               stroke={COLORS_PALETTE.line} 
+                               strokeWidth={3} 
+                               dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} 
+                               activeDot={{ r: 6, strokeWidth: 0 }}
+                               animationDuration={1000}
+                             />
+                           </LineChart>
+                         </ResponsiveContainer>
+                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* VISTA DE TABLA */}
+              {viewType === 'table' && (
+                <div className="space-y-6">
+                  <div className="bg-white dark:bg-slate-800 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="p-5 border-b border-slate-200 dark:border-slate-700">
+                       <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-indigo-500" />
+                          Detalle por Concepto
+                       </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead className="bg-slate-50 dark:bg-slate-900/50">
+                          <tr>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Concepto</th>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Registros</th>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-right">Monto Total</th>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-right">Promedio</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                          {conceptChartData.map((item, index) => (
+                            <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                              <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">{item.name}</td>
+                              <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-center">{item.cantidad}</td>
+                              <td className="px-6 py-4 font-bold text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(item.montoReal)}</td>
+                              <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-right">{formatCurrency(item.montoReal / item.cantidad)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-800 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="p-5 border-b border-slate-200 dark:border-slate-700">
+                       <h3 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-blue-500" />
+                          Detalle por Método de Pago
+                       </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead className="bg-slate-50 dark:bg-slate-900/50">
+                          <tr>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">Método</th>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-center">Registros</th>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-right">Monto Total</th>
+                            <th className="px-6 py-4 font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 text-right">Promedio</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                          {methodChartData.map((item, index) => (
+                            <tr key={index} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                              <td className="px-6 py-4 font-medium text-slate-800 dark:text-slate-200">{item.name}</td>
+                              <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-center">{item.cantidad}</td>
+                              <td className="px-6 py-4 font-bold text-indigo-600 dark:text-indigo-400 text-right">{formatCurrency(item.montoReal)}</td>
+                              <td className="px-6 py-4 text-slate-600 dark:text-slate-400 text-right">{formatCurrency(item.montoReal / item.cantidad)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Selector de Visualización */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <label style={{
-              fontSize: '12px',
-              fontWeight: 600,
-              color: theme.textSecondary,
-            }}>
-              📈 Visualización
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {['bar', 'pie', 'combined'].map(type => (
-                <button
-                  key={type}
-                  onClick={() => setViewType(type)}
-                  style={{
-                    padding: '8px 12px',
-                    border: `1.5px solid ${viewType === type ? 'transparent' : theme.border}`,
-                    backgroundColor: viewType === type ? '#2563eb' : theme.card,
-                    color: viewType === type ? 'white' : theme.text,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (viewType !== type) e.target.style.backgroundColor = theme.bgSecondary;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (viewType !== type) e.target.style.backgroundColor = theme.card;
-                  }}
-                >
-                  {type === 'bar' && '📊'}
-                  {type === 'pie' && '🥧'}
-                  {type === 'combined' && '📈'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Botón PDF */}
-          <button
-            onClick={handleExportFilteredPDF}
-            style={{
-              padding: '8px 16px',
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 600,
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => e.target.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.3)'}
-            onMouseLeave={(e) => e.target.style.boxShadow = 'none'}
-          >
-            📄 PDF
-          </button>
         </div>
 
-        {/* SCROLLABLE CONTENT */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {/* Stats Summary */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-              gap: '12px',
-              padding: '16px 24px',
-              backgroundColor: theme.bgLight,
-              transition: 'all 300ms ease-in-out',
-              flexShrink: 0,
-            }}
-          >
-            {[
-              { icon: '💰', label: 'Total de Registros', value: displayStats.totalRecords, color: theme.text },
-              {
-                icon: '💵',
-                label: 'Monto Total',
-                value: formatCurrency(displayStats.totalAmount || 0),
-                color: theme.text,
-              },
-              {
-                icon: '✅',
-                label: 'Verificados',
-                value: `${displayStats.verifiedCount} - ${formatCurrency(displayStats.verifiedAmount || 0)}`,
-                color: COLORS_PALETTE.verified,
-              },
-              {
-                icon: '⏳',
-                label: 'Pendientes de Verificar',
-                value: `${displayStats.unverifiedCount} - ${formatCurrency(displayStats.unverifiedAmount || 0)}`,
-                color: COLORS_PALETTE.unverified,
-              },
-            ].map((stat, idx) => (
-              <div
-                key={idx}
-                style={{
-                  backgroundColor: theme.card,
-                  padding: '12px',
-                  borderRadius: '8px',
-                  border: `1px solid ${theme.border}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  transition: 'all 300ms ease-in-out',
-                }}
-              >
-                <div style={{ fontSize: '24px' }}>{stat.icon}</div>
-                <div>
-                  <p style={{
-                    margin: 0,
-                    fontSize: '11px',
-                    fontWeight: 600,
-                    color: theme.textSecondary,
-                  }}>
-                    {stat.label}
-                  </p>
-                  <p style={{
-                    margin: '2px 0 0 0',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    color: stat.color,
-                  }}>
-                    {stat.value}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Body Content */}
-          <div style={{ padding: '24px' }}>
-            {/* Comparativa Mensual (solo cuando año está seleccionado) */}
-            {filterType === 'year' && monthlyComparisonData.length > 0 && (
-              <div
-                style={{
-                  backgroundColor: theme.card,
-                  padding: '20px',
-                  borderRadius: '8px',
-                  border: `1px solid ${theme.border}`,
-                  marginBottom: '20px',
-                }}
-              >
-                <h3 style={{
-                  margin: '0 0 16px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: theme.text,
-                }}>
-                  Comparativa Mensual - {selectedYear}
-                </h3>
-                <ResponsiveContainer width="100%" height={350}>
-                  <LineChart data={monthlyComparisonData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
-                    <XAxis
-                      dataKey="month"
-                      angle={-45}
-                      textAnchor="end"
-                      height={100}
-                      tick={{ fontSize: 12, fill: theme.text }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12, fill: theme.text }}
-                      tickFormatter={formatYAxis}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: theme.card,
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: '8px',
-                        color: theme.text,
-                      }}
-                      formatter={(value) => [formatCurrency(value), 'Total Mensual']}
-                      labelFormatter={(label) => `Mes: ${label}`}
-                    />
-                    <Legend wrapperStyle={{ color: theme.text }} />
-                    <Line
-                      type="monotone"
-                      dataKey="total"
-                      stroke="#2563eb"
-                      strokeWidth={2}
-                      name="Total Mensual"
-                      dot={{ fill: '#2563eb', r: 4 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            {/* Gráficas según vista seleccionada */}
-            {viewType === 'bar' && (
-              <div>
-                <div
-                  style={{
-                    backgroundColor: theme.card,
-                    padding: '20px',
-                    borderRadius: '8px',
-                    border: `1px solid ${theme.border}`,
-                    marginBottom: '20px',
-                  }}
-                >
-                  <h3 style={{
-                    margin: '0 0 16px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: theme.text,
-                  }}>
-                    Ingresos por Concepto
-                  </h3>
-                  {conceptChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart data={conceptChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          tick={{ fontSize: 12, fill: theme.text }}
-                        />
-                        <YAxis 
-                          tick={{ fontSize: 12, fill: theme.text }}
-                          tickFormatter={formatYAxis}
-                          label={{ 
-                            value: 'Valores en Miles', 
-                            angle: -90, 
-                            position: 'insideLeft',
-                            style: { fill: theme.textSecondary, fontSize: 11 }
-                          }}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: theme.card,
-                            border: `1px solid ${theme.border}`,
-                            borderRadius: '8px',
-                            color: theme.text,
-                          }}
-                          formatter={(value, name, props) => {
-                            if (name === "Monto (Miles)") {
-                              const realValue = props.payload.montoReal;
-                              return [formatCurrency(realValue), "Monto Total"];
-                            }
-                            return [formatCurrency(value), name];
-                          }}
-                          labelFormatter={(label) => `Concepto: ${label}`}
-                        />
-                        <Legend wrapperStyle={{ color: theme.text }} />
-                        <Bar dataKey="monto" fill="#3b82f6" name="Monto (Miles)" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p style={{ color: theme.textSecondary, textAlign: 'center', padding: '20px' }}>
-                      No hay datos para este período
-                    </p>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    backgroundColor: theme.card,
-                    padding: '20px',
-                    borderRadius: '8px',
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  <h3 style={{
-                    margin: '0 0 16px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: theme.text,
-                  }}>
-                    Ingresos por Método de Pago
-                  </h3>
-                  {methodChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart data={methodChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={100}
-                          tick={{ fontSize: 12, fill: theme.text }}
-                        />
-                        <YAxis 
-                          tick={{ fontSize: 12, fill: theme.text }}
-                          tickFormatter={formatYAxis}
-                          label={{ 
-                            value: 'Valores en Miles', 
-                            angle: -90, 
-                            position: 'insideLeft',
-                            style: { fill: theme.textSecondary, fontSize: 11 }
-                          }}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: theme.card,
-                            border: `1px solid ${theme.border}`,
-                            borderRadius: '8px',
-                            color: theme.text,
-                          }}
-                          formatter={(value, name, props) => {
-                            if (name === "Monto (Miles)") {
-                              const realValue = props.payload.montoReal;
-                              return [formatCurrency(realValue), "Monto Total"];
-                            }
-                            return [formatCurrency(value), name];
-                          }}
-                          labelFormatter={(label) => `Método: ${label}`}
-                        />
-                        <Legend wrapperStyle={{ color: theme.text }} />
-                        <Bar dataKey="monto" fill="#0891b2" name="Monto (Miles)" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p style={{ color: theme.textSecondary, textAlign: 'center', padding: '20px' }}>
-                      No hay datos para este período
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {viewType === 'pie' && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))',
-                  gap: '20px',
-                }}
-              >
-                <div
-                  style={{
-                    backgroundColor: theme.card,
-                    padding: '20px',
-                    borderRadius: '8px',
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  <h3 style={{
-                    margin: '0 0 16px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: theme.text,
-                  }}>
-                    Distribución por Concepto
-                  </h3>
-                  {conceptChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={350}>
-                      <PieChart>
-                        <Pie
-                          data={conceptChartData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={true}
-                          label={({ name, value }) => `${name} (${value})`}
-                          outerRadius={100}
-                          dataKey="cantidad"
-                        >
-                          {conceptChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value, name, props) => {
-                            if (name === "cantidad") {
-                              return [`${value} registros`, 'Cantidad'];
-                            }
-                            return [value, name];
-                          }}
-                          contentStyle={{
-                            backgroundColor: theme.card,
-                            border: `1px solid ${theme.border}`,
-                            color: theme.text,
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p style={{ color: theme.textSecondary, textAlign: 'center', padding: '20px' }}>
-                      No hay datos para este período
-                    </p>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    backgroundColor: theme.card,
-                    padding: '20px',
-                    borderRadius: '8px',
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  <h3 style={{
-                    margin: '0 0 16px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: theme.text,
-                  }}>
-                    Estado de Verificación
-                  </h3>
-                  {verificationData.some(v => v.value > 0) ? (
-                    <ResponsiveContainer width="100%" height={350}>
-                      <PieChart>
-                        <Pie
-                          data={verificationData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={true}
-                          label={({ name, value }) => `${name} (${value})`}
-                          outerRadius={100}
-                          dataKey="value"
-                        >
-                          {verificationData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => [`${value} registros`, 'Cantidad']}
-                          contentStyle={{
-                            backgroundColor: theme.card,
-                            border: `1px solid ${theme.border}`,
-                            color: theme.text,
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p style={{ color: theme.textSecondary, textAlign: 'center', padding: '20px' }}>
-                      No hay datos para este período
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {viewType === 'combined' && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))',
-                  gap: '20px',
-                  marginBottom: '20px',
-                }}
-              >
-                <div
-                  style={{
-                    backgroundColor: theme.card,
-                    padding: '20px',
-                    borderRadius: '8px',
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  <h3 style={{
-                    margin: '0 0 16px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: theme.text,
-                  }}>
-                    Ingresos por Concepto
-                  </h3>
-                  {conceptChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={conceptChartData} margin={{ top: 20, right: 20, left: 20, bottom: 40 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={theme.gridColor} />
-                        <XAxis
-                          dataKey="name"
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                          tick={{ fontSize: 11, fill: theme.text }}
-                        />
-                        <YAxis 
-                          tick={{ fontSize: 11, fill: theme.text }}
-                          tickFormatter={formatYAxis}
-                        />
-                        <Tooltip
-                          formatter={(value, name, props) => {
-                            const realValue = props.payload.montoReal;
-                            return [formatCurrency(realValue), "Monto Total"];
-                          }}
-                          contentStyle={{
-                            backgroundColor: theme.card,
-                            border: `1px solid ${theme.border}`,
-                            color: theme.text,
-                          }}
-                        />
-                        <Bar dataKey="monto" fill="#3b82f6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p style={{ color: theme.textSecondary, textAlign: 'center', padding: '20px' }}>
-                      No hay datos para este período
-                    </p>
-                  )}
-                </div>
-
-                <div
-                  style={{
-                    backgroundColor: theme.card,
-                    padding: '20px',
-                    borderRadius: '8px',
-                    border: `1px solid ${theme.border}`,
-                  }}
-                >
-                  <h3 style={{
-                    margin: '0 0 16px',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: theme.text,
-                  }}>
-                    Verificación
-                  </h3>
-                  {verificationData.some(v => v.value > 0) ? (
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={verificationData}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={90}
-                          dataKey="value"
-                          label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                        >
-                          {verificationData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          formatter={(value) => [`${value} registros`, 'Cantidad']}
-                          contentStyle={{
-                            backgroundColor: theme.card,
-                            border: `1px solid ${theme.border}`,
-                            color: theme.text,
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p style={{ color: theme.textSecondary, textAlign: 'center', padding: '20px' }}>
-                      No hay datos para este período
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Tables */}
-            {displayStats.totalRecords > 0 && (
-              <div style={{ marginTop: '20px' }}>
-                <h3 style={{
-                  margin: '0 0 12px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: theme.text,
-                }}>
-                  📋 Detalle por Concepto
-                </h3>
-                <div style={{ overflowX: 'auto', marginBottom: '30px' }}>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '12px',
-                      border: `1px solid ${theme.border}`,
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      backgroundColor: theme.card,
-                    }}
-                  >
-                    <thead style={{ backgroundColor: theme.bgSecondary }}>
-                      <tr>
-                        {['Concepto', 'Registros', 'Monto Total', 'Promedio'].map(header => (
-                          <th
-                            key={header}
-                            style={{
-                              padding: '12px',
-                              textAlign: header === 'Concepto' ? 'left' : 'center',
-                              color: theme.text,
-                              fontWeight: 600,
-                              borderBottom: `2px solid ${theme.border}`,
-                            }}
-                          >
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {conceptChartData.map((item, index) => (
-                        <tr
-                          key={index}
-                          style={{
-                            backgroundColor: index % 2 === 0 ? theme.card : theme.bgSecondary,
-                            borderBottom: `1px solid ${theme.border}`,
-                          }}
-                        >
-                          <td style={{
-                            padding: '12px',
-                            color: theme.text,
-                            fontWeight: 500,
-                          }}>
-                            {item.name}
-                          </td>
-                          <td style={{
-                            padding: '12px',
-                            textAlign: 'center',
-                            color: theme.text,
-                          }}>
-                            {item.cantidad}
-                          </td>
-                          <td style={{
-                            padding: '12px',
-                            textAlign: 'center',
-                            color: theme.text,
-                          }}>
-                            {formatCurrency(item.montoReal)}
-                          </td>
-                          <td style={{
-                            padding: '12px',
-                            textAlign: 'center',
-                            color: theme.text,
-                          }}>
-                            {formatCurrency(item.montoReal / item.cantidad)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <h3 style={{
-                  margin: '0 0 12px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: theme.text,
-                }}>
-                  📋 Detalle por Método de Pago
-                </h3>
-                <div style={{ overflowX: 'auto', marginBottom: '20px' }}>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '12px',
-                      border: `1px solid ${theme.border}`,
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      backgroundColor: theme.card,
-                    }}
-                  >
-                    <thead style={{ backgroundColor: theme.bgSecondary }}>
-                      <tr>
-                        {['Método', 'Registros', 'Monto Total', 'Promedio'].map(header => (
-                          <th
-                            key={header}
-                            style={{
-                              padding: '12px',
-                              textAlign: header === 'Método' ? 'left' : 'center',
-                              color: theme.text,
-                              fontWeight: 600,
-                              borderBottom: `2px solid ${theme.border}`,
-                            }}
-                          >
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {methodChartData.map((item, index) => (
-                        <tr
-                          key={index}
-                          style={{
-                            backgroundColor: index % 2 === 0 ? theme.card : theme.bgSecondary,
-                            borderBottom: `1px solid ${theme.border}`,
-                          }}
-                        >
-                          <td style={{
-                            padding: '12px',
-                            color: theme.text,
-                            fontWeight: 500,
-                          }}>
-                            {item.name}
-                          </td>
-                          <td style={{
-                            padding: '12px',
-                            textAlign: 'center',
-                            color: theme.text,
-                          }}>
-                            {item.cantidad}
-                          </td>
-                          <td style={{
-                            padding: '12px',
-                            textAlign: 'center',
-                            color: theme.text,
-                          }}>
-                            {formatCurrency(item.montoReal)}
-                          </td>
-                          <td style={{
-                            padding: '12px',
-                            textAlign: 'center',
-                            color: theme.text,
-                          }}>
-                            {formatCurrency(item.montoReal / item.cantidad)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* FOOTER - Sticky */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '12px',
-            justifyContent: 'flex-end',
-            padding: '16px 24px',
-            borderTop: `1px solid ${theme.border}`,
-            backgroundColor: theme.bgLight,
-            borderRadius: '0 0 12px 12px',
-            position: 'sticky',
-            bottom: 0,
-            transition: 'all 300ms ease-in-out',
-            flexShrink: 0,
-          }}
-        >
+        {/* FOOTER */}
+        <div className="p-4 md:p-6 bg-slate-50 border-t border-slate-200 dark:bg-slate-900 dark:border-slate-800 flex flex-col-reverse sm:flex-row justify-end gap-3 shrink-0 rounded-b-[2rem] absolute bottom-0 inset-x-0">
           <button
             onClick={onClose}
-            style={{
-              backgroundColor: theme.bgSecondary,
-              color: theme.text,
-              border: `1px solid ${theme.border}`,
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => e.target.style.opacity = '0.8'}
-            onMouseLeave={(e) => e.target.style.opacity = '1'}
+            className="px-6 py-3 rounded-xl font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 transition-all text-sm w-full sm:w-auto text-center"
           >
-            ✕ Cerrar
+            Cerrar
           </button>
           <button
             onClick={handleExportFilteredPDF}
-            style={{
-              background: 'linear-gradient(135deg, #2563eb 0%, #0891b2 100%)',
-              color: 'white',
-              border: 'none',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
-              e.target.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.boxShadow = 'none';
-              e.target.style.transform = 'translateY(0)';
-            }}
+            className="px-8 py-3 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all text-sm w-full sm:w-auto text-center flex items-center justify-center gap-2"
           >
-            📄 Descargar PDF
+            <Download className="w-4 h-4" />
+            Descargar PDF
           </button>
         </div>
-
-        <style>{`
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-          @keyframes slideInUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-          }
-        `}</style>
       </div>
     </div>
   );

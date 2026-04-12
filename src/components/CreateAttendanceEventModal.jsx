@@ -1,16 +1,27 @@
 // ============================================
-// CreateAttendanceEventModal.jsx
+// CreateAttendanceEventModal.jsx - ELITE MODERN
 // Modal para crear eventos de asistencia especiales
 // ============================================
 
 import React, { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
+import { 
+  X, 
+  CalendarPlus, 
+  Trash2, 
+  AlertCircle, 
+  CheckCircle2, 
+  ShieldAlert, 
+  Plus, 
+  Info,
+  Loader2,
+  Calendar,
+  Zap
+} from 'lucide-react';
 
 const CreateAttendanceEventModal = ({ 
   isOpen, 
   onClose, 
   onCreate, 
-  theme, 
   isMobile,
   userRole
 }) => {
@@ -39,7 +50,11 @@ const CreateAttendanceEventModal = ({
   if (!isOpen) return null;
 
   // Verificar permisos
-  const canCreate = userRole === 'PASTORES' || userRole === 'CONEXION';
+  const canCreate = (() => {
+    if (!userRole) return false;
+    const role = String(userRole).toUpperCase();
+    return role.includes('PASTORES') || role.includes('CONEXION') || role.includes('ADMIN');
+  })();
 
   // Agregar fecha a la lista temporal
   const handleAddDate = () => {
@@ -48,10 +63,11 @@ const CreateAttendanceEventModal = ({
       return;
     }
 
-    // Validar que no sea fecha pasada
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const selectedDate = new Date(dateInput);
+    // Para compensar zona horaria local
+    selectedDate.setMinutes(selectedDate.getMinutes() + selectedDate.getTimezoneOffset());
     selectedDate.setHours(0, 0, 0, 0);
 
     if (selectedDate < today) {
@@ -59,7 +75,6 @@ const CreateAttendanceEventModal = ({
       return;
     }
 
-    // Validar que no esté duplicada
     if (tempDates.includes(dateInput)) {
       setError('Esta fecha ya fue agregada');
       return;
@@ -70,12 +85,10 @@ const CreateAttendanceEventModal = ({
     setError('');
   };
 
-  // Eliminar fecha de la lista temporal
   const handleRemoveDate = (dateToRemove) => {
     setTempDates(tempDates.filter(d => d !== dateToRemove));
   };
 
-  // Manejar envío del formulario
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -105,9 +118,8 @@ const CreateAttendanceEventModal = ({
       };
 
       await onCreate(payload);
-      setSuccess('✅ Evento creado exitosamente');
+      setSuccess('Evento creado exitosamente');
       
-      // Cerrar después de 1.5 segundos
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -118,7 +130,6 @@ const CreateAttendanceEventModal = ({
     }
   };
 
-  // Obtener el próximo mes para el input date (evitar fechas pasadas)
   const getMinDate = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -127,7 +138,6 @@ const CreateAttendanceEventModal = ({
     return `${year}-${month}-${day}`;
   };
 
-  // Formatear fecha para mostrar
   const formatDateForDisplay = (dateStr) => {
     const [year, month, day] = dateStr.split('-');
     const date = new Date(year, month - 1, day);
@@ -139,381 +149,183 @@ const CreateAttendanceEventModal = ({
   };
 
   return (
-    <div
-      className="ca-stats-modal-overlay"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: isMobile ? '12px' : '20px'
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+    <div 
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl flex items-center justify-center p-0 sm:p-4 z-[100] animate-in fade-in duration-300"
+      onClick={onClose}
     >
-      <div
-        style={{
-          backgroundColor: theme.bgSecondary,
-          borderRadius: isMobile ? '20px' : '24px',
-          width: '100%',
-          maxWidth: '600px',
-          maxHeight: '90vh',
-          overflow: 'hidden',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-          border: `1px solid ${theme.border}`
-        }}
+      <div 
+        className="bg-white dark:bg-[#0f172a] sm:rounded-[2.5rem] w-full max-w-xl h-full sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 animate-in slide-in-from-bottom-8 duration-500"
+        onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          className="ca-stats-modal-header"
-          style={{
-            padding: isMobile ? '16px 18px' : '20px 24px',
-            borderBottom: `1px solid ${theme.border}`,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            cursor: 'pointer'
-          }}
-          onClick={onClose}
-        >
-          <h2 style={{ margin: 0, fontSize: isMobile ? '1.1rem' : '1.3rem', color: theme.text }}>
-            📅 Crear Evento Especial
-          </h2>
-          <div className="ca-stats-modal-header-buttons">
-            <button
+        {/* HEADER */}
+        <div className="relative overflow-hidden shrink-0">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-bl-[8rem] -mr-16 -mt-16 pointer-events-none"></div>
+          <div className="flex justify-between items-center p-8 pb-6 border-b border-slate-100 dark:border-white/5 relative z-10">
+            <div className="flex items-center gap-5">
+              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-indigo-600/30 border border-white/20">
+                <CalendarPlus className="w-7 h-7" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Crear Evento</h2>
+                <div className="flex items-center gap-2 mt-1">
+                   <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                   <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">Programación Ministerial</p>
+                </div>
+              </div>
+            </div>
+            <button 
               onClick={onClose}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontSize: '1.5rem',
-                cursor: 'pointer',
-                color: theme.textSecondary,
-                padding: '0 8px'
-              }}
+              className="p-3 bg-slate-100 dark:bg-white/5 text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-all rounded-2xl border border-transparent hover:border-indigo-100 dark:hover:border-white/10"
             >
-              ✕
+              <X size={20} />
             </button>
           </div>
         </div>
 
-        {/* Contenido con scroll */}
-        <div
-          className="ca-stats-modal-scroll"
-          style={{
-            padding: isMobile ? '18px' : '24px',
-            overflowY: 'auto',
-            maxHeight: 'calc(90vh - 140px)'
-          }}
-        >
+        {/* CONTENIDO */}
+        <div className="p-8 overflow-y-auto custom-scrollbar">
           {!canCreate ? (
-            <div
-              style={{
-                padding: '40px 20px',
-                textAlign: 'center',
-                backgroundColor: theme.errorBg,
-                color: theme.errorText,
-                borderRadius: '12px'
-              }}
-            >
-              <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🚫</div>
-              <h3 style={{ margin: '0 0 8px' }}>Acceso denegado</h3>
-              <p>Solo PASTORES y CONEXION pueden crear eventos especiales.</p>
+            <div className="bg-rose-50 dark:bg-rose-500/5 border-2 border-dashed border-rose-100 dark:border-rose-500/20 rounded-[2.5rem] p-12 flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-rose-500/10 text-rose-500 rounded-[1.5rem] flex items-center justify-center mb-6 shadow-inner">
+                 <ShieldAlert size={32} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase mb-3">Acceso Protegido</h3>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest max-w-xs leading-relaxed">Solo el equipo de Liderazgo y CONEXIÓN puede aperturar eventos de asistencia.</p>
             </div>
           ) : (
-            <form onSubmit={handleSubmit}>
-              {/* Mensajes */}
-              {error && (
-                <div
-                  style={{
-                    backgroundColor: theme.errorBg,
-                    color: theme.errorText,
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    marginBottom: '16px',
-                    fontSize: '0.9rem'
-                  }}
-                >
-                  ❌ {error}
-                </div>
-              )}
+            <form onSubmit={handleSubmit} className="space-y-8">
               
-              {success && (
-                <div
-                  style={{
-                    backgroundColor: theme.successBg,
-                    color: theme.successText,
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    marginBottom: '16px',
-                    fontSize: '0.9rem'
-                  }}
-                >
-                  ✅ {success}
+              {(error || success) && (
+                <div className={`p-5 rounded-[1.5rem] flex items-center gap-4 animate-in slide-in-from-top-4 border-2 ${error ? 'bg-rose-50 dark:bg-rose-500/5 border-rose-100 dark:border-rose-500/10 text-rose-600 dark:text-rose-400' : 'bg-emerald-50 dark:bg-emerald-500/5 border-emerald-100 dark:border-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${error ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
+                    {error ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
+                  </div>
+                  <p className="text-xs font-black uppercase tracking-widest">{error || success}</p>
                 </div>
               )}
 
-              {/* Nombre del evento */}
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: theme.textSecondary,
-                    marginBottom: '6px'
-                  }}
-                >
-                  Nombre del evento <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Ej: Reunión especial de avivamiento"
-                  maxLength={200}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: '12px',
-                    border: `1.5px solid ${theme.border}`,
-                    backgroundColor: theme.bgTertiary,
-                    color: theme.text,
-                    fontSize: '1rem',
-                    outline: 'none'
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: theme.textSecondary,
-                    marginTop: '4px',
-                    textAlign: 'right'
-                  }}
-                >
-                  {formData.name.length}/200
-                </div>
-              </div>
-
-              {/* Descripción */}
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: theme.textSecondary,
-                    marginBottom: '6px'
-                  }}
-                >
-                  Descripción (opcional)
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Breve descripción del evento..."
-                  maxLength={500}
-                  rows={3}
-                  style={{
-                    width: '100%',
-                    padding: '12px 14px',
-                    borderRadius: '12px',
-                    border: `1.5px solid ${theme.border}`,
-                    backgroundColor: theme.bgTertiary,
-                    color: theme.text,
-                    fontSize: '0.95rem',
-                    outline: 'none',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: '0.7rem',
-                    color: theme.textSecondary,
-                    marginTop: '4px',
-                    textAlign: 'right'
-                  }}
-                >
-                  {formData.description.length}/500
-                </div>
-              </div>
-
-              {/* Selector de fechas */}
-              <div style={{ marginBottom: '20px' }}>
-                <label
-                  style={{
-                    display: 'block',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    color: theme.textSecondary,
-                    marginBottom: '6px'
-                  }}
-                >
-                  Fechas del evento <span style={{ color: '#ef4444' }}>*</span>
-                </label>
-                
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                  <input
-                    type="date"
-                    value={dateInput}
-                    onChange={(e) => setDateInput(e.target.value)}
-                    min={getMinDate()}
-                    style={{
-                      flex: 1,
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      border: `1.5px solid ${theme.border}`,
-                      backgroundColor: theme.bgTertiary,
-                      color: theme.text,
-                      fontSize: '0.95rem',
-                      outline: 'none'
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddDate}
-                    style={{
-                      padding: '10px 18px',
-                      borderRadius: '12px',
-                      border: 'none',
-                      backgroundColor: theme.accentBlue,
-                      color: 'white',
-                      fontWeight: 600,
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    + Agregar
-                  </button>
-                </div>
-
-                {/* Lista de fechas agregadas */}
-                {tempDates.length > 0 && (
-                  <div
-                    style={{
-                      backgroundColor: theme.bgTertiary,
-                      borderRadius: '12px',
-                      padding: '12px',
-                      marginTop: '8px'
-                    }}
-                  >
-                    <div style={{ fontSize: '0.8rem', color: theme.textSecondary, marginBottom: '8px' }}>
-                      📅 {tempDates.length} fecha{tempDates.length !== 1 ? 's' : ''} seleccionada{tempDates.length !== 1 ? 's' : ''}:
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {tempDates.map((date) => (
-                        <div
-                          key={date}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            padding: '8px 12px',
-                            backgroundColor: theme.bgSecondary,
-                            borderRadius: '8px',
-                            border: `1px solid ${theme.border}`
-                          }}
-                        >
-                          <span style={{ fontSize: '0.9rem', color: theme.text }}>
-                            📌 {formatDateForDisplay(date)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveDate(date)}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              fontSize: '1rem',
-                              cursor: 'pointer',
-                              padding: '4px 8px'
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-6 flex items-center gap-2">
+                    <Zap size={14} className="text-indigo-500"/> Nombre del Evento *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Ej: Reunión especial de avivamiento"
+                      maxLength={200}
+                      required
+                      className="w-full bg-slate-50 dark:bg-black/40 border-2 border-transparent focus:border-indigo-600 rounded-[1.5rem] px-8 py-5 text-sm font-black text-slate-800 dark:text-white transition-all outline-none shadow-inner"
+                    />
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 dark:text-slate-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-md">
+                      {formData.name.length}/200
                     </div>
                   </div>
-                )}
-              </div>
-
-              {/* Información de reglas */}
-              <div
-                style={{
-                  backgroundColor: 'rgba(59, 130, 246, 0.08)',
-                  borderRadius: '12px',
-                  padding: '12px 16px',
-                  marginBottom: '24px',
-                  fontSize: '0.85rem',
-                  color: theme.textSecondary,
-                  border: `1px dashed ${theme.accentBlue}`
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: '6px', color: theme.accentBlue }}>
-                  📋 Reglas para eventos:
                 </div>
-                <ul style={{ margin: 0, paddingLeft: '18px', lineHeight: 1.6 }}>
-                  <li>Deben programarse <strong>ANTES</strong> del inicio del mes del evento</li>
-                  <li>Las fechas deben ser futuras (a partir de hoy)</li>
-                  <li>Las asistencias se generarán automáticamente el primer día del mes</li>
-                  <li>Puedes agregar múltiples fechas para un mismo evento</li>
-                </ul>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-6 flex items-center gap-2">
+                    <Info size={14} className="text-slate-400"/> Descripción (Opcional)
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Detalles espirituales u objetivos del encuentro..."
+                    maxLength={500}
+                    rows={2}
+                    className="w-full bg-slate-50 dark:bg-black/40 border-2 border-transparent focus:border-indigo-600 rounded-[1.5rem] px-8 py-5 text-sm font-bold text-slate-800 dark:text-slate-300 transition-all outline-none resize-none shadow-inner no-scrollbar text-xs md:text-sm"
+                  />
+                </div>
+
+                <div className="space-y-3 border-t border-slate-100 dark:border-white/5 pt-6">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-6">
+                    Cronograma del Evento *
+                  </label>
+                  <div className="flex gap-3">
+                    <div className="relative flex-1">
+                      <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none text-indigo-500">
+                        <Calendar size={18} />
+                      </div>
+                      <input
+                        type="date"
+                        value={dateInput}
+                        onChange={(e) => setDateInput(e.target.value)}
+                        min={getMinDate()}
+                        className="w-full bg-slate-50 dark:bg-black/40 border-2 border-transparent focus:border-indigo-600 rounded-[1.5rem] pl-14 pr-6 py-4 text-sm font-black text-slate-800 dark:text-white transition-all outline-none shadow-inner"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAddDate}
+                      className="w-16 h-16 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all outline-none"
+                    >
+                      <Plus size={24} strokeWidth={3} />
+                    </button>
+                  </div>
+                  
+                  {tempDates.length > 0 && (
+                    <div className="mt-4 p-5 bg-indigo-50/30 dark:bg-white/5 rounded-[2.5rem] border border-indigo-100 dark:border-white/10 overflow-hidden">
+                      <div className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] px-4 mb-4 flex items-center justify-between">
+                         <span>{tempDates.length} Fecha(s) Programada(s)</span>
+                         <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {tempDates.map((date) => (
+                          <div key={date} className="flex justify-between items-center px-5 py-3.5 bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-white/5 shadow-sm group hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all">
+                            <span className="text-xs font-black text-slate-700 dark:text-slate-300">
+                              {formatDateForDisplay(date)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveDate(date)}
+                              className="p-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-400 group-hover:text-rose-600 rounded-xl hover:bg-rose-500 hover:text-white transition-all"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-[2rem] p-6 mt-4 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-bl-[6rem] -mr-8 -mt-8 pointer-events-none"></div>
+                  <div className="flex items-center gap-2 text-indigo-500 mb-3">
+                    <ShieldAlert size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">Protocolo CBI</span>
+                  </div>
+                  <ul className="text-[10px] md:text-xs font-bold text-slate-500 dark:text-slate-400 space-y-2 list-none pl-1">
+                    <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-indigo-400 rounded-full mt-1.5 shrink-0" /> Programa antes del cierre de mes para una sincronización óptima.</li>
+                    <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-indigo-400 rounded-full mt-1.5 shrink-0" /> Solo se permiten fechas futuras al día de creación.</li>
+                    <li className="flex items-start gap-2"><div className="w-1.5 h-1.5 bg-indigo-400 rounded-full mt-1.5 shrink-0" /> Las listas se generarán automáticamente en el primer ciclo del mes.</li>
+                  </ul>
+                </div>
               </div>
 
-              {/* Botones de acción */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '12px',
-                  justifyContent: 'flex-end',
-                  marginTop: '24px'
-                }}
-              >
+              <div className="flex flex-col sm:flex-row justify-end gap-3 md:gap-4 pt-6 shrink-0 relative z-10 border-t border-slate-100 dark:border-white/5">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={loading}
-                  style={{
-                    padding: '12px 20px',
-                    borderRadius: '30px',
-                    border: `1.5px solid ${theme.border}`,
-                    backgroundColor: 'transparent',
-                    color: theme.text,
-                    fontSize: '0.95rem',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    opacity: loading ? 0.5 : 1
-                  }}
+                  className="px-8 py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 transition-all disabled:opacity-50 w-full sm:w-auto"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={loading || tempDates.length === 0}
-                  style={{
-                    padding: '12px 28px',
-                    borderRadius: '30px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #3b82f6, #1e40af)',
-                    color: 'white',
-                    fontSize: '0.95rem',
-                    fontWeight: 700,
-                    cursor: loading || tempDates.length === 0 ? 'not-allowed' : 'pointer',
-                    opacity: loading || tempDates.length === 0 ? 0.6 : 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}
+                  className="flex-1 sm:flex-none px-10 py-5 bg-slate-900 dark:bg-indigo-600 hover:bg-black dark:hover:bg-indigo-500 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] transition-all shadow-2xl shadow-indigo-600/30 active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-3 hover:-translate-y-1"
                 >
-                  {loading ? '⏳ Creando...' : '🎯 Crear Evento'}
+                  {loading ? (
+                    <><Loader2 className="w-5 h-5 animate-spin" /> Procesando...</>
+                  ) : (
+                    <>
+                      Confirmar Calendario <CalendarPlus size={18} />
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -522,20 +334,6 @@ const CreateAttendanceEventModal = ({
       </div>
     </div>
   );
-};
-
-CreateAttendanceEventModal.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  onCreate: PropTypes.func.isRequired,
-  theme: PropTypes.object.isRequired,
-  isMobile: PropTypes.bool,
-  userRole: PropTypes.string
-};
-
-CreateAttendanceEventModal.defaultProps = {
-  isMobile: false,
-  userRole: ''
 };
 
 export default CreateAttendanceEventModal;

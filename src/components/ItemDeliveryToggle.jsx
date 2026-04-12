@@ -6,6 +6,7 @@
 
 import React, { useState } from "react";
 import apiService from "../apiService";
+import { useConfirmation } from "../context/ConfirmationContext";
 
 const ItemDeliveryToggle = ({
   contributionId,         // ID de la contribución (ActivityContributionManager.id)
@@ -15,6 +16,7 @@ const ItemDeliveryToggle = ({
   disabled = false,
   compact = false,        // modo compacto para usar dentro de tablas
 }) => {
+  const confirm = useConfirmation();
   const [delivered, setDelivered] = useState(initialDelivered);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -24,36 +26,39 @@ const ItemDeliveryToggle = ({
     if (loading || disabled) return;
 
     const newValue = !delivered;
-    const confirmMsg = newValue
-      ? `¿Confirmas que el artículo fue entregado a ${memberName || "este participante"}?`
-      : `¿Desmarcar la entrega del artículo para ${memberName || "este participante"}?`;
+    const isConfirmed = await confirm({
+      title: newValue ? "Confirmar Entrega" : "¿Rectificar Entrega?",
+      message: newValue 
+        ? `¿Confirmas que el artículo fue entregado a ${memberName || "este participante"}?`
+        : `¿Estás seguro de que deseas desmarcar la entrega del artículo para ${memberName || "este participante"}?`,
+      type: "info",
+      confirmLabel: newValue ? "SÍ, Entregado" : "SÍ, Rectificar",
+      onConfirm: async () => {
+        setLoading(true);
+        setError("");
+        setAnimating(true);
 
-    if (!window.confirm(confirmMsg)) return;
+        try {
+          await apiService.request(
+            `/activity-contribution/${contributionId}/deliver`,
+            {
+              method: "PATCH",
+              body: JSON.stringify({ delivered: newValue }),
+            }
+          );
 
-    setLoading(true);
-    setError("");
-    setAnimating(true);
-
-    try {
-      await apiService.request(
-        `/activity-contribution/${contributionId}/deliver`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({ delivered: newValue }),
+          setDelivered(newValue);
+          if (onDeliveryChange) onDeliveryChange(contributionId, newValue);
+        } catch (err) {
+          const msg = err?.data?.error || err?.message || "Error al actualizar la entrega";
+          setError(msg);
+          setTimeout(() => setError(""), 4000);
+        } finally {
+          setLoading(false);
+          setTimeout(() => setAnimating(false), 400);
         }
-      );
-
-      setDelivered(newValue);
-      if (onDeliveryChange) onDeliveryChange(contributionId, newValue);
-    } catch (err) {
-      const msg =
-        err?.data?.error || err?.message || "Error al actualizar la entrega";
-      setError(msg);
-      setTimeout(() => setError(""), 4000);
-    } finally {
-      setLoading(false);
-      setTimeout(() => setAnimating(false), 400);
-    }
+      }
+    });
   };
 
   // ── Modo compacto: solo el badge/botón para usar en tablas ──────────────

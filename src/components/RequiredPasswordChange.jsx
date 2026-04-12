@@ -1,23 +1,24 @@
 // ============================================
-// RequiredPasswordChange.jsx
-// Modal OBLIGATORIO para cambiar contraseña al primer login
-// Con Logo Pastoreapp Blanco
+// RequiredPasswordChange.jsx - MODERN EDITION
 // ============================================
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../services/authService'; // ✅ AGREGAR ESTE IMPORT
+import authService from '../services/authService';
 import logoBlancoImg from '../assets/Pastoreapp_blanco.png';
-import '../css/RequiredPasswordChange.css';
+import { 
+  Lock, Key, ShieldAlert, CheckCircle2, 
+  Eye, EyeOff, Save, Loader2, Info, ShieldCheck 
+} from 'lucide-react';
 
 const RequiredPasswordChange = ({ accessToken, onPasswordChanged }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showOld, setShowOld] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [formData, setFormData] = useState({
     oldPassword: 'AdminSeguro123!',
@@ -25,290 +26,197 @@ const RequiredPasswordChange = ({ accessToken, onPasswordChanged }) => {
     confirmPassword: '',
   });
 
-  // ✅ Validar fortaleza de contraseña
   const validatePassword = (password) => {
-    const errors = [];
-    
-    if (password.length < 8) {
-      errors.push('Mínimo 8 caracteres');
-    }
-    if (!/[A-Z]/.test(password)) {
-      errors.push('Debe contener mayúscula');
-    }
-    if (!/[a-z]/.test(password)) {
-      errors.push('Debe contener minúscula');
-    }
-    if (!/[0-9]/.test(password)) {
-      errors.push('Debe contener número');
-    }
-    
-    return { valid: errors.length === 0, errors };
+    return {
+      length: password.length >= 8,
+      upper: /[A-Z]/.test(password),
+      lower: /[a-z]/.test(password),
+      number: /[0-9]/.test(password),
+      match: formData.newPassword === formData.confirmPassword && formData.newPassword.length > 0
+    };
   };
 
-  // ✅ Validar que las contraseñas coincidan
-  const validateForm = () => {
-    setError('');
+  const passwordChecks = validatePassword(formData.newPassword);
+  const isValid = Object.values(passwordChecks).every(Boolean) && formData.newPassword !== formData.oldPassword;
 
-    if (formData.newPassword !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
-      return false;
-    }
-
-    if (formData.newPassword === formData.oldPassword) {
-      setError('La nueva contraseña no puede ser igual a la actual');
-      return false;
-    }
-
-    const validation = validatePassword(formData.newPassword);
-    if (!validation.valid) {
-      setError('La contraseña no es segura: ' + validation.errors.join(', '));
-      return false;
-    }
-
-    return true;
-  };
-
-  // ✅ Enviar cambio de contraseña
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!isValid) return;
 
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      // ✅ Llamar a authService.changePassword()
-      console.log('🔐 [RequiredPasswordChange] Cambiando contraseña...');
-      
-      await authService.changePassword(
-        formData.oldPassword,
-        formData.newPassword
-      );
-
-      console.log('✅ [RequiredPasswordChange] Contraseña cambiada exitosamente');
-      
-      setSuccess('✅ Contraseña cambiada exitosamente');
-      
-      // Esperar 1.5 segundos y redirigir
+      await authService.changePassword(formData.oldPassword, formData.newPassword);
+      setSuccess('Contraseña actualizada correctamente');
       setTimeout(() => {
-        if (onPasswordChanged) {
-          onPasswordChanged();
-        } else {
-          navigate('/dashboard');
-        }
+        if (onPasswordChanged) onPasswordChanged();
+        else navigate('/dashboard');
       }, 1500);
     } catch (err) {
       setError(err.message || 'Error al cambiar la contraseña');
-      console.error('Error:', err);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="required-password-change-overlay">
-      <div className="required-password-change-modal">
-        {/* Encabezado con Logo */}
-        <div className="rpc-header">
-          <div className="rpc-logo-wrapper">
-            <img 
-              src={logoBlancoImg} 
-              alt="Pastoreapp Logo" 
-              className="rpc-logo"
-            />
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-sm overflow-hidden">
+      
+      {/* MODAL CONTAINER */}
+      <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-y-auto max-h-[92vh] custom-scrollbar animate-in zoom-in-95 duration-500">
+        
+        {/* HEADER SECTION */}
+        <div className="bg-gradient-to-br from-indigo-600 to-violet-700 px-6 py-8 md:px-10 md:py-10 relative text-center">
+          <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
+          <div className="relative z-10 flex flex-col items-center">
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-md rounded-2xl p-3 mb-4 ring-1 ring-white/30">
+              <img src={logoBlancoImg} alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight uppercase">Activar mi Cuenta</h1>
+            <p className="text-indigo-100/80 text-xs md:text-sm font-medium mt-1">Por seguridad, debes establecer una contraseña personal</p>
           </div>
-          <h1>Cambio Obligatorio de Contraseña</h1>
-          <p>Debes cambiar tu contraseña antes de acceder al sistema</p>
         </div>
 
-        {/* Contenido */}
-        <div className="rpc-content">
-          {/* Alerta de información */}
-          <div className="rpc-info-box">
-            <span className="rpc-info-icon">ℹ️</span>
-            <div>
-              <strong>Primera vez iniciando sesión</strong>
-              <p>Por seguridad, se requiere que cambies tu contraseña temporal</p>
+        {/* CONTENT SECTION */}
+        <div className="p-6 md:p-12 space-y-8">
+          
+          {/* INFO BOX */}
+          <div className="p-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 rounded-2xl flex items-start gap-4">
+            <div className="p-2 bg-indigo-500 text-white rounded-xl flex-shrink-0">
+              <Info size={20} />
             </div>
+            <p className="text-xs md:text-sm text-indigo-900 dark:text-indigo-200 font-medium leading-relaxed">
+              Has iniciado sesión con una clave temporal. Establece una nueva contraseña secreta para proteger tu integridad ministerial.
+            </p>
           </div>
 
-          {/* Errores */}
-          {error && (
-            <div className="rpc-error-box">
-              <span className="rpc-error-icon">❌</span>
-              <div>
-                <strong>Error</strong>
-                <p>{error}</p>
-              </div>
+          {(error || success) && (
+            <div className={`p-4 rounded-xl border flex items-center gap-3 animate-in slide-in-from-top-2 ${
+              error ? 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400' : 
+              'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400'
+            }`}>
+              {error ? <ShieldAlert size={18} /> : <CheckCircle2 size={18} />}
+              <p className="text-xs font-bold uppercase tracking-wide">{error || success}</p>
             </div>
           )}
 
-          {/* Éxito */}
-          {success && (
-            <div className="rpc-success-box">
-              <span className="rpc-success-icon">✅</span>
-              <div>
-                <strong>Éxito</strong>
-                <p>{success}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Formulario */}
-          <form onSubmit={handleChangePassword} className="rpc-form">
-            {/* Contraseña actual */}
-            <div className="rpc-form-group">
-              <label htmlFor="oldPassword">
-                Contraseña Actual
-                <span className="rpc-readonly-badge">Solo lectura</span>
-              </label>
-              <div className="rpc-input-wrapper">
+          <form onSubmit={handleChangePassword} className="space-y-6">
+            {/* CURRENT PASSWORD */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Clave Temporal (Lectura)</label>
+              <div className="relative">
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="oldPassword"
+                  type={showOld ? 'text' : 'password'}
                   value={formData.oldPassword}
-                  disabled
                   readOnly
-                  className="rpc-input rpc-input-readonly"
-                  title="Esta contraseña es solo lectura"
+                  className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-950/50 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-sm font-bold text-slate-400 cursor-not-allowed outline-none focus:ring-0"
                 />
                 <button
                   type="button"
-                  className="rpc-toggle-password"
-                  onClick={() => setShowPassword(!showPassword)}
-                  title="Mostrar/Ocultar contraseña"
+                  onClick={() => setShowOld(!showOld)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 z-40 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all rounded-full hover:bg-slate-100 dark:hover:bg-white/10"
+                  title="Ver contraseña"
                 >
-                  {showPassword ? '👁️' : '🙈'}
+                  {showOld ? <EyeOff size={22} strokeWidth={2.5} /> : <Eye size={22} strokeWidth={2.5} />}
                 </button>
               </div>
-              <small className="rpc-help-text">
-                Contraseña temporal inicial. No puedes cambiarla en este campo.
-              </small>
             </div>
 
-            {/* Nueva contraseña */}
-            <div className="rpc-form-group">
-              <label htmlFor="newPassword">
-                Nueva Contraseña *
-              </label>
-              <div className="rpc-input-wrapper">
-                <input
-                  type={showNewPassword ? 'text' : 'password'}
-                  id="newPassword"
-                  value={formData.newPassword}
-                  onChange={(e) =>
-                    setFormData({ ...formData, newPassword: e.target.value })
-                  }
-                  placeholder="Ingresa tu nueva contraseña"
-                  disabled={loading}
-                  required
-                  minLength="8"
-                  className="rpc-input"
-                />
-                <button
-                  type="button"
-                  className="rpc-toggle-password"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  disabled={loading}
-                  title="Mostrar/Ocultar contraseña"
-                >
-                  {showNewPassword ? '👁️' : '🙈'}
-                </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* NEW PASSWORD */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">Nueva Clave</label>
+                <div className="relative group">
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    value={formData.newPassword}
+                    onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
+                    className="w-full px-6 pr-12 py-4 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-indigo-500 transition-all shadow-sm group-hover:border-slate-300 dark:group-hover:border-slate-700"
+                    placeholder="Establecer..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNew(!showNew)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 z-40 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all rounded-full hover:bg-slate-100 dark:hover:bg-white/10"
+                  >
+                    {showNew ? <EyeOff size={22} strokeWidth={2.5} /> : <Eye size={22} strokeWidth={2.5} />}
+                  </button>
+                </div>
               </div>
-              <small className="rpc-help-text">
-                Mínimo 8 caracteres: mayúscula, minúscula, número
-              </small>
-            </div>
 
-            {/* Confirmar contraseña */}
-            <div className="rpc-form-group">
-              <label htmlFor="confirmPassword">
-                Confirmar Contraseña *
-              </label>
-              <div className="rpc-input-wrapper">
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  id="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={(e) =>
-                    setFormData({ ...formData, confirmPassword: e.target.value })
-                  }
-                  placeholder="Confirma tu nueva contraseña"
-                  disabled={loading}
-                  required
-                  minLength="8"
-                  className="rpc-input"
-                />
-                <button
-                  type="button"
-                  className="rpc-toggle-password"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={loading}
-                  title="Mostrar/Ocultar contraseña"
-                >
-                  {showConfirmPassword ? '👁️' : '🙈'}
-                </button>
+              {/* CONFIRM PASSWORD */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 px-1">Verificar Clave</label>
+                <div className="relative group">
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    className="w-full px-6 pr-12 py-4 bg-white dark:bg-slate-950 border-2 border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:border-indigo-500 transition-all shadow-sm group-hover:border-slate-300 dark:group-hover:border-slate-700"
+                    placeholder="Repetir..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 z-40 flex items-center justify-center text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all rounded-full hover:bg-slate-100 dark:hover:bg-white/10"
+                  >
+                    {showConfirm ? <EyeOff size={22} strokeWidth={2.5} /> : <Eye size={22} strokeWidth={2.5} />}
+                  </button>
+                </div>
               </div>
-              <small className="rpc-help-text">
-                Debe coincidir con la nueva contraseña
-              </small>
             </div>
 
-            {/* Requisitos de contraseña */}
-            <div className="rpc-requirements">
-              <strong>Requisitos:</strong>
-              <ul>
-                <li className={formData.newPassword.length >= 8 ? 'done' : ''}>
-                  ✓ Mínimo 8 caracteres
-                </li>
-                <li className={/[A-Z]/.test(formData.newPassword) ? 'done' : ''}>
-                  ✓ Contiene mayúscula
-                </li>
-                <li className={/[a-z]/.test(formData.newPassword) ? 'done' : ''}>
-                  ✓ Contiene minúscula
-                </li>
-                <li className={/[0-9]/.test(formData.newPassword) ? 'done' : ''}>
-                  ✓ Contiene número
-                </li>
-                <li className={formData.newPassword === formData.confirmPassword && formData.newPassword ? 'done' : ''}>
-                  ✓ Las contraseñas coinciden
-                </li>
-              </ul>
+            {/* REQUIREMENTS LIST */}
+            <div className="p-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Requerimientos de Seguridad</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6">
+                <CheckItem label="Mínimo 8 caracteres" active={passwordChecks.length} />
+                <CheckItem label="Mayúscula (A-Z)" active={passwordChecks.upper} />
+                <CheckItem label="Minúscula (a-z)" active={passwordChecks.lower} />
+                <CheckItem label="Numérico (0-9)" active={passwordChecks.number} />
+                <CheckItem label="Confirmación exacta" active={passwordChecks.match} />
+              </div>
             </div>
 
-            {/* Botón de envío */}
+            {/* SUBMIT BUTTON */}
             <button
               type="submit"
-              className="rpc-submit-btn"
-              disabled={loading || !formData.newPassword || !formData.confirmPassword}
+              disabled={loading || !isValid}
+              className="w-full py-5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-50 hover:to-violet-500 text-white rounded-2xl flex items-center justify-center gap-3 shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all disabled:opacity-50 disabled:grayscale disabled:pointer-events-none group"
             >
               {loading ? (
-                <>
-                  <span className="rpc-spinner"></span>
-                  Cambiando contraseña...
-                </>
+                <Loader2 size={24} className="animate-spin" />
               ) : (
                 <>
-                  💾 Cambiar Contraseña
+                  <Save size={20} />
+                  <span className="font-bold uppercase tracking-widest text-sm">Cambiar y Activar Acceso</span>
                 </>
               )}
             </button>
           </form>
-        </div>
 
-        {/* Pie de página */}
-        <div className="rpc-footer">
-          <p>
-            🔒 Tu cuenta está protegida con encriptación de nivel empresarial
-          </p>
+          {/* FOOTER */}
+          <div className="pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              Conexión Encriptada SSL • Seguridad Pastoreapp
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+
+const CheckItem = ({ label, active }) => (
+  <div className="flex items-center gap-2">
+    <div className={`w-4 h-4 rounded-full flex items-center justify-center transition-colors ${active ? 'bg-emerald-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-transparent'}`}>
+      <CheckCircle2 size={12} strokeWidth={3} />
+    </div>
+    <span className={`text-xs font-bold transition-colors ${active ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{label}</span>
+  </div>
+);
 
 export default RequiredPasswordChange;

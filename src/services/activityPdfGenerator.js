@@ -126,7 +126,7 @@ const calculateCapacityUsage = (participantCount, quantity) => {
 
 // Calcular valor total (MANTENIDO)
 const calculateTotalValue = (price, quantity) => {
-  return (price || 0) * (quantity || 0);
+  return Math.round(price || 0) * (quantity || 0);
 };
 
 // Helper para determinar color según balance (MANTENIDO)

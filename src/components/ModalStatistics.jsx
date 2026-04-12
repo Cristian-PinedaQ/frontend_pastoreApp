@@ -1,21 +1,30 @@
-// 📊 ModalStatistics.jsx - Modal de Estadísticas Dinámicas (v2.1 - CORREGIDO)
-// ✅ Muestra estadísticas generales o filtradas según lo que aplique el usuario
-// ✅ Indicador visual de filtros activos
-// ✅ Exportación de PDF desde el modal
-// ✅ CORREGIDO: useMemo antes del early return (React Hooks Rules)
+// ============================================
+// ModalStatistics.jsx - ELITE MODERN EDITION
+// ============================================
 
 import React, { useMemo } from 'react';
 import { generatePDF } from '../services/Pdfgenerator';
-import '../css/ModalStatistics.css';
+import { 
+  BarChart3, 
+  X, 
+  Download, 
+  Users, 
+  CheckCircle2, 
+  XCircle, 
+  Clock, 
+  Ban, 
+  TrendingUp,
+  Filter,
+  Calendar,
+  Layers,
+  Search,
+} from 'lucide-react';
 
 const ModalStatistics = ({ isOpen, onClose, data, isDarkMode }) => {
-  // ========== CALCULAR TOTALES (ANTES del early return - REGLA DE HOOKS) ==========
-  // Los hooks SIEMPRE deben llamarse en el mismo orden, nunca condicionalmente
   const totals = useMemo(() => {
     if (!data || !data.statistics) {
       return { total: 0, passed: 0, failed: 0, pending: 0, cancelled: 0, passPercentage: 0 };
     }
-
     const statistics = data.statistics || {};
     const total = Object.values(statistics).reduce((sum, stat) => sum + (stat.total || 0), 0);
     const passed = Object.values(statistics).reduce((sum, stat) => sum + (stat.passed || 0), 0);
@@ -23,11 +32,9 @@ const ModalStatistics = ({ isOpen, onClose, data, isDarkMode }) => {
     const pending = Object.values(statistics).reduce((sum, stat) => sum + (stat.pending || 0), 0);
     const cancelled = Object.values(statistics).reduce((sum, stat) => sum + (stat.cancelled || 0), 0);
     const passPercentage = total > 0 ? ((passed / total) * 100).toFixed(1) : 0;
-
     return { total, passed, failed, pending, cancelled, passPercentage };
   }, [data]);
 
-  // ========== EARLY RETURN (DESPUÉS de los hooks) ==========
   if (!isOpen || !data) return null;
 
   const {
@@ -37,27 +44,13 @@ const ModalStatistics = ({ isOpen, onClose, data, isDarkMode }) => {
     dataCount = 0,
   } = data;
 
-  // ========== THEME COLORS ==========
-  const theme = {
-    bg: isDarkMode ? '#0f172a' : '#ffffff',
-    bgDark: isDarkMode ? '#1e293b' : '#f9fafb',
-    text: isDarkMode ? '#f3f4f6' : '#1f2937',
-    textSecondary: isDarkMode ? '#9ca3af' : '#6b7280',
-    border: isDarkMode ? '#334155' : '#e5e7eb',
-    accent: '#667eea',
-    accentLight: '#f0f4ff',
-  };
-
-  // ========== EXPORTAR PDF DESDE MODAL ==========
   const handleExportPDF = () => {
     try {
       const title = hasFilters 
         ? `Estadísticas ${Object.keys(filtersInfo).length > 0 ? '(Con Filtros)' : ''}`
         : 'Estadísticas Generales';
-
       const filename = hasFilters ? 'estadisticas-filtradas' : 'estadisticas-generales';
-
-      const pdfData = {
+      generatePDF({
         title: title,
         statistics: statistics,
         totals: totals,
@@ -65,492 +58,154 @@ const ModalStatistics = ({ isOpen, onClose, data, isDarkMode }) => {
         filtersInfo: filtersInfo,
         dataCount: dataCount,
         date: new Date().toLocaleDateString('es-CO'),
-      };
-
-      generatePDF(pdfData, filename);
-      alert('PDF de estadísticas descargado exitosamente');
+      }, filename);
     } catch (err) {
       console.error('Error al exportar PDF:', err);
-      alert('Error al generar PDF: ' + err.message);
     }
   };
 
+  const StatItem = ({ label, value, icon: Icon, color }) => (
+    <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+      <div className={`p-2.5 rounded-xl bg-${color}-500/10 text-${color}-600 dark:text-${color}-400`}>
+        <Icon size={20} />
+      </div>
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+        <p className="text-xl font-black text-slate-900 dark:text-white leading-none mt-1">{value}</p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="modal-statistics-overlay" onClick={onClose} style={{ backgroundColor: isDarkMode ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.5)' }}>
-      <div
-        className="modal-statistics"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: theme.bg,
-          color: theme.text,
-        }}
-      >
-        {/* ========== HEADER ========== */}
-        <div className="modal-statistics__header" style={{ borderColor: theme.border }}>
-          <div className="modal-statistics__title-wrapper">
-            <h2 className="modal-statistics__title">📊 Estadísticas de Estudiantes</h2>
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+      <div 
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"
+        onClick={onClose}
+      />
+      
+      <div className="relative bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col animate-in zoom-in-95 duration-300">
+        
+        {/* Header */}
+        <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+              <BarChart3 size={24} />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none">Estadísticas Académicas</h2>
+              <p className="text-sm text-slate-500 font-medium mt-1">Análisis de rendimiento y progresión</p>
+            </div>
             {hasFilters && (
-              <span className="modal-statistics__filter-badge">🔍 Con Filtros</span>
+              <span className="ml-4 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest border border-amber-500/20 animate-pulse">
+                Filtros Activos
+              </span>
             )}
           </div>
-          <button
-            className="modal-statistics__close"
+          <button 
             onClick={onClose}
-            style={{ color: theme.textSecondary }}
+            className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all"
           >
-            ✕
+            <X size={24} />
           </button>
         </div>
 
-        {/* ========== FILTER INFO ==========*/}
-        {hasFilters && Object.keys(filtersInfo).length > 0 && (
-          <div
-            className="modal-statistics__filter-info"
-            style={{
-              backgroundColor: isDarkMode ? '#1a2f3a' : theme.accentLight,
-              borderColor: theme.accent,
-              borderLeft: `4px solid ${theme.accent}`,
-            }}
-          >
-            <strong>Filtros Aplicados:</strong>
-            <div className="modal-statistics__filters-list">
-              {Object.entries(filtersInfo).map(([key, value]) => (
-                <span 
-                  key={key} 
-                  className="modal-statistics__filter-tag"
-                  style={{
-                    backgroundColor: isDarkMode ? '#334155' : '#ffffff',
-                    color: isDarkMode ? '#f3f4f6' : '#1f2937',
-                  }}
-                >
-                  {key === 'year' && `📅 ${value}`}
-                  {key === 'level' && `📌 ${value}`}
-                  {key === 'result' && `✅ ${value}`}
-                  {key === 'search' && `🔍 Búsqueda: ${value}`}
-                </span>
-              ))}
-            </div>
-            <p className="modal-statistics__filter-message">
-              Mostrando <strong>{dataCount}</strong> estudiante(s) que coinciden con los filtros
-            </p>
-          </div>
-        )}
-
-        {/* ========== CONTENT ==========*/}
-        <div className="modal-statistics__content">
-
-          {/* ========== RESUMEN GENERAL ==========*/}
-          <div className="modal-statistics__summary">
-            <h3 className="modal-statistics__section-title">Resumen General</h3>
-            <div className="modal-statistics__summary-grid">
-              <div
-                className="modal-statistics__summary-card modal-statistics__summary-card--total"
-                style={{
-                  backgroundColor: isDarkMode ? '#1a2332' : '#f0f4ff',
-                  borderColor: theme.accent,
-                }}
-              >
-                <div className="modal-statistics__summary-icon">👥</div>
-                <div className="modal-statistics__summary-data">
-                  <p className="modal-statistics__summary-label">Total de Estudiantes</p>
-                  <p className="modal-statistics__summary-value">{totals.total}</p>
-                </div>
+        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+          {/* Active Filters Summary */}
+          {hasFilters && Object.keys(filtersInfo).length > 0 && (
+            <div className="p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/20">
+              <div className="flex items-center gap-2 mb-4 text-indigo-600 dark:text-indigo-400">
+                <Filter size={18} />
+                <span className="font-bold text-sm uppercase tracking-wider">Criterios de Análisis</span>
               </div>
-
-              <div
-                className="modal-statistics__summary-card modal-statistics__summary-card--passed"
-                style={{
-                  backgroundColor: isDarkMode ? '#1a2f1a' : '#ecfdf5',
-                  borderColor: '#10b981',
-                }}
-              >
-                <div className="modal-statistics__summary-icon">✅</div>
-                <div className="modal-statistics__summary-data">
-                  <p className="modal-statistics__summary-label">Aprobados</p>
-                  <p className="modal-statistics__summary-value">{totals.passed}</p>
-                </div>
-              </div>
-
-              <div
-                className="modal-statistics__summary-card modal-statistics__summary-card--failed"
-                style={{
-                  backgroundColor: isDarkMode ? '#2f1a1a' : '#fef2f2',
-                  borderColor: '#ef4444',
-                }}
-              >
-                <div className="modal-statistics__summary-icon">❌</div>
-                <div className="modal-statistics__summary-data">
-                  <p className="modal-statistics__summary-label">Reprobados</p>
-                  <p className="modal-statistics__summary-value">{totals.failed}</p>
-                </div>
-              </div>
-
-              <div
-                className="modal-statistics__summary-card modal-statistics__summary-card--pending"
-                style={{
-                  backgroundColor: isDarkMode ? '#2f2a1a' : '#fffbeb',
-                  borderColor: '#f59e0b',
-                }}
-              >
-                <div className="modal-statistics__summary-icon">⏳</div>
-                <div className="modal-statistics__summary-data">
-                  <p className="modal-statistics__summary-label">Pendientes</p>
-                  <p className="modal-statistics__summary-value">{totals.pending}</p>
-                </div>
-              </div>
-
-              <div
-                className="modal-statistics__summary-card modal-statistics__summary-card--cancelled"
-                style={{
-                  backgroundColor: isDarkMode ? '#2f2f2f' : '#f3f4f6',
-                  borderColor: '#6b7280',
-                }}
-              >
-                <div className="modal-statistics__summary-icon">🚫</div>
-                <div className="modal-statistics__summary-data">
-                  <p className="modal-statistics__summary-label">Cancelados</p>
-                  <p className="modal-statistics__summary-value">{totals.cancelled}</p>
-                </div>
-              </div>
-
-              <div
-                className="modal-statistics__summary-card modal-statistics__summary-card--percentage"
-                style={{
-                  backgroundColor: isDarkMode ? '#1a232f' : '#f0f9ff',
-                  borderColor: '#0ea5e9',
-                }}
-              >
-                <div className="modal-statistics__summary-icon">📈</div>
-                <div className="modal-statistics__summary-data">
-                  <p className="modal-statistics__summary-label">Tasa de Aprobación</p>
-                  <p className="modal-statistics__summary-value">{totals.passPercentage}%</p>
-                </div>
+              <div className="flex flex-wrap gap-3">
+                {Object.entries(filtersInfo).map(([key, value]) => (
+                  <div key={key} className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm">
+                    {key === 'year' && <Calendar size={14} className="text-indigo-500" />}
+                    {key === 'level' && <Layers size={14} className="text-indigo-500" />}
+                    {key === 'result' && <CheckCircle2 size={14} className="text-indigo-500" />}
+                    {key === 'search' && <Search size={14} className="text-indigo-500" />}
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{value}</span>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
+
+          {/* Overview Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <StatItem icon={Users} label="Total Estudiantes" value={totals.total} color="indigo" />
+            <StatItem icon={CheckCircle2} label="Aprobados" value={totals.passed} color="emerald" />
+            <StatItem icon={XCircle} label="Reprobados" value={totals.failed} color="rose" />
+            <StatItem icon={Clock} label="Pendientes" value={totals.pending} color="amber" />
+            <StatItem icon={Ban} label="Cancelados" value={totals.cancelled} color="slate" />
+            <StatItem icon={TrendingUp} label="Tasa de Aprobación" value={`${totals.passPercentage}%`} color="violet" />
           </div>
 
-          {/* ========== TABLA POR NIVEL ==========*/}
-          <div className="modal-statistics__table-section">
-            <h3 className="modal-statistics__section-title">Desglose por Nivel</h3>
-            <div className="modal-statistics__table-wrapper" style={{ borderColor: theme.border }}>
-              <table className="modal-statistics__table">
+          {/* Breakdown Table */}
+          <section className="space-y-4">
+            <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+              <Layers size={20} className="text-indigo-500" />
+              Rendimiento por Nivel
+            </h3>
+            <div className="overflow-hidden rounded-3xl border border-slate-100 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-950/30">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr style={{ backgroundColor: theme.bgDark, borderColor: theme.border }}>
-                    <th style={{ color: theme.text }}>Nivel</th>
-                    <th style={{ color: theme.text }}>Total</th>
-                    <th style={{ color: '#10b981' }}>✅ Aprobados</th>
-                    <th style={{ color: '#ef4444' }}>❌ Reprobados</th>
-                    <th style={{ color: '#f59e0b' }}>⏳ Pendientes</th>
-                    <th style={{ color: '#6b7280' }}>🚫 Cancelados</th>
-                    <th style={{ color: theme.accent }}>% Aprobación</th>
+                  <tr className="border-b border-slate-100 dark:border-slate-800">
+                    <th className="px-6 py-4 text-[10px] font-black italic text-slate-400 uppercase tracking-widest leading-none">Nivel</th>
+                    <th className="px-6 py-4 text-[10px] font-black italic text-slate-400 uppercase tracking-widest leading-none">Total</th>
+                    <th className="px-6 py-4 text-[10px] font-black italic text-emerald-500 uppercase tracking-widest leading-none">Aprobados</th>
+                    <th className="px-6 py-4 text-[10px] font-black italic text-rose-500 uppercase tracking-widest leading-none">Reprobados</th>
+                    <th className="px-6 py-4 text-[10px] font-black italic text-indigo-500 uppercase tracking-widest leading-none text-right">Eficacia</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {Object.entries(statistics).map(([key, stat]) => (
-                    stat.total > 0 && (
-                      <tr key={key} style={{ borderColor: theme.border }}>
-                        <td style={{ fontWeight: 600, color: theme.text }}>{stat.label}</td>
-                        <td style={{ color: theme.text }}>{stat.total}</td>
-                        <td style={{ color: '#10b981', fontWeight: 600 }}>{stat.passed}</td>
-                        <td style={{ color: '#ef4444', fontWeight: 600 }}>{stat.failed}</td>
-                        <td style={{ color: '#f59e0b', fontWeight: 600 }}>{stat.pending}</td>
-                        <td style={{ color: '#6b7280', fontWeight: 600 }}>{stat.cancelled}</td>
-                        <td style={{ color: theme.accent, fontWeight: 600 }}>{stat.passPercentage}%</td>
-                      </tr>
-                    )
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {Object.entries(statistics).map(([key, stat]) => stat.total > 0 && (
+                    <tr key={key} className="group hover:bg-white dark:hover:bg-slate-900 transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 text-sm tracking-tight">{stat.label}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-black text-slate-500 dark:text-slate-400">{stat.total}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">{stat.passed}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-black text-rose-500 dark:text-rose-400">{stat.failed}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-3 text-sm font-black text-indigo-600 dark:text-indigo-400 tracking-tighter">
+                          {stat.passPercentage}%
+                          <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden border border-slate-200/50 dark:border-slate-700/50">
+                            <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${stat.passPercentage}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </div>
+          </section>
         </div>
 
-        {/* ========== FOOTER / ACTIONS ==========*/}
-        <div className="modal-statistics__footer" style={{ borderColor: theme.border }}>
-          <button
-            className="modal-statistics__btn modal-statistics__btn--secondary"
+        {/* Footer */}
+        <div className="px-8 py-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-slate-50/50 dark:bg-slate-950/50">
+          <button 
             onClick={onClose}
+            className="px-6 py-3 rounded-2xl font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-sm"
           >
-            Cerrar
+            Cerrar Reporte
           </button>
-          <button
-            className="modal-statistics__btn modal-statistics__btn--primary"
+          <button 
             onClick={handleExportPDF}
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-500/25 transition-all active:scale-95 text-sm"
           >
-            📄 Descargar PDF
+            <Download size={18} />
+            Descargar Informe Completo
           </button>
         </div>
       </div>
-
-      <style>{`
-        .modal-statistics-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
-
-        .modal-statistics {
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          max-width: 900px;
-          width: 90%;
-          max-height: 85vh;
-          overflow-y: auto;
-          animation: slideUp 0.3s ease;
-        }
-
-        @keyframes slideUp {
-          from {
-            transform: translateY(20px);
-            opacity: 0;
-          }
-          to {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-
-        .modal-statistics__header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 24px;
-          border-bottom: 1px solid #e5e7eb;
-          gap: 16px;
-        }
-
-        .modal-statistics__title-wrapper {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .modal-statistics__title {
-          font-size: 24px;
-          font-weight: 700;
-          margin: 0;
-        }
-
-        .modal-statistics__filter-badge {
-          display: inline-block;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 6px 12px;
-          border-radius: 20px;
-          font-size: 12px;
-          font-weight: 600;
-        }
-
-        .modal-statistics__close {
-          background: none;
-          border: none;
-          font-size: 24px;
-          cursor: pointer;
-          padding: 0;
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 6px;
-          transition: background-color 0.2s ease;
-        }
-
-        .modal-statistics__close:hover {
-          background-color: #f3f4f6;
-        }
-
-        .modal-statistics__filter-info {
-          margin: 16px 24px;
-          padding: 16px;
-          border-radius: 8px;
-          background-color: #f0f4ff;
-          border: 2px solid #667eea;
-        }
-
-        .modal-statistics__filters-list {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          margin-top: 8px;
-        }
-
-        .modal-statistics__filter-tag {
-          display: inline-block;
-          background: white;
-          padding: 6px 10px;
-          border-radius: 6px;
-          font-size: 13px;
-          font-weight: 500;
-        }
-
-        .modal-statistics__filter-message {
-          margin: 12px 0 0 0;
-          font-size: 13px;
-          opacity: 0.8;
-        }
-
-        .modal-statistics__content {
-          padding: 24px;
-        }
-
-        .modal-statistics__section-title {
-          font-size: 18px;
-          font-weight: 700;
-          margin: 0 0 16px 0;
-          padding-bottom: 12px;
-          border-bottom: 2px solid #667eea;
-        }
-
-        .modal-statistics__summary-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 16px;
-          margin-bottom: 32px;
-        }
-
-        .modal-statistics__summary-card {
-          display: flex;
-          gap: 16px;
-          padding: 16px;
-          border-radius: 8px;
-          border: 2px solid;
-          align-items: center;
-        }
-
-        .modal-statistics__summary-icon {
-          font-size: 32px;
-          min-width: 40px;
-          text-align: center;
-        }
-
-        .modal-statistics__summary-data {
-          flex: 1;
-        }
-
-        .modal-statistics__summary-label {
-          font-size: 12px;
-          font-weight: 600;
-          margin: 0;
-          opacity: 0.7;
-        }
-
-        .modal-statistics__summary-value {
-          font-size: 28px;
-          font-weight: 700;
-          margin: 4px 0 0 0;
-        }
-
-        .modal-statistics__table-section {
-          margin-top: 24px;
-        }
-
-        .modal-statistics__table-wrapper {
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          overflow: hidden;
-        }
-
-        .modal-statistics__table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 14px;
-        }
-
-        .modal-statistics__table thead tr {
-          background-color: #f9fafb;
-        }
-
-        .modal-statistics__table th {
-          padding: 12px 16px;
-          text-align: left;
-          font-weight: 600;
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .modal-statistics__table td {
-          padding: 12px 16px;
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .modal-statistics__table tbody tr:hover {
-          background-color: #f9fafb;
-        }
-
-        .modal-statistics__footer {
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          padding: 16px 24px;
-          border-top: 1px solid #e5e7eb;
-        }
-
-        .modal-statistics__btn {
-          padding: 10px 20px;
-          border-radius: 6px;
-          font-weight: 600;
-          cursor: pointer;
-          border: none;
-          transition: all 0.3s ease;
-          font-size: 14px;
-        }
-
-        .modal-statistics__btn--primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-        }
-
-        .modal-statistics__btn--primary:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
-        }
-
-        .modal-statistics__btn--secondary {
-          background: #f3f4f6;
-          color: #1f2937;
-        }
-
-        .modal-statistics__btn--secondary:hover {
-          background: #e5e7eb;
-        }
-
-        @media (max-width: 768px) {
-          .modal-statistics {
-            width: 95%;
-            max-height: 90vh;
-          }
-
-          .modal-statistics__summary-grid {
-            grid-template-columns: 1fr;
-          }
-
-          .modal-statistics__table {
-            font-size: 12px;
-          }
-
-          .modal-statistics__table th,
-          .modal-statistics__table td {
-            padding: 8px 12px;
-          }
-        }
-      `}</style>
     </div>
   );
 };
