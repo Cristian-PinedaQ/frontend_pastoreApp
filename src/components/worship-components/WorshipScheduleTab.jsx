@@ -17,7 +17,7 @@ import {
   X, 
   Info, 
   Music, 
-  Youtube, 
+  YoutubeIcon, 
   FileCode,
   ChevronRight,
   User,
@@ -831,7 +831,7 @@ const WorshipScheduleTab = ({
                                       className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"
                                       title="Ver en YouTube"
                                     >
-                                      <Youtube className="w-4 h-4" />
+                                      <YoutubeIcon className="w-4 h-4" />
                                     </a>
                                   )}
                                   {song.chordsLink && (
