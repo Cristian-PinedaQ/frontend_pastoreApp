@@ -56,7 +56,8 @@ const LEGACY_MAP = {
 };
 
 const applyLegacyMap = (value) => {
-  if (!value) return value;
+  if (!value || typeof value !== 'string') return value;
+
   const upper = value.toUpperCase().trim();
   return LEGACY_MAP[upper] ?? value;
 };

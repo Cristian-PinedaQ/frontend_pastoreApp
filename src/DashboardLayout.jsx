@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-//import { useConfirmation } from "./context/ConfirmationContext";
+import { useConfirmation } from "./context/ConfirmationContext";
 import { 
   Users, HeartPulse, GraduationCap, 
   ShieldCheck, LayoutGrid, CheckSquare, Music, 
@@ -39,8 +39,8 @@ const SCROLLBAR_STYLES = `
 `;
 
 export const DashboardLayout = () => {
-  const { user, hasRole, hasAnyRole } = useAuth();
-  //const confirm = useConfirmation();
+  const { user, logout, hasRole, hasAnyRole } = useAuth();
+  const confirm = useConfirmation();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -66,7 +66,7 @@ export const DashboardLayout = () => {
   }, []);
 
   const handleLogout = async () => {
-    /*const isConfirmed = await confirm({
+    const isConfirmed = await confirm({
       title: "¿Cerrar Sesión?",
       message: "¿Estás seguro de que deseas salir del sistema? Deberás autenticarte nuevamente para acceder.",
       type: "info",
@@ -75,7 +75,7 @@ export const DashboardLayout = () => {
         logout();
         navigate("/login");
       }
-    });*/
+    });
   };
 
   const handleNavClick = (path) => {

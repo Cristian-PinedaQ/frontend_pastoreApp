@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, AlertTriangle, CheckCircle2, Info, AlertOctagon, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, AlertOctagon, Loader2 } from 'lucide-react';
 
 /**
  * ConfirmationModal - A premium, Elite Modern confirmation dialog.
