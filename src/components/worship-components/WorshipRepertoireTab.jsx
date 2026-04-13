@@ -7,8 +7,7 @@ import { createPortal } from "react-dom";
 import apiService from "../../apiService";
 import { useConfirmation } from "../../context/ConfirmationContext";
 import nameHelper from "../../services/nameHelper";
-import { 
-  Search, 
+import {  
   Plus, 
   Youtube, 
   FileText, 
@@ -126,9 +125,8 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, loadData, 
       {/* SEARCH AND ACTIONS BAR */}
       <div className="flex flex-col md:flex-row gap-4 items-center bg-white dark:bg-[#12141c] backdrop-blur-3xl p-5 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.05)] relative overflow-hidden group">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none" />
-        <div className="relative flex-grow w-full group/input">
+        <div className="relative md:flex-[4] w-full group/input">
           <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/input:text-indigo-500 transition-colors">
-            <Search className="w-5 h-5" />
           </div>
           <input 
             type="text" 
@@ -142,7 +140,7 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, loadData, 
         {canManageWorship && (
           <button 
             onClick={() => openSongModal()} 
-            className="flex items-center gap-2 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black shadow-xl shadow-indigo-600/20 transition-all active:scale-95 whitespace-nowrap w-full md:w-auto relative overflow-hidden group/btn"
+            className="flex items-center justify-center gap-2 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black shadow-xl shadow-indigo-600/20 transition-all active:scale-95 whitespace-nowrap w-full md:flex-1 relative overflow-hidden group/btn"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-700" />
             <Plus className="w-5 h-5 stroke-[3px]" />
@@ -220,7 +218,7 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, loadData, 
                     href={song.youtubeLink} 
                     target="_blank" 
                     rel="noreferrer" 
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-500 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-red-600/20 transition-all active:scale-95"
+                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-violet-600/20 transition-all active:scale-95"
                   >
                     <Youtube className="w-3.5 h-3.5 stroke-[2.5px]" /> Video
                   </a>
@@ -272,13 +270,13 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, loadData, 
 
       {/* SONG MODAL */}
       {showSongModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4">
+        <div className="fixed inset-0 z-[9999] overflow-y-auto overflow-x-hidden flex items-start sm:items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300">
           <div 
             className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-500" 
             onClick={() => !loading && setShowSongModal(false)} 
           />
           
-          <div className="relative w-full max-w-2xl bg-white dark:bg-[#12141c] rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 max-h-[92vh] flex flex-col">
+          <div className="relative w-full max-w-2xl my-auto bg-white dark:bg-[#12141c] rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 max-h-[92vh] flex flex-col">
             {/* MODAL HEADER */}
             <div className="px-8 pt-8 pb-4 flex justify-between items-center bg-gradient-to-b from-white/5 to-transparent shrink-0">
               <div>

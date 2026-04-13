@@ -20,6 +20,7 @@ import {
 
 import { MemberDetailModal } from "../components/MemberDetailModal";
 import { ModalAddMember } from "../components/ModalAddMember";
+import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal"; // ← NEW
 import { generateMembersPDF } from "../services/generateMembersPDF";
 
 const { getDisplayName } = nameHelper;
@@ -33,6 +34,13 @@ const MembersPage = () => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState(null);
+
+  // ── History modal state ──────────────────────────────────────────────────
+  const [historyModal, setHistoryModal] = useState({
+    isOpen: false,
+    history: [],
+    memberName: "",
+  });
 
   const loadMembers = useCallback(async () => {
     try {
@@ -83,59 +91,81 @@ const MembersPage = () => {
     if (searchTerm) summary.push(`Búsqueda: ${searchTerm}`);
     if (filters.district !== 'ALL') summary.push(`Distrito: ${filters.district}`);
     if (filters.gender !== 'ALL') summary.push(`Género: ${filters.gender}`);
-    
     generateMembersPDF(filteredMembers, summary, "Listado_Membresia");
   };
+
+  // ── Open history: fetch enrollments then show modal ──────────────────────
+  const handleOpenHistory = useCallback(async (member) => {
+    const mName = (member.name || `${member.firstName || ''} ${member.lastName || ''}`).trim();
+    const dispName = getDisplayName(mName);
+
+    // Optimistic open with empty list while loading
+    setHistoryModal({ isOpen: true, history: [], memberName: dispName });
+
+    try {
+      // Adapt this call to your actual apiService method
+      const data = await apiService.getMemberEnrollmentHistory(member.id);
+      const list = Array.isArray(data) ? data : (data?.content || []);
+      setHistoryModal(prev => ({ ...prev, history: list }));
+    } catch (err) {
+      console.error("Error cargando historial:", err);
+      // Modal stays open with empty state — user sees "Sin Inscripciones"
+    }
+  }, []);
+
+  const handleCloseHistory = useCallback(() => {
+    setHistoryModal({ isOpen: false, history: [], memberName: "" });
+  }, []);
 
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-10 lg:p-14 space-y-12 animate-in fade-in duration-700">
       
       {/* ─────────────────────────────────────────────
-          HERO HEADER: Membresía Central
+          HERO HEADER
       ───────────────────────────────────────────── */}
-      <div className="relative p-10 md:p-16 lg:p-20 bg-white dark:bg-[#0f172a] rounded-[3rem] md:rounded-[4.5rem] border border-slate-200 dark:border-white/10 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] overflow-hidden group">
+      <div className="relative p-6 sm:p-10 md:p-16 lg:p-20 bg-white dark:bg-[#0f172a] rounded-[2.5rem] md:rounded-[4.5rem] border border-slate-200 dark:border-white/10 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] overflow-hidden group">
          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none group-hover:bg-indigo-500/10 transition-all duration-1000" />
          
-         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-12 relative z-10">
+         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 md:gap-12 relative z-10">
             <div className="space-y-6 md:space-y-8 max-w-2xl">
                <div className="flex items-center gap-4">
-                  <div className="h-0.5 w-12 bg-indigo-600 rounded-full" />
-                  <span className="text-indigo-600 dark:text-indigo-400 font-black text-xs uppercase tracking-[0.4em]">Altar Ministerial</span>
+                  <div className="h-0.5 w-8 md:w-12 bg-indigo-600 rounded-full" />
+                  <span className="text-indigo-600 dark:text-indigo-400 font-black text-[10px] md:text-xs uppercase tracking-[0.4em]">Altar Ministerial</span>
                </div>
-               <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-[ -0.05em] text-slate-950 dark:text-white leading-[0.85]">
+               <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-[-0.05em] text-slate-950 dark:text-white leading-[0.9] md:leading-[0.85]">
                   Membresía <br />
                   <span className="bg-gradient-to-r from-indigo-600 to-indigo-400 bg-clip-text text-transparent">General</span>
                </h1>
-               <div className="flex flex-wrap items-center gap-4">
-                  <div className="px-6 py-2.5 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center gap-3 border border-white/5 backdrop-blur-md">
-                     <Users className="text-indigo-500" size={18} />
-                     <span className="text-[11px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">{stats.total} Integrantes en Red</span>
+               <div className="flex flex-wrap items-center gap-3 md:gap-4">
+                  <div className="px-4 md:px-6 py-2 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center gap-3 border border-white/5 backdrop-blur-md">
+                     <Users className="text-indigo-500" size={16} />
+                     <span className="text-[10px] md:text-[11px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">{stats.total} Integrantes en Red</span>
                   </div>
-                  <div className="px-6 py-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center gap-3 border border-emerald-500/20">
-                     <ShieldCheck size={18} />
-                     <span className="text-[11px] font-black uppercase tracking-widest">Verificación Global Activa</span>
+                  <div className="px-4 md:px-6 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center gap-3 border border-emerald-500/20">
+                     <ShieldCheck size={16} />
+                     <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest">Verificación Global</span>
                   </div>
                </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch lg:items-center gap-6 w-full xl:w-auto">
-               <div className="flex items-center gap-12 px-10 py-8 bg-slate-50 dark:bg-black/20 rounded-[2.5rem] border-2 border-slate-100 dark:border-white/5 shadow-inner">
+            <div className="flex flex-col gap-4 md:gap-6 w-full xl:w-[380px] shrink-0">
+               <div className="w-full flex items-center justify-around gap-8 md:gap-12 px-6 md:px-10 py-6 md:py-8 bg-slate-50 dark:bg-black/20 rounded-[2rem] md:rounded-[2.5rem] border-2 border-slate-100 dark:border-white/5 shadow-inner">
                   <div className="text-center">
-                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2">Hombres</p>
-                     <p className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.men}</p>
+                     <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1 md:mb-2">Hombres</p>
+                     <p className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.men}</p>
                   </div>
-                  <div className="w-px h-12 bg-slate-200 dark:bg-white/10" />
+                  <div className="w-px h-10 md:h-12 bg-slate-200 dark:bg-white/10" />
                   <div className="text-center">
-                     <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-2 text-rose-500/70">Mujeres</p>
-                     <p className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.women}</p>
+                     <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1 md:mb-2 text-rose-500/70">Mujeres</p>
+                     <p className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.women}</p>
                   </div>
                </div>
                
                <button 
                   onClick={() => { setMemberToEdit(null); setIsAddMemberModalOpen(true); }}
-                  className="px-12 py-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2.5rem] font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/30 transition-all hover:-translate-y-2 active:scale-95 flex flex-col items-center justify-center gap-2 group"
+                  className="w-full px-8 md:px-12 py-6 md:py-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2rem] md:rounded-[2.5rem] font-black text-xs md:text-sm uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/30 transition-all hover:-translate-y-2 active:scale-95 flex items-center justify-center gap-4 group"
                >
-                  <UserPlus className="w-8 h-8 group-hover:scale-110 transition-transform" />
+                  <UserPlus className="w-6 h-6 md:w-8 md:h-8 group-hover:rotate-12 transition-transform" />
                   <span>Nuevo Registro</span>
                </button>
             </div>
@@ -143,14 +173,13 @@ const MembersPage = () => {
       </div>
 
       {/* ─────────────────────────────────────────────
-          SEARCH & FILTERS: Operaciones de Datos
+          SEARCH & FILTERS
       ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-end">
          
          <div className="lg:col-span-4 space-y-3">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Motor de Búsqueda Biográfica</label>
+            <label className="flex gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4"><Search className="text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={16} />Buscar Miembro</label>
             <div className="relative group">
-               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={24} />
                <input 
                   type="text" 
                   placeholder="Nombre o Documento..." 
@@ -171,9 +200,9 @@ const MembersPage = () => {
                   className="w-full h-18 pl-16 pr-10 bg-white dark:bg-[#1a2332] rounded-[2rem] border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm appearance-none cursor-pointer"
                >
                   <option value="ALL">TODOS LOS DISTRITOS</option>
-                  <option value="D1">JURISDICCIÓN D1</option>
-                  <option value="D2">JURISDICCIÓN D2</option>
-                  <option value="D3">JURISDICCIÓN D3</option>
+                  <option value="D1">Distrito 1</option>
+                  <option value="D2">Distrito 2</option>
+                  <option value="D3">Distrito 3</option>
                </select>
                <ChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
             </div>
@@ -207,13 +236,13 @@ const MembersPage = () => {
                onClick={handleExportPDF}
                className="h-full flex-1 bg-slate-900 dark:bg-indigo-600 text-white rounded-[2rem] font-black text-[11px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-black dark:hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/10 active:scale-95"
             >
-               <Download size={18} /> Exportar Listado
+               <Download size={18} /> Exportar PDF
             </button>
          </div>
       </div>
 
       {/* ─────────────────────────────────────────────
-          MEMBERS GRID: Galería de Integrantes
+          MEMBERS GRID
       ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
          {loading ? (
@@ -260,13 +289,33 @@ const MembersPage = () => {
                      </div>
                   </div>
 
-                  <div className="p-8 pt-0 mt-auto">
-                     <div className="flex items-center justify-between gap-4 p-5 bg-slate-50 dark:bg-black/20 rounded-[2rem] border border-slate-100 dark:border-white/5 group-hover:bg-white dark:group-hover:bg-indigo-900/20 transition-all duration-500">
+                  <div className="p-8 pt-0">
+                     <div className="flex items-center justify-between gap-4 bg-slate-50 dark:bg-black/20 rounded-[2rem] border border-slate-100 dark:border-white/5 group-hover:bg-white dark:group-hover:bg-indigo-900/20 transition-all duration-500 p-3">
                         <div className="flex gap-2">
-                           <button onClick={() => setSelectedMember(member)} className="p-3 bg-white dark:bg-slate-800 text-slate-400 hover:text-indigo-600 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110"><FileText size={18} /></button>
-                           <button className="p-3 bg-white dark:bg-slate-800 text-slate-400 hover:text-emerald-600 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110"><History size={18} /></button>
+                           {/* ── Detail button ── */}
+                           <button
+                              onClick={() => setSelectedMember(member)}
+                              className="p-3 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110 flex items-center justify-center group/icon"
+                              title="Ver Detalle"
+                           >
+                              <FileText size={22} className="transition-transform group-hover/icon:rotate-6" />
+                           </button>
+
+                           {/* ── History button ── UPDATED */}
+                           <button
+                              onClick={() => handleOpenHistory(member)}
+                              className="p-3 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110 flex items-center justify-center group/icon"
+                              title="Historial de Inscripciones"
+                           >
+                              <History size={22} className="transition-transform group-hover/icon:-rotate-6" />
+                           </button>
                         </div>
-                        <button onClick={() => setSelectedMember(member)} className="h-12 px-6 bg-slate-900 dark:bg-indigo-600 text-white rounded-[1.2rem] font-black text-[9px] uppercase tracking-widest shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all">Gestionar</button>
+                        <button
+                           onClick={() => setSelectedMember(member)}
+                           className="h-12 px-6 bg-slate-900 dark:bg-indigo-600 text-white rounded-[1.2rem] font-black text-[9px] uppercase tracking-widest shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all"
+                        >
+                           Gestionar
+                        </button>
                      </div>
                   </div>
                </div>
@@ -289,7 +338,7 @@ const MembersPage = () => {
          </div>
       )}
 
-      {/* MODALS */}
+      {/* ── MODALS ── */}
       {selectedMember && (
         <MemberDetailModal
           member={selectedMember}
@@ -318,6 +367,14 @@ const MembersPage = () => {
         initialData={memberToEdit}
         isEditing={!!memberToEdit}
         allMembers={allMembers}
+      />
+
+      {/* ── Enrollment History Modal ── NEW */}
+      <EnrollmentHistoryModal
+        isOpen={historyModal.isOpen}
+        history={historyModal.history}
+        memberName={historyModal.memberName}
+        onClose={handleCloseHistory}
       />
 
       <style dangerouslySetInnerHTML={{ __html: `

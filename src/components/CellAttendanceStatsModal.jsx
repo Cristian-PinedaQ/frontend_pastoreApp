@@ -3,12 +3,7 @@
 // v6 completo + UI moderna + soporte global
 // ============================================
 
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   BarChart3,
   Calendar,
@@ -143,7 +138,9 @@ const getStatusConfig = (pct) => {
 const KPICard = ({ icon, label, value, colorClass, iconBgClass }) => (
   <div className="group flex flex-col gap-3 bg-white/70 dark:bg-slate-800/40 backdrop-blur-md rounded-2xl p-5 border border-slate-100 dark:border-white/5 shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300">
     <div className="flex items-center justify-between">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconBgClass} shadow-inner`}>
+      <div
+        className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconBgClass} shadow-inner`}
+      >
         {icon}
       </div>
       <div className="flex h-1.5 w-1.5 rounded-full bg-slate-200 dark:bg-slate-700 group-hover:bg-indigo-500 transition-colors" />
@@ -159,23 +156,43 @@ const KPICard = ({ icon, label, value, colorClass, iconBgClass }) => (
   </div>
 );
 
-const HighlightCard = ({ icon, title, titleColor, date, stat, pct, meta, accentBg, accentBorder }) => (
-  <div className={`flex-1 min-w-[160px] rounded-2xl p-5 border shadow-sm ${accentBg} ${accentBorder} space-y-3 hover:shadow-md transition-all`}>
+const HighlightCard = ({
+  icon,
+  title,
+  titleColor,
+  date,
+  stat,
+  pct,
+  meta,
+  accentBg,
+  accentBorder,
+}) => (
+  <div
+    className={`flex-1 min-w-[160px] rounded-2xl p-5 border shadow-sm ${accentBg} ${accentBorder} space-y-3 hover:shadow-md transition-all`}
+  >
     <div className="flex items-center gap-2">
-      <div className="p-1.5 rounded-lg bg-white/50 dark:bg-black/20">{icon}</div>
-      <span className={`text-[11px] font-black uppercase tracking-wider ${titleColor}`}>
+      <div className="p-1.5 rounded-lg bg-white/50 dark:bg-black/20">
+        {icon}
+      </div>
+      <span
+        className={`text-[11px] font-black uppercase tracking-wider ${titleColor}`}
+      >
         {title}
       </span>
     </div>
     <div>
-      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1">{date}</div>
-      <div className="text-xl font-black text-slate-800 dark:text-white flex items-baseline gap-1">
-        {stat} 
-        <span className={`text-xs font-bold ${titleColor}`}>
-          ({pct}%)
-        </span>
+      <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1">
+        {date}
       </div>
-      {meta && <div className="text-[10px] text-slate-400 mt-1 italic font-medium">{meta}</div>}
+      <div className="text-xl font-black text-slate-800 dark:text-white flex items-baseline gap-1">
+        {stat}
+        <span className={`text-xs font-bold ${titleColor}`}>({pct}%)</span>
+      </div>
+      {meta && (
+        <div className="text-[10px] text-slate-400 mt-1 italic font-medium">
+          {meta}
+        </div>
+      )}
     </div>
   </div>
 );
@@ -194,7 +211,9 @@ const MiniBar = ({ pct }) => {
 };
 
 const Badge = ({ value, colorClass }) => (
-  <span className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tight shadow-sm ${colorClass}`}>
+  <span
+    className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-tight shadow-sm ${colorClass}`}
+  >
     {value}
   </span>
 );
@@ -212,6 +231,7 @@ const CellAttendanceStatsModal = ({
   isMobile,
   onRefresh,
   logUserAction,
+  onOpenOverview,
 }) => {
   // ── State ──────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
@@ -435,13 +455,22 @@ const CellAttendanceStatsModal = ({
           // ─────────────────────────────────────────────────────────────────────
 
           // Calcular totales reales desde dailyStats (después del enriquecimiento)
-          const totalJustifiedCalc = dailyStats.reduce((sum, d) => sum + (d.justified || 0), 0);
+          const totalJustifiedCalc = dailyStats.reduce(
+            (sum, d) => sum + (d.justified || 0),
+            0,
+          );
 
           // Promedio de presentes por sesión (solo sesiones con datos reales)
-          const sessionsWithData = dailyStats.filter(d => d.total > 0);
-          const avgAttendanceCalc = sessionsWithData.length > 0
-            ? Math.round(sessionsWithData.reduce((sum, d) => sum + (d.present || 0), 0) / sessionsWithData.length)
-            : 0;
+          const sessionsWithData = dailyStats.filter((d) => d.total > 0);
+          const avgAttendanceCalc =
+            sessionsWithData.length > 0
+              ? Math.round(
+                  sessionsWithData.reduce(
+                    (sum, d) => sum + (d.present || 0),
+                    0,
+                  ) / sessionsWithData.length,
+                )
+              : 0;
 
           setStats({
             ...globalTotals,
@@ -683,7 +712,10 @@ const CellAttendanceStatsModal = ({
       ? Math.round((totalPresent / totalRegistered) * 100)
       : 0;
 
-  const safeDailyStats = useMemo(() => (Array.isArray(dailyStats) ? dailyStats : []), [dailyStats]);
+  const safeDailyStats = useMemo(
+    () => (Array.isArray(dailyStats) ? dailyStats : []),
+    [dailyStats],
+  );
 
   const monthlyNewParticipants = useMemo(() => {
     if (isAnnualView) return totalNewParticipants;
@@ -782,6 +814,10 @@ const CellAttendanceStatsModal = ({
     }
   };
 
+  const handleGenerateOverviewPDF = () => {
+    if (onOpenOverview) onOpenOverview();
+  };
+
   const handleReload = () => {
     if (selectedMonth === 0) loadAnnualStats(selectedYear);
     else loadStats(selectedMonth, selectedYear);
@@ -833,8 +869,8 @@ const CellAttendanceStatsModal = ({
                 {subtitleLabel}
               </span>
               {isAnnualView && (
-                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20">
-                  📅 Anual
+                <span className="flex text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20">
+                  <Calendar size={16} /> Anual
                 </span>
               )}
               {isGlobal && (
@@ -850,21 +886,29 @@ const CellAttendanceStatsModal = ({
               onClick={handleReload}
               disabled={loading || isInitialLoad}
               title="Recargar"
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all disabled:opacity-40"
+              className="rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all disabled:opacity-40"
             >
               <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            </button>
+            <button
+              onClick={handleGenerateOverviewPDF}
+              disabled={!stats || generatingPDF || isAnnualView}
+              title="Reporte Comparativo (PDF)"
+              className="rounded-2xl flex items-center justify-center text-indigo-500 dark:text-indigo-400 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all disabled:opacity-40"
+            >
+              <Zap size={18} />
             </button>
             <button
               onClick={handleGeneratePDF}
               disabled={!stats || generatingPDF}
               title="Descargar PDF"
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all disabled:opacity-40"
+              className="rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all disabled:opacity-40"
             >
               <FileText size={18} />
             </button>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500 transition-all"
+              className="rounded-2xl flex items-center justify-center text-slate-400 dark:text-slate-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500 transition-all"
             >
               <X size={20} />
             </button>
@@ -873,7 +917,8 @@ const CellAttendanceStatsModal = ({
 
         <div className="flex flex-wrap items-end gap-x-6 gap-y-4 px-8 py-5 border-b border-slate-100 dark:border-white/5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
           <div className="flex flex-col gap-1 shrink-0">
-            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+            <label className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+              <Calendar size={16} />
               Período de consulta
             </label>
             <div className="flex items-center gap-2">
@@ -883,7 +928,7 @@ const CellAttendanceStatsModal = ({
                 disabled={isInitialLoad}
                 className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-[0.8rem] px-4 py-2 text-sm font-black outline-none border-2 border-transparent focus:border-indigo-500 transition-all cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700"
               >
-                {!isGlobal && <option value={0}>📅 Todo el año</option>}
+                {!isGlobal && <option value={0}> Todo el año</option>}
                 {displayMonths.map((m) => (
                   <option key={m} value={m}>
                     {MONTH_NAMES[m - 1]}
@@ -908,7 +953,9 @@ const CellAttendanceStatsModal = ({
           {!loading && !isInitialLoad && (
             <div className="flex flex-1 items-center justify-between sm:justify-end gap-6 min-w-full sm:min-w-0">
               <div className="text-left">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">Historial</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                  Historial
+                </p>
                 <p className="text-xs font-bold text-slate-600 dark:text-slate-400">
                   {availablePeriods?.years.length || 0} años registrados
                 </p>
@@ -963,7 +1010,10 @@ const CellAttendanceStatsModal = ({
             !stats && (
               <div className="flex flex-col items-center gap-4 py-16 text-center text-slate-400">
                 <div className="w-20 h-20 rounded-full bg-slate-50 dark:bg-slate-800/50 flex items-center justify-center">
-                  <BarChart3 size={40} className="text-slate-200 dark:text-slate-700" />
+                  <BarChart3
+                    size={40}
+                    className="text-slate-200 dark:text-slate-700"
+                  />
                 </div>
                 <div className="space-y-1">
                   <p className="font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">
@@ -1025,20 +1075,30 @@ const CellAttendanceStatsModal = ({
               {/* KPIs de Visitas y Asistentes Totales */}
               {hasSessionData && (
                 <div className="flex flex-wrap gap-3">
-                  <KPICard 
+                  <KPICard
                     icon={<Star size={16} />}
-                    label={isAnnualView ? "Nuevas visitas / año" : "Nuevas visitas / mes"}
+                    label={
+                      isAnnualView
+                        ? "Nuevas visitas / año"
+                        : "Nuevas visitas / mes"
+                    }
                     value={monthlyNewParticipants}
                     iconBgClass="bg-teal-50 dark:bg-teal-500/10 text-teal-500"
                   />
-                  {(!isAnnualView || isGlobal) && (monthlyTotalAttendees > 0 || isGlobal) && (
-                    <KPICard 
-                      icon={<Home size={16} />}
-                      label="Total en el lugar"
-                      value={isGlobal ? (statsTotalAttendees || totalPresent + monthlyNewParticipants) : monthlyTotalAttendees}
-                      iconBgClass="bg-purple-50 dark:bg-purple-500/10 text-purple-500"
-                    />
-                  )}
+                  {(!isAnnualView || isGlobal) &&
+                    (monthlyTotalAttendees > 0 || isGlobal) && (
+                      <KPICard
+                        icon={<Home size={16} />}
+                        label="Total en el lugar"
+                        value={
+                          isGlobal
+                            ? statsTotalAttendees ||
+                              totalPresent + monthlyNewParticipants
+                            : monthlyTotalAttendees
+                        }
+                        iconBgClass="bg-purple-50 dark:bg-purple-500/10 text-purple-500"
+                      />
+                    )}
                 </div>
               )}
 
@@ -1132,7 +1192,9 @@ const CellAttendanceStatsModal = ({
                       accentBorder="border-emerald-200 dark:border-emerald-500/20"
                     />
                     <HighlightCard
-                      icon={<AlertCircle size={18} className="text-amber-500" />}
+                      icon={
+                        <AlertCircle size={18} className="text-amber-500" />
+                      }
                       title="Sesión más baja"
                       titleColor="text-amber-600 dark:text-amber-400"
                       date={formatDateLong(worstSession.date)}
@@ -1155,14 +1217,46 @@ const CellAttendanceStatsModal = ({
                     <table className="w-full text-left border-collapse text-sm min-w-[500px]">
                       <thead className="bg-slate-50 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-white/5">
                         <tr>
-                          <th className="px-4 py-3 text-indigo-500"><div className="flex items-center gap-1"><Calendar size={12}/> Mes</div></th>
-                          <th className="px-3 py-3 text-center text-slate-400"><div className="flex items-center justify-center gap-1"><Zap size={12}/> Ses.</div></th>
-                          <th className="px-3 py-3 text-center text-emerald-500"><div className="flex items-center justify-center gap-1"><Users size={12}/> Pres.</div></th>
-                          <th className="px-3 py-3 text-center text-rose-400"><div className="flex items-center justify-center gap-1"><XCircle size={12}/> Aus.</div></th>
-                          <th className="px-3 py-3 text-center text-amber-500"><div className="flex items-center justify-center gap-1"><AlertCircle size={12}/> Just.</div></th>
-                          <th className="px-3 py-3 text-center text-teal-500"><div className="flex items-center justify-center gap-1"><Star size={12}/> Visitas</div></th>
-                          <th className="px-3 py-3 text-center text-purple-500"><div className="flex items-center justify-center gap-1"><Home size={12}/> Asis.</div></th>
-                          <th className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1"><Activity size={12}/> %</div></th>
+                          <th className="px-4 py-3 text-indigo-500">
+                            <div className="flex items-center gap-1">
+                              <Calendar size={12} /> Mes
+                            </div>
+                          </th>
+                          <th className="px-3 py-3 text-center text-slate-400">
+                            <div className="flex items-center justify-center gap-1">
+                              <Zap size={12} /> Ses.
+                            </div>
+                          </th>
+                          <th className="px-3 py-3 text-center text-emerald-500">
+                            <div className="flex items-center justify-center gap-1">
+                              <Users size={12} /> Pres.
+                            </div>
+                          </th>
+                          <th className="px-3 py-3 text-center text-rose-400">
+                            <div className="flex items-center justify-center gap-1">
+                              <XCircle size={12} /> Aus.
+                            </div>
+                          </th>
+                          <th className="px-3 py-3 text-center text-amber-500">
+                            <div className="flex items-center justify-center gap-1">
+                              <AlertCircle size={12} /> Just.
+                            </div>
+                          </th>
+                          <th className="px-3 py-3 text-center text-teal-500">
+                            <div className="flex items-center justify-center gap-1">
+                              <Star size={12} /> Visitas
+                            </div>
+                          </th>
+                          <th className="px-3 py-3 text-center text-purple-500">
+                            <div className="flex items-center justify-center gap-1">
+                              <Home size={12} /> Asis.
+                            </div>
+                          </th>
+                          <th className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Activity size={12} /> %
+                            </div>
+                          </th>
                           <th className="px-4 py-3" />
                         </tr>
                       </thead>
@@ -1251,7 +1345,10 @@ const CellAttendanceStatsModal = ({
                 annualData.monthlySummary?.length === 0 && (
                   <div className="flex flex-col items-center gap-3 py-10 text-center text-slate-400">
                     <div className="p-4 rounded-full bg-slate-50 dark:bg-slate-800/50">
-                      <FileText size={40} className="text-slate-300 dark:text-slate-600" />
+                      <FileText
+                        size={40}
+                        className="text-slate-300 dark:text-slate-600"
+                      />
                     </div>
                     <p className="text-sm font-medium">
                       No se encontraron datos para el año {selectedYear}
@@ -1288,13 +1385,15 @@ const CellAttendanceStatsModal = ({
                                   : "border-transparent text-slate-700 dark:text-slate-300 focus:border-indigo-500"
                               }`}
                           >
-                            <option value="">📋 Todas las sesiones</option>
+                            <option value="">Todas las sesiones</option>
                             {safeDailyStats.map((d) => {
                               const pct = Math.round(d.percentage);
-                              const isEvent = d.isEvent || d.dayType === "EVENTO";
+                              const isEvent =
+                                d.isEvent || d.dayType === "EVENTO";
                               return (
                                 <option key={d.date} value={d.date}>
-                                  {isEvent ? "🎯 " : ""} {formatDateShort(d.date)} — {pct}%
+                                  {isEvent ? "🎯 " : ""}{" "}
+                                  {formatDateShort(d.date)} — {pct}%
                                 </option>
                               );
                             })}
@@ -1339,7 +1438,10 @@ const CellAttendanceStatsModal = ({
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200 capitalize mt-0.5">
                           {sessionStat.isEvent ||
                           sessionStat.dayType === "EVENTO" ? (
-                            <Zap size={14} className="inline mr-1 text-amber-500" />
+                            <Zap
+                              size={14}
+                              className="inline mr-1 text-amber-500"
+                            />
                           ) : null}
                           {formatDateLong(sessionStat.date)}
                         </p>
@@ -1461,14 +1563,46 @@ const CellAttendanceStatsModal = ({
                           <table className="w-full text-left border-collapse text-sm min-w-[480px]">
                             <thead className="bg-slate-50 dark:bg-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 dark:border-white/5">
                               <tr>
-                                <th className="px-4 py-3 text-indigo-500"><div className="flex items-center gap-1"><Home size={12}/> Célula</div></th>
-                                <th className="px-3 py-3 text-center text-emerald-500"><div className="flex items-center justify-center gap-1"><Users size={12}/> Pres.</div></th>
-                                <th className="px-3 py-3 text-center text-rose-400"><div className="flex items-center justify-center gap-1"><XCircle size={12}/> Aus.</div></th>
-                                <th className="px-3 py-3 text-center text-amber-500"><div className="flex items-center justify-center gap-1"><AlertCircle size={12}/> Just.</div></th>
-                                <th className="px-3 py-3 text-center text-slate-400"><div className="flex items-center justify-center gap-1"><Users size={12}/> Censo</div></th>
-                                <th className="px-3 py-3 text-center text-teal-500"><div className="flex items-center justify-center gap-1"><Star size={12}/> Visitas</div></th>
-                                <th className="px-3 py-3 text-center text-purple-500"><div className="flex items-center justify-center gap-1"><Home size={12}/> Asis.</div></th>
-                                <th className="px-4 py-3 text-right"><div className="flex items-center justify-end gap-1"><Activity size={12}/> %</div></th>
+                                <th className="px-4 py-3 text-indigo-500">
+                                  <div className="flex items-center gap-1">
+                                    <Home size={12} /> Célula
+                                  </div>
+                                </th>
+                                <th className="px-3 py-3 text-center text-emerald-500">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Users size={12} /> Pres.
+                                  </div>
+                                </th>
+                                <th className="px-3 py-3 text-center text-rose-400">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <XCircle size={12} /> Aus.
+                                  </div>
+                                </th>
+                                <th className="px-3 py-3 text-center text-amber-500">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <AlertCircle size={12} /> Just.
+                                  </div>
+                                </th>
+                                <th className="px-3 py-3 text-center text-slate-400">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Users size={12} /> Censo
+                                  </div>
+                                </th>
+                                <th className="px-3 py-3 text-center text-teal-500">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Star size={12} /> Visitas
+                                  </div>
+                                </th>
+                                <th className="px-3 py-3 text-center text-purple-500">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Home size={12} /> Asis.
+                                  </div>
+                                </th>
+                                <th className="px-4 py-3 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Activity size={12} /> %
+                                  </div>
+                                </th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-white/5">

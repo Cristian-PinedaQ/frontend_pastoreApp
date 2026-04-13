@@ -5,12 +5,11 @@
 import React, { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import { useConfirmation } from "./context/ConfirmationContext";
+//import { useConfirmation } from "./context/ConfirmationContext";
 import { 
-  Home, Users, HeartPulse, GraduationCap, 
+  Users, HeartPulse, GraduationCap, 
   ShieldCheck, LayoutGrid, CheckSquare, Music, 
-  Calendar, Landmark, BarChart3, Settings, 
-  BookOpen, Book, UserCircle, LogOut, Menu, X, Bell, Flame, Compass, Library, NotebookPen
+  Calendar, Landmark, BarChart3, Settings, UserCircle, LogOut, Menu, X, Flame, Compass, NotebookPen
 } from 'lucide-react';
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
@@ -40,12 +39,12 @@ const SCROLLBAR_STYLES = `
 `;
 
 export const DashboardLayout = () => {
-  const { user, logout, hasRole, hasAnyRole } = useAuth();
-  const confirm = useConfirmation();
+  const { user, hasRole, hasAnyRole } = useAuth();
+  //const confirm = useConfirmation();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [, setIsDarkMode] = useState(false);
 
   // ========== SYNC DARK MODE ==========
   useEffect(() => {
@@ -67,7 +66,7 @@ export const DashboardLayout = () => {
   }, []);
 
   const handleLogout = async () => {
-    const isConfirmed = await confirm({
+    /*const isConfirmed = await confirm({
       title: "¿Cerrar Sesión?",
       message: "¿Estás seguro de que deseas salir del sistema? Deberás autenticarte nuevamente para acceder.",
       type: "info",
@@ -76,7 +75,7 @@ export const DashboardLayout = () => {
         logout();
         navigate("/login");
       }
-    });
+    });*/
   };
 
   const handleNavClick = (path) => {
@@ -239,7 +238,7 @@ export const DashboardLayout = () => {
 
         {/* CONTENT VIEWPORT */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 bg-slate-50/50 dark:bg-slate-950/50 custom-scrollbar relative">
-          <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 w-full overflow-hidden">
+          <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 w-full">
             <Outlet />
           </div>
         </div>

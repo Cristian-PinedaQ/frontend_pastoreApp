@@ -176,7 +176,7 @@ const WorshipTeamTab = ({
       <section className="bg-white dark:bg-[#12141c] backdrop-blur-3xl p-5 rounded-[2.5rem] border border-slate-200 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.05)] relative overflow-hidden group">
         <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 to-transparent pointer-events-none" />
         <div className="relative flex flex-col md:flex-row gap-4 items-center">
-          <div className="relative flex-grow w-full group/input">
+          <div className="relative md:flex-[1.5] w-full group/input">
             <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/input:text-indigo-500 transition-colors">
               <Search className="w-5 h-5" />
             </div>
@@ -189,7 +189,7 @@ const WorshipTeamTab = ({
             />
           </div>
           
-          <div className="flex gap-3 w-full md:w-auto">
+          <div className="flex gap-3 w-full md:flex-1">
             <div className="relative flex-grow md:min-w-[200px]">
               <div className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400">
                 <Filter className="w-4 h-4" />
@@ -273,11 +273,12 @@ const WorshipTeamTab = ({
                       <div className="flex flex-wrap gap-2">
                          {member.skills && member.skills.length > 0 ? (
                           member.skills.map((skill, idx) => {
-                            const skillVisuals = getRoleVisuals(typeof skill === 'object' ? skill.name : skill);
+                            const skillName = (typeof skill === 'object' ? skill.name : skill) || "Instrumento";
+                            const skillVisuals = getRoleVisuals(skillName);
                             return (
                               <span key={idx} className={`flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-xl text-[10px] font-black shadow-sm transition-all hover:scale-105 ${skillVisuals.color}`}>
                                 <skillVisuals.icon className="w-3.5 h-3.5" />
-                                {skillVisuals.name.split(" ")[0]}
+                                {(skillVisuals.name || skillName).split(" ")[0]}
                               </span>
                             );
                           })
@@ -310,12 +311,12 @@ const WorshipTeamTab = ({
 
       {/* MODAL: ADD MEMBER */}
       {showAddMemberModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] overflow-y-auto overflow-x-hidden flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div 
             className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-500" 
             onClick={() => setShowAddMemberModal(false)} 
           />
-          <div className="relative w-full max-w-xl bg-white dark:bg-[#12141c] border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] flex flex-col max-h-[92vh] animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 overflow-hidden">
+          <div className="relative w-full max-w-xl my-auto bg-white dark:bg-[#12141c] border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] flex flex-col max-h-[92vh] animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 overflow-hidden">
             
             {/* Modal Header */}
             <div className="p-8 pb-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5 shrink-0 relative overflow-hidden">
@@ -475,12 +476,12 @@ const WorshipTeamTab = ({
 
       {/* MODAL: EDIT MEMBER */}
       {showEditModal && editingMember && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] overflow-y-auto overflow-x-hidden flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div 
             className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-500" 
             onClick={() => setShowEditModal(false)} 
           />
-          <div className="relative w-full max-w-xl bg-white dark:bg-[#12141c] border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] flex flex-col max-h-[92vh] animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 overflow-hidden">
+          <div className="relative w-full max-w-xl my-auto bg-white dark:bg-[#12141c] border border-slate-200 dark:border-white/10 rounded-[2.5rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] flex flex-col max-h-[92vh] animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 overflow-hidden">
             
             {/* Modal Header */}
             <div className="p-8 pb-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5 shrink-0 relative overflow-hidden">

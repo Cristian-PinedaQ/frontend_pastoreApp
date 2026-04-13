@@ -12,7 +12,7 @@ import {
   generateFinancePDF,
   generateDailyFinancePDF,
 } from "../services/financepdfgenerator";
-import { logSecurityEvent, logUserAction } from "../utils/securityLogger";
+import { logSecurityEvent, } from "../utils/securityLogger";
 import { transformForDisplay, prepareForBackend } from "../services/nameHelper";
 import { 
   TrendingUp, 
@@ -47,7 +47,7 @@ const INCOME_CONCEPTS = [
   "FIRST_FRUITS",
   "CELL_GROUP_OFFERING",
 ];
-const INCOME_METHODS = ["CASH", "BANK_TRANSFER"];
+//const INCOME_METHODS = ["CASH", "BANK_TRANSFER"];
 
 const CONCEPT_LABELS = {
   TITHE: "Diezmo",
@@ -484,7 +484,7 @@ const FinancesPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           <div className="space-y-1.5 md:space-y-2 group flex flex-col">
-            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-3 md:ml-4"><Search className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />Miembro</label>
+            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-3 md:ml-4">Miembro</label>
             <div className="relative">
               <input 
                 type="text" 

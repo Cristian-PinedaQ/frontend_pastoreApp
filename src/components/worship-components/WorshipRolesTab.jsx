@@ -199,13 +199,13 @@ const WorshipRolesTab = ({ roles, canManageWorship, loadData, showSuccess, showE
 
       {/* ROLE MODAL */}
       {showRoleModal && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] overflow-y-auto overflow-x-hidden flex items-start sm:items-center justify-center p-2 sm:p-4">
           <div 
             className="absolute inset-0 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-500" 
             onClick={() => setShowRoleModal(false)} 
           />
           
-          <div className="relative w-full max-w-lg bg-white dark:bg-[#12141c] rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 max-h-[92vh] flex flex-col">
+          <div className="relative w-full max-w-lg my-auto bg-white dark:bg-[#12141c] rounded-[3rem] shadow-[0_0_100px_rgba(99,102,241,0.15)] overflow-hidden border border-slate-200 dark:border-white/10 animate-in zoom-in-95 fade-in slide-in-from-bottom-8 duration-500 max-h-[92vh] flex flex-col">
             
             {/* Modal Header */}
             <div className="p-8 pb-6 flex items-center justify-between border-b border-slate-100 dark:border-white/5 shrink-0 relative overflow-hidden">

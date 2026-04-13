@@ -10,8 +10,7 @@ import { logError } from "../utils/securityLogger";
 import { throttle } from "lodash";
 import { 
   UserPlus, 
-  Users, 
-  Search, 
+  Users,
   ShieldCheck, 
   Mail, 
   Key, 
@@ -42,14 +41,14 @@ const ERROR_MESSAGES = {
 
 const ROLE_OPTIONS = [
   { value: "PASTORES", label: "Pastores", icon: "🐑", color: "indigo" },
-  { value: "CONEXION", label: "Conexión", icon: "🔗", color: "cyan" },
+  { value: "CONEXION", label: "Conexión", icon: "🔗", color: "violet" },
   { value: "CIMIENTO", label: "Cimiento", icon: "🏗️", color: "amber" },
   { value: "ESENCIA", label: "Esencia", icon: "✨", color: "purple" },
   { value: "DESPLIEGUE", label: "Despliegue", icon: "🚀", color: "emerald" },
-  { value: "ECONOMICO", label: "Económico", icon: "💰", color: "orange" },
+  { value: "ECONOMICO", label: "Económico", icon: "💰", color: "slate" },
   { value: "LIDER", label: "Líder", icon: "⚔️", color: "red" },
   { value: "PROFESORES", label: "Profesores", icon: "📚", color: "blue" },
-  { value: "ALABANZA", label: "Alabanza", icon: "🎹", color: "pink" },
+  { value: "ALABANZA", label: "Alabanza", icon: "🎹", color: "fuchsia" },
 ];
 
 const UsersPage = () => {
@@ -208,6 +207,7 @@ const UsersPage = () => {
     });
   }, 2000);
 
+
   const handleCancel = () => {
     setFormData({ username: "", email: "", password: "", role: "PROFESORES" });
     setEditingId(null);
@@ -296,17 +296,14 @@ const UsersPage = () => {
             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* USERNAME */}
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4">Nombre de Usuario</label>
+                <label className=" flex gap-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4"><UserPlus className="w-5 h-5 " />Nombre de Usuario</label>
                 <div className="relative group/field">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/field:text-indigo-500 transition-colors">
-                    <UserPlus className="w-5 h-5" />
-                  </div>
                   <input 
                     type="text" 
                     required 
                     value={formData.username}
                     onChange={(e) => setFormData({...formData, username: e.target.value})}
-                    placeholder="ej: john_doe"
+                    placeholder="ej: ministerio_rd"
                     className="w-full pl-14 pr-6 py-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 rounded-3xl text-slate-900 dark:text-white focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium"
                   />
                 </div>
@@ -314,11 +311,8 @@ const UsersPage = () => {
 
               {/* EMAIL */}
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4">Correo Electrónico</label>
+                <label className="flex gap-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4"><Mail className="w-5 h-5" />Correo Electrónico</label>
                 <div className="relative group/field">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/field:text-indigo-500 transition-colors">
-                    <Mail className="w-5 h-5" />
-                  </div>
                   <input 
                     type="email" 
                     required 
@@ -333,13 +327,10 @@ const UsersPage = () => {
               {/* PASSWORD */}
               <div className="space-y-3">
                 <div className="flex justify-between items-center ml-4">
-                  <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Contraseña</label>
+                  <label className="flex gap-2 text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest"><Key className="w-5 h-5" />Contraseña</label>
                   {editingId && <span className="text-[10px] font-black bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-full uppercase tracking-tighter">Opcional</span>}
                 </div>
                 <div className="relative group/field">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within/field:text-indigo-500 transition-colors">
-                    <Key className="w-5 h-5" />
-                  </div>
                   <input 
                     type={showPassword ? "text" : "password"}
                     value={formData.password}
@@ -431,7 +422,6 @@ const UsersPage = () => {
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-grow group">
               <div className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                <Search className="w-5 h-5" />
               </div>
               <input 
                 type="text" 
@@ -451,44 +441,86 @@ const UsersPage = () => {
             </button>
           </div>
 
-          {/* ROLE PILLS (HORIZONTAL SCROLL) */}
-          <div className="relative group">
-            <div className="flex items-center gap-3 overflow-x-auto pb-4 px-2 no-scrollbar scroll-smooth">
-              <button 
-                onClick={() => setSelectedRole(null)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full border-2 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all shadow-sm ${
-                  !selectedRole 
-                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20' 
-                    : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-400'
-                }`}
-              >
-                <Users className="w-4 h-4" />
-                Todos
-                <span className={`px-2 py-0.5 rounded-lg text-[10px] ${!selectedRole ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800'}`}>{users.length}</span>
-              </button>
-              
-              {ROLE_OPTIONS.map(role => {
-                const isActive = selectedRole === role.value;
-                const count = roleCounts[role.value] || 0;
-                return (
-                  <button 
-                    key={role.value}
-                    onClick={() => setSelectedRole(isActive ? null : role.value)}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full border-2 text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all shadow-sm ${
-                      isActive 
-                        ? `bg-${role.color}-600 border-${role.color}-600 text-white shadow-lg` 
-                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-400'
-                    }`}
-                  >
-                    <span>{role.icon}</span>
-                    {role.label}
-                    <span className={`px-2 py-0.5 rounded-lg text-[10px] ${isActive ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800'}`}>{count}</span>
-                  </button>
-                );
-              })}
+          {/* ROLE FILTERS CONTAINER */}
+          <div className="space-y-4">
+            {/* MOBILE SELECT VIEW */}
+            <div className="block lg:hidden space-y-3">
+              <div className="relative group">
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-500 z-10">
+                  <Filter className="w-5 h-5" />
+                </div>
+                <select 
+                  value={selectedRole || "ALL"}
+                  onChange={(e) => setSelectedRole(e.target.value === "ALL" ? null : e.target.value)}
+                  className="w-full pl-16 pr-12 py-5 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 rounded-[2rem] text-sm font-black uppercase tracking-widest appearance-none focus:outline-none focus:border-indigo-500 transition-all shadow-lg shadow-slate-200/20 dark:shadow-none cursor-pointer"
+                >
+                  <option value="ALL">👥 TODOS LOS MIEMBROS ({users.length})</option>
+                  {ROLE_OPTIONS.map(role => (
+                    <option key={role.value} value={role.value} className="py-4">
+                      {role.icon} {role.label.toUpperCase()} ({roleCounts[role.value] || 0})
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                  <ChevronRight className="w-5 h-5 rotate-90" />
+                </div>
+              </div>
             </div>
-            {/* GRADIENTS FOR SCROLL HINT */}
-            <div className="absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-slate-50 dark:from-slate-950 pointer-events-none"></div>
+
+            {/* DESKTOP GRID VIEW */}
+            <div className="hidden lg:block bg-slate-50/50 dark:bg-white/[0.02] p-6 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-inner">
+              <div className="flex flex-wrap justify-center gap-3 md:gap-4">
+                <button 
+                  onClick={() => setSelectedRole(null)}
+                  className={`flex items-center gap-3 px-6 py-3 rounded-2xl border-2 text-xs font-black uppercase tracking-widest transition-all duration-300 active:scale-95 shadow-sm ${
+                    !selectedRole 
+                      ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-600/30' 
+                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-400 hover:text-indigo-600'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Todos</span>
+                  <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black ${!selectedRole ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                    {users.length}
+                  </span>
+                </button>
+                
+                {ROLE_OPTIONS.map(role => {
+                  const isActive = selectedRole === role.value;
+                  const count = roleCounts[role.value] || 0;
+                  
+                  const colorMap = {
+                    indigo: isActive ? 'bg-indigo-600 border-indigo-600 shadow-indigo-600/30' : 'hover:border-indigo-400',
+                    violet: isActive ? 'bg-violet-600 border-violet-600 shadow-violet-600/30' : 'hover:border-violet-400',
+                    amber: isActive ? 'bg-amber-600 border-amber-600 shadow-amber-600/30' : 'hover:border-amber-400',
+                    purple: isActive ? 'bg-purple-600 border-purple-600 shadow-purple-600/30' : 'hover:border-purple-400',
+                    emerald: isActive ? 'bg-emerald-600 border-emerald-600 shadow-emerald-600/30' : 'hover:border-emerald-400',
+                    slate: isActive ? 'bg-slate-600 border-slate-600 shadow-slate-600/30' : 'hover:border-slate-400',
+                    red: isActive ? 'bg-red-600 border-red-600 shadow-red-600/30' : 'hover:border-red-400',
+                    blue: isActive ? 'bg-blue-600 border-blue-600 shadow-blue-600/30' : 'hover:border-blue-400',
+                    fuchsia: isActive ? 'bg-fuchsia-600 border-fuchsia-600 shadow-fuchsia-600/30' : 'hover:border-fuchsia-400',
+                  };
+
+                  return (
+                    <button 
+                      key={role.value}
+                      onClick={() => setSelectedRole(isActive ? null : role.value)}
+                      className={`flex items-center gap-3 px-6 py-3 rounded-2xl border-2 text-xs font-black uppercase tracking-widest transition-all duration-300 active:scale-90 shadow-sm ${
+                        isActive 
+                          ? `${colorMap[role.color]} text-white shadow-xl` 
+                          : `bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 ${colorMap[role.color]}`
+                      }`}
+                    >
+                      <span className="text-sm scale-110 group-hover:scale-125 transition-transform">{role.icon}</span>
+                      <span>{role.label}</span>
+                      <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-black ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           {/* USERS LIST (CARDS) */}
@@ -498,7 +530,7 @@ const UsersPage = () => {
               <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">Sincronizando Usuarios...</p>
             </div>
           ) : filteredUsers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-18">
               {filteredUsers.map((usr) => {
                 const mainRole = usr.roles?.[0] || 'SIN_ROL';
                 const roleConfig = ROLE_OPTIONS.find(r => r.value === mainRole) || { color: 'slate', icon: '👤' };
@@ -521,7 +553,6 @@ const UsersPage = () => {
                             <h3 className="text-xl font-black text-slate-800 dark:text-white leading-tight">
                               {usr.username}
                             </h3>
-                            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 mt-1 uppercase tracking-tighter">ID: {usr.id}</p>
                           </div>
                         </div>
                         <div className="relative group/menu">
@@ -573,14 +604,14 @@ const UsersPage = () => {
                       <div className="flex gap-2">
                         <button 
                           onClick={() => handleEdit(usr.id)}
-                          className="w-10 h-10 flex items-center justify-center bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
+                          className="flex items-center justify-center bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm"
                           title="Editar"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => handleDelete(usr.id, usr.username)}
-                          className="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm"
+                          className="flex items-center justify-center bg-red-50 dark:bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-sm"
                           title="Eliminar"
                         >
                           <Trash2 className="w-4 h-4" />

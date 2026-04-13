@@ -32,6 +32,7 @@ const WorshipPage = () => {
   const canManageWorship = true; // Permiso hardcodeado según lógica previa de administración
 
   const [activeTab, setActiveTab] = useState("SCHEDULE");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [teamMembers, setTeamMembers] = useState([]);
   const [roles, setRoles] = useState([]);
   const [events, setEvents] = useState([]);
@@ -41,7 +42,13 @@ const WorshipPage = () => {
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+    loadData();
+  };
+
   const theme = {
+    // ... existiendo
     primary: "#6366f1",
     danger: "#ef4444",
     successText: "#10b981",
@@ -106,6 +113,7 @@ const WorshipPage = () => {
   const isInitialLoading = loading && stats.team === 0;
 
   return (
+
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0b0e14] p-4 md:p-8 pt-20 transition-all duration-500">
       <div className="max-w-[1600px] mx-auto space-y-10 animate-in">
         
@@ -155,9 +163,9 @@ const WorshipPage = () => {
                  </div>
 
                  <button 
-                   onClick={loadData}
+                   onClick={handleRefresh}
                    disabled={loading}
-                   className="group/sync w-16 h-16 bg-white/5 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-[1.8rem] flex items-center justify-center border border-white/5 transition-all duration-500 active:scale-90 shadow-lg hover:shadow-indigo-600/40"
+                   className="group/sync w-14 h-14 bg-white/5 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-[1.8rem] flex items-center justify-center border border-white/5 transition-all duration-500 active:scale-90 shadow-lg hover:shadow-indigo-600/40"
                  >
                     <RefreshCw size={28} className={`${loading ? "animate-spin" : "group-hover/sync:rotate-180"} transition-all duration-700`} />
                  </button>
@@ -227,6 +235,7 @@ const WorshipPage = () => {
                 <div className="pb-20">
                   {activeTab === "SCHEDULE" && (
                     <WorshipScheduleTab
+                      key={`schedule-${refreshKey}`}
                       events={toArray(events)}
                       teamMembers={toArray(teamMembers)}
                       roles={toArray(roles)}
@@ -244,6 +253,7 @@ const WorshipPage = () => {
 
                   {activeTab === "TEAM" && (
                     <WorshipTeamTab
+                      key={`team-${refreshKey}`}
                       teamMembers={toArray(teamMembers)}
                       roles={toArray(roles)}
                       canManageWorship={canManageWorship}
@@ -259,6 +269,7 @@ const WorshipPage = () => {
 
                   {activeTab === "ROLES" && (
                     <WorshipRolesTab
+                      key={`roles-${refreshKey}`}
                       roles={toArray(roles)}
                       canManageWorship={canManageWorship}
                       theme={theme}
@@ -273,6 +284,7 @@ const WorshipPage = () => {
 
                   {activeTab === "REPERTOIRE" && (
                     <WorshipRepertoireTab
+                      key={`repertoire-${refreshKey}`}
                       songs={toArray(songs)}
                       teamMembers={toArray(teamMembers)}
                       canManageWorship={canManageWorship}
