@@ -7,9 +7,9 @@ import { createPortal } from "react-dom";
 import apiService from "../../apiService";
 import { useConfirmation } from "../../context/ConfirmationContext";
 import nameHelper from "../../services/nameHelper";
+import { FaYoutube } from "react-icons/fa";
 import {  
   Plus, 
-  YoutubeIcon, 
   FileText, 
   Edit2, 
   Trash2, 
@@ -220,7 +220,7 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, loadData, 
                     rel="noreferrer" 
                     className="flex-1 flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-violet-600/20 transition-all active:scale-95"
                   >
-                    <YoutubeIcon className="w-3.5 h-3.5 stroke-[2.5px]" /> Video
+                    <FaYoutube className="w-3.5 h-3.5 stroke-[2.5px]" /> Video
                   </a>
                 )}
                 {song.chordsLink && (
@@ -430,7 +430,7 @@ const WorshipRepertoireTab = ({ songs, teamMembers, canManageWorship, loadData, 
                       <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Link YouTube</label>
                       <div className="relative flex">
                         <div className="flex items-center justify-center w-14 bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 border-r-0 rounded-l-2xl text-red-600 dark:text-red-400">
-                          <YoutubeIcon className="w-5 h-5" />
+                          <FaYoutube className="w-5 h-5" />
                         </div>
                         <input 
                           type="url" 

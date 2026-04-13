@@ -4,6 +4,7 @@ import apiService from "../../apiService";
 import { useConfirmation } from "../../context/ConfirmationContext";
 import nameHelper from "../../services/nameHelper";
 import { generateWorshipRangeAttendancePDF } from "../../services/worshipPdfGenerator";
+import { FaYoutube } from "react-icons/fa";
 import { 
   Plus, 
   Sparkles, 
@@ -16,8 +17,7 @@ import {
   Share2, 
   X, 
   Info, 
-  Music, 
-  YoutubeIcon, 
+  Music,
   FileCode,
   ChevronRight,
   User,
@@ -831,7 +831,7 @@ const WorshipScheduleTab = ({
                                       className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all"
                                       title="Ver en YouTube"
                                     >
-                                      <YoutubeIcon className="w-4 h-4" />
+                                      <FaYoutube className="w-4 h-4" />
                                     </a>
                                   )}
                                   {song.chordsLink && (
