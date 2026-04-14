@@ -29,7 +29,6 @@ import {
   Zap,
   CheckCircle2,
   Ghost,
-  MoreHorizontal
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;

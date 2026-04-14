@@ -427,7 +427,7 @@ const ActivityPage = () => {
                       >Gestión</button>
                       <button
                         onClick={() => { setSelectedActivity(activity); setModals(prev => ({ ...prev, participants: true })); }}
-                        className="flex-1 min-w-[80px] h-11 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                        className=" bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5"
                       >
                         <Users size={12} /> <span>Equipo</span>
                       </button>

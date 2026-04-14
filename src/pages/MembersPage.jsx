@@ -262,7 +262,7 @@ const MembersPage = () => {
                         <div className="w-20 h-20 rounded-[1.8rem] bg-indigo-50 dark:bg-black/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-3xl font-black shadow-inner border border-indigo-100 dark:border-white/5 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">
                            {initials}
                         </div>
-                        <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/5 shadow-sm ${isFemale ? 'bg-rose-500/10 text-rose-600' : 'bg-blue-500/10 text-blue-600'}`}>
+                        <div className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border border-white/5 shadow-sm ${isFemale ? 'bg-pink-500/10 text-pink-600' : 'bg-blue-500/10 text-blue-600'}`}>
                            {isFemale ? '♀ Femenino' : '♂ Masculino'}
                         </div>
                      </div>
@@ -295,19 +295,19 @@ const MembersPage = () => {
                            {/* ── Detail button ── */}
                            <button
                               onClick={() => setSelectedMember(member)}
-                              className="p-3 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110 flex items-center justify-center group/icon"
+                              className="flex items-center justify-center bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl transition-all active:scale-90 p-2"
                               title="Ver Detalle"
                            >
-                              <FileText size={22} className="transition-transform group-hover/icon:rotate-6" />
+                              <FileText className="w-8 h-8 transition-transform group-hover/icon:rotate-6 text-green-700" />
                            </button>
 
                            {/* ── History button ── UPDATED */}
                            <button
                               onClick={() => handleOpenHistory(member)}
-                              className="p-3 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-[1.2rem] border border-slate-200 dark:border-white/5 shadow-sm transition-all hover:scale-110 flex items-center justify-center group/icon"
+                              className="flex items-center justify-center bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl transition-all active:scale-90 p-2"
                               title="Historial de Inscripciones"
                            >
-                              <History size={22} className="transition-transform group-hover/icon:-rotate-6" />
+                              <History className="w-8 h-8 transition-transform group-hover/icon:-rotate-6 text-violet-700" />
                            </button>
                         </div>
                         <button

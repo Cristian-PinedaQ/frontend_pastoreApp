@@ -141,7 +141,7 @@ export const EnrollmentHistoryModal = ({
 
               <button
                 onClick={onClose}
-                className="w-12 h-12 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 transition-all active:scale-95 shrink-0"
+                className="bg-slate-100 dark:bg-white/5 hover:bg-rose-200 dark:hover:bg-white/10 rounded-2xl flex items-center justify-center text-slate-500 dark:text-slate-400 transition-all active:scale-95 shrink-0"
               >
                 <X size={20} />
               </button>
