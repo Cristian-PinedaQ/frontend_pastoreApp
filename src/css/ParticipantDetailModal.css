@@ -2,7 +2,6 @@
    ParticipantDetailModal.css
    Estilos para el submodal de detalle de participante
 ============================================ */
-
 /* Overlay del submodal */
 .participant-detail-modal-overlay {
   position: fixed;
