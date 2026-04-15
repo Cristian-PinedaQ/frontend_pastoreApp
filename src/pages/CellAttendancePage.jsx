@@ -35,6 +35,11 @@ import {
   Clock,
   UserCheck,
   UserX,
+  UserStar,
+  ShieldUser,
+  CircleUserRound,
+  User,
+  Home,
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -42,26 +47,28 @@ const { getDisplayName } = nameHelper;
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ALLOWED_DAYS = [0, 3, 4];
 const LEADER_TYPE_MAP = {
-  LEADER_12: { label: "Líder 12", icon: "👑", color: "indigo" },
-  LEADER_144: { label: "Líder Rama", icon: "🌿", color: "blue" },
-  SERVANT: { label: "Servidor", icon: "🤝", color: "emerald" },
-  LEADER_GROUP: { label: "Líder Grupo", icon: "🏠", color: "amber" },
+  LEADER_12: { label: "Líder 12", icon: ShieldUser, color: "indigo" },
+  LEADER_144: { label: "Líder Rama", icon: CircleUserRound, color: "blue" },
+  SERVANT: { label: "Servidor", icon: UserStar, color: "emerald" },
+  LEADER_GROUP: { label: "Líder Grupo", icon: Home, color: "amber" },
 };
 
 const resolveLeaderLabel = (attendance) => {
   if (!attendance?.leaderType) return null;
+
   const roleMap = {
-    GROUP_LEADER: { label: "Líder de Grupo", icon: "🏠", color: "amber" },
-    HOST: { label: "Anfitrión", icon: "🏡", color: "emerald" },
-    TIMOTEO: { label: "Timoteo", icon: "📖", color: "emerald" },
-    BRANCH_LEADER: { label: "Líder de Rama", icon: "🌿", color: "blue" },
-    MAIN_LEADER: { label: "Líder 12", icon: "👑", color: "indigo" },
+    GROUP_LEADER: { label: "Líder de Grupo", icon: UserStar, color: "amber" },
+    HOST: { label: "Anfitrión", icon: Home, color: "emerald" },
+    TIMOTEO: { label: "Timoteo", icon: BookOpen, color: "emerald" },
+    BRANCH_LEADER: { label: "Líder de Rama", icon: CircleUserRound, color: "blue" },
+    MAIN_LEADER: { label: "Líder 12", icon: ShieldUser, color: "indigo" },
   };
+
   return (
     roleMap[attendance.roleInCell] ||
     LEADER_TYPE_MAP[attendance.leaderType] || {
       label: attendance.leaderType,
-      icon: "👤",
+      icon: User,
       color: "slate",
     }
   );
@@ -195,9 +202,18 @@ const MemberCard = ({ att, edited, onChange }) => {
         {/* Avatar */}
         <div
           className={`w-12 h-12 md:w-14 md:h-14 rounded-[1rem] md:rounded-[1.2rem] flex items-center justify-center text-white text-lg md:text-xl font-bold transition-all shrink-0
-          ${isPresent ? "bg-emerald-500 scale-105 shadow-lg shadow-emerald-500/30" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}
+  ${
+    isPresent
+      ? "bg-emerald-500 scale-105 shadow-lg shadow-emerald-500/30"
+      : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+  }`}
         >
-          {isLeader ? leaderInfo.icon : att.memberName.charAt(0).toUpperCase()}
+          {isLeader
+            ? (() => {
+                const Icon = leaderInfo.icon;
+                return <Icon className="w-5 h-5" />;
+              })()
+            : att.memberName.charAt(0).toUpperCase()}
         </div>
 
         {/* Info */}
@@ -238,11 +254,11 @@ const MemberCard = ({ att, edited, onChange }) => {
           onKeyDown={handleKeyDown}
           aria-label={isPresent ? "Marcar ausente" : "Marcar presente"}
           aria-pressed={isPresent}
-          className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2
+          className={`rounded-xl md:rounded-2xl flex items-center justify-center transition-all shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2
             ${
               isPresent
                 ? "bg-emerald-500 text-white active:scale-90 shadow-md shadow-emerald-500/30"
-                : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-500 hover:border-emerald-500 hover:text-emerald-500 active:scale-90"
+                : "bg-rose-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-white dark:text-slate-500 hover:border-emerald-500 hover:text-emerald-500 active:scale-90"
             }`}
         >
           {isPresent ? (
@@ -677,7 +693,7 @@ const CellAttendancePage = () => {
                   }}
                   className="bg-transparent border-none text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 outline-none cursor-pointer focus:text-indigo-600 dark:focus:text-indigo-400 transition-colors w-full min-w-[200px] appearance-none"
                 >
-                  <option value="">-- Selecciona Grupo Célula --</option>
+                  <option value="">-- Selecciona Altar de Vida --</option>
                   {userCells.map((c) => (
                     <option
                       key={c.id}
@@ -777,7 +793,7 @@ const CellAttendancePage = () => {
                   Selecciona una fecha
                 </h3>
                 <p className="text-[10px] md:text-xs font-bold text-slate-300 dark:text-slate-600 uppercase tracking-[0.3em] mt-3">
-                  Cronograma Ministerial CBI
+                  Cronograma Ministerial Altares
                 </p>
               </div>
             )}
@@ -829,7 +845,6 @@ const CellAttendancePage = () => {
                   <div className="flex flex-col sm:flex-row gap-3 items-center">
                     {/* Search */}
                     <div className="relative w-full sm:flex-1 group">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                       <input
                         ref={searchRef}
                         type="text"
@@ -1004,7 +1019,7 @@ const CellAttendancePage = () => {
                 </div>
                 <div>
                   <h3 className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-[0.2em]">
-                    Bitácora del Encuentro
+                    Bitácora Celebración
                   </h3>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                     Visitas y Revelaciones
@@ -1056,7 +1071,7 @@ const CellAttendancePage = () => {
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-1.5">
                     <BookOpen size={11} className="text-indigo-400" />{" "}
-                    Revelaciones y Peticiones
+                    Notas u Observaciones
                   </label>
                   <textarea
                     value={sessionForm.notes}
@@ -1066,7 +1081,7 @@ const CellAttendancePage = () => {
                     }}
                     rows="3"
                     className="w-full px-5 py-4 bg-slate-50 dark:bg-black/40 border-2 border-transparent focus:border-indigo-500 rounded-2xl text-xs font-bold text-slate-700 dark:text-slate-300 outline-none transition-all resize-none no-scrollbar"
-                    placeholder="Consolidación y clamores…"
+                    placeholder="Nuevos en consolidacion…"
                   />
                 </div>
               </div>

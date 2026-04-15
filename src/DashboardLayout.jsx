@@ -7,9 +7,9 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useConfirmation } from "./context/ConfirmationContext";
 import { 
-  Users, HeartPulse, GraduationCap, 
-  ShieldCheck, LayoutGrid, CheckSquare, Music, 
-  Calendar, Landmark, BarChart3, Settings, UserCircle, LogOut, Menu, X, Flame, Compass, NotebookPen
+  Users, HeartHandshake, GraduationCap, 
+  UserStar, Church, CheckSquare, Music, 
+  Calendar, Landmark, ChartPie, SlidersHorizontal, UserCircle, LogOut, Menu, X, Flame, MessageCircleQuestionMark, NotebookPen
 } from 'lucide-react';
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
@@ -84,22 +84,22 @@ export const DashboardLayout = () => {
       setSidebarOpen(false);
     }
   };
-
+ 
   const menuItems = [
-    { label: "Inicio", path: "/dashboard", icon: LayoutGrid, visible: true },
+    { label: "Inicio", path: "/dashboard", icon: Church, visible: true },
     { label: "Membresía", path: "/dashboard/members", icon: Users, visible: true },
-    { label: "Consejería", path: "/dashboard/Counseling", icon: HeartPulse, visible: hasAnyRole(["ROLE_PASTORES"]) },
+    { label: "Consejería", path: "/dashboard/Counseling", icon: HeartHandshake, visible: hasAnyRole(["ROLE_PASTORES"]) },
     { label: "Formaciones", path: "/dashboard/enrollments", icon: NotebookPen, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_PROFESORES"]) },
     { label: "Estudiantes", path: "/dashboard/students", icon: GraduationCap, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
-    { label: "Servidores", path: "/dashboard/leadership", icon: ShieldCheck, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_DESPLIEGUE"]) },
+    { label: "Servidores", path: "/dashboard/leadership", icon: UserStar, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_DESPLIEGUE"]) },
     { label: "Altares de Vida", path: "/dashboard/cellgroups", icon: Flame, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_DESPLIEGUE"]) },
     { label: "Asistencias", path: "/dashboard/cellgroups-atendance", icon: CheckSquare, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]) },
     { label: "Alabanza", path: "/dashboard/worshipPage", icon: Music, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]) },
     { label: "Actividades", path: "/dashboard/activity", icon: Calendar, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
     { label: "Finanzas", path: "/dashboard/finances", icon: Landmark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]) },
-    { label: "Contabilidad", path: "/dashboard/financesChurch", icon: BarChart3, visible: hasAnyRole(["ROLE_PASTORES"]) },
-    { label: "Configuración", path: "/dashboard/LevelsConfig", icon: Settings, visible: hasRole("ROLE_PASTORES") },
-    { label: "Manual Raiz Viva", path: "/dashboard/ManualRaizViva", icon: Compass, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_LIDER"]) },
+    { label: "Contabilidad", path: "/dashboard/financesChurch", icon: ChartPie, visible: hasAnyRole(["ROLE_PASTORES"]) },
+    { label: "Configuración", path: "/dashboard/LevelsConfig", icon: SlidersHorizontal, visible: hasRole("ROLE_PASTORES") },
+    { label: "Manual Raiz Viva", path: "/dashboard/ManualRaizViva", icon: MessageCircleQuestionMark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_LIDER"]) },
     { label: "Usuarios", path: "/dashboard/users", icon: UserCircle, visible: hasRole("ROLE_PASTORES") },
   ];
 

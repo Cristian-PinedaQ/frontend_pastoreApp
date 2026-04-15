@@ -3,11 +3,9 @@ import apiService from '../apiService';
 import { useAuth } from '../context/AuthContext';
 import { 
   Users, 
-  Heart, 
+  Rose, 
   Sword, 
-  Home, 
   ShieldCheck, 
-  FolderKanban, 
   ArrowRight,
   Sparkles,
   Zap,
@@ -40,7 +38,7 @@ const StatCard = ({ title, value, icon: Icon, gradient, loading }) => (
 const QuickAction = ({ href, title, description, icon: Icon, variant }) => {
   const themes = {
     indigo: "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 dark:shadow-indigo-900/20",
-    violet: "bg-violet-600 hover:bg-violet-700 shadow-violet-200 dark:shadow-violet-900/20",
+    amber: "bg-amber-600 hover:bg-amber-700 shadow-amber-200 dark:shadow-amber-900/20",
     slate: "bg-slate-900 hover:bg-black shadow-slate-200 dark:shadow-slate-900/40"
   };
 
@@ -153,8 +151,8 @@ const DashboardHome = () => {
         <StatCard 
           title="Rocíos de Vida" 
           value={stats.totalMembersFemale} 
-          icon={Heart} 
-          gradient="bg-gradient-to-br from-rose-500 via-rose-600 to-rose-800" 
+          icon={Rose} 
+          gradient="bg-gradient-to-br from-rose-500 via-pink-500 to-pink-800" 
           loading={loading}
         />
         <StatCard 
@@ -168,7 +166,7 @@ const DashboardHome = () => {
           title="Altares de Vida" 
           value={stats.totalLessons} 
           icon={Flame} 
-          gradient="bg-gradient-to-br from-violet-600 via-violet-700 to-violet-900" 
+          gradient="bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700" 
           loading={loading}
         />
         <StatCard 
@@ -182,7 +180,7 @@ const DashboardHome = () => {
           title="Procesos Activos" 
           value={stats.totalEnrollments} 
           icon={NotebookPen} 
-          gradient="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900" 
+          gradient="bg-gradient-to-br from-purple-600 via-violet-700 to-purple-900" 
           loading={loading}
         />
       </div>
@@ -215,7 +213,7 @@ const DashboardHome = () => {
               title="Actividades" 
               description="Crea y gestiona" 
               icon={Calendar} 
-              variant="violet"
+              variant="amber"
             />
           </div>
         </div>

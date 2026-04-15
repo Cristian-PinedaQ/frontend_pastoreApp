@@ -11,8 +11,7 @@ import { generatePDF } from '../services/Pdfgenerator';
 import { logUserAction } from '../utils/securityLogger';
 import nameHelper from '../services/nameHelper';
 import { 
-  Users, 
-  Search,
+  Users,
   Calendar, 
   GraduationCap, 
   CheckCircle2, 
@@ -388,7 +387,6 @@ const StudentsPage = () => {
             {/* Search */}
             <div className="flex-1 relative">
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
-                <Search size={20} />
               </div>
               <input
                 type="text"

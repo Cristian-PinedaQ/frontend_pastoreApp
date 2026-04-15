@@ -7,7 +7,8 @@ import ModalLeaderStatistics from "../components/ModalLeaderStatistics";
 import ModalLeaderDetail from "../components/ModalLeaderDetail";
 import { useAuth } from "../context/AuthContext";
 import { 
-  Users, 
+  Users,
+  CircleUserRound, 
   Crown, 
   ShieldCheck, 
   Search, 
@@ -24,7 +25,7 @@ import {
   List,
   ShieldAlert,
   Star,
-  Award,
+  ShieldUser,
   Activity,
   Zap,
   CheckCircle2,
@@ -50,7 +51,7 @@ const LeadersPage = () => {
     LEADER_144: { 
       label: "Líder 144", 
       color: "violet", 
-      icon: <Users size={20} />,
+      icon: <CircleUserRound size={20} />,
       gradient: "from-amber-500/20 to-orange-600/20",
       iconColor: "text-amber-600 dark:text-amber-400",
       accent: "bg-amber-500",
@@ -59,7 +60,7 @@ const LeadersPage = () => {
     LEADER_12: { 
       label: "Líder 12", 
       color: "emerald", 
-      icon: <Award size={20} />,
+      icon: <ShieldUser size={20} />,
       gradient: "from-green-500/20 to-emerald-600/20",
       iconColor: "text-green-600 dark:text-green-400",
       accent: "bg-green-600",

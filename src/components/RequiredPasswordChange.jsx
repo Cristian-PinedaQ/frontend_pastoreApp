@@ -7,8 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
 import logoBlancoImg from '../assets/Pastoreapp_blanco.png';
 import { 
-  Lock, Key, ShieldAlert, CheckCircle2, 
-  Eye, EyeOff, Save, Loader2, Info, ShieldCheck 
+  ShieldAlert, CheckCircle2, 
+  Eye, EyeOff, Save, Loader2, Info, 
 } from 'lucide-react';
 
 const RequiredPasswordChange = ({ accessToken, onPasswordChanged }) => {

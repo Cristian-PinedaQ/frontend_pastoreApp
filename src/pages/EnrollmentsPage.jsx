@@ -914,7 +914,6 @@ const EnrollmentsPage = () => {
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
           <div className="flex flex-col lg:flex-row items-center gap-4">
             <div className="relative flex-1 group w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
               <input
                 type="text"
                 placeholder="Buscar cohortes..."
@@ -1439,7 +1438,7 @@ const SelectFilter = ({ value, onChange, placeholder, children }) => (
     <select
       value={value}
       onChange={onChange}
-      className="h-11 pl-3 pr-8 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-500/30 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 outline-none appearance-none cursor-pointer transition-all"
+      className="bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-indigo-500/30 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 outline-none appearance-none cursor-pointer transition-all"
     >
       <option value="">{placeholder}</option>
       {children}

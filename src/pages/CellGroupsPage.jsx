@@ -11,7 +11,7 @@ import ModalCellStatistics from '../components/ModalCellStatistics';
 import ModalCellDetail from '../components/ModalCellDetail';
 import ModalLeaderDetail from '../components/ModalLeaderDetail';
 import { 
-  Home, Users, MapPin, MoreHorizontal, Search, Plus,
+  Home, House, MapPin, MoreHorizontal, Search, HousePlus,
   FileDown, BarChart3, ShieldCheck, Clock, TrendingUp,
   LayoutGrid, List, RefreshCw, AlertTriangle, ChevronRight,
   ShieldAlert, Calendar, CheckCircle2, X
@@ -141,7 +141,7 @@ const CellGroupsPage = () => {
           </h1>
           <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-2">
             <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <Users size={14} className="text-emerald-500"/> {allCells.length} hogares
+              <House size={14} className="text-emerald-500"/> {allCells.length} hogares
             </p>
             <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"/>
             <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
@@ -172,7 +172,7 @@ const CellGroupsPage = () => {
             onClick={() => setModals(m => ({ ...m, create: true }))}
             className="flex w-full sm:w-auto justify-center items-center gap-2 px-6 sm:px-10 py-3.5 sm:py-5 bg-indigo-600 text-white rounded-[2rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all whitespace-nowrap"
           >
-            <Plus size={18} strokeWidth={3}/> Aperturar Altar
+            <HousePlus size={18} strokeWidth={3}/> Aperturar Altar
           </button>
         </div>
       </div>

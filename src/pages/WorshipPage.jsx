@@ -165,7 +165,7 @@ const WorshipPage = () => {
                  <button 
                    onClick={handleRefresh}
                    disabled={loading}
-                   className="group/sync w-14 h-14 bg-white/5 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-[1.8rem] flex items-center justify-center border border-white/5 transition-all duration-500 active:scale-90 shadow-lg hover:shadow-indigo-600/40"
+                   className="group/sync bg-white/5 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-[1.8rem] flex items-center justify-center border border-white/5 transition-all duration-500 active:scale-90 shadow-lg hover:shadow-indigo-600/40"
                  >
                     <RefreshCw size={28} className={`${loading ? "animate-spin" : "group-hover/sync:rotate-180"} transition-all duration-700`} />
                  </button>

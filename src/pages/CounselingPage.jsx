@@ -36,6 +36,7 @@ import {
   Phone,
   Mail,
   Zap,
+  ListTodo,
   RefreshCw,
   Download,
   Ghost,
@@ -1745,7 +1746,7 @@ const CounselingPage = () => {
             className="flex items-center gap-3 px-10 py-5 bg-indigo-600 text-white rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-all active:scale-95 shadow-2xl shadow-indigo-600/30"
           >
             <Plus className="w-6 h-6" />
-            Agendar Encuentro
+            Agendar Consejeria
           </button>
         </div>
       </div>
@@ -1827,11 +1828,10 @@ const CounselingPage = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
           <div className="space-y-2 group">
-            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4">
-              Miembro / Documento
+            <label className="flex text-[9px] font-black text-slate-400 uppercas">
+              <Search className="w-3 h-3 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />Miembro / Documento
             </label>
             <div className="relative">
-              <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input
                 type="text"
                 placeholder="Buscar paciente..."
@@ -1847,7 +1847,7 @@ const CounselingPage = () => {
               Nivel de Estado
             </label>
             <div className="relative">
-              <Activity className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <History className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -1869,7 +1869,7 @@ const CounselingPage = () => {
               Línea Pastoral / Tema
             </label>
             <div className="relative">
-              <Zap className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <ListTodo className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               <select
                 value={filterTopic}
                 onChange={(e) => setFilterTopic(e.target.value)}
