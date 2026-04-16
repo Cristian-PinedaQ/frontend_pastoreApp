@@ -82,18 +82,14 @@ const BottomSheet = ({ isOpen, onClose, children }) => {
   const dragControls = useDragControls();
 
   const scrollRef = useRef(null);
-  const isDragging = useRef(false);
+  //const isDragging = useRef(false);
   const currentSnap = useRef("full");
 
   const lockDrag = useRef(false); // 👈 FIX CLAVE
 
   const y = useMotionValue(0);
 
-  const overlayOpacity = useTransform(
-    y,
-    [0, window.innerHeight * 0.5],
-    [1, 0],
-  );
+  const overlayOpacity = useTransform(y, [0, window.innerHeight * 0.5], [1, 0]);
 
   const [scrollBlur, setScrollBlur] = useState(false);
 
@@ -279,7 +275,7 @@ const DragHandle = ({ onSnapCycle, dragControls }) => {
   const scale = useSpring(1, SPRING_HANDLE);
   return (
     <motion.button
-       onPointerDown={(e) => dragControls.start(e)}
+      onPointerDown={(e) => dragControls.start(e)}
       className="w-full flex flex-col items-center pt-3 pb-2 touch-none select-none cursor-grab active:cursor-grabbing"
       onHoverStart={() => scale.set(1.3)}
       onHoverEnd={() => scale.set(1)}
@@ -419,9 +415,12 @@ const CellGroupOverviewModal = ({
                 ? {
                     totalPresent: d.totalPresent || 0,
                     totalRegistered: d.totalRegistered || 0,
-                    totalMeetings: 1,
                     totalJustified: d.totalJustified || 0,
                     totalNewParticipants: d.newParticipants || 0,
+                    totalAttendees: d.totalAttendees, // ← AGREGAR ESTE CAMPO
+                    totalRealAttendees:
+                      d.totalAttendees ??
+                      d.totalPresent + (d.newParticipants || 0), // ← VALOR REAL
                   }
                 : null,
               error: d ? null : "No hay datos para esta sesión",
@@ -440,7 +439,16 @@ const CellGroupOverviewModal = ({
               .then((data) => ({
                 cellId: cell.id,
                 cellName: cell.name,
-                stats: data,
+                stats: {
+                  totalPresent: data.totalPresent || 0,
+                  totalRegistered: data.totalRegistered || 0,
+                  totalJustified: data.totalJustified || 0,
+                  totalNewParticipants: data.totalNewParticipants || 0,
+                  totalAttendees: data.totalAttendees, // ← AGREGAR ESTE CAMPO
+                  totalRealAttendees:
+                    data.totalAttendees ??
+                    data.totalPresent + (data.totalNewParticipants || 0), // ← VALOR REAL
+                },
                 error: null,
               }))
               .catch((err) => ({
@@ -471,9 +479,12 @@ const CellGroupOverviewModal = ({
   }, [isOpen]);
 
   // ── Aggregated ───────────────────────────────────────────────────────────
+  // En CellGroupOverviewModal.jsx - Sección aggregated
+
   const aggregated = useMemo(() => {
     const w = cellStats.filter((c) => c.stats?.totalRegistered > 0);
     if (!w.length) return null;
+
     const totalPresent = w.reduce((s, c) => s + (c.stats.totalPresent || 0), 0);
     const totalJustified = w.reduce(
       (s, c) => s + (c.stats.totalJustified || 0),
@@ -487,10 +498,21 @@ const CellGroupOverviewModal = ({
       (s, c) => s + (c.stats.totalRegistered || 0),
       0,
     );
+
+    // 🔥 NUEVO: Sumar totalAttendees real desde cada célula
+    const totalRealAttendees = w.reduce((s, c) => {
+      // Priorizar totalAttendees del backend si existe
+      const attendees =
+        c.stats.totalAttendees ??
+        c.stats.totalPresent + (c.stats.totalNewParticipants || 0);
+      return s + attendees;
+    }, 0);
+
     const overallPct =
       totalRegistered > 0
         ? Math.round((totalPresent / totalRegistered) * 100)
         : 0;
+
     const avgPct =
       w.length > 0
         ? Math.round(
@@ -503,12 +525,13 @@ const CellGroupOverviewModal = ({
             }, 0) / w.length,
           )
         : 0;
+
     return {
       totalPresent,
       totalRegistered,
       totalJustified,
       totalNew,
-      totalCelebracion: totalPresent + totalNew,
+      totalRealAttendees, // ← NUEVO: este es el verdadero "Impacto"
       overallPct,
       avgPct,
       cellsWithData: w.length,
@@ -811,7 +834,7 @@ const CellGroupOverviewModal = ({
                 },
                 {
                   label: "Impacto",
-                  value: aggregated.totalCelebracion,
+                  value: aggregated.totalRealAttendees,
                   icon: Users,
                   bg: "bg-indigo-500/10",
                   text: "text-indigo-600",
@@ -906,6 +929,7 @@ const CellGroupOverviewModal = ({
                 ? Math.round((stats.totalPresent / stats.totalRegistered) * 100)
                 : 0;
               const newVisits = stats?.totalNewParticipants || 0;
+              const realAttendees = stats?.totalRealAttendees || 0; // ← VALOR REAL DE IMPACTO
               const barColor =
                 pct >= 70
                   ? "bg-emerald-500"
@@ -938,11 +962,11 @@ const CellGroupOverviewModal = ({
                   }}
                   disabled={!hasData}
                   className={`group relative w-full text-left p-4 rounded-2xl border-2 transition-colors flex items-center gap-3.5 overflow-hidden
-                  ${
-                    hasData
-                      ? "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 active:border-indigo-400/50"
-                      : "bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-75"
-                  }`}
+      ${
+        hasData
+          ? "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 active:border-indigo-400/50"
+          : "bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-75"
+      }`}
                 >
                   {/* Acento izquierdo */}
                   <div
@@ -952,7 +976,7 @@ const CellGroupOverviewModal = ({
                   {/* Avatar */}
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black shrink-0
-                  ${!hasData ? "bg-slate-100 dark:bg-slate-700 text-slate-400" : "bg-indigo-500/10 text-indigo-600"}`}
+        ${!hasData ? "bg-slate-100 dark:bg-slate-700 text-slate-400" : "bg-indigo-500/10 text-indigo-600"}`}
                   >
                     {cellName.charAt(0).toUpperCase()}
                   </div>
@@ -965,6 +989,8 @@ const CellGroupOverviewModal = ({
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                       )}
                     </h4>
+
+                    {/* 🔥 SECCIÓN ACTUALIZADA CON totalRealAttendees */}
                     <div className="flex items-center gap-2 mt-0.5 text-[8px] font-black uppercase tracking-widest text-slate-400">
                       {hasData ? (
                         <>
@@ -981,7 +1007,12 @@ const CellGroupOverviewModal = ({
                           <span className="text-slate-200 dark:text-slate-700">
                             |
                           </span>
-                          <span>{stats.totalRegistered} miembros</span>
+                          {/* 🔥 AQUÍ USAMOS EL totalRealAttendees REAL */}
+                          <span className="flex items-center gap-0.5">
+                            <Users className="w-2.5 h-2.5 text-indigo-500" />{" "}
+                            {realAttendees}{" "}
+                            <span className="text-[7px]">impacto</span>
+                          </span>
                         </>
                       ) : (
                         <span className="flex items-center gap-1 text-rose-400">
@@ -996,7 +1027,7 @@ const CellGroupOverviewModal = ({
                     <div className="flex flex-col items-end gap-1 shrink-0">
                       <span
                         className={`text-base font-black tracking-tighter
-                      ${pct >= 70 ? "text-emerald-500" : pct >= 40 ? "text-amber-500" : "text-rose-500"}`}
+            ${pct >= 70 ? "text-emerald-500" : pct >= 40 ? "text-amber-500" : "text-rose-500"}`}
                       >
                         {pct}%
                       </span>

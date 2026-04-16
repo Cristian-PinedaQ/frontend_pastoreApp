@@ -1,13 +1,14 @@
 // ============================================
 // cellGroupOverviewPdfGenerator.js
-// Generador de PDF actualizado: Visitas, Asistentes y Justificados
+// Generador de PDF actualizado: Impacto REAL (totalAttendees)
+// Ahora usa el campo totalRealAttendees en lugar de calcular presentes + visitas
 // ============================================
 
 const OVERVIEW_COLORS = {
   primary: '#1e40af',
   accent: '#3b82f6',
   success: '#10b981',
-  warning: '#f59e0b', // Color para Justificados
+  warning: '#f59e0b',
   danger: '#ef4444',
   inactive: '#6b7280',
   purple: '#8b5cf6',
@@ -53,7 +54,6 @@ export const generateOverviewPDF = (
   const reportSubtitle = selectedDate ? "Reporte Detallado de Sesión Única" : "Resumen Comparativo Mensual";
 
   const cellsWithData = cellStats.filter(c => c.stats && c.stats.totalRegistered > 0);
-  //const cellsNoData = cellStats.filter(c => !c.stats || c.stats.totalRegistered === 0);
 
   const sortedCells = [...cellsWithData].sort((a, b) => {
     const pctA = Math.round((a.stats.totalPresent / a.stats.totalRegistered) * 100);
@@ -61,14 +61,40 @@ export const generateOverviewPDF = (
     return pctB - pctA;
   });
 
-  // 1. KPI boxes globales incluyendo JUSTIFICADOS
+  // 1. KPI boxes globales - Usando totalRealAttendees para IMPACTO
   const kpiData = aggregated
     ? [
-      { label: 'Altares con datos', value: aggregated.cellsWithData, color: OVERVIEW_COLORS.accent, icon: '🏘️' },
-      { label: 'Miembros Presentes', value: aggregated.totalPresent, color: OVERVIEW_COLORS.success, icon: '✅' },
-      { label: 'Ausencias Justificadas', value: aggregated.totalJustified || 0, color: OVERVIEW_COLORS.warning, icon: '📝' },
-      { label: 'Nuevas Visitas', value: aggregated.totalNew || 0, color: OVERVIEW_COLORS.teal, icon: '🌟' },
-      { label: 'Impacto Total', value: (aggregated.totalPresent + (aggregated.totalNew || 0)), color: OVERVIEW_COLORS.purple, icon: '🏠' },
+      { 
+        label: 'Altares con datos', 
+        value: aggregated.cellsWithData, 
+        color: OVERVIEW_COLORS.accent, 
+        icon: '🏘️' 
+      },
+      { 
+        label: 'Miembros Presentes', 
+        value: aggregated.totalPresent, 
+        color: OVERVIEW_COLORS.success, 
+        icon: '✅' 
+      },
+      { 
+        label: 'Ausencias Justificadas', 
+        value: aggregated.totalJustified || 0, 
+        color: OVERVIEW_COLORS.warning, 
+        icon: '📝' 
+      },
+      { 
+        label: 'Nuevas Visitas', 
+        value: aggregated.totalNew || 0, 
+        color: OVERVIEW_COLORS.teal, 
+        icon: '🌟' 
+      },
+      { 
+        label: 'Impacto REAL', 
+        value: aggregated.totalRealAttendees || (aggregated.totalPresent + (aggregated.totalNew || 0)), 
+        color: OVERVIEW_COLORS.purple, 
+        icon: '🏠',
+        note: 'Total real de asistentes (incluye correcciones manuales)'
+      },
     ]
     : [];
 
@@ -77,49 +103,58 @@ export const generateOverviewPDF = (
       <div style="font-size:20px;line-height:1;margin-bottom:4px">${k.icon}</div>
       <div style="font-size:20px;font-weight:800;color:${k.color};line-height:1.2">${k.value}</div>
       <div style="font-size:8px;color:${OVERVIEW_COLORS.textSub};margin-top:4px;text-transform:uppercase;letter-spacing:0.5px">${k.label}</div>
+      ${k.note ? `<div style="font-size:6px;color:${OVERVIEW_COLORS.textSub};margin-top:2px;">${k.note}</div>` : ''}
     </div>
   `).join('');
 
-  // 2. Tabla de altares con columna de JUSTIFICADOS
+  // 2. Tabla de altares - Usando totalRealAttendees para IMPACTO REAL
   const tableRows = sortedCells.map((c, i) => {
     const { stats, cellName } = c;
     const pct = Math.round((stats.totalPresent / stats.totalRegistered) * 100);
     const color = pctColor(pct);
-    const newVisits = stats.totalNewParticipants || 0; // 🌟 Visitas
+    const newVisits = stats.totalNewParticipants || 0;
     const justified = stats.totalJustified || 0;
-    const totalAttendance = stats.totalPresent + newVisits; // 🏠 Asistentes Totales
+    // 🔥 NUEVO: Usar totalRealAttendees del backend, no calcular
+    const realImpact = stats.totalRealAttendees || (stats.totalPresent + newVisits);
+    const hasManualCorrection = stats.totalAttendees !== null && stats.totalAttendees !== undefined;
+    const correctionIcon = hasManualCorrection ? '' : '';
 
     return `
       <tr style="background:${i % 2 === 0 ? OVERVIEW_COLORS.white : OVERVIEW_COLORS.light}">
         <td style="padding:8px 10px;font-size:11px;font-weight:600;color:${OVERVIEW_COLORS.textMain};border-bottom:1px solid ${OVERVIEW_COLORS.border}">
           🏡 ${cellName}
         </td>
-        <td style="padding:8px 10px;font-size:11px;color:${OVERVIEW_COLORS.success};font-weight:600;text-align: center;">
+        <td style="padding:8px 10px;font-size:11px;color:${OVERVIEW_COLORS.success};font-weight:600;text-align:center;">
           ${stats.totalPresent}
         </td>
-        <td style="padding:8px 10px;font-size:11px;color:${OVERVIEW_COLORS.warning};font-weight:600;text-align: center;">
+        <td style="padding:8px 10px;font-size:11px;color:${OVERVIEW_COLORS.warning};font-weight:600;text-align:center;">
           ${justified}
         </td>
-        <td style="padding:8px 10px;font-size:11px;color:${OVERVIEW_COLORS.teal};font-weight:600;text-align: center;">
+        <td style="padding:8px 10px;font-size:11px;color:${OVERVIEW_COLORS.teal};font-weight:600;text-align:center;">
           🌟 ${newVisits}
         </td>
-        <td style="padding:8px 10px;font-size:11px;background:${OVERVIEW_COLORS.purple}08;color:${OVERVIEW_COLORS.purple};font-weight:700;text-align: center;">
-          🏠 ${totalAttendance}
+        <td style="padding:8px 10px;font-size:11px;background:${OVERVIEW_COLORS.purple}08;color:${OVERVIEW_COLORS.purple};font-weight:800;text-align:center;">
+          🏠 ${realImpact} ${correctionIcon}
         </td>
         <td style="padding:8px 10px;border-bottom:1px solid ${OVERVIEW_COLORS.border}">
-          <div style="display:flex;align-items:center;gap:8px; justify-content: center;">
+          <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
             <div style="width:50px;background:${OVERVIEW_COLORS.border};border-radius:4px;height:6px">
               <div style="width:${pct}%;height:100%;background:${color};border-radius:4px"></div>
             </div>
             <span style="font-size:10px;font-weight:700;color:${color}">${pct}%</span>
           </div>
         </td>
-        <td style="padding:8px 10px;font-size:10px;font-weight:600;color:${color}; text-align: right;">
+        <td style="padding:8px 10px;font-size:10px;font-weight:600;color:${color};text-align:right;">
           ${pctLabel(pct)}
         </td>
       </tr>
     `;
-}).join('');
+  }).join('');
+
+  // Calcular totales reales para el pie de página
+  const totalRealImpact = sortedCells.reduce((sum, c) => {
+    return sum + (c.stats.totalRealAttendees || (c.stats.totalPresent + (c.stats.totalNewParticipants || 0)));
+  }, 0);
 
   const html = `
 <!DOCTYPE html>
@@ -134,7 +169,7 @@ export const generateOverviewPDF = (
       background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
       border-radius: 12px; padding: 20px; margin-bottom: 20px; color: #fff;
     }
-    .kpi-container { display: flex; gap: 10px; margin-bottom: 20px; }
+    .kpi-container { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th {
       background: #f8fafc; padding: 10px; font-size: 9px; color: #64748b;
@@ -144,6 +179,14 @@ export const generateOverviewPDF = (
     .footer {
       margin-top: 20px; padding-top: 10px; border-top: 1px solid #e2e8f0;
       display: flex; justify-content: space-between; font-size: 9px; color: #94a3b8;
+    }
+    .note {
+      background: #fef3c7; padding: 8px 12px; border-radius: 8px; font-size: 8px;
+      color: #92400e; margin-top: 15px; display: flex; align-items: center; gap: 8px;
+    }
+    .badge {
+      background: ${OVERVIEW_COLORS.purple}20; padding: 2px 6px; border-radius: 12px;
+      font-size: 7px; font-weight: 700; color: ${OVERVIEW_COLORS.purple};
     }
   </style>
 </head>
@@ -156,7 +199,7 @@ export const generateOverviewPDF = (
   <div class="kpi-container">${kpiBoxes}</div>
 
   <div style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">
-    <div style="background:${OVERVIEW_COLORS.primary}; padding:10px; color:#white; font-size:11px; font-weight:700; color: white;">
+    <div style="background:${OVERVIEW_COLORS.primary}; padding:10px; color:white; font-size:11px; font-weight:700;">
       COMPARATIVA DETALLADA POR ALTAR
     </div>
     <table>
@@ -166,7 +209,7 @@ export const generateOverviewPDF = (
           <th>Presentes</th>
           <th>Justificados</th>
           <th>Visitas</th>
-          <th>Total Impacto</th>
+          <th>Impacto REAL</th>
           <th>Asistencia %</th>
           <th style="text-align:right;">Estado</th>
         </tr>
@@ -177,9 +220,23 @@ export const generateOverviewPDF = (
     </table>
   </div>
 
+  ${selectedDate ? `
+  <div class="note">
+    <span>📌</span>
+    <span><strong>Nota:</strong> El campo "Impacto REAL" representa el total de asistentes reales registrados por el líder (incluye miembros presentes + visitas + ajustes manuales).</span>
+    <span class="badge">✏️ Corregido manualmente</span>
+  </div>
+  ` : `
+  <div class="note">
+    <span>📊</span>
+    <span><strong>Resumen del mes:</strong> ${totalRealImpact} asistentes reales en total entre todos los altares (Impacto REAL).</span>
+    <span class="badge">Datos en tiempo real</span>
+  </div>
+  `}
+
   <div class="footer">
     <span>Generado el ${new Date().toLocaleString()}</span>
-    <span>Sistema de Gestión Pastoral • Página 1 de 1</span>
+    <span>Sistema de Gestión Pastoral • Impacto REAL (totalAttendees)</span>
   </div>
 </body>
 </html>`;

@@ -1274,7 +1274,7 @@ const CellAttendanceStatsModal = ({
                                 {m.monthShort}
                               </td>
                               <td className="px-3 py-2.5 text-center text-slate-400 text-xs">
-                                {m.totalMeetings}
+                               {m.totalMeetings}
                               </td>
                               <td className="px-3 py-2.5 text-center">
                                 <Badge
