@@ -8,7 +8,7 @@ import { useAuth } from "./context/AuthContext";
 import { useConfirmation } from "./context/ConfirmationContext";
 import { 
   Users, HeartHandshake, GraduationCap, 
-  UserStar, Church, CheckSquare, Music, 
+  UserStar, Church, CheckSquare, Music, Rocket, 
   Calendar, Landmark, ChartPie, SlidersHorizontal, UserCircle, LogOut, Menu, X, Flame, MessageCircleQuestionMark, NotebookPen
 } from 'lucide-react';
 import DashboardTopbar from "./components/DashboardTopbar";
@@ -95,6 +95,7 @@ export const DashboardLayout = () => {
     { label: "Altares de Vida", path: "/dashboard/cellgroups", icon: Flame, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_DESPLIEGUE"]) },
     { label: "Asistencias", path: "/dashboard/cellgroups-atendance", icon: CheckSquare, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]) },
     { label: "Alabanza", path: "/dashboard/worshipPage", icon: Music, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]) },
+    { label: "Ministerios", path: "/dashboard/ministeriesPage", icon: Rocket, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE"]) },
     { label: "Actividades", path: "/dashboard/activity", icon: Calendar, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
     { label: "Finanzas", path: "/dashboard/finances", icon: Landmark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]) },
     { label: "Contabilidad", path: "/dashboard/financesChurch", icon: ChartPie, visible: hasAnyRole(["ROLE_PASTORES"]) },

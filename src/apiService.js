@@ -4130,6 +4130,199 @@ async getGlobalSummaryByDate(date) {
   }
 }
 
+// ============================================================
+  // 🏛️ MÓDULO DE MINISTERIOS
+  // Base URL del módulo: /api/v1/ministeries
+  // ============================================================
+
+  /**
+   * Listar todos los miembros asignados a equipos ministeriales (DTO)
+   */
+  async getMinisteryTeams() {
+    try {
+      log('🏛️ [getMinisteryTeams] Obteniendo equipos ministeriales');
+      return await this.request('/ministeries/teams');
+    } catch (error) {
+      logError('❌ [getMinisteryTeams] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Crear un nuevo ministerio
+   */
+  async createMinistery(name) {
+    try {
+      validateString(name, 'name', 2, 100);
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      
+      log('🏛️ [createMinistery] Creando ministerio:', name);
+      return await this.request(`/ministeries?${params.toString()}`, { method: 'POST' });
+    } catch (error) {
+      logError('❌ [createMinistery] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Añadir un rol a un ministerio
+   */
+  async addRoleToMinistery(ministeryId, name, description = null) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      validateString(name, 'name', 2, 100);
+      
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      if (description) params.append('description', description.trim());
+
+      log('🏛️ [addRoleToMinistery] Añadiendo rol al ministerio ID:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/roles?${params.toString()}`, { method: 'POST' });
+    } catch (error) {
+      logError('❌ [addRoleToMinistery] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Asignar un líder a un equipo ministerial
+   */
+  async assignLeaderToMinisteryTeam(ministeryId, leaderId, level, roleIds = []) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      validateId(leaderId, 'leaderId');
+      validateString(level, 'level', 1, 20); // LEVEL_1, LEVEL_2, LEVEL_3
+
+      const params = new URLSearchParams();
+      params.append('leaderId', leaderId);
+      params.append('level', level);
+      // Spring Boot espera los arrays repetidos o separados por coma
+      roleIds.forEach(id => params.append('roleIds', id));
+
+      log('🏛️ [assignLeaderToMinisteryTeam] Asignando líder al ministerio ID:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/team?${params.toString()}`, { method: 'POST' });
+    } catch (error) {
+      logError('❌ [assignLeaderToMinisteryTeam] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // 🏛️ Catálogo de Ministerios
+  async getMinisteries() {
+    try {
+      log('🏛️ [getMinisteries] Obteniendo catálogo de ministerios');
+      return await this.request('/ministeries');
+    } catch (error) {
+      logError('❌ [getMinisteries] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Actualizar estado del miembro en el equipo
+  async updateMinisteryTeamStatus(teamId, status) {
+    try {
+      validateId(teamId, 'teamId');
+      return await this.request(`/ministeries/teams/${teamId}/status?status=${status}`, { method: 'PUT' });
+    } catch (error) {
+      logError('❌ [updateMinisteryTeamStatus] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // --- Añadir al bloque de MINISTERIOS en apiService.js ---
+
+  async updateMinistery(id, name, active) {
+    try {
+      validateId(id, 'ministeryId');
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      
+      // Añadir el estado a la URL si viene definido
+      if (active !== undefined && active !== null) {
+          params.append('active', active);
+      }
+      
+      return await this.request(`/ministeries/${id}?${params.toString()}`, { method: 'PUT' });
+    } catch (error) {
+      logError('❌ [updateMinistery] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteMinistery(id) {
+    try {
+      validateId(id, 'ministeryId');
+      return await this.request(`/ministeries/${id}`, { method: 'DELETE' });
+    } catch (error) {
+      logError('❌ [deleteMinistery] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async updateMinisteryRole(roleId, name, description = null, active = null) {
+    try {
+      validateId(roleId, 'roleId');
+      const params = new URLSearchParams();
+      params.append('name', name.trim());
+      if (description) params.append('description', description.trim());
+      
+      // Añadir el estado a la URL si viene definido
+      if (active !== null && active !== undefined) {
+        params.append('active', active);
+      }
+      
+      return await this.request(`/ministeries/roles/${roleId}?${params.toString()}`, { method: 'PUT' });
+    } catch (error) {
+      logError('❌ [updateMinisteryRole] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Actualizar roles y nivel de un líder ya asignado a un equipo
+  async updateMinisteryTeam(teamId, level, roleIds = []) {
+    try {
+      validateId(teamId, 'teamId');
+      validateString(level, 'level', 1, 20);
+
+      const params = new URLSearchParams();
+      params.append('level', level);
+      roleIds.forEach(id => params.append('roleIds', id));
+
+      log('🏛️ [updateMinisteryTeam] Actualizando equipo ID:', teamId);
+      return await this.request(`/ministeries/teams/${teamId}?${params.toString()}`, { method: 'PUT' });
+    } catch (error) {
+      logError('❌ [updateMinisteryTeam] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteMinisteryRole(roleId) {
+    try {
+      validateId(roleId, 'roleId');
+      return await this.request(`/ministeries/roles/${roleId}`, { method: 'DELETE' });
+    } catch (error) {
+      logError('❌ [deleteMinisteryRole] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Cambiar el estado de un miembro en el equipo ministerial
+   */
+  async updateMinisteryTeamStatus(teamId, status) {
+    try {
+      validateId(teamId, 'teamId');
+      validateString(status, 'status', 1, 20); // ACTIVE, SUSPENDED, INACTIVE
+
+      log('🏛️ [updateMinisteryTeamStatus] Actualizando estado a:', status);
+      return await this.request(`/ministeries/teams/${teamId}/status?status=${status}`, { method: 'PUT' });
+    } catch (error) {
+      logError('❌ [updateMinisteryTeamStatus] Error:', error.message);
+      throw error;
+    }
+  }
+
 } // Fin de la clase ApiService
 
 const apiService = new ApiService();

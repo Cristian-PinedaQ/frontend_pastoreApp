@@ -30,6 +30,7 @@ import CounselingPage from './pages/CounselingPage.jsx';
 import ManualRaizViva from './pages/ManualRaizViva.jsx';
 import LevelsConfigPage from './pages/LevelsConfigPage.jsx';
 import WorshipPage from './pages/WorshipPage.jsx';
+import MinisteriesPage from './pages/MinisteriesPage.jsx';
 
 function App() {
   return (
@@ -128,6 +129,18 @@ function App() {
                   <ProtectedRoute
                     element={<WorshipPage />}
                     requiredRoles={['ROLE_PASTORES', 'ROLE_ALABANZA']}
+                  />
+                }
+              />
+
+              {/* Ministerios */}
+
+              <Route
+                path="ministeriesPage"
+                element={
+                  <ProtectedRoute
+                    element={<MinisteriesPage />}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_DESPLIEGUE']}
                   />
                 }
               />
