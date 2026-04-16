@@ -4,12 +4,12 @@ import {
   X,
   Zap,
   Calendar,
-  DollarSign,
   Users,
   Target,
   CheckCircle2,
   AlertCircle,
   ArrowRight,
+  Banknote,
   BookOpen,
   ShieldCheck,
   Settings,
@@ -349,11 +349,10 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
           <div className="space-y-5 sm:space-y-6">
             {/* ── Nombre ──────────────────────────────────────────────── */}
             <div className="space-y-2 group">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
-                Nombre de la Actividad *
+              <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+                <Target className="w-4 h-4 sm:w-5 sm:h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />Nombre de la Actividad *
               </label>
               <div className="relative">
-                <Target className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-300 group-focus-within:text-indigo-600 transition-colors" />
                 <input
                   type="text"
                   name="activityName"
@@ -456,14 +455,13 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-6">
               {/* Precio */}
               <div className="space-y-2 group">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
-                  Inversión (COP) *
+                <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+                 <Banknote
+                    size={18}
+                    className="text-slate-300 group-focus-within:text-emerald-500 transition-colors"
+                  /> Inversión (COP) *
                 </label>
                 <div className="relative">
-                  <DollarSign
-                    size={18}
-                    className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors"
-                  />
                   <input
                     type="number"
                     name="price"
@@ -490,14 +488,14 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
 
               {/* Capacidad */}
               <div className="space-y-2 group">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
-                  Cupos (Opcional)
+                <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+                 <Users
+                    size={18}
+                    className="text-slate-300 group-focus-within:text-indigo-600 transition-colors"
+                  /> Cupos (Opcional)
                 </label>
                 <div className="relative">
-                  <Users
-                    size={18}
-                    className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors"
-                  />
+                  
                   <input
                     type="number"
                     name="quantity"
@@ -527,14 +525,13 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
 
             {/* ── Fecha de finalización ────────────────────────────────── */}
             <div className="space-y-2 group">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
-                Finalización de Agenda *
+              <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+               <Calendar
+                  size={18}
+                  className="text-slate-300 group-focus-within:text-indigo-600 transition-colors"
+                /> Finalización de Agenda *
               </label>
               <div className="relative">
-                <Calendar
-                  size={18}
-                  className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors"
-                />
                 <input
                   type="date"
                   name="endDate"

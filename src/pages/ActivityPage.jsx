@@ -34,6 +34,12 @@ const STATUS_CONFIG = {
   INACTIVE:    { label: "Inactiva",    color: "rose",    icon: <AlertCircle className="w-4 h-4" /> },
 };
 
+const parseLocalDate = (dateString) => {
+  if (!dateString) return null;
+  const [year, month, day] = dateString.split("-");
+  return new Date(year, month - 1, day); // LOCAL, no UTC
+};
+
 const ActivityPage = () => {
   const [allActivities, setAllActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,14 +71,23 @@ const ActivityPage = () => {
   useEffect(() => { loadActivities(); }, [loadActivities]);
 
   const getActivityStatus = useCallback((activity) => {
-    if (!activity || !activity.isActive) return STATUS_CONFIG.INACTIVE;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const end = new Date(activity.endDate);
-    if (end < today) return STATUS_CONFIG.FINISHED;
-    const daysLeft = (end - today) / (1000 * 60 * 60 * 24);
-    if (daysLeft <= 7) return STATUS_CONFIG.ENDING_SOON;
-    return STATUS_CONFIG.ACTIVE;
-  }, []);
+  if (!activity || !activity.isActive) return STATUS_CONFIG.INACTIVE;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const end = parseLocalDate(activity.endDate);
+
+  if (!end) return STATUS_CONFIG.INACTIVE;
+
+  if (end < today) return STATUS_CONFIG.FINISHED;
+
+  const daysLeft = (end - today) / (1000 * 60 * 60 * 24);
+
+  if (daysLeft <= 7) return STATUS_CONFIG.ENDING_SOON;
+
+  return STATUS_CONFIG.ACTIVE;
+}, []);
 
   const filteredActivities = useMemo(() => {
     return allActivities.filter(a => {
@@ -83,9 +98,12 @@ const ActivityPage = () => {
         (selectedStatus === "ACTIVE" && a.isActive && statusInfo.label !== "Finalizada") ||
         (selectedStatus === "FINISHED" && (statusInfo.label === "Finalizada" || !a.isActive));
 
-      const matchesDate = (!dateRange.start || a.endDate >= dateRange.start) && (!dateRange.end || a.endDate <= dateRange.end);
+      const matchesDate = (
+  (!dateRange.start || parseLocalDate(a.endDate) >= parseLocalDate(dateRange.start)) &&
+  (!dateRange.end || parseLocalDate(a.endDate) <= parseLocalDate(dateRange.end))
+);
       return matchesSearch && matchesStatus && matchesDate;
-    }).sort((a, b) => new Date(b.endDate) - new Date(a.endDate));
+    }).sort((a, b) => parseLocalDate(b.endDate) - parseLocalDate(a.endDate));
   }, [allActivities, searchTerm, selectedStatus, dateRange, getActivityStatus]);
 
   const stats = useMemo(() => {
@@ -414,7 +432,7 @@ const ActivityPage = () => {
                       </div>
                       <div className="space-y-1">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Calendar size={11} /> Cierre</p>
-                        <p className="text-sm font-black text-slate-700 dark:text-slate-400 tracking-tighter">{new Date(activity.endDate).toLocaleDateString()}</p>
+                        <p className="text-sm font-black text-slate-700 dark:text-slate-400 tracking-tighter">{parseLocalDate(activity.endDate).toLocaleDateString()}</p>
                       </div>
                     </div>
                   </div>
@@ -473,7 +491,7 @@ const ActivityPage = () => {
                         <td className="px-5 sm:px-8 py-5 sm:py-7">
                           <div className="flex flex-col">
                             <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight group-hover:text-indigo-600 transition-colors leading-tight">{activity.activityName}</span>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{new Date(activity.endDate).toLocaleDateString()}</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{parseLocalDate(activity.endDate).toLocaleDateString()}</span>
                           </div>
                         </td>
                         <td className="px-5 sm:px-8 py-5 sm:py-7 hidden sm:table-cell">

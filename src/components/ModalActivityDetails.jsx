@@ -375,10 +375,7 @@ const ModalActivityDetails = ({
   };
 
   // ✅ FIX #5: Verifica estado de la actividad para habilitar inscripción
-  const canEnroll =
-    activity?.status?.color === "success" ||
-    activity?.status?.color === "warning";
-
+  const canEnroll = activity?.isActive === true;
   if (!isOpen || !activity) return null;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -689,14 +686,13 @@ const ModalActivityDetails = ({
                       className="space-y-2 relative group"
                       ref={dropdownRef}
                     >
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
-                        Localizador de Miembro *
-                      </label>
-                      <div className="relative">
+                      <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
                         <Search
                           size={18}
-                          className="absolute left-5 sm:left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors"
-                        />
+                          className="text-slate-300 group-focus-within:text-indigo-600 transition-colors"
+                        />Localizador de Miembro *
+                      </label>
+                      <div className="relative">
                         <input
                           type="text"
                           placeholder="Nombre o documento..."

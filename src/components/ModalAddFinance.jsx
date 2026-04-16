@@ -9,7 +9,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { useConfirmation } from "../context/ConfirmationContext";
 import {
   X,
-  Search,
   CheckCircle2,
   AlertCircle,
   Banknote,
@@ -346,10 +345,6 @@ const ModalAddFinance = ({
               <User size={16} className="text-blue-500" /> Miembro <span className="text-red-500">*</span>
             </label>
             <div className="relative">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                size={18}
-              />
               <input
                 type="text"
                 placeholder={
@@ -414,7 +409,7 @@ const ModalAddFinance = ({
               <span className="text-xs font-normal text-gray-400 ml-1">(sin puntos/comas)</span>
             </label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-semibold"></span>
               <input
                 type="text"
                 name="amount"
