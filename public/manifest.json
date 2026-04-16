@@ -1,6 +1,6 @@
 {
   "name": "Gestión Pastoral",
-  "short_name": "Pastoral",
+  "short_name": "PastoreAPP",
   "description": "Sistema integral de administración para congregaciones e iglesias",
   "start_url": "/",
   "display": "standalone",
