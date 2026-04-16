@@ -60,7 +60,11 @@ const resolveLeaderLabel = (attendance) => {
     GROUP_LEADER: { label: "Líder de Grupo", icon: UserStar, color: "amber" },
     HOST: { label: "Anfitrión", icon: Home, color: "emerald" },
     TIMOTEO: { label: "Timoteo", icon: BookOpen, color: "emerald" },
-    BRANCH_LEADER: { label: "Líder de Rama", icon: CircleUserRound, color: "blue" },
+    BRANCH_LEADER: {
+      label: "Líder de Rama",
+      icon: CircleUserRound,
+      color: "blue",
+    },
     MAIN_LEADER: { label: "Líder 12", icon: ShieldUser, color: "indigo" },
   };
 
@@ -345,6 +349,7 @@ const CellAttendancePage = () => {
   const searchRef = useRef(null);
   const { user, hasAnyRole } = useAuth();
   const isLeaderShip = hasAnyRole(["PASTORES", "CONEXION"]);
+  const [datesWithRecords, setDatesWithRecords] = useState(new Set());
 
   // ── Toast helpers ──────────────────────────────────────────────────────────
   const addToast = useCallback((message, type = "success") => {
@@ -369,8 +374,10 @@ const CellAttendancePage = () => {
         apiService.getCellAttendancesCurrentMonth(),
         apiService.getActiveAttendanceEvents(),
       ]);
+
       setUserCells(Array.isArray(cellsRes) ? cellsRes : []);
-      setMonthAttendances(monthRes?.attendances || {});
+      // ✅ CORRECCIÓN: Usar monthRes.cells en lugar de monthRes.attendances
+      setMonthAttendances(monthRes?.cells || {});
 
       const dates = new Set();
       const now = new Date();
@@ -445,45 +452,57 @@ const CellAttendancePage = () => {
 
   // ── Load attendances when cell/date changes ────────────────────────────────
   const loadAttendances = useCallback(async () => {
-    if (!selectedCellId || !selectedDate) return;
-    setLoading(true);
-    setIsDirty(false);
-    try {
-      const [attRes, sumRes, sesRes] = await Promise.all([
-        apiService.getCellAttendancesByDate(selectedCellId, selectedDate),
-        apiService.getCellAttendanceSummary(selectedCellId, selectedDate),
-        apiService.getSessionData(selectedCellId, selectedDate),
-      ]);
-      const list = (attRes?.attendances || []).filter(
-        (a) => a.attendanceDate === selectedDate,
-      );
-      setAttendances(list);
-      setSummary(sumRes);
-      const edited = {};
-      list.forEach((a) => {
-        edited[a.memberId] = {
-          present: a.present || false,
-          justifiedAbsence: a.justifiedAbsence || false,
-          justificationReason: a.justificationReason || "",
-        };
-      });
-      setEditedAttendances(edited);
-      setSessionForm(
-        sesRes?.hasData
-          ? {
-              newParticipants: sesRes.sessionData.newParticipants || 0,
-              totalAttendees: sesRes.sessionData.totalAttendees || "",
-              notes: sesRes.sessionData.notes || "",
-            }
-          : { newParticipants: 0, totalAttendees: "", notes: "" },
-      );
-    } catch {
-      setAttendances([]);
-      setSummary(null);
-    } finally {
-      setLoading(false);
+  if (!selectedCellId || !selectedDate) return;
+  setLoading(true);
+  setIsDirty(false);
+  try {
+    const [attRes, sumRes, sesRes] = await Promise.all([
+      apiService.getCellAttendancesByDate(selectedCellId, selectedDate),
+      apiService.getCellAttendanceSummary(selectedCellId, selectedDate),
+      apiService.getSessionData(selectedCellId, selectedDate),
+    ]);
+    const list = (attRes?.attendances || []).filter(
+      (a) => a.attendanceDate === selectedDate,
+    );
+    setAttendances(list);
+    setSummary(sumRes);
+    
+    // Verificar si hay datos significativos en esta fecha
+    const hasSignificantData = list.some(a => 
+      a.present === true || 
+      a.justifiedAbsence === true ||
+      (a.lastModifiedBy && a.lastModifiedBy !== "SYSTEM")
+    );
+    
+    if (hasSignificantData) {
+      setDatesWithRecords(prev => new Set([...prev, selectedDate]));
     }
-  }, [selectedCellId, selectedDate]);
+    
+    const edited = {};
+    list.forEach((a) => {
+      edited[a.memberId] = {
+        present: a.present || false,
+        justifiedAbsence: a.justifiedAbsence || false,
+        justificationReason: a.justificationReason || "",
+      };
+    });
+    setEditedAttendances(edited);
+    setSessionForm(
+      sesRes?.hasData
+        ? {
+            newParticipants: sesRes.sessionData.newParticipants || 0,
+            totalAttendees: sesRes.sessionData.totalAttendees || "",
+            notes: sesRes.sessionData.notes || "",
+          }
+        : { newParticipants: 0, totalAttendees: "", notes: "" },
+    );
+  } catch {
+    setAttendances([]);
+    setSummary(null);
+  } finally {
+    setLoading(false);
+  }
+}, [selectedCellId, selectedDate]);
 
   useEffect(() => {
     loadAttendances();
@@ -541,56 +560,61 @@ const CellAttendancePage = () => {
 
   // ── Save ───────────────────────────────────────────────────────────────────
   const handleFinalSubmit = async () => {
-    if (!selectedDate) return;
-    setSaving(true);
-    try {
-      const attendanceRequests = Object.entries(editedAttendances).map(
-        ([id, data]) => ({
-          memberId: Number(id),
-          present: data.present,
-          justifiedAbsence: data.justifiedAbsence,
-          justificationReason: data.justificationReason,
-        }),
-      );
-      await Promise.all([
-        apiService.updateBulkCellAttendances(
-          selectedCellId,
-          selectedDate,
-          attendanceRequests,
-        ),
-        apiService.saveSessionData(selectedCellId, selectedDate, {
-          newParticipants: Number(sessionForm.newParticipants),
-          totalAttendees: sessionForm.totalAttendees
-            ? Number(sessionForm.totalAttendees)
-            : null,
-          notes: sessionForm.notes,
-        }),
-      ]);
-      addToast("¡Reporte consolidado guardado con éxito!");
-      setIsDirty(false);
-      loadAttendances();
-    } catch (err) {
-      addToast(
-        err?.message || "Ocurrió un error al sincronizar el reporte",
-        "error",
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+  if (!selectedDate) return;
+  setSaving(true);
+  try {
+    const attendanceRequests = Object.entries(editedAttendances).map(
+      ([id, data]) => ({
+        memberId: Number(id),
+        present: data.present,
+        justifiedAbsence: data.justifiedAbsence,
+        justificationReason: data.justificationReason,
+      }),
+    );
+    await Promise.all([
+      apiService.updateBulkCellAttendances(
+        selectedCellId,
+        selectedDate,
+        attendanceRequests,
+      ),
+      apiService.saveSessionData(selectedCellId, selectedDate, {
+        newParticipants: Number(sessionForm.newParticipants),
+        totalAttendees: sessionForm.totalAttendees
+          ? Number(sessionForm.totalAttendees)
+          : null,
+        notes: sessionForm.notes,
+      }),
+    ]);
+    addToast("¡Reporte consolidado guardado con éxito!");
+    
+    // Marcar esta fecha como que tiene registros significativos
+    setDatesWithRecords(prev => new Set([...prev, selectedDate]));
+    
+    setIsDirty(false);
+    loadAttendances();
+  } catch (err) {
+    addToast(
+      err?.message || "Ocurrió un error al sincronizar el reporte",
+      "error",
+    );
+  } finally {
+    setSaving(false);
+  }
+};
 
   // ── Generate list ──────────────────────────────────────────────────────────
   const handleGenerateList = async () => {
-    setGenerating(true);
-    try {
-      await apiService.generateCellAttendances(selectedCellId, selectedDate);
-      loadAttendances();
-    } catch (err) {
-      addToast(err.message, "error");
-    } finally {
-      setGenerating(false);
-    }
-  };
+  setGenerating(true);
+  try {
+    await apiService.generateCellAttendances(selectedCellId, selectedDate);
+    // IMPORTANTE: NO marcar la fecha aquí porque solo es la estructura inicial
+    loadAttendances();
+  } catch (err) {
+    addToast(err.message, "error");
+  } finally {
+    setGenerating(false);
+  }
+};
 
   // ── Monthly PDF ────────────────────────────────────────────────────────────
   const handleMonthlyReport = async () => {
@@ -661,9 +685,42 @@ const CellAttendancePage = () => {
   const recordedDates = useMemo(() => {
     if (!selectedCellId || !monthAttendances) return new Set();
     const key = String(selectedCellId);
-    const data = monthAttendances[key] || monthAttendances;
-    return new Set(Object.keys(data || {}));
-  }, [monthAttendances, selectedCellId]);
+    const cellAttendanceData = monthAttendances[key];
+
+    if (!Array.isArray(cellAttendanceData)) return datesWithRecords;
+
+    // Crear un mapa de fecha -> si tiene datos significativos
+    const dateHasData = new Map();
+
+    cellAttendanceData.forEach((attendance) => {
+      const date = attendance.attendanceDate;
+      const currentStatus = dateHasData.get(date) || false;
+
+      // Una fecha tiene datos significativos si:
+      // 1. Algún miembro está presente (present === true)
+      // 2. O hay una justificación de ausencia
+      // 3. O fue modificado por un usuario real (no SYSTEM)
+      const hasSignificantData =
+        currentStatus ||
+        attendance.present === true ||
+        attendance.justifiedAbsence === true ||
+        (attendance.lastModifiedBy && attendance.lastModifiedBy !== "SYSTEM");
+
+      if (hasSignificantData) {
+        dateHasData.set(date, true);
+      }
+    });
+
+    // Devolver solo las fechas que tienen datos significativos
+    const result = new Set();
+    for (const [date, hasData] of dateHasData.entries()) {
+      if (hasData) {
+        result.add(date);
+      }
+    }
+
+    return result.size > 0 ? result : datesWithRecords;
+  }, [monthAttendances, selectedCellId, datesWithRecords]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -1070,8 +1127,8 @@ const CellAttendancePage = () => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] ml-1 flex items-center gap-1.5">
-                    <BookOpen size={11} className="text-indigo-400" />{" "}
-                    Notas u Observaciones
+                    <BookOpen size={11} className="text-indigo-400" /> Notas u
+                    Observaciones
                   </label>
                   <textarea
                     value={sessionForm.notes}
