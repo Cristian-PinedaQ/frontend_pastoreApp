@@ -95,7 +95,7 @@ export const DashboardLayout = () => {
     { label: "Altares de Vida", path: "/dashboard/cellgroups", icon: Flame, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_DESPLIEGUE"]) },
     { label: "Asistencias", path: "/dashboard/cellgroups-atendance", icon: CheckSquare, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]) },
     { label: "Alabanza", path: "/dashboard/worshipPage", icon: Music, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]) },
-    { label: "Ministerios", path: "/dashboard/ministeriesPage", icon: Rocket, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE"]) },
+    { label: "Ministerios", path: "/dashboard/ministeriesPage", icon: Rocket, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE", "ROLE_PROTOCOLO", "ROLE_MINISTERIOS"]) },
     { label: "Actividades", path: "/dashboard/activity", icon: Calendar, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
     { label: "Finanzas", path: "/dashboard/finances", icon: Landmark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]) },
     { label: "Contabilidad", path: "/dashboard/financesChurch", icon: ChartPie, visible: hasAnyRole(["ROLE_PASTORES"]) },

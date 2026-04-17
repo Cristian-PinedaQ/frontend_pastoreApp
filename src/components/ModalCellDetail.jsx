@@ -22,10 +22,10 @@ import {
 } from 'lucide-react';
 import apiService from "../apiService";
 import { logUserAction } from "../utils/securityLogger";
-import nameHelper from "../services/nameHelper";
+//import nameHelper from "../services/nameHelper";
 import { generateCellDetailPDF } from "../services/cellDetailPdfGenerator";
 
-const { getDisplayName } = nameHelper;
+//const { getDisplayName } = nameHelper;
 
 const STATUS_MAP = {
   ACTIVE: { label: "Activa", icon: CheckCircle2, color: "emerald", bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400" },
@@ -50,7 +50,7 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const [error, setError] = useState("");
+  const [, setError] = useState("");
   
   // Search state
   const [searchTerm, setSearchTerm] = useState("");

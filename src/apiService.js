@@ -4219,17 +4219,6 @@ async getGlobalSummaryByDate(date) {
     }
   }
 
-  // Actualizar estado del miembro en el equipo
-  async updateMinisteryTeamStatus(teamId, status) {
-    try {
-      validateId(teamId, 'teamId');
-      return await this.request(`/ministeries/teams/${teamId}/status?status=${status}`, { method: 'PUT' });
-    } catch (error) {
-      logError('❌ [updateMinisteryTeamStatus] Error:', error.message);
-      throw error;
-    }
-  }
-
   // --- Añadir al bloque de MINISTERIOS en apiService.js ---
 
   async updateMinistery(id, name, active) {
@@ -4319,6 +4308,57 @@ async getGlobalSummaryByDate(date) {
       return await this.request(`/ministeries/teams/${teamId}/status?status=${status}`, { method: 'PUT' });
     } catch (error) {
       logError('❌ [updateMinisteryTeamStatus] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // --- EVENTOS (PROGRAMACIÓN) ---
+  async getMinisteryEvents(ministeryId) { return await this.request(`/ministeries/${ministeryId}/events`); }
+
+  async deleteMinisteryEvent(eventId) { return await this.request(`/ministeries/events/${eventId}`, { method: 'DELETE' }); }
+
+  async createMinisteryEvent(ministeryId, name, eventDate) {
+    const params = new URLSearchParams();
+    params.append('name', name);
+    
+    // 🛠️ FIX: Spring Boot requiere los segundos. 
+    // Si el string viene como "2026-04-20T19:00" (16 caracteres), le agregamos ":00"
+    let safeDate = eventDate;
+    if (safeDate.length === 16) {
+      safeDate += ":00";
+    }
+    
+    params.append('eventDate', safeDate); 
+    return await this.request(`/ministeries/${ministeryId}/events?${params.toString()}`, { method: 'POST' });
+  }
+
+  
+
+  async syncMinisteryEventAssignments(eventId, assignmentsArray) {
+    // assignmentsArray = [{ roleId: 1, teamId: 2 }, ...]
+    return await this.request(`/ministeries/events/${eventId}/assignments`, { 
+      method: 'PUT',
+      body: JSON.stringify(assignmentsArray)
+    });
+  }
+
+  // Autogenerar programación mensual (Miércoles y Domingos)
+  async autoGenerateMinisterySchedule() {
+    try {
+      log('⚙️ [autoGenerateMinisterySchedule] Lanzando algoritmo de generación');
+      return await this.request('/ministeries/schedule/auto-generate', { method: 'POST' });
+    } catch (error) {
+      logError('❌ [autoGenerateMinisterySchedule] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Marcar la asistencia de un miembro en un evento
+  async markMinisteryEventAttendance(assignmentId, attended) {
+    try {
+      return await this.request(`/ministeries/events/assignments/${assignmentId}/attendance?attended=${attended}`, { method: 'PATCH' });
+    } catch (error) {
+      logError('❌ [markMinisteryEventAttendance] Error:', error.message);
       throw error;
     }
   }

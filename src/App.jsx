@@ -140,7 +140,7 @@ function App() {
                 element={
                   <ProtectedRoute
                     element={<MinisteriesPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_DESPLIEGUE']}
+                    requiredRoles={['ROLE_PASTORES', 'ROLE_DESPLIEGUE', 'ROLE_PROTOCOLO', 'ROLE_MINISTERIOS']}
                   />
                 }
               />
