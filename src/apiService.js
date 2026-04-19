@@ -3512,6 +3512,23 @@ async enrollInActivity(memberId, activityId, initialPayment, incomeMethod, quant
   }
 }
 
+// En apiService.js, dentro del bloque de CONTRIBUCIONES DE ACTIVIDAD
+async deleteActivityContribution(contributionId) {
+  try {
+    validateId(contributionId, 'contributionId');
+    log('🗑️ [deleteActivityContribution] Eliminando contribución ID:', contributionId);
+    const response = await this.request(
+      `/activity-contribution/delete/${contributionId}`,
+      { method: 'DELETE' }
+    );
+    log('✅ [deleteActivityContribution] Eliminado correctamente');
+    return response;
+  } catch (error) {
+    logError('❌ [deleteActivityContribution] Error:', error.message);
+    throw error;
+  }
+}
+
   // ========== ⚙️ NIVELES — ACTUALIZAR requiresPayment ==========
 
   /**
