@@ -275,17 +275,23 @@ const ActivityPage = () => {
     quantity,
   ) => {
     try {
-      const payload = {
-        activityId,
-        memberId,
-        initialPayment: parseFloat(initialPayment) || 0,
-        incomeMethod,
-        quantity: parseInt(quantity) || 1,
-      };
-      await apiService.request("/activity-contribution", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      // ✅ CORRECTO
+      const currentUser = JSON.parse(sessionStorage.getItem("user") || "{}");
+
+      await apiService.request(
+        "/activity-contribution/create-with-initial-payment",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            memberId: memberId,
+            activityId: activityId,
+            incomeMethod: incomeMethod, // "CASH" | "BANK_TRANSFER"
+            recordedBy: currentUser?.username || "Sistema",
+            initialPaymentAmount: initialPayment > 0 ? initialPayment : null, // null = sin pago
+            quantity: quantity, // 1 para ENROLLMENT, >= 1 para STANDALONE
+          }),
+        },
+      );
       loadActivities();
       return true;
     } catch (err) {
@@ -626,7 +632,8 @@ const ActivityPage = () => {
                       </h3>
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-indigo-50 dark:bg-black/40 text-indigo-600 dark:text-indigo-400 text-[8px] font-black uppercase tracking-widest rounded-full border border-indigo-100 dark:border-white/5">
                         <Layers size={9} />{" "}
-                        {LEVEL_LABELS[activity.requiredLevel?.code] || "General"}
+                        {LEVEL_LABELS[activity.requiredLevel?.code] ||
+                          "General"}
                       </span>
                     </div>
 
@@ -744,7 +751,8 @@ const ActivityPage = () => {
                         </td>
                         <td className="px-5 sm:px-8 py-5 sm:py-7 hidden sm:table-cell">
                           <span className="px-3 py-1.5 bg-slate-100 dark:bg-white/5 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-xl">
-                            {LEVEL_LABELS[activity.requiredLevel?.code] || "General"}
+                            {LEVEL_LABELS[activity.requiredLevel?.code] ||
+                              "General"}
                           </span>
                         </td>
                         <td className="px-5 sm:px-8 py-5 sm:py-7">
@@ -876,13 +884,18 @@ const ActivityPage = () => {
         initialData={modals.edit ? selectedActivity : null}
         isEditing={modals.edit}
       />
-      <ModalActivityDetails
-        isOpen={modals.details}
-        onClose={() => setModals({ ...modals, details: false })}
-        activity={selectedActivity}
-        onUpdate={loadActivities}
-        onEnrollParticipant={handleEnrollParticipant}
-      />
+      // ✅ Modal con balance
+<ModalActivityDetails
+  isOpen={modals.details}
+  onClose={() => {
+    setModals({ ...modals, details: false });
+    setSelectedBalance(null);
+  }}
+  activity={selectedActivity}
+  balance={selectedBalance}         
+  onUpdate={loadActivities}
+  onEnrollParticipant={handleEnrollParticipant}
+/>
       <ModalActivityParticipants
         isOpen={modals.participants}
         onClose={() => setModals({ ...modals, participants: false })}

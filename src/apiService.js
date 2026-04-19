@@ -3490,6 +3490,28 @@ class ApiService {
     }
   }
 
+  // ========== 🎯 CONTRIBUCIONES DE ACTIVIDAD ==========
+
+async enrollInActivity(memberId, activityId, initialPayment, incomeMethod, quantity) {
+  try {
+    const currentUser = this.getCurrentUser();
+    return await this.request('/activity-contribution/create-with-initial-payment', {
+      method: 'POST',
+      body: JSON.stringify({
+        memberId,
+        activityId,
+        incomeMethod: incomeMethod || 'CASH',
+        recordedBy: currentUser?.username || 'Sistema',
+        initialPaymentAmount: initialPayment > 0 ? initialPayment : null,
+        quantity: quantity || 1,
+      }),
+    });
+  } catch (error) {
+    console.error('❌ [enrollInActivity] Error:', error.message);
+    throw error;
+  }
+}
+
   // ========== ⚙️ NIVELES — ACTUALIZAR requiresPayment ==========
 
   /**
