@@ -1062,9 +1062,9 @@ const EnrollmentsPage = () => {
                   </div>
 
                   {/* Acciones de documentos */}
-                  <div className="flex flex-col gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <button onClick={handleOpenEditModal} className="flex items-center justify-center gap-2 w-full py-3 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all border border-amber-200 dark:border-amber-800">
-                      <Pencil size={14} /> Editar Cohorte
+                      <Pencil size={12} /> Editar Cohorte
                     </button>
                     <button onClick={exportCohortPDF} disabled={exportingPDF} className="flex items-center justify-center gap-2 w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20">
                       {exportingPDF ? <><RefreshCw size={14} className="animate-spin" /> Preparando...</> : <><FileDown size={14} /> Exportar PDF de Cohorte</>}

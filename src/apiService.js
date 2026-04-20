@@ -229,7 +229,7 @@ class ApiService {
     log('👋 [logout] Sesión cerrada');
   }
 
-  
+
 
   // ========== 👥 MIEMBROS ==========
   async getMembers(page = 0, limit = 10) {
@@ -769,16 +769,16 @@ class ApiService {
   // ========== ✅ ASISTENCIAS ==========
 
   async getAttendanceByLesson(lessonId) {
-  try {
-    validateId(lessonId, 'lessonId');
-    log('🔍 [getAttendanceByLesson] Consultando lección:', lessonId);
-    // IMPORTANTE: Asegúrate de que este sea el endpoint correcto en tu backend
-    return await this.request(`/attendance/lesson/${lessonId}`);
-  } catch (error) {
-    logError('❌ [getAttendanceByLesson] Error:', error.message);
-    throw error;
+    try {
+      validateId(lessonId, 'lessonId');
+      log('🔍 [getAttendanceByLesson] Consultando lección:', lessonId);
+      // IMPORTANTE: Asegúrate de que este sea el endpoint correcto en tu backend
+      return await this.request(`/attendance/lesson/${lessonId}`);
+    } catch (error) {
+      logError('❌ [getAttendanceByLesson] Error:', error.message);
+      throw error;
+    }
   }
-}
   async recordAttendance(attendanceData) {
     try {
       if (!attendanceData || typeof attendanceData !== 'object') {
@@ -1774,6 +1774,19 @@ class ApiService {
           }
         }
       });
+      if (payload.meetingTime && payload.meetingTime.length > 5) {
+        payload.meetingTime = payload.meetingTime.substring(0, 5);
+      }
+      // Fix 2 — Asegurar que district sea el valor del enum, no la descripción
+      const districtMap = {
+        'Pastores': 'PASTORES',
+        'Distrito 1': 'D1',
+        'Distrito 2': 'D2',
+        'Distrito 3': 'D3',
+      };
+      if (payload.district && districtMap[payload.district]) {
+        payload.district = districtMap[payload.district];
+      }
       log('📝 [updateCell] Actualizando célula ID:', id);
       const response = await this.request(`/cells/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
       log('✅ [updateCell] Célula actualizada');
@@ -1931,109 +1944,109 @@ class ApiService {
   // ========== 📊 ESTADÍSTICAS ==========
 
   async getStatisticsByLevelAndYear() {
-  try {
-    log('📊 [getStatisticsByLevelAndYear] Iniciando');
-    const enrollments = await this.getEnrollments();
-    log(`📋 Cohortes obtenidas: ${enrollments.length}`);
+    try {
+      log('📊 [getStatisticsByLevelAndYear] Iniciando');
+      const enrollments = await this.getEnrollments();
+      log(`📋 Cohortes obtenidas: ${enrollments.length}`);
 
-    if (!enrollments.length) return {};
+      if (!enrollments.length) return {};
 
-    // ✅ TODAS las cohortes en paralelo en lugar de secuencial
-    const results = await Promise.allSettled(
-      enrollments.map(enrollment =>
-        this.getStudentEnrollmentsByEnrollment(enrollment.id)
-          .then(students => ({ enrollment, students: students || [] }))
-      )
-    );
+      // ✅ TODAS las cohortes en paralelo en lugar de secuencial
+      const results = await Promise.allSettled(
+        enrollments.map(enrollment =>
+          this.getStudentEnrollmentsByEnrollment(enrollment.id)
+            .then(students => ({ enrollment, students: students || [] }))
+        )
+      );
 
-    const levelYearData = {};
+      const levelYearData = {};
 
-    results.forEach(result => {
-      if (result.status === 'rejected') {
-        console.warn('⚠️ Cohorte falló:', result.reason?.message);
-        return;
-      }
+      results.forEach(result => {
+        if (result.status === 'rejected') {
+          console.warn('⚠️ Cohorte falló:', result.reason?.message);
+          return;
+        }
 
-      const { enrollment, students } = result.value;
-      const cohortName = enrollment.cohortName || enrollment.name;
+        const { enrollment, students } = result.value;
+        const cohortName = enrollment.cohortName || enrollment.name;
 
-      if (!students.length) {
-        log(`⚠️ ${cohortName} - Sin estudiantes`);
-        return;
-      }
+        if (!students.length) {
+          log(`⚠️ ${cohortName} - Sin estudiantes`);
+          return;
+        }
 
-      log(`✅ ${cohortName} - ${students.length} estudiantes`);
+        log(`✅ ${cohortName} - ${students.length} estudiantes`);
 
-      students.forEach(student => {
-        // Extraer año
-        let year = 'SIN_AÑO';
-        const rawDate = student.enrollmentDate || student.enrollment_date;
-        if (rawDate) {
-          const extractedYear = new Date(rawDate).getFullYear();
-          if (!isNaN(extractedYear) && extractedYear > 1900) {
-            year = extractedYear.toString();
+        students.forEach(student => {
+          // Extraer año
+          let year = 'SIN_AÑO';
+          const rawDate = student.enrollmentDate || student.enrollment_date;
+          if (rawDate) {
+            const extractedYear = new Date(rawDate).getFullYear();
+            if (!isNaN(extractedYear) && extractedYear > 1900) {
+              year = extractedYear.toString();
+            }
           }
-        }
 
-        const level = student.levelEnrollment || student.level || 'SIN_NIVEL';
+          const level = student.levelEnrollment || student.level || 'SIN_NIVEL';
 
-        if (!levelYearData[year]) levelYearData[year] = {};
-        if (!levelYearData[year][level]) {
-          levelYearData[year][level] = {
-            label: this.getLevelLabel(level),
-            levelEnrollment: level,
-            total: 0, passed: 0, failed: 0, pending: 0,
-          };
-        }
+          if (!levelYearData[year]) levelYearData[year] = {};
+          if (!levelYearData[year][level]) {
+            levelYearData[year][level] = {
+              label: this.getLevelLabel(level),
+              levelEnrollment: level,
+              total: 0, passed: 0, failed: 0, pending: 0,
+            };
+          }
 
-        const entry = levelYearData[year][level];
-        entry.total += 1;
-        if (student.passed === true)       entry.passed  += 1;
-        else if (student.passed === false) entry.failed  += 1;
-        else                               entry.pending += 1;
-      });
-    });
-
-    // Construir resultado ordenado
-    const LEVEL_ORDER = [
-      'PREENCUENTRO', 'ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS',
-      'ESENCIA_1', 'ESENCIA_2', 'ESENCIA_3', 'SANIDAD_INTEGRAL_RAICES',
-      'ESENCIA_4', 'ADIESTRAMIENTO', 'GRADUACION',
-    ];
-
-    const result = {};
-    Object.keys(levelYearData)
-      .sort((a, b) => {
-        if (a === 'SIN_AÑO') return 1;
-        if (b === 'SIN_AÑO') return -1;
-        return b - a; // años descendente
-      })
-      .forEach(year => {
-        result[year] = {};
-        LEVEL_ORDER.forEach(levelKey => {
-          const levelData = levelYearData[year][levelKey];
-          if (!levelData) return;
-          result[year][levelKey] = {
-            label:         levelData.label,
-            total:         levelData.total,
-            passed:        levelData.passed,
-            failed:        levelData.failed,
-            pending:       levelData.pending,
-            passPercentage: levelData.total > 0
-              ? parseFloat(((levelData.passed / levelData.total) * 100).toFixed(1))
-              : 0,
-          };
+          const entry = levelYearData[year][level];
+          entry.total += 1;
+          if (student.passed === true) entry.passed += 1;
+          else if (student.passed === false) entry.failed += 1;
+          else entry.pending += 1;
         });
       });
 
-    log('✅ [getStatisticsByLevelAndYear] Completado');
-    return result;
+      // Construir resultado ordenado
+      const LEVEL_ORDER = [
+        'PREENCUENTRO', 'ENCUENTRO', 'POST_ENCUENTRO', 'BAUTIZOS',
+        'ESENCIA_1', 'ESENCIA_2', 'ESENCIA_3', 'SANIDAD_INTEGRAL_RAICES',
+        'ESENCIA_4', 'ADIESTRAMIENTO', 'GRADUACION',
+      ];
 
-  } catch (error) {
-    logError('❌ [getStatisticsByLevelAndYear] Error:', error);
-    throw error;
+      const result = {};
+      Object.keys(levelYearData)
+        .sort((a, b) => {
+          if (a === 'SIN_AÑO') return 1;
+          if (b === 'SIN_AÑO') return -1;
+          return b - a; // años descendente
+        })
+        .forEach(year => {
+          result[year] = {};
+          LEVEL_ORDER.forEach(levelKey => {
+            const levelData = levelYearData[year][levelKey];
+            if (!levelData) return;
+            result[year][levelKey] = {
+              label: levelData.label,
+              total: levelData.total,
+              passed: levelData.passed,
+              failed: levelData.failed,
+              pending: levelData.pending,
+              passPercentage: levelData.total > 0
+                ? parseFloat(((levelData.passed / levelData.total) * 100).toFixed(1))
+                : 0,
+            };
+          });
+        });
+
+      log('✅ [getStatisticsByLevelAndYear] Completado');
+      return result;
+
+    } catch (error) {
+      logError('❌ [getStatisticsByLevelAndYear] Error:', error);
+      throw error;
+    }
   }
-}
 
   getLevelLabel(levelEnrollment) {
     const levelMap = { 'PREENCUENTRO': 'Pre-encuentro', 'ENCUENTRO': 'Encuentro', 'POST_ENCUENTRO': 'Post-encuentro', 'BAUTIZOS': 'Bautizos', 'ESENCIA_1': 'ESENCIA 1', 'ESENCIA_2': 'ESENCIA 2', 'ESENCIA_3': 'ESENCIA 3', 'SANIDAD_INTEGRAL_RAICES': 'Sanidad Integral Raíces', 'ESENCIA_4': 'ESENCIA 4', 'ADIESTRAMIENTO': 'Adiestramiento', 'GRADUACION': 'Graduación' };
@@ -3492,42 +3505,42 @@ class ApiService {
 
   // ========== 🎯 CONTRIBUCIONES DE ACTIVIDAD ==========
 
-async enrollInActivity(memberId, activityId, initialPayment, incomeMethod, quantity) {
-  try {
-    const currentUser = this.getCurrentUser();
-    return await this.request('/activity-contribution/create-with-initial-payment', {
-      method: 'POST',
-      body: JSON.stringify({
-        memberId,
-        activityId,
-        incomeMethod: incomeMethod || 'CASH',
-        recordedBy: currentUser?.username || 'Sistema',
-        initialPaymentAmount: initialPayment > 0 ? initialPayment : null,
-        quantity: quantity || 1,
-      }),
-    });
-  } catch (error) {
-    console.error('❌ [enrollInActivity] Error:', error.message);
-    throw error;
+  async enrollInActivity(memberId, activityId, initialPayment, incomeMethod, quantity) {
+    try {
+      const currentUser = this.getCurrentUser();
+      return await this.request('/activity-contribution/create-with-initial-payment', {
+        method: 'POST',
+        body: JSON.stringify({
+          memberId,
+          activityId,
+          incomeMethod: incomeMethod || 'CASH',
+          recordedBy: currentUser?.username || 'Sistema',
+          initialPaymentAmount: initialPayment > 0 ? initialPayment : null,
+          quantity: quantity || 1,
+        }),
+      });
+    } catch (error) {
+      console.error('❌ [enrollInActivity] Error:', error.message);
+      throw error;
+    }
   }
-}
 
-// En apiService.js, dentro del bloque de CONTRIBUCIONES DE ACTIVIDAD
-async deleteActivityContribution(contributionId) {
-  try {
-    validateId(contributionId, 'contributionId');
-    log('🗑️ [deleteActivityContribution] Eliminando contribución ID:', contributionId);
-    const response = await this.request(
-      `/activity-contribution/delete/${contributionId}`,
-      { method: 'DELETE' }
-    );
-    log('✅ [deleteActivityContribution] Eliminado correctamente');
-    return response;
-  } catch (error) {
-    logError('❌ [deleteActivityContribution] Error:', error.message);
-    throw error;
+  // En apiService.js, dentro del bloque de CONTRIBUCIONES DE ACTIVIDAD
+  async deleteActivityContribution(contributionId) {
+    try {
+      validateId(contributionId, 'contributionId');
+      log('🗑️ [deleteActivityContribution] Eliminando contribución ID:', contributionId);
+      const response = await this.request(
+        `/activity-contribution/delete/${contributionId}`,
+        { method: 'DELETE' }
+      );
+      log('✅ [deleteActivityContribution] Eliminado correctamente');
+      return response;
+    } catch (error) {
+      logError('❌ [deleteActivityContribution] Error:', error.message);
+      throw error;
+    }
   }
-}
 
   // ========== ⚙️ NIVELES — ACTUALIZAR requiresPayment ==========
 
@@ -3799,10 +3812,10 @@ async deleteActivityContribution(contributionId) {
 
       const params = new URLSearchParams();
       params.append('memberId', memberId);
-      
+
       // 🚀 CORRECCIÓN AQUÍ: El backend espera 'primaryRoleId', no 'roleId'
-      params.append('primaryRoleId', primaryRoleId); 
-      
+      params.append('primaryRoleId', primaryRoleId);
+
       if (skillsIds && skillsIds.length > 0) {
         params.append('skills', skillsIds.join(','));
       }
@@ -3965,20 +3978,20 @@ async deleteActivityContribution(contributionId) {
    * PUT /api/v1/worship/schedule/event/{eventId}/assignments
    */
   async syncEventAssignments(eventId, assignmentsList) {
-    try {
-      validateId(eventId, 'eventId');
-      if (!Array.isArray(assignmentsList)) throw new Error('Las asignaciones deben ser un arreglo');
+    try {
+      validateId(eventId, 'eventId');
+      if (!Array.isArray(assignmentsList)) throw new Error('Las asignaciones deben ser un arreglo');
 
-      log('🔄 [syncEventAssignments] Sincronizando músicos para evento ID:', eventId);
-      return await this.request(`/worship/schedule/event/${eventId}/assignments`, {
-        method: 'PUT',
-        body: JSON.stringify(assignmentsList) // Aquí el componente ya envía { roleId, memberId }
-      });
-    } catch (error) {
-      logError('❌ [syncEventAssignments] Error:', error.message);
-      throw error;
-    }
-  }
+      log('🔄 [syncEventAssignments] Sincronizando músicos para evento ID:', eventId);
+      return await this.request(`/worship/schedule/event/${eventId}/assignments`, {
+        method: 'PUT',
+        body: JSON.stringify(assignmentsList) // Aquí el componente ya envía { roleId, memberId }
+      });
+    } catch (error) {
+      logError('❌ [syncEventAssignments] Error:', error.message);
+      throw error;
+    }
+  }
 
   /**
    * Eliminar un evento/culto en el calendario.
@@ -4004,14 +4017,14 @@ async deleteActivityContribution(contributionId) {
    * GET /api/v1/worship/schedule/events
    */
   async getWorshipEvents() {
-    try {
-      log('📅 [getWorshipEvents] Obteniendo calendario de eventos');
-      return await this.request('/worship/schedule/events') || [];
-    } catch (error) {
-      logError('❌ [getWorshipEvents] Error:', error.message);
-      return [];
-    }
-  }
+    try {
+      log('📅 [getWorshipEvents] Obteniendo calendario de eventos');
+      return await this.request('/worship/schedule/events') || [];
+    } catch (error) {
+      logError('❌ [getWorshipEvents] Error:', error.message);
+      return [];
+    }
+  }
 
   /**
    * Asignar manualmente a un músico a un evento.
@@ -4040,11 +4053,11 @@ async deleteActivityContribution(contributionId) {
     }
   }
 
- /**
-   * Ejecutar el algoritmo de auto-sugerencia mensual equitativa.
-   * POST /api/v1/worship/schedule/auto-suggest/batch
-   * @param {Object} data - MonthlyScheduleRequest { eventIds: [1,2,3], requiredRoles: { "1": 1, "2": 3 }, praiseSongCount: 2, worshipSongCount: 2 }
-   */
+  /**
+    * Ejecutar el algoritmo de auto-sugerencia mensual equitativa.
+    * POST /api/v1/worship/schedule/auto-suggest/batch
+    * @param {Object} data - MonthlyScheduleRequest { eventIds: [1,2,3], requiredRoles: { "1": 1, "2": 3 }, praiseSongCount: 2, worshipSongCount: 2 }
+    */
   async autoSuggestWorshipSchedule(data) {
     try {
       if (!data || !Array.isArray(data.eventIds)) throw new Error('Datos inválidos');
@@ -4125,51 +4138,51 @@ async deleteActivityContribution(contributionId) {
   // ==========================================
   // REPERTORIO (SONGS Y SETLIST) - AÑADIDOS HOY
   // ==========================================
-  async getWorshipSongs() { 
+  async getWorshipSongs() {
     // Corregido para evitar el No mapping for GET /api/v1/worship/schedule/songs
-    return await this.request('/worship/schedule/songs'); 
+    return await this.request('/worship/schedule/songs');
   }
   async createWorshipSong(songData) { return await this.request('/worship/schedule/songs', { method: 'POST', body: JSON.stringify(songData) }); }
   async updateWorshipSong(id, songData) { return await this.request(`/worship/schedule/songs/${id}`, { method: 'PUT', body: JSON.stringify(songData) }); }
   async deleteWorshipSong(id) { return await this.request(`/worship/schedule/songs/${id}`, { method: 'DELETE' }); }
-  async syncEventSetlist(eventId, songIds) { 
-    return await this.request(`/worship/schedule/event/${eventId}/setlist`, { 
-      method: 'PUT', 
+  async syncEventSetlist(eventId, songIds) {
+    return await this.request(`/worship/schedule/event/${eventId}/setlist`, {
+      method: 'PUT',
       body: JSON.stringify(toArray(songIds).map(id => parseInt(id)).filter(id => !isNaN(id) && id > 0))// Asegurar tipos numéricos
-    }); 
+    });
   }
-  
+
 
   // Agrega esto justo ANTES de  } // Fin de la clase ApiService
-async getWorshipEventById(id) {
-  try {
-    validateId(id, 'eventId');
-    log('🔍 [getWorshipEventById] Obteniendo evento ID:', id);
-    const response = await this.request(`/worship/schedule/event/${id}`);
-    log('✅ [getWorshipEventById] Éxito');
-    return response;
-  } catch (error) {
-    logError('❌ [getWorshipEventById] Error:', error.message);
-    throw error;
+  async getWorshipEventById(id) {
+    try {
+      validateId(id, 'eventId');
+      log('🔍 [getWorshipEventById] Obteniendo evento ID:', id);
+      const response = await this.request(`/worship/schedule/event/${id}`);
+      log('✅ [getWorshipEventById] Éxito');
+      return response;
+    } catch (error) {
+      logError('❌ [getWorshipEventById] Error:', error.message);
+      throw error;
+    }
   }
-}
 
-// Dentro de la clase ApiService en apiService.js
+  // Dentro de la clase ApiService en apiService.js
 
-// En apiService.js, asegúrate de tener este método (ya lo tienes al final):
+  // En apiService.js, asegúrate de tener este método (ya lo tienes al final):
 
-async getGlobalSummaryByDate(date) {
-  try {
-    validateString(date, 'date', 10, 10);
-    log('🌐 [getGlobalSummaryByDate] Obteniendo resumen masivo para:', date);
-    return await this.request(`/attendance-cell-group/summary/all-cells/date/${date}`);
-  } catch (error) {
-    logError('❌ [getGlobalSummaryByDate] Error:', error.message);
-    throw error;
+  async getGlobalSummaryByDate(date) {
+    try {
+      validateString(date, 'date', 10, 10);
+      log('🌐 [getGlobalSummaryByDate] Obteniendo resumen masivo para:', date);
+      return await this.request(`/attendance-cell-group/summary/all-cells/date/${date}`);
+    } catch (error) {
+      logError('❌ [getGlobalSummaryByDate] Error:', error.message);
+      throw error;
+    }
   }
-}
 
-// ============================================================
+  // ============================================================
   // 🏛️ MÓDULO DE MINISTERIOS
   // Base URL del módulo: /api/v1/ministeries
   // ============================================================
@@ -4195,7 +4208,7 @@ async getGlobalSummaryByDate(date) {
       validateString(name, 'name', 2, 100);
       const params = new URLSearchParams();
       params.append('name', name.trim());
-      
+
       log('🏛️ [createMinistery] Creando ministerio:', name);
       return await this.request(`/ministeries?${params.toString()}`, { method: 'POST' });
     } catch (error) {
@@ -4211,7 +4224,7 @@ async getGlobalSummaryByDate(date) {
     try {
       validateId(ministeryId, 'ministeryId');
       validateString(name, 'name', 2, 100);
-      
+
       const params = new URLSearchParams();
       params.append('name', name.trim());
       if (description) params.append('description', description.trim());
@@ -4265,12 +4278,12 @@ async getGlobalSummaryByDate(date) {
       validateId(id, 'ministeryId');
       const params = new URLSearchParams();
       params.append('name', name.trim());
-      
+
       // Añadir el estado a la URL si viene definido
       if (active !== undefined && active !== null) {
-          params.append('active', active);
+        params.append('active', active);
       }
-      
+
       return await this.request(`/ministeries/${id}?${params.toString()}`, { method: 'PUT' });
     } catch (error) {
       logError('❌ [updateMinistery] Error:', error.message);
@@ -4294,12 +4307,12 @@ async getGlobalSummaryByDate(date) {
       const params = new URLSearchParams();
       params.append('name', name.trim());
       if (description) params.append('description', description.trim());
-      
+
       // Añadir el estado a la URL si viene definido
       if (active !== null && active !== undefined) {
         params.append('active', active);
       }
-      
+
       return await this.request(`/ministeries/roles/${roleId}?${params.toString()}`, { method: 'PUT' });
     } catch (error) {
       logError('❌ [updateMinisteryRole] Error:', error.message);
@@ -4359,23 +4372,23 @@ async getGlobalSummaryByDate(date) {
   async createMinisteryEvent(ministeryId, name, eventDate) {
     const params = new URLSearchParams();
     params.append('name', name);
-    
+
     // 🛠️ FIX: Spring Boot requiere los segundos. 
     // Si el string viene como "2026-04-20T19:00" (16 caracteres), le agregamos ":00"
     let safeDate = eventDate;
     if (safeDate.length === 16) {
       safeDate += ":00";
     }
-    
-    params.append('eventDate', safeDate); 
+
+    params.append('eventDate', safeDate);
     return await this.request(`/ministeries/${ministeryId}/events?${params.toString()}`, { method: 'POST' });
   }
 
-  
+
 
   async syncMinisteryEventAssignments(eventId, assignmentsArray) {
     // assignmentsArray = [{ roleId: 1, teamId: 2 }, ...]
-    return await this.request(`/ministeries/events/${eventId}/assignments`, { 
+    return await this.request(`/ministeries/events/${eventId}/assignments`, {
       method: 'PUT',
       body: JSON.stringify(assignmentsArray)
     });

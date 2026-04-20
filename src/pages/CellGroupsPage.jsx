@@ -182,7 +182,6 @@ const CellGroupsPage = () => {
         <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           <div className="flex flex-col lg:flex-row items-center gap-4 md:gap-6">
             <div className="relative flex-1 group w-full">
-              <Search className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 dark:group-focus-within:text-indigo-400 transition-all" size={20}/>
               <input
                 type="text"
                 placeholder="Identificar grupo por nombre..."
