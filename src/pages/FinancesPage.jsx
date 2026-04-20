@@ -277,7 +277,10 @@ const FinancesPage = () => {
     }
 
     // Sort by date (desc)
-    filtered.sort((a, b) => parseLocalDate(b.registrationDate) - parseLocalDate(a.registrationDate));
+    filtered.sort(
+      (a, b) =>
+        parseLocalDate(b.registrationDate) - parseLocalDate(a.registrationDate),
+    );
 
     setFilteredFinances(filtered);
   }, [
@@ -611,6 +614,25 @@ const FinancesPage = () => {
 
           <div className="space-y-1.5 md:space-y-2 flex flex-col">
             <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-3 md:ml-4">
+              Método de Pago
+            </label>
+            <div className="relative">
+              <CreditCard className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={selectedMethod}
+                onChange={(e) => setSelectedMethod(e.target.value)}
+                className="w-full h-12 md:h-14 pl-12 md:pl-14 pr-10 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl md:rounded-3xl text-xs md:text-sm font-bold text-slate-800 dark:text-slate-200 appearance-none focus:outline-none focus:border-indigo-500 transition-all cursor-pointer"
+              >
+                <option value="ALL">Cualquier Método</option>
+                <option value="CASH">Efectivo</option>
+                <option value="BANK_TRANSFER">Transferencia</option>
+              </select>
+              <ChevronDown className="absolute right-4 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="space-y-1.5 md:space-y-2 flex flex-col">
+            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-3 md:ml-4">
               Concepto
             </label>
             <div className="relative">
@@ -655,7 +677,8 @@ const FinancesPage = () => {
 
           <div className="space-y-1.5 md:space-y-2 flex flex-col">
             <label className="flex gap-1 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-3 md:ml-4">
-              <Calendar className="w-4 h-4 text-slate-400 pointer-events-none" />Inicio
+              <Calendar className="w-4 h-4 text-slate-400 pointer-events-none" />
+              Inicio
             </label>
             <div className="relative">
               <input
@@ -669,7 +692,8 @@ const FinancesPage = () => {
           {/* Pega esto inmediatamente después del bloque de "Inicio" */}
           <div className="space-y-1.5 md:space-y-2 flex flex-col">
             <label className="flex gap-1 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-3 md:ml-4">
-              <Calendar className="w-4 h-4 text-slate-400 pointer-events-none" />Fin
+              <Calendar className="w-4 h-4 text-slate-400 pointer-events-none" />
+              Fin
             </label>
             <div className="relative">
               <input
@@ -714,8 +738,7 @@ const FinancesPage = () => {
           <div className="flex flex-col items-center justify-center py-20 md:py-32 text-center px-6 md:px-10">
             <div className="w-20 h-20 md:w-24 md:h-24 bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] md:rounded-[2.5rem] flex items-center justify-center mb-6 md:mb-8 relative border border-slate-200 dark:border-slate-700">
               <CircleDollarSign className="w-10 h-10 md:w-12 md:h-12 text-slate-300 dark:text-slate-500" />
-              <div className="absolute -right-2 -bottom-2 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white border-[3px] border-white dark:border-[#1a2332] shadow-xl">
-              </div>
+              <div className="absolute -right-2 -bottom-2 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white border-[3px] border-white dark:border-[#1a2332] shadow-xl"></div>
             </div>
             <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white mb-2 decoration-indigo-500/30">
               Sin Transacciones
@@ -777,7 +800,9 @@ const FinancesPage = () => {
                             </p>
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                                {parseLocalDate(f.registrationDate)?.toLocaleDateString("es-CO")}
+                                {parseLocalDate(
+                                  f.registrationDate,
+                                )?.toLocaleDateString("es-CO")}
                               </span>
                               {leaderType && (
                                 <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded border border-emerald-100 dark:border-emerald-800/50 text-[8px] md:text-[9px] font-black uppercase tracking-tighter">

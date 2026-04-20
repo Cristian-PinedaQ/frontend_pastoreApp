@@ -5,7 +5,6 @@ import { useAuth } from "../context/AuthContext";
 import {
   Users,
   Crown,
-  Search,
   RefreshCcw,
   Activity,
   Building2,
@@ -642,10 +641,6 @@ const MinisteriesPage = () => {
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-8 shadow-sm">
             <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="relative group md:col-span-1">
-                <Search
-                  className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={20}
-                />
                 <input
                   type="text"
                   placeholder="Buscar líder..."

@@ -681,20 +681,20 @@ const ActivityPage = () => {
                             participants: true,
                           }));
                         }}
-                        className=" bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl border border-emerald-100 dark:border-emerald-500/20 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                        className="flex-1 min-w-[80px] h-11  bg-pink-50 dark:bg-pink-500/10 text-pink-600 dark:text-pink-400 hover:bg-pink-100 dark:hover:bg-pink-500/20 rounded-xl border border-pink-100 dark:border-pink-500/20 text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-1"
                       >
-                        <Users size={12} /> <span>Equipo</span>
+                        <Users size={32} /> <span>Equipo</span>
                       </button>
                       <button
                         onClick={() => handleOpenFinance(activity)}
-                        className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 rounded-xl border border-indigo-100 dark:border-indigo-500/20 shadow-sm flex items-center justify-center shrink-0 active:scale-90 transition-all"
+                        className="flex-1 min-w-[80px] h-11  bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 rounded-xl border border-emerald-100 dark:border-emerald-500/20 shadow-sm flex items-center justify-center shrink-0 active:scale-90 transition-all"
                         title="Finanzas"
                       >
                         <DollarSign size={16} />
                       </button>
                       <button
                         onClick={() => handleEditActivity(activity)}
-                        className="bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 rounded-xl border border-amber-100 dark:border-amber-500/20 transition-all shadow-sm flex items-center justify-center shrink-0 active:scale-90"
+                        className="flex-1 min-w-[80px] h-11  bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/20 rounded-xl border border-amber-100 dark:border-amber-500/20 transition-all shadow-sm flex items-center justify-center shrink-0 active:scale-90"
                         title="Editar Actividad"
                       >
                         <Edit2 size={16} />

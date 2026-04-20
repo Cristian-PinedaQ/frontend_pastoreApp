@@ -540,7 +540,8 @@ const ParticipantDetailModal = ({
           
           {/* Header Controls */}
           <div className="px-6 md:px-10 py-4 md:py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 shrink-0 z-10">
-            <div className="flex gap-8 overflow-x-auto custom-scrollbar no-scrollbar pb-1">
+            {/* MODIFICACIÓN UX: md:overflow-visible y md:flex-wrap eliminan el scroll innecesario en escritorio */}
+            <div className="flex gap-2 md:gap-2 overflow-x-auto md:overflow-visible ">
               {[
                 { id: 'details', label: 'Detalles', icon: <User size={14} /> },
                 { id: 'addPayment', label: 'Agregar Pago', icon: <Plus size={14} />, disabled: isFullyPaid },
@@ -550,7 +551,8 @@ const ParticipantDetailModal = ({
                   key={tab.id}
                   onClick={() => !tab.disabled && setActiveTab(tab.id)}
                   disabled={tab.disabled}
-                  className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all relative pb-2 shrink-0 flex items-center gap-2 ${
+                  // MODIFICACIÓN UX: whitespace-nowrap previene que el texto colapse, permitiendo que el flex-wrap haga su trabajo si la pantalla se encoge
+                  className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all relative pb-2 flex items-center gap-2 whitespace-nowrap ${
                     activeTab === tab.id 
                       ? 'text-blue-600 dark:text-blue-400' 
                       : tab.disabled 
@@ -564,7 +566,9 @@ const ParticipantDetailModal = ({
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2">
+            
+            {/* MODIFICACIÓN UX: Se añade shrink-0 y ml-4 para que los botones de acción nunca peleen por el espacio de las pestañas */}
+            <div className="flex items-center gap-2 shrink-0 ml-4">
               <button
                 onClick={handleGeneratePDF}
                 disabled={generatingPDF}

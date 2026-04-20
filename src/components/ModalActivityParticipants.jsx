@@ -536,7 +536,7 @@ const ModalActivityParticipants = ({
                   </div>
                   <div className="space-y-2">
                     <label className="text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">
-                      Distrito Eclesiástico
+                      Distrito
                     </label>
                     <select
                       value={districtFilter}
@@ -656,7 +656,6 @@ const ModalActivityParticipants = ({
                           <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center text-indigo-600 font-black text-lg">
                             {participant.memberName?.charAt(0)}
                           </div>
-                          // ✅ Reemplaza la sección de nombre en la card mobile
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-black text-slate-900 dark:text-white uppercase truncate">
                               {participant.participantName ||
@@ -666,18 +665,17 @@ const ModalActivityParticipants = ({
                               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">
                                 {participant.leaderName || "SIN LÍDER"}
                               </p>
-                              {/* ✅ Badge de estado */}
                               {participant.isFullyPaid ? (
-                                <span className="text-[8px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 rounded-md font-black uppercase tracking-widest shrink-0">
-                                  ✅ Al día
+                                <span className="flex gap-2 text-[8px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-600 rounded-md font-black uppercase tracking-widest shrink-0">
+                                  <CheckCircle size={12}  className="text-emerald-500" />Pagado   
                                 </span>
                               ) : (participant.totalPaid || 0) > 0 ? (
-                                <span className="text-[8px] px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded-md font-black uppercase tracking-widest shrink-0">
-                                  🟡 Parcial
+                                <span className="flex gap-2 text-[8px] px-1.5 py-0.5 bg-amber-500/10 text-amber-500 rounded-md font-black uppercase tracking-widest shrink-0">
+                                  <Clock size={12}  className="text-amber-500" /> Parcial
                                 </span>
                               ) : (
-                                <span className="text-[8px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-md font-black uppercase tracking-widest shrink-0">
-                                  ⏳ Pendiente
+                                <span className=" flex gap-2 text-[8px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-md font-black uppercase tracking-widest shrink-0">
+                                  <Clock size={12}  className="text-amber-500" />Sin abono
                                 </span>
                               )}
                             </div>
@@ -757,7 +755,7 @@ const ModalActivityParticipants = ({
                               Participante
                             </th>
                             <th className="px-8 py-5 text-[9px] font-black uppercase text-slate-400 tracking-widest">
-                              Liderazgo
+                              Lider
                             </th>
                             <th className="px-8 py-5 text-[9px] font-black uppercase text-slate-400 tracking-widest">
                               Distrito
@@ -794,8 +792,8 @@ const ModalActivityParticipants = ({
                               className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                             >
                               <td className="px-8 py-5">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-black text-sm uppercase">
+                                <div className="flex items-center gap-2">
+                                  <div className="rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-black text-sm uppercase">
                                     {participant.memberName?.charAt(0)}
                                   </div>
                                   <div>
@@ -820,15 +818,15 @@ const ModalActivityParticipants = ({
                               </td>
                               <td className="px-8 py-5">
                                 {participant.isFullyPaid ? (
-                                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl text-[9px] font-black uppercase tracking-widest">
+                                  <span className="items-center gap-1 py-1.5 text-emerald-600 dark:text-emerald-400 rounded-xl text-[7px] font-black uppercase tracking-widest">
                                     <CheckCircle size={12} /> Completado
                                   </span>
                                 ) : (participant.totalPaid || 0) > 0 ? (
-                                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl text-[9px] font-black uppercase tracking-widest">
+                                  <span className="items-center gap-1 py-1.5  text-amber-600 dark:text-amber-400 rounded-xl text-[7px] font-black uppercase tracking-widest">
                                     <AlertTriangle size={12} /> Parcial
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl text-[9px] font-black uppercase tracking-widest">
+                                  <span className="items-center gap-1 py-1.5 dark:bg-slate-800 text-slate-400 rounded-xl text-[7px] font-black uppercase tracking-widest">
                                     <Clock size={12} /> Pendiente
                                   </span>
                                 )}
@@ -853,8 +851,8 @@ const ModalActivityParticipants = ({
                                 </p>
                               </td>
                               <td className="px-8 py-5">
-                                <div className="flex items-center gap-4">
-                                  <div className="w-24 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                <div className="items-center gap-2">
+                                  <div className="w-18 bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all duration-700 ${participant.isFullyPaid ? "bg-emerald-500" : "bg-indigo-500"}`}
                                       style={{
@@ -873,7 +871,7 @@ const ModalActivityParticipants = ({
                                 </div>
                               </td>
                               <td
-                                className="px-8 py-5"
+                                className=""
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <ItemDeliveryToggle
@@ -896,7 +894,7 @@ const ModalActivityParticipants = ({
                                     onClick={(e) =>
                                       handleDeleteClick(e, participant)
                                     }
-                                    className="p-3 bg-white dark:bg-slate-800 text-slate-300 hover:text-rose-500 rounded-xl transition-all shadow-sm opacity-0 group-hover:opacity-100 active:scale-90"
+                                    className="p-3 bg-white dark:bg-slate-800 text-slate-300 hover:text-rose-500 rounded-xl "
                                   >
                                     <Trash2 size={16} />
                                   </button>

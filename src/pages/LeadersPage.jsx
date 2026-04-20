@@ -10,8 +10,7 @@ import {
   Users,
   CircleUserRound, 
   Crown, 
-  ShieldCheck, 
-  Search, 
+  ShieldCheck,
   FileText, 
   BarChart3, 
   RefreshCcw, 
@@ -385,7 +384,6 @@ const LeadersPage = () => {
         {/* Filtering Bar */}
         <div className="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-950/20">
           <div className="relative flex-1 w-full group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 group-focus-within:scale-110 transition-all" size={20} />
             <input 
               type="text" 
               placeholder="Buscar por nombre, apellido o documento..." 
