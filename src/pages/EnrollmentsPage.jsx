@@ -309,11 +309,10 @@ const EnrollmentsPage = () => {
     setExportingPDF(true);
     setError("");
     try {
-      // 1. Obtener todos los estudiantes de la cohorte
       const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
-      const allStudents = toArray(rawStudents);
+      // Validamos si es arreglo o si viene dentro de .data
+      const allStudents = Array.isArray(rawStudents) ? rawStudents : (rawStudents?.data || []);
 
-      // 2. Filtrar SOLO los que pasaron 
       const approvedStudents = allStudents.filter(s => s.status === "COMPLETED" || s.passed === true);
 
       if (approvedStudents.length === 0) {
@@ -322,136 +321,102 @@ const EnrollmentsPage = () => {
       }
 
       // 3. Obtener la jerarquía desde el Member
-      const memberResults = await Promise.allSettled(approvedStudents.map(s => apiService.getMemberById(s.memberId)));
-      
-      const enrichedStudents = approvedStudents.map((student, i) => {
-        const m = memberResults[i].status === "fulfilled" ? memberResults[i].value || {} : {};
-        
-        return {
-          ...student,
-          memberName: student.memberName || m.name || `Miembro ${student.memberId}`,
-          // 🚀 Ahora consumimos los nombres exactos que nos manda Java
-          directLeader: m.leaderName || "Sin Líder Directo",
-          mainLeader: m.mainLeaderName || "Ministerio General",
-          averageScore: student.averageScore || 0.0
-        };
-      });
+      const enrichedStudents = await Promise.all(
+        approvedStudents.map(async (student) => {
+          try {
+            // Aseguramos de capturar el ID sin importar la estructura
+            const mId = student.memberId || student.member?.id;
+            if (!mId) return { ...student, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
 
-      // 4. Generar el documento
+            const res = await apiService.getMemberById(mId);
+            // 🚀 EL FIX: Entramos a .data si es respuesta de Axios
+            const m = res?.data || res || {};
+
+            // Buscamos al líder en la entidad Member o en su Célula
+            const directLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || m.cell?.groupLeader?.name || "Sin Líder Directo";
+            const mainLeader = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || m.cell?.mainLeader?.name || "Ministerio General";
+
+            return {
+              ...student,
+              memberName: student.memberName || m.name || student.member?.name || `Miembro ${mId}`,
+              directLeader,
+              mainLeader,
+              averageScore: student.averageScore || 0.0
+            };
+          } catch (err) {
+            return { ...student, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General", averageScore: student.averageScore || 0.0 };
+          }
+        })
+      );
+
       generateApprovedStudentsPDF(selectedEnrollment, enrichedStudents);
-
     } catch (err) {
-      logError("Error exportando Acta de Aprobados:", err);
-      setError("Error al generar el acta de aprobados.");
+      console.error("Error exportando Acta:", err);
+      setError("Error al generar el acta.");
     } finally {
       setExportingPDF(false);
     }
   };
 
-  const handlePrintLessonAttendance = async (lesson) => {
+  const handlePrintLessonAttendance = async (lesson, currentStudents, attendedEnrollmentIds) => {
     try {
-      setExportingPDF(true);
-      const response = await apiService.getAttendanceByLesson(lesson.id);
-      const attendanceRecords = toArray(response);
-      const attendedEnrollmentIds = new Set(
-        attendanceRecords.filter((r) => r.present === true).map((r) => Number(r.studentEnrollmentId))
-      );
-      let currentStudents = students;
-      if (currentStudents.length === 0) {
-        const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
-        currentStudents = toArray(rawStudents).filter((s) => s.status !== "CANCELLED");
-      }
       const enrichedStudents = await Promise.all(
-        currentStudents.map(async (s) => {
-          const hasAttended = attendedEnrollmentIds.has(Number(s.id));
+        currentStudents.map(async (student) => {
+          const hasAttended = attendedEnrollmentIds.has(Number(student.id));
           try {
-            const memberData = await apiService.getMemberById(s.memberId);
-            return { ...s, isActuallyPresent: hasAttended, leaderName: memberData.leaderName || memberData.leader?.name || "—" };
+            const mId = student.memberId || student.member?.id;
+            const res = await apiService.getMemberById(mId);
+            const m = res?.data || res || {};
+
+            const directLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || "Sin Líder Directo";
+            const mainLeader = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || "Ministerio General";
+
+            return {
+              ...student,
+              memberName: student.memberName || m.name || `Miembro ${mId}`,
+              isActuallyPresent: hasAttended,
+              directLeader,
+              mainLeader
+            };
           } catch (e) {
-            return { ...s, isActuallyPresent: hasAttended, leaderName: "—" };
+            return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
           }
         })
       );
-      const finalAttendanceList = enrichedStudents.filter((s) => s.isActuallyPresent).map((s) => s.memberId);
-      generateAttendancePDF(selectedEnrollment, lesson, enrichedStudents, finalAttendanceList);
-    } catch (err) {
-      console.error("Error:", err);
-      await confirm({
-        title: "Error de Procesamiento",
-        message: "Ocurrió un error al procesar el conteo de asistencia para el reporte.",
-        type: "error",
-        confirmLabel: "Entendido"
-      });
-    } finally {
-      setExportingPDF(false);
+      generateAttendancePDF(selectedEnrollment, lesson, enrichedStudents, Array.from(attendedEnrollmentIds));
+    } catch (error) {
+      console.error(error);
     }
   };
 
   const handlePrintCohortAttendance = async () => {
-    if (!selectedEnrollment) return;
+    if (!selectedEnrollment || lessons.length === 0) return;
     setExportingPDF(true);
-    setError("");
     try {
-      const lessonsRaw = await apiService.getLessonsByEnrollment(selectedEnrollment.id);
-      const allLessons = (lessonsRaw || []).sort((a, b) => a.lessonNumber - b.lessonNumber);
-      if (allLessons.length === 0) {
-        await confirm({
-          title: "Información Insuficiente",
-          message: "Esta cohorte no tiene lecciones registradas para generar el reporte.",
-          type: "info",
-          confirmLabel: "Entendido"
-        });
-        return;
-      }
+      const enrichedStudents = await Promise.all(
+        students.map(async (student) => {
+          try {
+            const mId = student.memberId || student.member?.id;
+            const res = await apiService.getMemberById(mId);
+            const m = res?.data || res || {};
 
-      let currentStudents = students;
-      if (currentStudents.length === 0) {
-        const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
-        currentStudents = toArray(rawStudents).filter((s) => s.status !== "CANCELLED");
-      }
-      const memberResults = await Promise.allSettled(currentStudents.map((s) => apiService.getMemberById(s.memberId)));
-      
-      const enrichedStudents = currentStudents.map((s, i) => {
-        const m = memberResults[i].status === "fulfilled" ? memberResults[i].value || {} : {};
-        
-        // Extraemos jerarquía exactamente igual que en el Acta
-        const directLeader = m.leaderName ?? m.leader?.name ?? m.cell?.groupLeader?.memberName ?? m.cell?.groupLeaderName ?? "Sin Líder Directo";
-        const mainLeader = m.mainLeaderName ?? m.leader?.leaderName ?? m.leader?.leader?.name ?? m.cell?.mainLeaderName ?? "Ministerio General";
+            const directLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || "Sin Líder Directo";
+            const mainLeader = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || "Ministerio General";
 
-        return {
-          ...s,
-          memberName: s.memberName || m.name || `Miembro ${s.memberId}`,
-          directLeader,
-          mainLeader,
-        };
-      });
-
-      const attendanceResults = await Promise.allSettled(allLessons.map((l) => apiService.getAttendanceByLesson(l.id)));
-      const attendanceMatrix = new Map();
-      const lessonsWithData = [];
-      allLessons.forEach((lesson, i) => {
-        const records = toArray(attendanceResults[i].status === "fulfilled" ? attendanceResults[i].value : []);
-        if (records.length === 0) return;
-        const presentIds = new Set(records.filter((r) => r.present === true).map((r) => Number(r.studentEnrollmentId)));
-        const presentMemberIds = new Set();
-        enrichedStudents.forEach((s) => { if (presentIds.has(Number(s.id))) presentMemberIds.add(Number(s.memberId)); });
-        attendanceMatrix.set(lesson.id, presentMemberIds);
-        lessonsWithData.push({ ...lesson, count: presentMemberIds.size });
-      });
-
-      if (lessonsWithData.length === 0) {
-        await confirm({
-          title: "Sin Registros",
-          message: "No hay registros de asistencia ingresados en ninguna lección para esta cohorte.",
-          type: "warning",
-          confirmLabel: "Entendido"
-        });
-        return;
-      }
-      generateCohortAttendanceFullPDF(selectedEnrollment, lessonsWithData, enrichedStudents, attendanceMatrix);
-    } catch (err) {
-      console.error("Error generando PDF consolidado:", err);
-      setError("Error al generar el reporte de asistencias. Inténtalo de nuevo.");
+            return {
+              ...student,
+              memberName: student.memberName || m.name || `Miembro ${mId}`,
+              directLeader,
+              mainLeader
+            };
+          } catch (e) {
+            return { ...student, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
+          }
+        })
+      );
+      generateCohortAttendanceFullPDF(selectedEnrollment, lessons, enrichedStudents, attendanceSummary);
+    } catch (error) {
+      console.error(error);
     } finally {
       setExportingPDF(false);
     }
