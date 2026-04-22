@@ -53,7 +53,6 @@ const logError = (msg, err) => console.error(`[EnrollmentsPage] ${msg}`, err);
 
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-//const toArray = (val) => (Array.isArray(val) ? val : []);
 
 const escapeHtml = (text) => {
   if (!text || typeof text !== "string") return "";
@@ -89,6 +88,45 @@ const isRecoverable = (enrollment) => {
   today.setHours(0, 0, 0, 0);
   const diffDays = (today - end) / (1000 * 60 * 60 * 24);
   return diffDays >= 0 && diffDays <= 30;
+};
+
+// ─── Motor Inteligente G12 para Reportes ─────────────────────────────────────
+const extractG12Hierarchy = (m) => {
+  const rawDl = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || m.cell?.groupLeader?.name || "Sin Líder Directo";
+  const rawMl = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || m.cell?.mainLeader?.name || "Ministerio General";
+
+  const isPastor = (name) => {
+    if (!name) return false;
+    const n = name.toUpperCase();
+    return n.includes("RUBEN") || n.includes("YAMILETH") || n.includes("CABEZAS") || n.includes("PEREZ ESCOBAR");
+  };
+
+  // Deducimos el pastor por el género del estudiante (G12 puro: mujeres con mujeres, hombres con hombres)
+  const genderStr = (m.gender || m.sex || m.genero || m.sexo || "M").toUpperCase();
+  const defaultPastor = genderStr.startsWith("F") ? "YAMILETH PEREZ ESCOBAR" : "RUBEN FRANCISCO CABEZAS QUIÑONES";
+
+  let pastor = "Ministerio General";
+  let networkLeader = "Sin Líder de Red";
+  let directLeader = "Sin Líder Directo";
+
+  if (isPastor(rawMl)) {
+    pastor = rawMl;
+    networkLeader = rawDl;
+    directLeader = "Sin Líder Directo"; // Se imprime como "Discípulos Directos" en el PDF
+  } else if (isPastor(rawDl)) {
+    pastor = rawDl;
+    networkLeader = "Red Pastoral Directa";
+    directLeader = "Sin Líder Directo";
+  } else {
+    // Si el Main Leader no es el pastor, entonces el Main Leader es el 12, y el Direct es el 144
+    pastor = defaultPastor;
+    networkLeader = rawMl;
+    directLeader = rawDl;
+  }
+
+  if (networkLeader === directLeader) directLeader = "Sin Líder Directo";
+
+  return { pastor, networkLeader, directLeader };
 };
 
 // ─── Validaciones ────────────────────────────────────────────────────────────
@@ -319,20 +357,43 @@ const EnrollmentsPage = () => {
         return;
       }
 
-      // 🚀 Enriquecer con los 3 niveles de G12 (Pastor -> Red -> Directo)
       const enrichedStudents = await Promise.all(
         approvedStudents.map(async (student) => {
           try {
             const mId = student.memberId || student.member?.id;
-            if (!mId) return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General" };
+            if (!mId) return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Sin Líder de Red", pastor: "Ministerio General" };
 
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            // Consumimos los métodos que Java calculó en Member.java
-            const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
-            const networkLeader = m.networkLeaderName || "Ministerio General";
-            const pastor = m.pastorName || "Ministerio General";
+            console.log(`Datos crudos de Java para el miembro ${mId}:`, m);
+
+            // 1. Intentamos leer las variables exactas que configuraste en Member.java
+            let directLeader = m.directLeaderName;
+            let networkLeader = m.networkLeaderName;
+            let pastor = m.pastorName;
+
+            // 2. Si Java ocultó la información por culpa de un DTO, el Frontend asume el control:
+            if (!networkLeader || networkLeader === "Ministerio General") {
+              // Obtenemos el líder que Java SÍ envió
+              const rawLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || "Sin Líder Directo";
+              
+              // Deducimos el Pastor por el género (Regla de Oro G12)
+              const gender = (m.gender || m.sex || "M").toUpperCase();
+              pastor = gender.startsWith("F") ? "YAMILETH PEREZ ESCOBAR" : "RUBEN FRANCISCO CABEZAS QUIÑONES";
+
+              const isPastorObj = (name) => name && (name.includes("RUBEN") || name.includes("YAMILETH"));
+
+              if (isPastorObj(rawLeader)) {
+                networkLeader = "Red Pastoral Directa";
+                directLeader = "Sin Líder Directo"; 
+              } else {
+                // Si el líder no es el pastor, asumimos que el líder directo es un 144 y su red está arriba
+                // Como Java no lo mandó, forzamos la estructura
+                networkLeader = rawLeader;
+                directLeader = rawLeader; 
+              }
+            }
 
             return {
               ...student,
@@ -348,7 +409,8 @@ const EnrollmentsPage = () => {
         })
       );
 
-      generateApprovedStudentsPDF(selectedEnrollment, enrichedStudents);
+      // Pasamos getDisplayName para que el PDF oculte el nombre legal
+      generateApprovedStudentsPDF(selectedEnrollment, enrichedStudents, { getDisplayName });
     } catch (err) {
       console.error("Error exportando Acta:", err);
       setError("Error al generar el acta.");
@@ -367,10 +429,7 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            // 🚀 Usamos los 3 niveles G12 del backend
-            const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
-            const networkLeader = m.networkLeaderName || "Sin Líder de Red";
-            const pastor = m.pastorName || "Ministerio General";
+            const { pastor, networkLeader, directLeader } = extractG12Hierarchy(m);
 
             return {
               ...student,
@@ -381,7 +440,7 @@ const EnrollmentsPage = () => {
               pastor
             };
           } catch (e) {
-            return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
+            return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General" };
           }
         })
       );
@@ -402,11 +461,7 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            // 🚀 Usamos la jerarquía G12 calculada por el backend
-            // Recibimos los 3 niveles desde Java
-            const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
-            const networkLeader = m.networkLeaderName || "Sin Líder de Red";
-            const pastor = m.pastorName || "Ministerio General";
+            const { pastor, networkLeader, directLeader } = extractG12Hierarchy(m);
 
             return {
               ...student,
@@ -417,7 +472,7 @@ const EnrollmentsPage = () => {
               averageScore: student.averageScore || 0.0
             };
           } catch (e) {
-            return { ...student, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
+            return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General" };
           }
         })
       );
@@ -578,7 +633,7 @@ const EnrollmentsPage = () => {
     setEditFormData((prev) => ({ ...prev, teacher }));
     setEditTeacherSearchTerm(getDisplayName(getTeacherName(teacher)));
     setEditShowTeacherDropdown(false);
-    setEditFilteredTeachers([]);
+    setFilteredTeachers([]);
   };
 
   const handleEditClearTeacher = () => { setEditFormData((prev) => ({ ...prev, teacher: null })); setEditTeacherSearchTerm(""); setEditFilteredTeachers([]); };
@@ -645,8 +700,7 @@ const EnrollmentsPage = () => {
     setActiveTab("details");
     setLessons([]); setStudents([]); setAttendanceSummary([]);
     setError("");
-  }, []); // <-- El arreglo vacío indica que esta función nunca necesita recrearse
-
+  }, []);
 
   const handleRecover = useCallback(async (enrollment) => {
     const confirmed = await confirm({
@@ -657,17 +711,16 @@ const EnrollmentsPage = () => {
       cancelLabel: "Cancelar",
     });
     if (!confirmed) return;
- 
+
     setRecoveringId(enrollment.id);
     setError("");
     try {
       const result = await apiService.recoverCancelledCohort(enrollment.id);
- 
-      // Mostrar advertencia si quedaron estudiantes en PENDING sin evaluar
+
       const warningMsg = result?.warning
         ? `\n\n⚠️ ${result.warning}`
         : "";
- 
+
       await confirm({
         title: "¡Cohorte Recuperada!",
         message:
@@ -677,8 +730,7 @@ const EnrollmentsPage = () => {
         type: "success",
         confirmLabel: "Excelente",
       });
- 
-      // Refrescar lista y cerrar modal si estaba abierto
+
       await fetchEnrollments();
       if (showEnrollmentModal && selectedEnrollment?.id === enrollment.id) {
         handleCloseEnrollmentModal();
@@ -1056,7 +1108,6 @@ const EnrollmentsPage = () => {
                 onRecordAttendance={() => { setSelectedEnrollment(enrollment); setShowRecordAttendanceModal(true); }}
                 onViewDetail={() => handleOpenEnrollmentModal(enrollment)}
                 onExportPDF={() => { setSelectedEnrollment(enrollment); exportCohortPDF(); }}
-                // 👇 ESTA ES LA LÍNEA QUE DEBE ESTAR 👇
                 onExportApproved={(e) => { e.stopPropagation(); setSelectedEnrollment(enrollment); exportApprovedPDF(); }}
                 onRecover={() => handleRecover(enrollment)}
                 recovering={recoveringId === enrollment.id}
@@ -1178,7 +1229,7 @@ const EnrollmentsPage = () => {
                       </p>
                     </div>
                   )}
- 
+
                   </div>
 
                   {/* Acciones de documentos */}

@@ -1,11 +1,14 @@
 // services/generateApprovedStudentsPDF.js
 
-export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
+export const generateApprovedStudentsPDF = (enrollment, approvedStudents, options = {}) => {
+  // 🚀 Extraemos el helper (si no lo envían, usamos una función que devuelve el texto original)
+  const getDisplayName = options.getDisplayName || ((name) => name);
+
   const COLORS = {
-    primary: '#0f172a',     // Azul marino oscuro
-    primaryBlue: '#1e40af', // Azul rey para líderes 12
-    gold: '#d97706',        // Dorado profesional
-    goldLight: '#fef3c7',   // Fondo sutil dorado
+    primary: '#0f172a',     
+    primaryBlue: '#1e40af', 
+    gold: '#d97706',        
+    goldLight: '#fef3c7',   
     border: '#cbd5e1',
     textMain: '#334155',
     textSub: '#64748b',
@@ -35,22 +38,22 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
   let globalCounter = 1;
 
   pastorsSorted.forEach(pastor => {
-    // Nivel 1: RAMA PASTORAL
+    // 🚀 Aplicamos el helper al Nivel 1 (Aquí cambiará el nombre por "PASTOR" o "PASTORA")
     tableRowsHtml += `
       <tr>
         <td colspan="4" style="background:${COLORS.primary}; color:${COLORS.white}; padding:12px 15px; font-weight:900; font-size:12px; letter-spacing:1px; text-transform:uppercase;">
-          👑 RAMA PASTORAL: ${pastor}
+          👑 RAMA PASTORAL: ${getDisplayName(pastor)}
         </td>
       </tr>
     `;
 
     const nets = Object.keys(hierarchy[pastor]).sort();
     nets.forEach(net => {
-      // Nivel 2: LÍDER DE RED (12)
+      // 🚀 Aplicamos el helper al Nivel 2
       tableRowsHtml += `
         <tr>
           <td colspan="4" style="background:${COLORS.primaryBlue}; color:${COLORS.white}; padding:9px 15px; font-weight:800; font-size:11px; border-bottom:1px solid #93c5fd; text-transform:uppercase;">
-            💎 LÍDER DE RED (G12): ${net}
+            💎 LÍDER DE RED (G12): ${getDisplayName(net)}
           </td>
         </tr>
       `;
@@ -59,13 +62,13 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
       dirs.forEach(dir => {
         const students = hierarchy[pastor][net][dir];
         
-        // 🚀 Lógica inteligente para no ser redundante
         const isSameAsNet = (net === dir || dir === 'Sin Líder Directo' || dir === 'Red Pastoral Directa');
+        
+        // 🚀 Aplicamos el helper al Nivel 3
         const dirLabel = isSameAsNet 
               ? "👤 DISCÍPULOS DIRECTOS DE LA RED" 
-              : `👤 LÍDER DIRECTO: ${dir}`;
+              : `👤 LÍDER DIRECTO: ${getDisplayName(dir)}`;
 
-        // Nivel 3: LÍDER DIRECTO (144, 1728...)
         tableRowsHtml += `
           <tr>
             <td colspan="4" style="background:${COLORS.goldLight}; color:${COLORS.gold}; padding:6px 15px; font-weight:700; font-size:10px; border-bottom:1px solid ${COLORS.gold}; text-transform:uppercase;">
@@ -80,10 +83,11 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
           const pct = s.finalAttendancePercentage !== undefined ? Number(s.finalAttendancePercentage).toFixed(0) : '100';
           const score = (s.averageScore !== undefined && s.averageScore !== null) ? Number(s.averageScore).toFixed(2) : '—';
 
+          // 🚀 Aplicamos el helper al nombre del estudiante por si acaso
           tableRowsHtml += `
             <tr style="background:${bg}; border-bottom: 1px solid ${COLORS.border};">
               <td style="padding:6px 15px; text-align:center; width:5%; color:${COLORS.textSub}; font-weight:600; font-size:10px;">${globalCounter++}</td>
-              <td style="padding:6px 15px; text-align:left; font-weight:800; color:${COLORS.textMain}; text-transform:uppercase; font-size:10px;">${s.memberName}</td>
+              <td style="padding:6px 15px; text-align:left; font-weight:800; color:${COLORS.textMain}; text-transform:uppercase; font-size:10px;">${getDisplayName(s.memberName)}</td>
               <td style="padding:6px 15px; text-align:center; font-weight:700; color:${COLORS.primaryBlue}; font-size:10px;">${pct}%</td>
               <td style="padding:6px 15px; text-align:center; font-weight:700; color:${COLORS.textSub}; font-size:10px;">${score}</td>
             </tr>
@@ -92,6 +96,10 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
       });
     });
   });
+
+  // 🚀 Aplicamos el helper a la firma del Maestro Titular
+  const teacherRawName = enrollment.teacher?.name || enrollment.teacher?.memberName || '_________________________';
+  const teacherDisplayName = getDisplayName(teacherRawName);
 
   // ── 3. Estructura HTML del Documento ─────────────────────────────────────
   const html = `
@@ -123,13 +131,11 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
     </style>
   </head>
   <body>
-
     <div class="header">
       <div class="header-eyebrow">Documento Oficial de Certificación</div>
       <div class="header-title">Acta de Aprobación</div>
       <div class="header-subtitle">NIVEL: ${enrollment.levelDisplayName || enrollment.levelCode}</div>
     </div>
-
     <div class="meta-grid">
       <div class="meta-item">
         <div class="meta-lbl">Cohorte</div>
@@ -144,7 +150,6 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
         <div class="meta-val" style="color:${COLORS.gold}">${approvedStudents.length}</div>
       </div>
     </div>
-
     <table>
       <thead>
         <tr>
@@ -158,10 +163,9 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
         ${tableRowsHtml}
       </tbody>
     </table>
-
     <div class="signatures">
       <div class="sig-box">
-        <div class="sig-line">${enrollment.teacher?.name || enrollment.teacher?.memberName || '_________________________'}</div>
+        <div class="sig-line">${teacherDisplayName}</div>
         <div class="sig-role">Maestro Titular</div>
       </div>
       <div class="sig-box">
@@ -169,11 +173,9 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
         <div class="sig-role">Dirección Académica</div>
       </div>
     </div>
-
     <div class="footer">
       Generado por PastoreApp el ${new Date().toLocaleString('es-CO')}
     </div>
-
   </body>
   </html>`;
 
