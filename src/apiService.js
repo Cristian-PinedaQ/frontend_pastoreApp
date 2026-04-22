@@ -456,6 +456,35 @@ class ApiService {
     }
   }
 
+  /**
+   * Recupera una cohorte cancelada incorrectamente por el job automático.
+   * POST /api/v1/enrollments/{id}/recover
+   * * @param {number} id - ID de la cohorte a recuperar
+   * @returns {Object} Datos de la cohorte recuperada (cohortId, newStatus, etc.)
+   */
+  async recoverCancelledCohort(id) {
+    try {
+      validateId(id, 'enrollmentId');
+      
+      log('🔧 [recoverCancelledCohort] Intentando recuperar cohorte ID:', id);
+
+      // Nota: Según el Java docstring el endpoint es /enrollments/{id}/recover (plural).
+      // Si tu backend usa el singular o un prefijo como en tus otros métodos 
+      // (ej. /enrollment/cohorts/{id}/recover), ajusta la URL aquí abajo.
+      const response = await this.request(`/enrollments/${id}/recover`, {
+        method: 'POST',
+      });
+
+      log('✅ [recoverCancelledCohort] Éxito - Nuevo estado:', response?.newStatus);
+      return response;
+      
+    } catch (error) {
+      logError('❌ [recoverCancelledCohort] Error:', error.message);
+      throw error;
+    }
+  }
+
+
   // ========== 📚 NIVELES FORMATIVOS ==========
 
   async getActiveLevels() {
@@ -509,6 +538,9 @@ class ApiService {
       { id: 11, code: 'GRADUACION', displayName: 'Graduación', levelOrder: 11, isActive: true }
     ];
   }
+
+ 
+
 
   // ========== 🎓 INSCRIPCIONES DE ESTUDIANTES ==========
 

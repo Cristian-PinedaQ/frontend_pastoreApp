@@ -40,6 +40,7 @@ import {
   FileText,
   Printer,
   ChevronDown,
+  RotateCcw,
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -76,6 +77,16 @@ const formatLocalDate = (dateString) => {
   const date = parseLocalDate(dateString);
   if (!date || isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("es-CO", { year: "numeric", month: "short", day: "numeric" });
+};
+
+const isRecoverable = (enrollment) => {
+  if (enrollment.status !== "CANCELLED") return false;
+  const end = parseLocalDate(enrollment.endDate);
+  if (!end || isNaN(end.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = (today - end) / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= 30;
 };
 
 // ─── Validaciones ────────────────────────────────────────────────────────────
@@ -195,6 +206,7 @@ const EnrollmentsPage = () => {
   const [viewMode, setViewMode] = useState("grid");
   const [showForm, setShowForm] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [recoveringId, setRecoveringId] = useState(null);
 
   // ── Estado modal de detalles ──────────────────────────────────────────────
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
@@ -610,6 +622,54 @@ const EnrollmentsPage = () => {
     setError("");
   };
 
+
+  const handleRecover = useCallback(async (enrollment) => {
+    const confirmed = await confirm({
+      title: "¿Recuperar cohorte?",
+      message: `Se evaluará a los estudiantes de "${enrollment.cohortName}" y la cohorte pasará a estado COMPLETADA. Esta acción no se puede deshacer.`,
+      type: "warning",
+      confirmLabel: "Sí, recuperar",
+      cancelLabel: "Cancelar",
+    });
+    if (!confirmed) return;
+ 
+    setRecoveringId(enrollment.id);
+    setError("");
+    try {
+      const result = await apiService.recoverEnrollment(enrollment.id);
+ 
+      // Mostrar advertencia si quedaron estudiantes en PENDING sin evaluar
+      const warningMsg = result?.warning
+        ? `\n\n⚠️ ${result.warning}`
+        : "";
+ 
+      await confirm({
+        title: "¡Cohorte Recuperada!",
+        message:
+          `"${result?.cohortName ?? enrollment.cohortName}" fue marcada como COMPLETADA.\n` +
+          `✅ Aprobados: ${result?.passed ?? "—"}   ❌ Reprobados: ${result?.failed ?? "—"}` +
+          warningMsg,
+        type: "success",
+        confirmLabel: "Excelente",
+      });
+ 
+      // Refrescar lista y cerrar modal si estaba abierto
+      await fetchEnrollments();
+      if (showEnrollmentModal && selectedEnrollment?.id === enrollment.id) {
+        handleCloseEnrollmentModal();
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.message ||
+        "Error al recuperar la cohorte. Inténtalo de nuevo.";
+      setError(msg);
+      logError("Error recuperando cohorte:", err);
+    } finally {
+      setRecoveringId(null);
+    }
+  }, [confirm, fetchEnrollments, showEnrollmentModal, selectedEnrollment, handleCloseEnrollmentModal]);
+
   // ── Handlers de edición ───────────────────────────────────────────────────
   const handleOpenEditModal = () => {
     if (!selectedEnrollment) return;
@@ -971,6 +1031,8 @@ const EnrollmentsPage = () => {
                 onRecordAttendance={() => { setSelectedEnrollment(enrollment); setShowRecordAttendanceModal(true); }}
                 onViewDetail={() => handleOpenEnrollmentModal(enrollment)}
                 onExportPDF={() => { setSelectedEnrollment(enrollment); exportCohortPDF(); }}
+                onRecover={() => handleRecover(enrollment)}
+                recovering={recoveringId === enrollment.id}
               />
             ))}
           </div>
@@ -1059,6 +1121,37 @@ const EnrollmentsPage = () => {
                       {selectedEnrollment.status !== "COMPLETED" && <ActionBtn color="indigo" onClick={() => handleStatusChange(selectedEnrollment.id, "COMPLETED")}>✅ Completar</ActionBtn>}
                       {selectedEnrollment.status !== "CANCELLED" && <ActionBtn color="rose" onClick={() => handleStatusChange(selectedEnrollment.id, "CANCELLED")}>❌ Cancelar</ActionBtn>}
                     </div>
+                    {/* Recuperar cohorte cancelada (solo si aplica) */}
+                  {isRecoverable(selectedEnrollment) && (
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <p className="text-xs font-black text-amber-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                        <RotateCcw size={11} /> Recuperación disponible
+                      </p>
+                      <button
+                        onClick={() => handleRecover(selectedEnrollment)}
+                        disabled={recoveringId === selectedEnrollment.id}
+                        className="flex items-center justify-center gap-2 w-full py-3
+                          bg-gradient-to-r from-amber-500 to-orange-500
+                          hover:from-amber-600 hover:to-orange-600
+                          disabled:from-amber-300 disabled:to-orange-300
+                          text-white rounded-2xl font-black text-xs uppercase tracking-widest
+                          transition-all shadow-lg shadow-amber-500/25 active:scale-95"
+                      >
+                        {recoveringId === selectedEnrollment.id ? (
+                          <><RefreshCw size={14} className="animate-spin" /> Recuperando...</>
+                        ) : (
+                          <><RotateCcw size={14} /> Recuperar y Completar</>
+                        )}
+                      </button>
+                      <p className="text-[10px] text-slate-400 font-semibold text-center mt-1.5">
+                        Disponible hasta el {formatLocalDate(
+                          new Date(parseLocalDate(selectedEnrollment.endDate).getTime() + 30 * 24 * 60 * 60 * 1000)
+                            .toISOString().split("T")[0]
+                        )}
+                      </p>
+                    </div>
+                  )}
+ 
                   </div>
 
                   {/* Acciones de documentos */}
@@ -1456,7 +1549,7 @@ const ViewModeBtn = ({ active, onClick, children }) => (
   </button>
 );
 
-const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail, onExportPDF }) => {
+const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail, onExportPDF, onRecover, recovering }) => {
   const occupancy = Math.round(((enrollment.currentStudentCount || 0) / (enrollment.maxStudents || 30)) * 100);
 
   return (
@@ -1504,10 +1597,32 @@ const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail,
           </div>
         </div>
       </div>
-      <div className="p-3 bg-slate-50 dark:bg-slate-950/40 grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
-        <CardActionBtn icon={<ClipboardCheck size={13} />} label="Asis." onClick={onRecordAttendance} hoverClass="hover:bg-slate-900 hover:text-white dark:hover:bg-indigo-600" />
-        <CardActionBtn icon={<Search size={13} />} label="Detalle" onClick={onViewDetail} hoverClass="hover:bg-violet-600 hover:text-white" />
-        <CardActionBtn icon={<FileDown size={13} />} label="PDF" onClick={onExportPDF} hoverClass="hover:bg-indigo-600 hover:text-white" />
+       <div className="p-3 bg-slate-50 dark:bg-slate-950/40 space-y-2" onClick={(e) => e.stopPropagation()}>
+        <div className="grid grid-cols-3 gap-2">
+          <CardActionBtn icon={<ClipboardCheck size={13} />} label="Asis."   onClick={onRecordAttendance} hoverClass="hover:bg-slate-900 hover:text-white dark:hover:bg-indigo-600" />
+          <CardActionBtn icon={<Search size={13} />}         label="Detalle" onClick={onViewDetail}       hoverClass="hover:bg-violet-600 hover:text-white" />
+          <CardActionBtn icon={<FileDown size={13} />}       label="PDF"     onClick={onExportPDF}        hoverClass="hover:bg-indigo-600 hover:text-white" />
+        </div>
+ 
+        {/* Botón de recuperación: solo para cohortes canceladas dentro del plazo */}
+        {isRecoverable(enrollment) && (
+          <button
+            onClick={onRecover}
+            disabled={recovering}
+            className="w-full flex items-center justify-center gap-2 py-2.5
+              bg-gradient-to-r from-amber-500 to-orange-500
+              hover:from-amber-600 hover:to-orange-600
+              disabled:from-amber-300 disabled:to-orange-300
+              text-white rounded-xl font-black text-[10px] uppercase tracking-widest
+              transition-all shadow-md shadow-amber-500/20 active:scale-95"
+          >
+            {recovering ? (
+              <><RefreshCw size={12} className="animate-spin" /> Recuperando...</>
+            ) : (
+              <><RotateCcw size={12} /> Recuperar cohorte</>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
