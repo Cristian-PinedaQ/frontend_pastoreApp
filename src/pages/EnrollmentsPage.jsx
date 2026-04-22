@@ -310,7 +310,6 @@ const EnrollmentsPage = () => {
     setError("");
     try {
       const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
-      // Validamos si es arreglo o si viene dentro de .data
       const allStudents = Array.isArray(rawStudents) ? rawStudents : (rawStudents?.data || []);
 
       const approvedStudents = allStudents.filter(s => s.status === "COMPLETED" || s.passed === true);
@@ -320,22 +319,19 @@ const EnrollmentsPage = () => {
         return;
       }
 
-      // 3. Obtener la jerarquía desde el Member
+      // 🚀 Enriquecer con los 3 niveles de G12 (Pastor -> Red -> Directo)
       const enrichedStudents = await Promise.all(
         approvedStudents.map(async (student) => {
           try {
-            // Aseguramos de capturar el ID sin importar la estructura
             const mId = student.memberId || student.member?.id;
-            if (!mId) return { ...student, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
+            if (!mId) return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General" };
 
             const res = await apiService.getMemberById(mId);
-            // 🚀 EL FIX: Entramos a .data si es respuesta de Axios
             const m = res?.data || res || {};
 
-            // 🚀 Usamos la jerarquía G12 calculada por el backend en Member.java
-            // Recibimos los 3 niveles desde Java
+            // Consumimos los métodos que Java calculó en Member.java
             const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
-            const networkLeader = m.networkLeaderName || "Sin Líder de Red";
+            const networkLeader = m.networkLeaderName || "Ministerio General";
             const pastor = m.pastorName || "Ministerio General";
 
             return {
@@ -347,7 +343,7 @@ const EnrollmentsPage = () => {
               averageScore: student.averageScore || 0.0
             };
           } catch (err) {
-            return { ...student, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General", averageScore: student.averageScore || 0.0 };
+            return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General", averageScore: student.averageScore || 0.0 };
           }
         })
       );
