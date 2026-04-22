@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const ConfirmationContext = createContext();
@@ -8,45 +8,46 @@ export const ConfirmationProvider = ({ children }) => {
     isOpen: false,
     title: '',
     message: '',
-    onConfirm: null,
     type: 'warning',
     confirmLabel: 'Confirmar',
-    isExecuting: false
+    cancelLabel: 'Cancelar'
   });
 
-  const confirm = useCallback(({ 
-    title, 
-    message, 
-    onConfirm, 
-    type = 'warning', 
-    confirmLabel = 'Confirmar' 
-  }) => {
+  // Usamos una referencia para guardar el 'resolve' de la promesa.
+  // Así evitamos que React intente ejecutarlo al actualizar el estado.
+  const resolver = useRef(null);
+
+  const confirm = useCallback((options) => {
+    // 1. Mostramos el modal con las opciones recibidas
+    setConfirmState({
+      isOpen: true,
+      title: options.title || 'Confirmación',
+      message: options.message || '¿Estás seguro de realizar esta acción?',
+      type: options.type || 'warning',
+      confirmLabel: options.confirmLabel || 'Confirmar',
+      cancelLabel: options.cancelLabel || 'Cancelar'
+    });
+
+    // 2. Retornamos la promesa y guardamos la llave (resolve) en el ref
     return new Promise((resolve) => {
-      setConfirmState({
-        isOpen: true,
-        title,
-        message,
-        onConfirm: async () => {
-          setConfirmState(prev => ({ ...prev, isExecuting: true }));
-          try {
-            await onConfirm();
-            setConfirmState(prev => ({ ...prev, isOpen: false, isExecuting: false }));
-            resolve(true);
-          } catch (error) {
-            console.error("Confirmation action failed:", error);
-            setConfirmState(prev => ({ ...prev, isOpen: false, isExecuting: false }));
-            resolve(false);
-          }
-        },
-        type,
-        confirmLabel,
-        isExecuting: false
-      });
+      resolver.current = resolve;
     });
   }, []);
 
-  const closeConfirm = useCallback(() => {
+  const handleConfirm = useCallback(() => {
     setConfirmState(prev => ({ ...prev, isOpen: false }));
+    if (resolver.current) {
+      resolver.current(true); // Retorna 'true' al EnrollmentsPage
+      resolver.current = null;
+    }
+  }, []);
+
+  const handleCancel = useCallback(() => {
+    setConfirmState(prev => ({ ...prev, isOpen: false }));
+    if (resolver.current) {
+      resolver.current(false); // Retorna 'false' al EnrollmentsPage
+      resolver.current = null;
+    }
   }, []);
 
   return (
@@ -54,13 +55,14 @@ export const ConfirmationProvider = ({ children }) => {
       {children}
       <ConfirmationModal 
         isOpen={confirmState.isOpen}
-        onClose={closeConfirm}
+        onClose={handleCancel}
         title={confirmState.title}
         message={confirmState.message}
-        onConfirm={confirmState.onConfirm}
+        onConfirm={handleConfirm}
         confirmLabel={confirmState.confirmLabel}
+        cancelLabel={confirmState.cancelLabel}
         type={confirmState.type}
-        isExecuting={confirmState.isExecuting}
+        isExecuting={false} // Tu EnrollmentsPage ya maneja sus propios loadings
       />
     </ConfirmationContext.Provider>
   );
@@ -71,7 +73,7 @@ export const useConfirmation = () => {
   if (!context) {
     throw new Error('useConfirmation must be used within a ConfirmationProvider');
   }
-  return context.confirm;
+  return context.confirm; // Retornamos directamente la función para usar: const confirm = useConfirmation()
 };
 
 export default ConfirmationContext;
