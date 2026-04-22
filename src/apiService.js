@@ -471,7 +471,7 @@ class ApiService {
       // Nota: Según el Java docstring el endpoint es /enrollments/{id}/recover (plural).
       // Si tu backend usa el singular o un prefijo como en tus otros métodos 
       // (ej. /enrollment/cohorts/{id}/recover), ajusta la URL aquí abajo.
-      const response = await this.request(`/enrollments/${id}/recover`, {
+      const response = await this.request(`/enrollment/${id}/recover`, {
         method: 'POST',
       });
 
