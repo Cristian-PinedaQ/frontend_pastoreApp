@@ -2,14 +2,6 @@
 // Genera un PDF con la asistencia consolidada de TODAS las lecciones de una cohorte
 
 export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, attendanceMatrix) => {
-  /**
-   * attendanceMatrix: Map<lessonId, Set<memberId>>
-   *   → Para cada lección, el conjunto de memberIds que marcaron present: true
-   *
-   * students: array de estudiantes activos (status !== 'CANCELLED'), enriquecidos con leaderName
-   * lessons:  array de lecciones ordenadas por lessonNumber (solo las que tienen al menos 1 registro)
-   */
-
   const COLORS = {
     primary:      '#1e40af',
     primaryLight: '#dbeafe',
@@ -23,16 +15,15 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     light:        '#f8fafc',
     white:        '#ffffff',
     headerRow:    '#f1f5f9',
+    gold:         '#d97706',
+    goldLight:    '#fef3c7',
   };
 
   // ── 1. Métricas globales ──────────────────────────────────────────────────
   const totalStudents  = students.length;
   const totalLessons   = lessons.length;
-
-  // Asistencias totales esperadas
   const totalExpected  = totalStudents * totalLessons;
 
-  // Contar cuántas asistencias reales hay en toda la cohorte
   let totalAttended = 0;
   students.forEach(s => {
     lessons.forEach(l => {
@@ -53,7 +44,7 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
       : '0',
   }));
 
-  // ── 3. Asistencia por estudiante (para columna de resumen) ────────────────
+  // ── 3. Asistencia por estudiante ──────────────────────────────────────────
   const studentStats = students.map(s => {
     const attended = lessons.filter(l =>
       attendanceMatrix.get(l.id)?.has(Number(s.memberId))
@@ -62,14 +53,20 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     return { ...s, attended, pct };
   });
 
-  // ── 4. Agrupamiento por líder ─────────────────────────────────────────────
-  const groupedByLeader = studentStats.reduce((acc, s) => {
-    const leader = s.leaderName || 'Sin Líder Asignado';
-    if (!acc[leader]) acc[leader] = [];
-    acc[leader].push(s);
-    return acc;
-  }, {});
-  const leadersSorted = Object.keys(groupedByLeader).sort();
+  // ── 4. Agrupamiento Jerárquico (Red -> Directo) ───────────────────────────
+  const hierarchy = {};
+  
+  studentStats.forEach(s => {
+    const main = s.mainLeader || 'RED GENERAL';
+    const direct = s.directLeader || 'Sin Líder Directo';
+
+    if (!hierarchy[main]) hierarchy[main] = {};
+    if (!hierarchy[main][direct]) hierarchy[main][direct] = [];
+    
+    hierarchy[main][direct].push(s);
+  });
+
+  const mainLeadersSorted = Object.keys(hierarchy).sort();
 
   // ── 5. Helpers de renderizado ─────────────────────────────────────────────
   const cellStyle = (base = '') =>
@@ -87,7 +84,6 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     return COLORS.danger;
   };
 
-  // Columnas de lecciones: máximo 12 por página (si hay más, se encogen)
   const colWidth = Math.max(28, Math.min(50, Math.floor(420 / totalLessons)));
 
   // ── 6. Cabecera de lecciones ──────────────────────────────────────────────
@@ -105,57 +101,71 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     </td>
   `).join('');
 
-  // ── 8. Filas de estudiantes agrupadas por líder ───────────────────────────
+  // ── 8. Filas de estudiantes agrupadas por jerarquía ───────────────────────
   const renderStudentRows = () => {
     let html = '';
 
-    leadersSorted.forEach(leader => {
-      const groupStudents = groupedByLeader[leader];
-
-      // Fila de encabezado del grupo
+    mainLeadersSorted.forEach(mainLeader => {
+      // Fila del Líder de Red (Nivel 1)
       html += `
         <tr>
           <td colspan="${totalLessons + 3}"
-              style="background:${COLORS.primaryLight}; color:${COLORS.primary};
-                     padding:7px 10px; font-weight:800; font-size:11px;
-                     border:1px solid ${COLORS.border}">
-            👤 LÍDER: ${leader.toUpperCase()} &nbsp;·&nbsp; ${groupStudents.length} estudiante${groupStudents.length !== 1 ? 's' : ''}
+              style="background:${COLORS.primary}; color:${COLORS.white};
+                     padding:8px 10px; font-weight:800; font-size:11px; letter-spacing:1px;
+                     border:1px solid ${COLORS.border}; text-transform:uppercase;">
+            👑 LÍDER DE RED / PASTOR: ${mainLeader}
           </td>
         </tr>
       `;
 
-      groupStudents.forEach((s, idx) => {
-        const rowBg = idx % 2 === 0 ? COLORS.white : COLORS.light;
+      const directLeadersSorted = Object.keys(hierarchy[mainLeader]).sort();
 
-        // Celdas de asistencia por lección
-        const lessonCells = lessons.map(l => {
-          const attended = attendanceMatrix.get(l.id)?.has(Number(s.memberId));
-          return `
-            <td style="${cellStyle(`background:${attended ? COLORS.successLight : COLORS.dangerLight}`)}">
-              <span style="color:${attended ? COLORS.success : COLORS.danger}; font-size:13px; font-weight:900">
-                ${attended ? '✓' : '✗'}
-              </span>
-            </td>
-          `;
-        }).join('');
+      directLeadersSorted.forEach(directLeader => {
+        const groupStudents = hierarchy[mainLeader][directLeader];
 
-        // Celda de resumen del estudiante
-        //const pctNum = Number(s.pct);
+        // Fila del Líder Directo (Nivel 2)
         html += `
-          <tr style="background:${rowBg}">
-            <td style="${cellStyle(`text-align:left; padding-left:10px; font-weight:600;
-                         color:${COLORS.textMain}; min-width:140px; max-width:180px`)}">
-              ${s.memberName || `Miembro ${s.memberId}`}
-            </td>
-            ${lessonCells}
-            <td style="${cellStyle(`font-weight:700`)}">
-              ${s.attended}/${totalLessons}
-            </td>
-            <td style="${cellStyle(`font-weight:800; color:${pctColor(s.pct)}`)}">
-              ${s.pct}%
+          <tr>
+            <td colspan="${totalLessons + 3}"
+                style="background:${COLORS.primaryLight}; color:${COLORS.primary};
+                       padding:6px 10px; font-weight:700; font-size:10px;
+                       border:1px solid ${COLORS.border}; text-transform:uppercase;">
+              👤 LÍDER DIRECTO: ${directLeader} <span style="float:right; color:${COLORS.primary}; font-size:9px;">(${groupStudents.length} estudiante${groupStudents.length !== 1 ? 's' : ''})</span>
             </td>
           </tr>
         `;
+
+        // Estudiantes de este subgrupo
+        groupStudents.forEach((s, idx) => {
+          const rowBg = idx % 2 === 0 ? COLORS.white : COLORS.light;
+
+          const lessonCells = lessons.map(l => {
+            const attended = attendanceMatrix.get(l.id)?.has(Number(s.memberId));
+            return `
+              <td style="${cellStyle(`background:${attended ? COLORS.successLight : COLORS.dangerLight}`)}">
+                <span style="color:${attended ? COLORS.success : COLORS.danger}; font-size:13px; font-weight:900">
+                  ${attended ? '✓' : '✗'}
+                </span>
+              </td>
+            `;
+          }).join('');
+
+          html += `
+            <tr style="background:${rowBg}">
+              <td style="${cellStyle(`text-align:left; padding-left:10px; font-weight:600;
+                           color:${COLORS.textMain}; min-width:140px; max-width:180px`)}">
+                ${s.memberName || `Miembro ${s.memberId}`}
+              </td>
+              ${lessonCells}
+              <td style="${cellStyle(`font-weight:700`)}">
+                ${s.attended}/${totalLessons}
+              </td>
+              <td style="${cellStyle(`font-weight:800; color:${pctColor(s.pct)}`)}">
+                ${s.pct}%
+              </td>
+            </tr>
+          `;
+        });
       });
     });
 
@@ -208,10 +218,10 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     .stat-val   { font-size:20px; font-weight:800; margin-bottom:2px; }
     .stat-lbl   { font-size:9px; text-transform:uppercase; color:${COLORS.textSub}; letter-spacing:1px; }
 
-    table { width:100%; border-collapse:collapse; font-size:11px; }
+    table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom: 20px; }
 
     .legend { margin-top:20px; padding:14px; background:${COLORS.light};
-              border:1px solid ${COLORS.border}; border-radius:8px; }
+              border:1px solid ${COLORS.border}; border-radius:8px; page-break-inside: avoid; }
     .legend-title { font-weight:700; font-size:11px; margin-bottom:8px; color:${COLORS.primary}; }
 
     .footer { margin-top:28px; border-top:1px solid ${COLORS.border}; padding-top:12px;
@@ -225,7 +235,6 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
 </head>
 <body>
 
-  <!-- Encabezado -->
   <div class="page-header">
     <div class="badge">REPORTE DE ASISTENCIA CONSOLIDADA · TODAS LAS LECCIONES</div>
     <div class="title">${enrollment.cohortName}</div>
@@ -241,7 +250,6 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     </div>
   </div>
 
-  <!-- Métricas -->
   <div class="stats">
     <div class="stat">
       <div class="stat-val" style="color:${COLORS.primary}">${totalStudents}</div>
@@ -261,7 +269,6 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     </div>
   </div>
 
-  <!-- Matriz de asistencia -->
   <table>
     <thead>
       <tr>
@@ -274,7 +281,6 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
       </tr>
     </thead>
     <tbody>
-      <!-- Fila de totales por lección -->
       <tr>
         <td style="${cellStyle(`background:${COLORS.primaryLight}; font-weight:700;
                      color:${COLORS.primary}; text-align:left; padding-left:10px`)}">
@@ -288,12 +294,10 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
           ${globalPercentage}%
         </td>
       </tr>
-      <!-- Filas de estudiantes agrupadas por líder -->
       ${renderStudentRows()}
     </tbody>
   </table>
 
-  <!-- Leyenda de lecciones -->
   <div class="legend">
     <div class="legend-title">📚 Detalle de Lecciones</div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px 20px">
@@ -301,7 +305,6 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
     </div>
   </div>
 
-  <!-- Pie de página -->
   <div class="footer">
     <div>PastoreApp · Módulo de Formación Educativa · Reporte generado automáticamente</div>
     <div>${new Date().toLocaleString('es-CO')}</div>
@@ -310,7 +313,6 @@ export const generateCohortAttendanceFullPDF = (enrollment, lessons, students, a
 </body>
 </html>`;
 
-  // ── 11. Abrir e imprimir ──────────────────────────────────────────────────
   const win = window.open('', '_blank');
   if (!win) {
     alert('Por favor permite las ventanas emergentes para ver el reporte.');

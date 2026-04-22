@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { generateCohortPDF } from "../services/generateCohortPDF";
 import { generateAttendancePDF } from "../services/attendanceCohortsPdfGenerator";
 import { generateCohortAttendanceFullPDF } from "../services/generateCohortAttendanceFullPDF";
+import { generateApprovedStudentsPDF } from "../services/generateApprovedStudentsPDF"; // <-- Agrega esta ruta
 import {
   BookOpen,
   Users,
@@ -41,6 +42,7 @@ import {
   Printer,
   ChevronDown,
   RotateCcw,
+  Award,
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -302,6 +304,50 @@ const EnrollmentsPage = () => {
     }
   };
 
+  const exportApprovedPDF = async () => {
+    if (!selectedEnrollment) return;
+    setExportingPDF(true);
+    setError("");
+    try {
+      // 1. Obtener todos los estudiantes de la cohorte
+      const rawStudents = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
+      const allStudents = toArray(rawStudents);
+
+      // 2. Filtrar SOLO los que pasaron 
+      const approvedStudents = allStudents.filter(s => s.status === "COMPLETED" || s.passed === true);
+
+      if (approvedStudents.length === 0) {
+        await confirm({ title: "Sin Aprobados", message: "Esta cohorte no tiene estudiantes aprobados.", type: "info", confirmLabel: "Entendido" });
+        return;
+      }
+
+      // 3. Obtener la jerarquía desde el Member
+      const memberResults = await Promise.allSettled(approvedStudents.map(s => apiService.getMemberById(s.memberId)));
+      
+      const enrichedStudents = approvedStudents.map((student, i) => {
+        const m = memberResults[i].status === "fulfilled" ? memberResults[i].value || {} : {};
+        
+        return {
+          ...student,
+          memberName: student.memberName || m.name || `Miembro ${student.memberId}`,
+          // 🚀 Ahora consumimos los nombres exactos que nos manda Java
+          directLeader: m.leaderName || "Sin Líder Directo",
+          mainLeader: m.mainLeaderName || "Ministerio General",
+          averageScore: student.averageScore || 0.0
+        };
+      });
+
+      // 4. Generar el documento
+      generateApprovedStudentsPDF(selectedEnrollment, enrichedStudents);
+
+    } catch (err) {
+      logError("Error exportando Acta de Aprobados:", err);
+      setError("Error al generar el acta de aprobados.");
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
   const handlePrintLessonAttendance = async (lesson) => {
     try {
       setExportingPDF(true);
@@ -364,12 +410,19 @@ const EnrollmentsPage = () => {
         currentStudents = toArray(rawStudents).filter((s) => s.status !== "CANCELLED");
       }
       const memberResults = await Promise.allSettled(currentStudents.map((s) => apiService.getMemberById(s.memberId)));
+      
       const enrichedStudents = currentStudents.map((s, i) => {
         const m = memberResults[i].status === "fulfilled" ? memberResults[i].value || {} : {};
+        
+        // Extraemos jerarquía exactamente igual que en el Acta
+        const directLeader = m.leaderName ?? m.leader?.name ?? m.cell?.groupLeader?.memberName ?? m.cell?.groupLeaderName ?? "Sin Líder Directo";
+        const mainLeader = m.mainLeaderName ?? m.leader?.leaderName ?? m.leader?.leader?.name ?? m.cell?.mainLeaderName ?? "Ministerio General";
+
         return {
           ...s,
           memberName: s.memberName || m.name || `Miembro ${s.memberId}`,
-          leaderName: m.leaderName ?? m.leader?.name ?? m.cell?.groupLeader?.memberName ?? m.cell?.groupLeaderName ?? m.groupLeaderName ?? "Sin Líder Asignado",
+          directLeader,
+          mainLeader,
         };
       });
 
@@ -614,13 +667,13 @@ const EnrollmentsPage = () => {
     setError("");
   };
 
-  const handleCloseEnrollmentModal = () => {
+  const handleCloseEnrollmentModal = useCallback(() => {
     setSelectedEnrollment(null);
     setShowEnrollmentModal(false);
     setActiveTab("details");
     setLessons([]); setStudents([]); setAttendanceSummary([]);
     setError("");
-  };
+  }, []); // <-- El arreglo vacío indica que esta función nunca necesita recrearse
 
 
   const handleRecover = useCallback(async (enrollment) => {
@@ -1031,6 +1084,8 @@ const EnrollmentsPage = () => {
                 onRecordAttendance={() => { setSelectedEnrollment(enrollment); setShowRecordAttendanceModal(true); }}
                 onViewDetail={() => handleOpenEnrollmentModal(enrollment)}
                 onExportPDF={() => { setSelectedEnrollment(enrollment); exportCohortPDF(); }}
+                // 👇 ESTA ES LA LÍNEA QUE DEBE ESTAR 👇
+                onExportApproved={(e) => { e.stopPropagation(); setSelectedEnrollment(enrollment); exportApprovedPDF(); }}
                 onRecover={() => handleRecover(enrollment)}
                 recovering={recoveringId === enrollment.id}
               />
@@ -1549,7 +1604,7 @@ const ViewModeBtn = ({ active, onClick, children }) => (
   </button>
 );
 
-const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail, onExportPDF, onRecover, recovering }) => {
+const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail, onExportPDF, onExportApproved, onRecover, recovering}) => {
   const occupancy = Math.round(((enrollment.currentStudentCount || 0) / (enrollment.maxStudents || 30)) * 100);
 
   return (
@@ -1598,10 +1653,22 @@ const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail,
         </div>
       </div>
        <div className="p-3 bg-slate-50 dark:bg-slate-950/40 space-y-2" onClick={(e) => e.stopPropagation()}>
-        <div className="grid grid-cols-3 gap-2">
+        
+        {/* 🚀 MODIFICADO: Grid dinámico (4 columnas si está completado, 3 si no) */}
+        <div className={`grid ${enrollment.status === 'COMPLETED' ? 'grid-cols-4' : 'grid-cols-3'} gap-2`}>
           <CardActionBtn icon={<ClipboardCheck size={13} />} label="Asis."   onClick={onRecordAttendance} hoverClass="hover:bg-slate-900 hover:text-white dark:hover:bg-indigo-600" />
           <CardActionBtn icon={<Search size={13} />}         label="Detalle" onClick={onViewDetail}       hoverClass="hover:bg-violet-600 hover:text-white" />
           <CardActionBtn icon={<FileDown size={13} />}       label="PDF"     onClick={onExportPDF}        hoverClass="hover:bg-indigo-600 hover:text-white" />
+          
+          {/* NUEVO BOTÓN: Acta de aprobados (solo visible en COMPLETED) */}
+          {enrollment.status === 'COMPLETED' && (
+            <CardActionBtn 
+              icon={<Award size={13} />} 
+              label="Acta" 
+              onClick={onExportApproved} 
+              hoverClass="hover:bg-amber-500 hover:text-white dark:hover:bg-amber-600 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20" 
+            />
+          )}
         </div>
  
         {/* Botón de recuperación: solo para cohortes canceladas dentro del plazo */}
