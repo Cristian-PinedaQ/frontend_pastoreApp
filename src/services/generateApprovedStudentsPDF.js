@@ -2,9 +2,10 @@
 
 export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
     const COLORS = {
-        primary: '#0f172a',     // Azul marino oscuro muy elegante
-        gold: '#d97706',        // Dorado profesional
-        goldLight: '#fef3c7',   // Fondo sutil dorado
+        primary: '#0f172a',
+        primaryBlue: '#1e40af',
+        gold: '#d97706',
+        goldLight: '#fef3c7',
         border: '#cbd5e1',
         textMain: '#334155',
         textSub: '#64748b',
@@ -12,66 +13,82 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents) => {
         bgLight: '#f8fafc'
     };
 
-    // ── 1. Agrupación Jerárquica (Líder Principal -> Líder Directo) ─────────
+    // ── 1. Agrupación en 3 Niveles (Pastor -> Red -> Directo) ─────────
     const hierarchy = {};
 
     approvedStudents.forEach(student => {
-        const main = student.mainLeader || 'RED GENERAL';
-        const direct = student.directLeader || 'Sin Líder Directo';
+        const p = student.pastor || 'Ministerio General';
+        const net = student.networkLeader || 'Sin Líder de Red';
+        const dir = student.directLeader || 'Sin Líder Directo';
 
-        if (!hierarchy[main]) hierarchy[main] = {};
-        if (!hierarchy[main][direct]) hierarchy[main][direct] = [];
+        if (!hierarchy[p]) hierarchy[p] = {};
+        if (!hierarchy[p][net]) hierarchy[p][net] = {};
+        if (!hierarchy[p][net][dir]) hierarchy[p][net][dir] = [];
 
-        hierarchy[main][direct].push(student);
+        hierarchy[p][net][dir].push(student);
     });
 
-    const mainLeadersSorted = Object.keys(hierarchy).sort();
+    const pastorsSorted = Object.keys(hierarchy).sort();
 
-    // ── 2. Renderizado de las filas de la tabla ─────────────────────────────
+    // ── 2. Renderizado de las filas ─────────────────────────────
     let tableRowsHtml = '';
     let globalCounter = 1;
 
-    mainLeadersSorted.forEach(mainLeader => {
-        // Fila del Líder Principal (Nivel 1)
+    pastorsSorted.forEach(pastor => {
+        // Nivel 1: RAMA PASTORAL
         tableRowsHtml += `
       <tr>
-        <td colspan="4" style="background:${COLORS.primary}; color:${COLORS.white}; padding:10px 15px; font-weight:800; font-size:12px; letter-spacing:1px; text-transform:uppercase;">
-          👑 LÍDER DE RED / PASTOR: ${mainLeader}
+        <td colspan="4" style="background:${COLORS.primary}; color:${COLORS.white}; padding:12px 15px; font-weight:900; font-size:12px; letter-spacing:1px; text-transform:uppercase;">
+          👑 RAMA PASTORAL: ${pastor}
         </td>
       </tr>
     `;
 
-        const directLeaders = Object.keys(hierarchy[mainLeader]).sort();
-
-        directLeaders.forEach(directLeader => {
-            const students = hierarchy[mainLeader][directLeader];
-
-            // Fila del Líder Directo (Nivel 2)
+        const nets = Object.keys(hierarchy[pastor]).sort();
+        nets.forEach(net => {
+            // Nivel 2: LÍDER DE RED (12)
             tableRowsHtml += `
         <tr>
-          <td colspan="4" style="background:${COLORS.goldLight}; color:${COLORS.gold}; padding:8px 15px; font-weight:700; font-size:11px; border-bottom:1px solid ${COLORS.gold}; text-transform:uppercase;">
-            👤 LÍDER DIRECTO: ${directLeader} <span style="float:right; color:${COLORS.textSub}; font-size:9px;">(${students.length} Aprobados)</span>
+          <td colspan="4" style="background:${COLORS.primaryBlue}; color:${COLORS.white}; padding:9px 15px; font-weight:800; font-size:11px; border-bottom:1px solid #93c5fd; text-transform:uppercase;">
+            💎 LÍDER DE RED (G12): ${net}
           </td>
         </tr>
       `;
 
-            // Estudiantes de este líder
-            students.forEach((s, idx) => {
-                const bg = idx % 2 === 0 ? COLORS.white : COLORS.bgLight;
-                const pct = s.finalAttendancePercentage !== undefined ? Number(s.finalAttendancePercentage).toFixed(0) : '100';
-                // Validamos explícitamente que no sea undefined para que el 0.0 sí se imprima
-                const score = (s.averageScore !== undefined && s.averageScore !== null)
-                    ? Number(s.averageScore).toFixed(2)
-                    : '—';
+            const dirs = Object.keys(hierarchy[pastor][net]).sort();
+            dirs.forEach(dir => {
+                const students = hierarchy[pastor][net][dir];
 
+                // 🚀 EL FIX PARA LA REDUNDANCIA: Si el directo es el mismo líder 12
+                const isSameAsNet = (net === dir);
+                const dirLabel = isSameAsNet
+                    ? "👤 DISCÍPULOS DIRECTOS DE LA RED"
+                    : `👤 LÍDER DIRECTO: ${dir}`;
+
+                // Nivel 3: LÍDER DIRECTO (144, 1728...)
                 tableRowsHtml += `
-          <tr style="background:${bg}; border-bottom: 1px solid ${COLORS.border};">
-            <td style="padding:8px 15px; text-align:center; width:5%; color:${COLORS.textSub}; font-weight:600;">${globalCounter++}</td>
-            <td style="padding:8px 15px; text-align:left; font-weight:700; color:${COLORS.textMain}; text-transform:uppercase;">${s.memberName}</td>
-            <td style="padding:8px 15px; text-align:center; font-weight:600; color:${COLORS.primary};">${pct}%</td>
-            <td style="padding:8px 15px; text-align:center; font-weight:600; color:${COLORS.textSub};">${score}</td>
+          <tr>
+            <td colspan="4" style="background:${COLORS.goldLight}; color:${COLORS.gold}; padding:6px 15px; font-weight:700; font-size:10px; border-bottom:1px solid ${COLORS.gold}; text-transform:uppercase;">
+              ${dirLabel} <span style="float:right; color:${COLORS.textSub}; font-size:9px;">(${students.length} Aprobados)</span>
+            </td>
           </tr>
         `;
+
+                // Estudiantes
+                students.forEach((s, idx) => {
+                    const bg = idx % 2 === 0 ? COLORS.white : COLORS.bgLight;
+                    const pct = s.finalAttendancePercentage !== undefined ? Number(s.finalAttendancePercentage).toFixed(0) : '100';
+                    const score = (s.averageScore !== undefined && s.averageScore !== null) ? Number(s.averageScore).toFixed(2) : '—';
+
+                    tableRowsHtml += `
+            <tr style="background:${bg}; border-bottom: 1px solid ${COLORS.border};">
+              <td style="padding:6px 15px; text-align:center; width:5%; color:${COLORS.textSub}; font-weight:600; font-size:10px;">${globalCounter++}</td>
+              <td style="padding:6px 15px; text-align:left; font-weight:700; color:${COLORS.textMain}; text-transform:uppercase; font-size:10px;">${s.memberName}</td>
+              <td style="padding:6px 15px; text-align:center; font-weight:600; color:${COLORS.primaryBlue}; font-size:10px;">${pct}%</td>
+              <td style="padding:6px 15px; text-align:center; font-weight:600; color:${COLORS.textSub}; font-size:10px;">${score}</td>
+            </tr>
+          `;
+                });
             });
         });
     });

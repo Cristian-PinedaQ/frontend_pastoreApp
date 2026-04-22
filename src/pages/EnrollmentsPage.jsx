@@ -333,14 +333,17 @@ const EnrollmentsPage = () => {
             const m = res?.data || res || {};
 
             // 🚀 Usamos la jerarquía G12 calculada por el backend en Member.java
-            const directLeader = m.leaderName || "Sin Líder Directo";
-            const mainLeader = m.mainLeaderName || "Ministerio General";
+            // Recibimos los 3 niveles desde Java
+            const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
+            const networkLeader = m.networkLeaderName || "Sin Líder de Red";
+            const pastor = m.pastorName || "Ministerio General";
 
             return {
               ...student,
               memberName: student.memberName || m.name || student.member?.name || `Miembro ${mId}`,
               directLeader,
-              mainLeader,
+              networkLeader,
+              pastor,
               averageScore: student.averageScore || 0.0
             };
           } catch (err) {
@@ -369,15 +372,18 @@ const EnrollmentsPage = () => {
             const m = res?.data || res || {};
 
             // 🚀 Usamos la jerarquía G12 calculada por el backend
-            const directLeader = m.leaderName || "Sin Líder Directo";
-            const mainLeader = m.mainLeaderName || "Ministerio General";
+            // Recibimos los 3 niveles desde Java
+            const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
+            const networkLeader = m.networkLeaderName || "Sin Líder de Red";
+            const pastor = m.pastorName || "Ministerio General";
 
             return {
               ...student,
-              memberName: student.memberName || m.name || `Miembro ${mId}`,
-              isActuallyPresent: hasAttended,
+              memberName: student.memberName || m.name || student.member?.name || `Miembro ${mId}`,
               directLeader,
-              mainLeader
+              networkLeader,
+              pastor,
+              averageScore: student.averageScore || 0.0
             };
           } catch (e) {
             return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
@@ -402,14 +408,18 @@ const EnrollmentsPage = () => {
             const m = res?.data || res || {};
 
             // 🚀 Usamos la jerarquía G12 calculada por el backend
-            const directLeader = m.leaderName || "Sin Líder Directo";
-            const mainLeader = m.mainLeaderName || "Ministerio General";
+            // Recibimos los 3 niveles desde Java
+            const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
+            const networkLeader = m.networkLeaderName || "Sin Líder de Red";
+            const pastor = m.pastorName || "Ministerio General";
 
             return {
               ...student,
-              memberName: student.memberName || m.name || `Miembro ${mId}`,
+              memberName: student.memberName || m.name || student.member?.name || `Miembro ${mId}`,
               directLeader,
-              mainLeader
+              networkLeader,
+              pastor,
+              averageScore: student.averageScore || 0.0
             };
           } catch (e) {
             return { ...student, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
