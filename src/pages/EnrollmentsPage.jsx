@@ -53,7 +53,7 @@ const logError = (msg, err) => console.error(`[EnrollmentsPage] ${msg}`, err);
 
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const toArray = (val) => (Array.isArray(val) ? val : []);
+//const toArray = (val) => (Array.isArray(val) ? val : []);
 
 const escapeHtml = (text) => {
   if (!text || typeof text !== "string") return "";
@@ -332,9 +332,9 @@ const EnrollmentsPage = () => {
             // 🚀 EL FIX: Entramos a .data si es respuesta de Axios
             const m = res?.data || res || {};
 
-            // Buscamos al líder en la entidad Member o en su Célula
-            const directLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || m.cell?.groupLeader?.name || "Sin Líder Directo";
-            const mainLeader = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || m.cell?.mainLeader?.name || "Ministerio General";
+            // 🚀 Usamos la jerarquía G12 calculada por el backend en Member.java
+            const directLeader = m.leaderName || "Sin Líder Directo";
+            const mainLeader = m.mainLeaderName || "Ministerio General";
 
             return {
               ...student,
@@ -368,8 +368,9 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            const directLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || "Sin Líder Directo";
-            const mainLeader = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || "Ministerio General";
+            // 🚀 Usamos la jerarquía G12 calculada por el backend
+            const directLeader = m.leaderName || "Sin Líder Directo";
+            const mainLeader = m.mainLeaderName || "Ministerio General";
 
             return {
               ...student,
@@ -400,8 +401,9 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            const directLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || "Sin Líder Directo";
-            const mainLeader = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || "Ministerio General";
+            // 🚀 Usamos la jerarquía G12 calculada por el backend
+            const directLeader = m.leaderName || "Sin Líder Directo";
+            const mainLeader = m.mainLeaderName || "Ministerio General";
 
             return {
               ...student,
