@@ -367,19 +367,18 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            // 🚀 Usamos la jerarquía G12 calculada por el backend
-            // Recibimos los 3 niveles desde Java
+            // 🚀 Usamos los 3 niveles G12 del backend
             const directLeader = m.directLeaderName || m.leaderName || "Sin Líder Directo";
             const networkLeader = m.networkLeaderName || "Sin Líder de Red";
             const pastor = m.pastorName || "Ministerio General";
 
             return {
               ...student,
-              memberName: student.memberName || m.name || student.member?.name || `Miembro ${mId}`,
+              memberName: student.memberName || m.name || `Miembro ${mId}`,
+              isActuallyPresent: hasAttended,
               directLeader,
               networkLeader,
-              pastor,
-              averageScore: student.averageScore || 0.0
+              pastor
             };
           } catch (e) {
             return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", mainLeader: "Ministerio General" };
