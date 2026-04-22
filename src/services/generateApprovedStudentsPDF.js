@@ -38,7 +38,7 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents, option
   let globalCounter = 1;
 
   pastorsSorted.forEach(pastor => {
-    // 🚀 Aplicamos el helper al Nivel 1 (Aquí cambiará el nombre por "PASTOR" o "PASTORA")
+    // Nivel 1: RAMA PASTORAL
     tableRowsHtml += `
       <tr>
         <td colspan="4" style="background:${COLORS.primary}; color:${COLORS.white}; padding:12px 15px; font-weight:900; font-size:12px; letter-spacing:1px; text-transform:uppercase;">
@@ -49,7 +49,7 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents, option
 
     const nets = Object.keys(hierarchy[pastor]).sort();
     nets.forEach(net => {
-      // 🚀 Aplicamos el helper al Nivel 2
+      // Nivel 2: LÍDER DE RED (12)
       tableRowsHtml += `
         <tr>
           <td colspan="4" style="background:${COLORS.primaryBlue}; color:${COLORS.white}; padding:9px 15px; font-weight:800; font-size:11px; border-bottom:1px solid #93c5fd; text-transform:uppercase;">
@@ -62,13 +62,13 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents, option
       dirs.forEach(dir => {
         const students = hierarchy[pastor][net][dir];
         
+        // 🚀 EL FIX PARA CERO REDUNDANCIA
         const isSameAsNet = (net === dir || dir === 'Sin Líder Directo' || dir === 'Red Pastoral Directa');
-        
-        // 🚀 Aplicamos el helper al Nivel 3
         const dirLabel = isSameAsNet 
               ? "👤 DISCÍPULOS DIRECTOS DE LA RED" 
               : `👤 LÍDER DIRECTO: ${getDisplayName(dir)}`;
 
+        // Nivel 3: LÍDER DIRECTO (144, 1728...)
         tableRowsHtml += `
           <tr>
             <td colspan="4" style="background:${COLORS.goldLight}; color:${COLORS.gold}; padding:6px 15px; font-weight:700; font-size:10px; border-bottom:1px solid ${COLORS.gold}; text-transform:uppercase;">
@@ -77,13 +77,12 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents, option
           </tr>
         `;
 
-        // Estudiantes de este líder directo
+        // Estudiantes de este subgrupo
         students.forEach((s, idx) => {
           const bg = idx % 2 === 0 ? COLORS.white : COLORS.bgLight;
           const pct = s.finalAttendancePercentage !== undefined ? Number(s.finalAttendancePercentage).toFixed(0) : '100';
           const score = (s.averageScore !== undefined && s.averageScore !== null) ? Number(s.averageScore).toFixed(2) : '—';
 
-          // 🚀 Aplicamos el helper al nombre del estudiante por si acaso
           tableRowsHtml += `
             <tr style="background:${bg}; border-bottom: 1px solid ${COLORS.border};">
               <td style="padding:6px 15px; text-align:center; width:5%; color:${COLORS.textSub}; font-weight:600; font-size:10px;">${globalCounter++}</td>
@@ -97,11 +96,10 @@ export const generateApprovedStudentsPDF = (enrollment, approvedStudents, option
     });
   });
 
-  // 🚀 Aplicamos el helper a la firma del Maestro Titular
   const teacherRawName = enrollment.teacher?.name || enrollment.teacher?.memberName || '_________________________';
   const teacherDisplayName = getDisplayName(teacherRawName);
 
-  // ── 3. Estructura HTML del Documento ─────────────────────────────────────
+  // ── 3. HTML Documento ─────────────────────────────────────
   const html = `
   <!DOCTYPE html>
   <html lang="es">

@@ -1,6 +1,6 @@
 // ============================================
 // EnrollmentsPage.jsx - TAILWIND EDITION
-// Lógica completa del original + diseño moderno Tailwind
+// Lógica completa del original + diseño moderno Tailwind + Motor G12 Blindado
 // ============================================
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -16,7 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { generateCohortPDF } from "../services/generateCohortPDF";
 import { generateAttendancePDF } from "../services/attendanceCohortsPdfGenerator";
 import { generateCohortAttendanceFullPDF } from "../services/generateCohortAttendanceFullPDF";
-import { generateApprovedStudentsPDF } from "../services/generateApprovedStudentsPDF"; // <-- Agrega esta ruta
+import { generateApprovedStudentsPDF } from "../services/generateApprovedStudentsPDF";
 import {
   BookOpen,
   Users,
@@ -48,12 +48,9 @@ import {
 const { getDisplayName } = nameHelper;
 
 // ─── Debug condicional ───────────────────────────────────────────────────────
-
 const logError = (msg, err) => console.error(`[EnrollmentsPage] ${msg}`, err);
 
-
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
 const escapeHtml = (text) => {
   if (!text || typeof text !== "string") return "";
   const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
@@ -90,43 +87,60 @@ const isRecoverable = (enrollment) => {
   return diffDays >= 0 && diffDays <= 30;
 };
 
-// ─── Motor Inteligente G12 para Reportes ─────────────────────────────────────
-const extractG12Hierarchy = (m) => {
-  const rawDl = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || m.cell?.groupLeader?.name || "Sin Líder Directo";
-  const rawMl = m.mainLeaderName || m.leader?.leaderName || m.cell?.mainLeaderName || m.cell?.mainLeader?.name || "Ministerio General";
+// ─── 🚀 MOTOR G12 BLINDADO (Auto-sanación de Jerarquías) ────────────────────
+const G12_KNOWN_12 = [
+  "DIANA MILENA GARCIA MASETA", "JESUS PUBLIO BRAVO ARAUJO", "JULIO CESAR VIVEROS ERAZO",
+  "CRISTIAN HUMBERTO PINEDA QUIRAMA", "JEFFERSON MOSQUERA MENESES", "LIBIO BRAVO",
+  "LAURA DANIELA TIGREROS", "MARIA CENELIA OSSA DUQUE", "GIOVANNA HERNANDEZ"
+];
 
-  const isPastor = (name) => {
-    if (!name) return false;
-    const n = name.toUpperCase();
-    return n.includes("RUBEN") || n.includes("YAMILETH") || n.includes("CABEZAS") || n.includes("PEREZ ESCOBAR");
-  };
+const G12_KNOWN_144 = {
+  "CARMEN LIBIA OSSA": "DIANA MILENA GARCIA MASETA",
+  "MARIA FERNANDA RAMIREZ ORTIZ": "DIANA MILENA GARCIA MASETA", 
+  "FABIAN BARBOSA": "JESUS PUBLIO BRAVO ARAUJO",
+  "JUAN DAVID SALAZAR PASOS": "JULIO CESAR VIVEROS ERAZO"
+};
 
-  // Deducimos el pastor por el género del estudiante (G12 puro: mujeres con mujeres, hombres con hombres)
-  const genderStr = (m.gender || m.sex || m.genero || m.sexo || "M").toUpperCase();
-  const defaultPastor = genderStr.startsWith("F") ? "YAMILETH PEREZ ESCOBAR" : "RUBEN FRANCISCO CABEZAS QUIÑONES";
+const resolveG12Hierarchy = (m, allLeaders) => {
+  const rawDl = (m.leaderName || m.leader?.name || m.cell?.groupLeaderName || "Sin Líder Directo").toUpperCase().trim();
+  const gender = (m.gender || m.sex || m.genero || m.sexo || "M").toUpperCase();
+  const pastor = gender.startsWith("F") ? "YAMILETH PEREZ ESCOBAR" : "RUBEN FRANCISCO CABEZAS QUIÑONES";
 
-  let pastor = "Ministerio General";
-  let networkLeader = "Sin Líder de Red";
-  let directLeader = "Sin Líder Directo";
+  const isPastor = (n) => n.includes("RUBEN") || n.includes("YAMILETH") || n.includes("CABEZAS") || n.includes("PEREZ ESCOBAR");
+  const is12 = (n) => G12_KNOWN_12.some(l => n.includes(l) || l.includes(n));
 
-  if (isPastor(rawMl)) {
-    pastor = rawMl;
-    networkLeader = rawDl;
-    directLeader = "Sin Líder Directo"; // Se imprime como "Discípulos Directos" en el PDF
-  } else if (isPastor(rawDl)) {
-    pastor = rawDl;
-    networkLeader = "Red Pastoral Directa";
-    directLeader = "Sin Líder Directo";
-  } else {
-    // Si el Main Leader no es el pastor, entonces el Main Leader es el 12, y el Direct es el 144
-    pastor = defaultPastor;
-    networkLeader = rawMl;
-    directLeader = rawDl;
+  // Reglas directas
+  if (isPastor(rawDl)) return { pastor, networkLeader: "Red Pastoral Directa", directLeader: "Sin Líder Directo" };
+  if (is12(rawDl)) return { pastor, networkLeader: rawDl, directLeader: "Sin Líder Directo" };
+
+  // Usamos el árbol estricto mapeado si es un 144 conocido
+  for (let known144 of Object.keys(G12_KNOWN_144)) {
+      if (rawDl.includes(known144) || known144.includes(rawDl)) {
+          return { pastor, networkLeader: G12_KNOWN_144[known144], directLeader: rawDl };
+      }
   }
 
-  if (networkLeader === directLeader) directLeader = "Sin Líder Directo";
+  // Iteración inteligente para cualquier otro líder que no mapeamos arriba
+  let currentName = rawDl;
+  let currentObj = allLeaders.find(l => (l.name || l.memberName || "").toUpperCase().includes(currentName));
+  let safety = 0;
+  
+  while(currentObj && safety < 3) {
+      const nextName = (currentObj.leaderName || currentObj.leader?.name || "").toUpperCase().trim();
+      if (!nextName) break;
+      if (isPastor(nextName)) {
+          return { pastor, networkLeader: (currentObj.name || currentObj.memberName || currentName).toUpperCase(), directLeader: rawDl };
+      }
+      if (is12(nextName)) {
+          return { pastor, networkLeader: nextName, directLeader: rawDl };
+      }
+      currentName = nextName;
+      currentObj = allLeaders.find(l => (l.name || l.memberName || "").toUpperCase().includes(currentName));
+      safety++;
+  }
 
-  return { pastor, networkLeader, directLeader };
+  // Fallback si no logramos encontrar a su líder 12
+  return { pastor, networkLeader: rawDl, directLeader: "Sin Líder Directo" };
 };
 
 // ─── Validaciones ────────────────────────────────────────────────────────────
@@ -280,14 +294,12 @@ const EnrollmentsPage = () => {
   const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
   const [teacherSearchTerm, setTeacherSearchTerm] = useState("");
 
-  // ── Handlers de error ─────────────────────────────────────────────────────
   const handleError = useCallback((errorKey, context = "") => {
     const errorMessage = ERROR_MESSAGES[errorKey] || ERROR_MESSAGES.GENERIC;
     setError(errorMessage);
     logSecurityEvent("error_event", { errorKey, context, timestamp: new Date().toISOString() });
   }, []);
 
-  // ── Carga de maestros ────────────────────────────────────────────────────
   const loadTeachers = useCallback(async () => {
     try {
       const members = await apiService.getActiveLeaders();
@@ -298,7 +310,6 @@ const EnrollmentsPage = () => {
     }
   }, [handleError]);
 
-  // ── Helpers de label ─────────────────────────────────────────────────────
   const getLevelLabel = (levelCode) => {
     if (!levelCode) return "—";
     return levels.find((l) => l.code === levelCode)?.displayName || levelCode;
@@ -357,6 +368,7 @@ const EnrollmentsPage = () => {
         return;
       }
 
+      // 🚀 Aplicamos el Motor G12 a cada estudiante usando la lista de líderes para auto-resolver
       const enrichedStudents = await Promise.all(
         approvedStudents.map(async (student) => {
           try {
@@ -366,34 +378,7 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            console.log(`Datos crudos de Java para el miembro ${mId}:`, m);
-
-            // 1. Intentamos leer las variables exactas que configuraste en Member.java
-            let directLeader = m.directLeaderName;
-            let networkLeader = m.networkLeaderName;
-            let pastor = m.pastorName;
-
-            // 2. Si Java ocultó la información por culpa de un DTO, el Frontend asume el control:
-            if (!networkLeader || networkLeader === "Ministerio General") {
-              // Obtenemos el líder que Java SÍ envió
-              const rawLeader = m.leaderName || m.leader?.name || m.cell?.groupLeaderName || "Sin Líder Directo";
-              
-              // Deducimos el Pastor por el género (Regla de Oro G12)
-              const gender = (m.gender || m.sex || "M").toUpperCase();
-              pastor = gender.startsWith("F") ? "YAMILETH PEREZ ESCOBAR" : "RUBEN FRANCISCO CABEZAS QUIÑONES";
-
-              const isPastorObj = (name) => name && (name.includes("RUBEN") || name.includes("YAMILETH"));
-
-              if (isPastorObj(rawLeader)) {
-                networkLeader = "Red Pastoral Directa";
-                directLeader = "Sin Líder Directo"; 
-              } else {
-                // Si el líder no es el pastor, asumimos que el líder directo es un 144 y su red está arriba
-                // Como Java no lo mandó, forzamos la estructura
-                networkLeader = rawLeader;
-                directLeader = rawLeader; 
-              }
-            }
+            const { pastor, networkLeader, directLeader } = resolveG12Hierarchy(m, availableTeachers);
 
             return {
               ...student,
@@ -404,12 +389,12 @@ const EnrollmentsPage = () => {
               averageScore: student.averageScore || 0.0
             };
           } catch (err) {
-            return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General", averageScore: student.averageScore || 0.0 };
+            return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Sin Líder de Red", pastor: "Ministerio General", averageScore: student.averageScore || 0.0 };
           }
         })
       );
 
-      // Pasamos getDisplayName para que el PDF oculte el nombre legal
+      // Enviamos el helper de nombres para que en el PDF se imprima "PASTOR" o "PASTORA"
       generateApprovedStudentsPDF(selectedEnrollment, enrichedStudents, { getDisplayName });
     } catch (err) {
       console.error("Error exportando Acta:", err);
@@ -429,7 +414,7 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            const { pastor, networkLeader, directLeader } = extractG12Hierarchy(m);
+            const { pastor, networkLeader, directLeader } = resolveG12Hierarchy(m, availableTeachers);
 
             return {
               ...student,
@@ -440,7 +425,7 @@ const EnrollmentsPage = () => {
               pastor
             };
           } catch (e) {
-            return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General" };
+            return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", networkLeader: "Sin Líder de Red", pastor: "Ministerio General" };
           }
         })
       );
@@ -461,7 +446,7 @@ const EnrollmentsPage = () => {
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
-            const { pastor, networkLeader, directLeader } = extractG12Hierarchy(m);
+            const { pastor, networkLeader, directLeader } = resolveG12Hierarchy(m, availableTeachers);
 
             return {
               ...student,
@@ -472,7 +457,7 @@ const EnrollmentsPage = () => {
               averageScore: student.averageScore || 0.0
             };
           } catch (e) {
-            return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Ministerio General", pastor: "Ministerio General" };
+            return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Sin Líder de Red", pastor: "Ministerio General" };
           }
         })
       );
@@ -633,7 +618,7 @@ const EnrollmentsPage = () => {
     setEditFormData((prev) => ({ ...prev, teacher }));
     setEditTeacherSearchTerm(getDisplayName(getTeacherName(teacher)));
     setEditShowTeacherDropdown(false);
-    setFilteredTeachers([]);
+    setEditFilteredTeachers([]);
   };
 
   const handleEditClearTeacher = () => { setEditFormData((prev) => ({ ...prev, teacher: null })); setEditTeacherSearchTerm(""); setEditFilteredTeachers([]); };
@@ -700,7 +685,8 @@ const EnrollmentsPage = () => {
     setActiveTab("details");
     setLessons([]); setStudents([]); setAttendanceSummary([]);
     setError("");
-  }, []);
+  }, []); 
+
 
   const handleRecover = useCallback(async (enrollment) => {
     const confirmed = await confirm({
@@ -711,16 +697,17 @@ const EnrollmentsPage = () => {
       cancelLabel: "Cancelar",
     });
     if (!confirmed) return;
-
+ 
     setRecoveringId(enrollment.id);
     setError("");
     try {
       const result = await apiService.recoverCancelledCohort(enrollment.id);
-
+ 
+      // Mostrar advertencia si quedaron estudiantes en PENDING sin evaluar
       const warningMsg = result?.warning
         ? `\n\n⚠️ ${result.warning}`
         : "";
-
+ 
       await confirm({
         title: "¡Cohorte Recuperada!",
         message:
@@ -730,7 +717,8 @@ const EnrollmentsPage = () => {
         type: "success",
         confirmLabel: "Excelente",
       });
-
+ 
+      // Refrescar lista y cerrar modal si estaba abierto
       await fetchEnrollments();
       if (showEnrollmentModal && selectedEnrollment?.id === enrollment.id) {
         handleCloseEnrollmentModal();
