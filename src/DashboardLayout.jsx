@@ -48,7 +48,6 @@ export const DashboardLayout = () => {
 
   // ========== SYNC DARK MODE ==========
   useEffect(() => {
-    // Cargar preferencia guardada
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
       document.documentElement.classList.add('dark', 'dark-mode');
@@ -65,17 +64,19 @@ export const DashboardLayout = () => {
     return () => observer.disconnect();
   }, []);
 
+  // ✅ FIX: logout usa el boolean retornado por confirm(), no onConfirm callback
   const handleLogout = async () => {
     const isConfirmed = await confirm({
       title: "¿Cerrar Sesión?",
       message: "¿Estás seguro de que deseas salir del sistema? Deberás autenticarte nuevamente para acceder.",
       type: "info",
       confirmLabel: "Finalizar Sesión",
-      onConfirm: async () => {
-        logout();
-        navigate("/login");
-      }
     });
+
+    if (isConfirmed) {
+      logout();
+      navigate("/login");
+    }
   };
 
   const handleNavClick = (path) => {
@@ -84,24 +85,24 @@ export const DashboardLayout = () => {
       setSidebarOpen(false);
     }
   };
- 
+
   const menuItems = [
-    { label: "Inicio", path: "/dashboard", icon: Church, visible: true },
-    { label: "Membresía", path: "/dashboard/members", icon: Users, visible: true },
-    { label: "Consejería", path: "/dashboard/Counseling", icon: HeartHandshake, visible: hasAnyRole(["ROLE_PASTORES"]) },
-    { label: "Formaciones", path: "/dashboard/enrollments", icon: NotebookPen, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_PROFESORES"]) },
-    { label: "Estudiantes", path: "/dashboard/students", icon: GraduationCap, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
-    { label: "Servidores", path: "/dashboard/leadership", icon: UserStar, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_DESPLIEGUE"]) },
-    { label: "Altares de Vida", path: "/dashboard/cellgroups", icon: Flame, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_DESPLIEGUE"]) },
-    { label: "Asistencias", path: "/dashboard/cellgroups-atendance", icon: CheckSquare, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]) },
-    { label: "Alabanza", path: "/dashboard/worshipPage", icon: Music, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]) },
-    { label: "Ministerios", path: "/dashboard/ministeriesPage", icon: Rocket, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE", "ROLE_PROTOCOLO", "ROLE_MINISTERIOS"]) },
-    { label: "Actividades", path: "/dashboard/activity", icon: Calendar, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
-    { label: "Finanzas", path: "/dashboard/finances", icon: Landmark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]) },
-    { label: "Contabilidad", path: "/dashboard/financesChurch", icon: ChartPie, visible: hasAnyRole(["ROLE_PASTORES"]) },
-    { label: "Configuración", path: "/dashboard/LevelsConfig", icon: SlidersHorizontal, visible: hasRole("ROLE_PASTORES") },
-    { label: "Manual Raiz Viva", path: "/dashboard/ManualRaizViva", icon: MessageCircleQuestionMark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_LIDER"]) },
-    { label: "Usuarios", path: "/dashboard/users", icon: UserCircle, visible: hasRole("ROLE_PASTORES") },
+    { label: "Inicio",           path: "/dashboard",                  icon: Church,                    visible: true },
+    { label: "Membresía",        path: "/dashboard/members",           icon: Users,                     visible: true },
+    { label: "Consejería",       path: "/dashboard/Counseling",        icon: HeartHandshake,            visible: hasAnyRole(["ROLE_PASTORES"]) },
+    { label: "Formaciones",      path: "/dashboard/enrollments",       icon: NotebookPen,               visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_PROFESORES"]) },
+    { label: "Estudiantes",      path: "/dashboard/students",          icon: GraduationCap,             visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
+    { label: "Servidores",       path: "/dashboard/leadership",        icon: UserStar,                  visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_DESPLIEGUE"]) },
+    { label: "Altares de Vida",  path: "/dashboard/cellgroups",        icon: Flame,                     visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_DESPLIEGUE"]) },
+    { label: "Asistencias",      path: "/dashboard/cellgroups-atendance", icon: CheckSquare,            visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]) },
+    { label: "Alabanza",         path: "/dashboard/worshipPage",       icon: Music,                     visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]) },
+    { label: "Ministerios",      path: "/dashboard/ministeriesPage",   icon: Rocket,                    visible: hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE", "ROLE_PROTOCOLO", "ROLE_MINISTERIOS"]) },
+    { label: "Actividades",      path: "/dashboard/activity",          icon: Calendar,                  visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
+    { label: "Finanzas",         path: "/dashboard/finances",          icon: Landmark,                  visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]) },
+    { label: "Contabilidad",     path: "/dashboard/financesChurch",    icon: ChartPie,                  visible: hasAnyRole(["ROLE_PASTORES"]) },
+    { label: "Configuración",    path: "/dashboard/LevelsConfig",      icon: SlidersHorizontal,         visible: hasRole("ROLE_PASTORES") },
+    { label: "Manual Raiz Viva", path: "/dashboard/ManualRaizViva",    icon: MessageCircleQuestionMark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_LIDER"]) },
+    { label: "Usuarios",         path: "/dashboard/users",             icon: UserCircle,                visible: hasRole("ROLE_PASTORES") },
   ];
 
   const filteredMenu = menuItems.filter((item) => item.visible);
@@ -109,10 +110,10 @@ export const DashboardLayout = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex font-sans selection:bg-indigo-500/30">
       <style>{SCROLLBAR_STYLES}</style>
-      
+
       {/* MOBILE OVERLAY */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] lg:hidden transition-opacity duration-300"
           onClick={() => setSidebarOpen(false)}
         />
@@ -120,33 +121,26 @@ export const DashboardLayout = () => {
 
       {/* SIDEBAR */}
       <aside className={`
-        fixed inset-y-0 left-0 z-[70] w-72 bg-white dark:bg-slate-900 
+        fixed inset-y-0 left-0 z-[70] w-72 bg-white dark:bg-slate-900
         border-r border-slate-200 dark:border-white/5
         flex flex-col transform transition-all duration-300 ease-in-out
-        lg:relative lg:translate-x-0
+        lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* SIDEBAR MOBILE CLOSE BUTTON */}
-        <button 
+        {/* MOBILE CLOSE BUTTON */}
+        <button
           className="lg:hidden absolute top-5 right-4 w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 transition-transform active:scale-95"
           onClick={() => setSidebarOpen(false)}
         >
           <X size={20} />
         </button>
+
         {/* SIDEBAR HEADER */}
-        <div className="h-20 flex items-center px-8 border-b border-slate-100 dark:border-white/5">
+        <div className="h-20 flex items-center px-8 border-b border-slate-100 dark:border-white/5 shrink-0">
           <div className="flex items-center gap-1">
             <div className="relative w-14 h-14 flex items-center justify-center overflow-hidden shrink-0">
-              <img 
-                src={logoNegro} 
-                alt="Logo" 
-                className="block dark:hidden w-full h-full object-contain"
-              />
-              <img 
-                src={logoBlanco} 
-                alt="Logo" 
-                className="hidden dark:block w-full h-full object-contain"
-              />
+              <img src={logoNegro} alt="Logo" className="block dark:hidden w-full h-full object-contain" />
+              <img src={logoBlanco} alt="Logo" className="hidden dark:block w-full h-full object-contain" />
             </div>
             <h1 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tighter leading-tight">
               PastoreApp
@@ -154,7 +148,7 @@ export const DashboardLayout = () => {
           </div>
         </div>
 
-        {/* SIDEBAR NAVIGATION */}
+        {/* SIDEBAR NAVIGATION — único scroll del layout */}
         <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
           {filteredMenu.map((item) => {
             const isActive = location.pathname === item.path;
@@ -165,8 +159,8 @@ export const DashboardLayout = () => {
                 onClick={() => handleNavClick(item.path)}
                 className={`
                   w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 group
-                  ${isActive 
-                    ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' 
+                  ${isActive
+                    ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20'
                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}
                 `}
               >
@@ -183,7 +177,7 @@ export const DashboardLayout = () => {
         </div>
 
         {/* SIDEBAR USER SECTION */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-800">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] p-4 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold uppercase">
@@ -196,7 +190,7 @@ export const DashboardLayout = () => {
                 </p>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-black text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:border-rose-200 transition-all uppercase tracking-widest"
             >
@@ -207,38 +201,39 @@ export const DashboardLayout = () => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0 h-[100dvh] overflow-hidden">
-        
-        {/* TOPBAR */}
-        <header className="h-20 flex items-center justify-between px-4 lg:px-10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-100 dark:border-white/5 sticky top-0 z-50 transition-all">
-          <div className="flex items-center gap-2 lg:gap-4 truncate mr-2">
-            <button 
-              className="lg:hidden p-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-all active:scale-95"
+      {/* MAIN CONTENT AREA — sin overflow propio, cada página maneja su scroll */}
+      <main className="flex-1 flex flex-col min-w-0">
+
+        {/* TOPBAR — CSS Grid: columna izquierda flexible, derecha fija */}
+        <header
+          className="h-20 px-4 lg:px-10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-100 dark:border-white/5 sticky top-0 z-50 transition-all"
+          style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: "1rem" }}
+        >
+          {/* LEFT — se trunca si no hay espacio, nunca empuja la derecha */}
+          <div className="flex items-center gap-2 lg:gap-4 min-w-0 overflow-hidden">
+            <button
+              className="lg:hidden shrink-0 p-2.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-all active:scale-95"
               onClick={() => setSidebarOpen(true)}
             >
               <Menu size={22} />
             </button>
-            
-            <div className="flex-1 truncate">
+            <div className="min-w-0 overflow-hidden">
               <DashboardTopbar user={user} />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 lg:gap-6 shrink-0">
-            <div className="hidden md:flex flex-col items-end mr-1">
+          {/* RIGHT — siempre visible, tamaño natural */}
+          <div className="flex items-center gap-2 lg:gap-4">
+            <div className="hidden md:flex flex-col items-end">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Sesión activa</span>
               <span className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[120px]">{user?.username}</span>
             </div>
-            
-            <div className="relative">
-              <NotificationBell username={user?.username} pollInterval={30000} />
-            </div>
+            <NotificationBell username={user?.username} pollInterval={30000} />
           </div>
         </header>
 
-        {/* CONTENT VIEWPORT */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-10 bg-slate-50/50 dark:bg-slate-950/50 custom-scrollbar relative">
+        {/* CONTENT — flujo natural, sin contenedor de scroll */}
+        <div className="p-4 md:p-6 lg:p-10 bg-slate-50/50 dark:bg-slate-950/50">
           <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 w-full">
             <Outlet />
           </div>
