@@ -636,7 +636,7 @@ const EnrollmentsPage = () => {
     setRecoveringId(enrollment.id);
     setError("");
     try {
-      const result = await apiService.recoverEnrollment(enrollment.id);
+      const result = await apiService.recoverCancelledCohort(enrollment.id);
  
       // Mostrar advertencia si quedaron estudiantes en PENDING sin evaluar
       const warningMsg = result?.warning
