@@ -22,8 +22,7 @@ import {
   ShieldCheck,
   Sparkles,
   Loader2,
-  Ban,
-  ArrowLeft
+  Ban
 } from 'lucide-react';
 import { useConfirmation } from "../context/ConfirmationContext";
 import apiService from "../apiService";

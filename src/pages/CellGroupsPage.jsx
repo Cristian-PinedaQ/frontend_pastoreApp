@@ -11,7 +11,7 @@ import ModalCellStatistics from '../components/ModalCellStatistics';
 import ModalCellDetail from '../components/ModalCellDetail';
 import ModalLeaderDetail from '../components/ModalLeaderDetail';
 import { 
-  Home, House, MapPin, MoreHorizontal, Search, HousePlus,
+  Home, House, MapPin, MoreHorizontal, HousePlus,
   FileDown, BarChart3, ShieldCheck, Clock, TrendingUp,
   LayoutGrid, List, RefreshCw, AlertTriangle, ChevronRight,
   ShieldAlert, Calendar, CheckCircle2, X

@@ -37,53 +37,43 @@ function timeAgo(dateString) {
   return new Date(dateString).toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
 }
 
+function getPanelStyle(bellEl) {
+  if (!bellEl) {
+    return { position: "fixed", top: "80px", right: "16px", width: "420px", zIndex: 9999 };
+  }
+  const rect = bellEl.getBoundingClientRect();
+  if (window.innerWidth < 640) {
+    return { position: "fixed", top: "80px", left: "16px", right: "16px", zIndex: 9999 };
+  }
+  return {
+    position: "fixed",
+    top:   `${rect.bottom + 10}px`,
+    right: `${Math.max(8, window.innerWidth - rect.right)}px`,
+    width: "420px",
+    zIndex: 9999,
+  };
+}
+
 export default function NotificationBell({ username, pollInterval = 30_000 }) {
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount]     = useState(0);
-  const [open, setOpen]                   = useState(false);
-  const [loading, setLoading]             = useState(false);
-  const [error, setError]                 = useState(null);
-  const [markingAll, setMarkingAll]       = useState(false);
-  const [panelStyle, setPanelStyle]       = useState({});
+  const [unreadCount,   setUnreadCount]   = useState(0);
+  const [open,          setOpen]          = useState(false);
+  const [loading,       setLoading]       = useState(false);
+  const [error,         setError]         = useState(null);
+  const [markingAll,    setMarkingAll]    = useState(false);
+  const [panelStyle,    setPanelStyle]    = useState({
+    position: "fixed", top: "80px", right: "16px", width: "420px", zIndex: 9999,
+  });
 
   const panelRef = useRef(null);
   const bellRef  = useRef(null);
-
-  // ✅ FIX: recalcula posición correctamente en desktop y mobile
-  const calcPanelPosition = useCallback(() => {
-    if (!bellRef.current) return;
-    const rect = bellRef.current.getBoundingClientRect();
-    const isMobile = window.innerWidth < 640;
-
-    if (isMobile) {
-      setPanelStyle({
-        position: "fixed",
-        top: "80px",
-        left: "16px",
-        right: "16px",
-        zIndex: 9999,
-      });
-    } else {
-      // Alinea el panel al borde derecho del botón de campana
-      const rightOffset = window.innerWidth - rect.right;
-      setPanelStyle({
-        position: "fixed",
-        top: `${rect.bottom + 10}px`,
-        right: `${rightOffset}px`,
-        width: "420px",
-        zIndex: 9999,
-      });
-    }
-  }, []);
 
   const fetchUnreadCount = useCallback(async () => {
     if (!username) return;
     try {
       const data = await apiService.getUnreadNotificationCountByUsername(username);
-      setUnreadCount(data ?? 0);
-    } catch (err) {
-      console.log("Error unread count:", err);
-    }
+      setUnreadCount(typeof data === "number" ? data : 0);
+    } catch { /* silencioso */ }
   }, [username]);
 
   const fetchNotifications = useCallback(async () => {
@@ -91,7 +81,7 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await apiService.getActiveNotificationsByUsername(username);
+      const data   = await apiService.getActiveNotificationsByUsername(username);
       const list   = Array.isArray(data) ? data : [];
       const sorted = [...list].sort((a, b) => {
         if (a.status === "UNREAD" && b.status !== "UNREAD") return -1;
@@ -107,16 +97,11 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
     }
   }, [username]);
 
-  const markAsRead = useCallback(async (notificationId) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, status: "READ" } : n))
-    );
+  const markAsRead = useCallback(async (id) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, status: "READ" } : n)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
-    try {
-      await apiService.markNotificationAsRead(notificationId);
-    } catch {
-      fetchNotifications();
-    }
+    try { await apiService.markNotificationAsRead(id); }
+    catch { fetchNotifications(); }
   }, [fetchNotifications]);
 
   const markAllAsRead = useCallback(async () => {
@@ -124,45 +109,39 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
     setMarkingAll(true);
     try {
       const users = await apiService.getUsers();
-      const user  = users.find((u) => u.username === username);
-      if (user?.id) {
-        await apiService.markAllNotificationsAsRead(user.id);
+      const found = users.find((u) => u.username === username);
+      if (found?.id) {
+        await apiService.markAllNotificationsAsRead(found.id);
         setNotifications((n) => n.map((x) => ({ ...x, status: "READ" })));
         setUnreadCount(0);
       }
-    } catch (err) {
-      console.error("Error marking all:", err);
-    } finally {
-      setMarkingAll(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setMarkingAll(false); }
   }, [username]);
 
   const handleBellClick = useCallback(() => {
-    calcPanelPosition(); // siempre recalcula antes de abrir/cerrar
+    setPanelStyle(getPanelStyle(bellRef.current));
     setOpen((prev) => !prev);
-  }, [calcPanelPosition]);
+  }, []);
 
-  // Recalcula posición al hacer resize
   useEffect(() => {
     if (!open) return;
-    window.addEventListener("resize", calcPanelPosition);
-    return () => window.removeEventListener("resize", calcPanelPosition);
-  }, [open, calcPanelPosition]);
+    const onResize = () => setPanelStyle(getPanelStyle(bellRef.current));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [open]);
 
-  // Polling del contador cuando el panel está cerrado
   useEffect(() => {
     if (open) return;
     fetchUnreadCount();
-    const timer = setInterval(fetchUnreadCount, pollInterval);
-    return () => clearInterval(timer);
-  }, [fetchUnreadCount, pollInterval, open]);
+    const t = setInterval(fetchUnreadCount, pollInterval);
+    return () => clearInterval(t);
+  }, [open, fetchUnreadCount, pollInterval]);
 
-  // Carga completa al abrir el panel
   useEffect(() => {
     if (open) fetchNotifications();
   }, [open, fetchNotifications]);
 
-  // Cierra el panel al hacer click fuera
   useEffect(() => {
     const handler = (e) => {
       if (
@@ -174,8 +153,31 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const panel = open
-    ? createPortal(
+  return (
+    <>
+      {/* ── Botón campana ── */}
+      <button
+        ref={bellRef}
+        type="button"
+        onClick={handleBellClick}
+        className={`
+          relative w-11 h-11 rounded-2xl flex items-center justify-center shrink-0
+          transition-all duration-300
+          ${open
+            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}
+        `}
+      >
+        <Bell size={20} strokeWidth={open ? 2.5 : 2} />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 bg-rose-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center shadow-md z-10 leading-none">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+      </button>
+
+      {/* ── Panel — incluido en el return via Fragment para que React lo monte ── */}
+      {open && createPortal(
         <div
           ref={panelRef}
           style={panelStyle}
@@ -195,14 +197,12 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
             </div>
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={markAllAsRead}
                 disabled={markingAll}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
               >
-                {markingAll
-                  ? <Loader2 size={12} className="animate-spin" />
-                  : <Check size={12} />
-                }
+                {markingAll ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                 Leídas
               </button>
             )}
@@ -223,10 +223,8 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
                   <BellOff size={24} />
                 </div>
                 <p className="text-xs font-bold text-rose-500">{error}</p>
-                <button
-                  onClick={fetchNotifications}
-                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 mx-auto"
-                >
+                <button type="button" onClick={fetchNotifications}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 mx-auto">
                   <RefreshCcw size={14} /> Reintentar
                 </button>
               </div>
@@ -246,15 +244,11 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
               const cfg      = getTypeConfig(n.notificationType);
               const isUnread = n.status === "UNREAD";
               return (
-                <div
-                  key={n.id}
-                  onClick={() => isUnread && markAsRead(n.id)}
-                  className={`
-                    p-4 rounded-2xl transition-all duration-200 cursor-pointer flex gap-4 mb-1
+                <div key={n.id} onClick={() => isUnread && markAsRead(n.id)}
+                  className={`p-4 rounded-2xl transition-all duration-200 cursor-pointer flex gap-4 mb-1
                     ${isUnread
                       ? 'bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}
-                  `}
+                      : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
                 >
                   <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${cfg.color} bg-opacity-10 ${cfg.text}`}>
                     {cfg.icon}
@@ -267,13 +261,9 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
                     <p className={`text-sm font-bold leading-snug tracking-tight truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
                       {n.subject}
                     </p>
-                    <p className="text-[11px] text-slate-500 font-bold mt-1 line-clamp-2">
-                      {n.message}
-                    </p>
+                    <p className="text-[11px] text-slate-500 font-bold mt-1 line-clamp-2">{n.message}</p>
                   </div>
-                  {isUnread && (
-                    <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2 shrink-0 animate-pulse" />
-                  )}
+                  {isUnread && <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2 shrink-0 animate-pulse" />}
                 </div>
               );
             })}
@@ -287,30 +277,7 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
           </div>
         </div>,
         document.body
-      )
-    : null;
-
-  return (
-    // ✅ FIX: sin relative wrapper innecesario — el panel usa position:fixed via portal
-    <button
-      ref={bellRef}
-      onClick={handleBellClick}
-      className={`
-        relative rounded-2xl flex items-center justify-center
-        transition-all duration-300
-        ${open
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-          : 'bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}
-      `}
-    >
-      <Bell size={22} strokeWidth={open ? 2.5 : 2} />
-
-      {/* ✅ FIX: h-5.5 no existe en Tailwind — reemplazado por h-5 */}
-      {unreadCount > 0 && (
-        <span className="absolute top-1 right-1 min-w-[1.25rem] h-5 px-1 bg-rose-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center shadow-md shadow-rose-500/40 z-10 leading-none">
-          {unreadCount > 99 ? "99+" : unreadCount}
-        </span>
       )}
-    </button>
+    </>
   );
 }

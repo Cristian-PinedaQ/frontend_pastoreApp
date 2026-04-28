@@ -322,36 +322,54 @@ const EnrollmentsPage = () => {
 
   // ── Exportación PDF ───────────────────────────────────────────────────────
   const exportCohortPDF = async () => {
-    if (!selectedEnrollment) return;
-    setExportingPDF(true);
-    setError("");
-    try {
-      let exportStudents = students.filter((s) => s.status !== "CANCELLED");
-      if (exportStudents.length === 0) {
-        const raw = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
-        exportStudents = (raw || []).filter((s) => s.status !== "CANCELLED");
-      }
-      const memberResults = await Promise.allSettled(
-        exportStudents.map((s) => apiService.getMemberById(s.memberId))
-      );
-      const enriched = exportStudents.map((student, i) => {
-        const m = memberResults[i].status === "fulfilled" ? memberResults[i].value || {} : {};
-        return {
-          ...student,
-          memberName: student.memberName || m.name || `Miembro ${student.memberId}`,
-          gender: m.gender ?? m.sex ?? m.genero ?? m.sexo ?? "",
-          leader: m.leaderName ?? m.leader?.name ?? m.cell?.groupLeader?.memberName ?? m.cell?.groupLeader?.name ?? m.cell?.groupLeaderName ?? m.groupLeaderName ?? "—",
-          district: m.district ?? m.distrito ?? m.cell?.district ?? m.barrio ?? "—",
-        };
-      });
-      generateCohortPDF(selectedEnrollment, enriched, { getLevelLabel, getStatusLabel, getTeacherName, getDisplayName });
-    } catch (err) {
-      logError("Error exportando PDF:", err);
-      setError("Error al generar el PDF. Inténtalo de nuevo.");
-    } finally {
-      setExportingPDF(false);
+  if (!selectedEnrollment) return;
+  setExportingPDF(true);
+  setError("");
+  try {
+    let exportStudents = students.filter((s) => s.status !== "CANCELLED");
+    if (exportStudents.length === 0) {
+      const raw = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
+      exportStudents = (raw || []).filter((s) => s.status !== "CANCELLED");
     }
-  };
+    const enriched = await Promise.all(
+      exportStudents.map(async (student) => {
+        try {
+          const mId = student.memberId || student.member?.id;
+          if (!mId) return {
+            ...student,
+            pastor: "Ministerio General",
+            networkLeader: "Sin Líder de Red",
+            directLeader: "Sin Líder Directo",
+          };
+          const res = await apiService.getMemberById(mId);
+          const m = res?.data || res || {};
+          const { pastor, networkLeader, directLeader } = resolveG12Hierarchy(m, availableTeachers);
+          return {
+            ...student,
+            memberName: student.memberName || m.name || `Miembro ${mId}`,
+            gender: m.gender ?? m.sex ?? m.genero ?? m.sexo ?? "",
+            pastor,
+            networkLeader,
+            directLeader,
+          };
+        } catch {
+          return {
+            ...student,
+            pastor: "Ministerio General",
+            networkLeader: "Sin Líder de Red",
+            directLeader: "Sin Líder Directo",
+          };
+        }
+      })
+    );
+    generateCohortPDF(selectedEnrollment, enriched, { getLevelLabel, getStatusLabel, getTeacherName, getDisplayName });
+  } catch (err) {
+    logError("Error exportando PDF:", err);
+    setError("Error al generar el PDF. Inténtalo de nuevo.");
+  } finally {
+    setExportingPDF(false);
+  }
+};
 
   const exportApprovedPDF = async () => {
     if (!selectedEnrollment) return;
