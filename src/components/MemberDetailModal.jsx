@@ -8,6 +8,7 @@ import {
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
 import { getDisplayName } from "../services/nameHelper";
+import LeadershipTreeViewer from "./LeadershipTreeViewer";
 
 /**
  * MemberDetailModal
@@ -21,11 +22,13 @@ import { getDisplayName } from "../services/nameHelper";
  */
 export const MemberDetailModal = ({
   member,
+  allMembers = [],
   onClose,
   onUpdated,
   onEdit,
   onDelete,
   onViewEnrollment,
+  onNavigateToMember,
   canEdit = true
 }) => {
   const confirm = useConfirmation();
@@ -38,6 +41,13 @@ export const MemberDetailModal = ({
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("info");
   const [enrollmentDetail, setEnrollmentDetail] = useState(null);
+
+  // Reset internal state when member changes
+  useEffect(() => {
+    setActiveTab("info");
+    setError(null);
+    setEnrollmentDetail(null);
+  }, [member?.id]);
 
   const getLevelName = (level) => {
     if (!level) return "N/A";
@@ -108,6 +118,9 @@ export const MemberDetailModal = ({
   // ── FIX 2: clear error on tab switch ────────────────────────────────────────
   const handleTabChange = (tab) => {
     setError(null);
+    if (tab !== "enrollmentDetail") {
+      setEnrollmentDetail(null);
+    }
     setActiveTab(tab);
   };
 
@@ -175,7 +188,8 @@ export const MemberDetailModal = ({
         <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 overflow-x-auto no-scrollbar shrink-0">
           {[
             { key: "info",        label: "Información General" },
-            { key: "enrollments", label: `Cursos${enrollments.length > 0 ? ` (${enrollments.length})` : ""}` },
+            { key: "enrollments", label: `Nivel Raiz Viva${enrollments.length > 0 ? ` (${enrollments.length})` : ""}` },
+            { key: "tree",        label: "Red Ministerial" },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -201,6 +215,28 @@ export const MemberDetailModal = ({
                 <InfoItem icon={Heart}       label="Estado Civil"       value={member.maritalStatus || "—"} />
                 <InfoItem icon={Calendar}    label="Fecha Nacimiento"   value={member.birthdate ? new Date(member.birthdate).toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" }) : "—"} />
                 <InfoItem icon={ShieldCheck} label="Distrito"           value={member.district || "Distrito 1"} />
+                <InfoItem 
+                  icon={Award} 
+                  label="Nivel Pastoral" 
+                  value={member?.currentLevel?.displayName || member?.currentLevel?.code || "Sin nivel asignado"} 
+                />
+                <InfoItem 
+                  icon={ShieldCheck} 
+                  label="Líder" 
+                  value={
+                    member?.leader ? (
+                      <button
+                        onClick={() => onNavigateToMember?.(member.leader)}
+                        className="text-indigo-600 hover:underline flex items-center gap-1"
+                      >
+                        {getDisplayName(member.leader.name)}
+                        <ExternalLink className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      "Sin líder asignado"
+                    )
+                  }
+                />
               </div>
 
               <div className="pt-6 md:pt-8 border-t border-slate-200 dark:border-slate-800/80 flex flex-col md:flex-row flex-wrap gap-3 md:gap-4">
@@ -269,8 +305,17 @@ export const MemberDetailModal = ({
                     />
                   ))}
                 </div>
-              )}
-            </div>
+)}
+             </div>
+          )}
+
+          {/* TAB: Leadership Tree */}
+          {activeTab === "tree" && (
+            <LeadershipTreeViewer
+              member={member}
+              allMembers={allMembers}
+              onNavigateToMember={onNavigateToMember}
+            />
           )}
 
           {/* TAB: Enrollment Detail View */}

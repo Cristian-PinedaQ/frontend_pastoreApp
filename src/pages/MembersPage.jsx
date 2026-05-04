@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { MemberDetailModal } from "../components/MemberDetailModal";
+import MemberNavigator from "../components/MemberNavigator";
 import { ModalAddMember } from "../components/ModalAddMember";
 import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal"; // ← NEW
 import { generateMembersPDF } from "../services/generateMembersPDF";
@@ -31,7 +32,6 @@ const MembersPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({ gender: "ALL", district: "ALL" });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState(null);
 
@@ -41,6 +41,10 @@ const MembersPage = () => {
     history: [],
     memberName: "",
   });
+
+  // ── MemberDetailModal state (reutilizable para miembro y líder) ───────────────
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [showMemberModal, setShowMemberModal] = useState(false);
 
   const loadMembers = useCallback(async () => {
     try {
@@ -115,6 +119,11 @@ const MembersPage = () => {
 
   const handleCloseHistory = useCallback(() => {
     setHistoryModal({ isOpen: false, history: [], memberName: "" });
+  }, []);
+
+  const handleCloseMemberModal = useCallback(() => {
+    setShowMemberModal(false);
+    setSelectedMember(null);
   }, []);
 
   return (
@@ -292,12 +301,12 @@ const MembersPage = () => {
                   <div className="p-8 pt-0">
                      <div className="flex items-center justify-between gap-4 bg-slate-50 dark:bg-black/20 rounded-[2rem] border border-slate-100 dark:border-white/5 group-hover:bg-white dark:group-hover:bg-indigo-900/20 transition-all duration-500 p-3">
                         <div className="flex gap-2">
-                           {/* ── Detail button ── */}
-                           <button
-                              onClick={() => setSelectedMember(member)}
-                              className="flex items-center justify-center bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl transition-all active:scale-90 p-2"
-                              title="Ver Detalle"
-                           >
+{/* ── Detail button ── */}
+                            <button
+                               onClick={() => { setSelectedMember(member); setShowMemberModal(true); }}
+                               className="flex items-center justify-center bg-white dark:bg-slate-800 text-slate-400 hover:text-rose-600 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl transition-all active:scale-90 p-2"
+                               title="Ver Detalle"
+                            >
                               <FileText className="w-8 h-8 transition-transform group-hover/icon:rotate-6 text-green-700" />
                            </button>
 
@@ -311,7 +320,7 @@ const MembersPage = () => {
                            </button>
                         </div>
                         <button
-                           onClick={() => setSelectedMember(member)}
+                           onClick={() => { setSelectedMember(member); setShowMemberModal(true); }}
                            className="h-12 px-6 bg-slate-900 dark:bg-indigo-600 text-white rounded-[1.2rem] font-black text-[9px] uppercase tracking-widest shadow-lg hover:shadow-indigo-500/20 active:scale-95 transition-all"
                         >
                            Gestionar
@@ -339,24 +348,11 @@ const MembersPage = () => {
       )}
 
       {/* ── MODALS ── */}
-      {selectedMember && (
-        <MemberDetailModal
-          member={selectedMember}
-          onClose={() => setSelectedMember(null)}
-          onUpdated={loadMembers}
-          onEdit={(m) => {
-            setMemberToEdit(m);
-            setIsAddMemberModalOpen(true);
-          }}
-          onDelete={async (id) => {
-            try {
-              await apiService.deleteMember(id);
-              loadMembers();
-              setSelectedMember(null);
-            } catch (err) {
-              console.error("Error al eliminar miembro:", err);
-            }
-          }}
+      {showMemberModal && selectedMember && (
+        <MemberNavigator
+          initialMember={selectedMember}
+          allMembers={allMembers}
+          onClose={handleCloseMemberModal}
         />
       )}
 
