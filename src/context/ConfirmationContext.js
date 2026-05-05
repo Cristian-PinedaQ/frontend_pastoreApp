@@ -10,7 +10,9 @@ export const ConfirmationProvider = ({ children }) => {
     message: '',
     type: 'warning',
     confirmLabel: 'Confirmar',
-    cancelLabel: 'Cancelar'
+    cancelLabel: 'Cancelar',
+    onConfirm: null,
+    isExecuting: false
   });
 
   // Usamos una referencia para guardar el 'resolve' de la promesa.
@@ -25,7 +27,8 @@ export const ConfirmationProvider = ({ children }) => {
       message: options.message || '¿Estás seguro de realizar esta acción?',
       type: options.type || 'warning',
       confirmLabel: options.confirmLabel || 'Confirmar',
-      cancelLabel: options.cancelLabel || 'Cancelar'
+      cancelLabel: options.cancelLabel || 'Cancelar',
+      onConfirm: options.onConfirm || null
     });
 
     // 2. Retornamos la promesa y guardamos la llave (resolve) en el ref
@@ -34,13 +37,30 @@ export const ConfirmationProvider = ({ children }) => {
     });
   }, []);
 
-  const handleConfirm = useCallback(() => {
-    setConfirmState(prev => ({ ...prev, isOpen: false }));
-    if (resolver.current) {
-      resolver.current(true); // Retorna 'true' al EnrollmentsPage
+  const handleConfirm = useCallback(async () => {
+    const { onConfirm } = confirmState;
+
+    try {
+      setConfirmState(prev => ({ ...prev, isExecuting: true }));
+
+      if (onConfirm) {
+        await onConfirm();
+      }
+
+      if (resolver.current) {
+        resolver.current(true);
+      }
+
+    } catch (error) {
+      console.error('Error en confirmación:', error);
+      if (resolver.current) {
+        resolver.current(false);
+      }
+    } finally {
       resolver.current = null;
+      setConfirmState(prev => ({ ...prev, isOpen: false, isExecuting: false }));
     }
-  }, []);
+  }, [confirmState.onConfirm]);
 
   const handleCancel = useCallback(() => {
     setConfirmState(prev => ({ ...prev, isOpen: false }));
@@ -53,7 +73,7 @@ export const ConfirmationProvider = ({ children }) => {
   return (
     <ConfirmationContext.Provider value={{ confirm }}>
       {children}
-      <ConfirmationModal 
+      <ConfirmationModal
         isOpen={confirmState.isOpen}
         onClose={handleCancel}
         title={confirmState.title}
@@ -62,7 +82,7 @@ export const ConfirmationProvider = ({ children }) => {
         confirmLabel={confirmState.confirmLabel}
         cancelLabel={confirmState.cancelLabel}
         type={confirmState.type}
-        isExecuting={false} // Tu EnrollmentsPage ya maneja sus propios loadings
+        isExecuting={confirmState.isExecuting}
       />
     </ConfirmationContext.Provider>
   );

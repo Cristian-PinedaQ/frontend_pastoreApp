@@ -181,6 +181,15 @@ const ROLE_LEVEL_MAP = {
   ROLE_ESENCIA: ["ESENCIA_1","ESENCIA_2","ESENCIA_3","SANIDAD_INTEGRAL_RAICES","ESENCIA_4","ADIESTRAMIENTO","GRADUACION"],
 };
 
+const ALLOWED_AUTO_ENROLL_LEVELS = new Set(["ENCUENTRO", "POST_ENCUENTRO"]);
+
+const shouldShowAutoEnroll = (enrollment) => {
+  return (
+    enrollment.status === "COMPLETED" &&
+    ALLOWED_AUTO_ENROLL_LEVELS.has(enrollment.levelCode)
+  );
+};
+
 const ERROR_MESSAGES = {
   FETCH_ENROLLMENTS: "Error al cargar cohortes",
   FETCH_TEACHERS: "Error al cargar maestros",
@@ -262,6 +271,11 @@ const EnrollmentsPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const [recoveringId, setRecoveringId] = useState(null);
+  const [autoEnrolledCohorts, setAutoEnrolledCohorts] = useState(new Set());
+
+  const handleAutoEnrollSuccess = useCallback((cohortId) => {
+    setAutoEnrolledCohorts((prev) => new Set(prev).add(cohortId));
+  }, []);
 
   // ── Estado modal de detalles ──────────────────────────────────────────────
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
@@ -1118,6 +1132,8 @@ const EnrollmentsPage = () => {
                 onExportApproved={(e) => { e.stopPropagation(); setSelectedEnrollment(enrollment); exportApprovedPDF(); }}
                 onRecover={() => handleRecover(enrollment)}
                 recovering={recoveringId === enrollment.id}
+                autoEnrolledCohorts={autoEnrolledCohorts}
+                handleAutoEnrollSuccess={handleAutoEnrollSuccess}
               />
             ))}
           </div>
@@ -1634,7 +1650,7 @@ const ViewModeBtn = ({ active, onClick, children }) => (
   </button>
 );
 
-const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail, onExportPDF, onExportApproved, onRecover, recovering}) => {
+const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail, onExportPDF, onExportApproved, onRecover, recovering, autoEnrolledCohorts, handleAutoEnrollSuccess}) => {
   const occupancy = Math.round(((enrollment.currentStudentCount || 0) / (enrollment.maxStudents || 30)) * 100);
 
   return (
@@ -1701,9 +1717,13 @@ const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail,
             />
           )}
 
-          {/* 🚀 BOTÓN: Auto-matrícula aprobados (solo visible en COMPLETED) */}
-          {enrollment.status === 'COMPLETED' && (
-            <AutoEnrollButton cohortId={enrollment.id} />
+          {/* 🚀 BOTÓN: Auto-matrícula aprobados (solo niveles ENCUENTRO y POST_ENCUENTRO completados) */}
+          {shouldShowAutoEnroll(enrollment) && (
+            <AutoEnrollButton
+              cohortId={enrollment.id}
+              disabled={autoEnrolledCohorts.has(enrollment.id)}
+              onSuccess={() => handleAutoEnrollSuccess(enrollment.id)}
+            />
           )}
         </div>
  

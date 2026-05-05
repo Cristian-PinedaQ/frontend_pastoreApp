@@ -3,7 +3,7 @@ import { Rocket, Loader2 } from "lucide-react";
 import apiService from "../apiService";
 import { useNotification } from "../hooks";
 
-export default function AutoEnrollButton({ cohortId }) {
+export default function AutoEnrollButton({ cohortId, disabled = false, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const { success, warning, error, notifications, remove } = useNotification();
 
@@ -16,6 +16,11 @@ export default function AutoEnrollButton({ cohortId }) {
       if (data.requiresPayment) {
         warning("El siguiente nivel requiere pago.");
         return;
+      }
+
+      const hasChanges = data.enrolled > 0;
+      if (hasChanges && onSuccess) {
+        onSuccess();
       }
 
       const parts = [];
@@ -35,7 +40,6 @@ export default function AutoEnrollButton({ cohortId }) {
 
   return (
     <>
-      {/* Render de notificaciones del hook existente */}
       {notifications.length > 0 && (
         <div className="fixed top-6 right-6 z-50 flex flex-col gap-2 w-80 pointer-events-none">
           {notifications.map((n) => (
@@ -58,7 +62,7 @@ export default function AutoEnrollButton({ cohortId }) {
 
       <button
         onClick={handleClick}
-        disabled={loading}
+        disabled={loading || disabled}
         className="
           flex-1 min-w-[120px]
           flex items-center justify-center gap-2
