@@ -54,25 +54,6 @@ const ModalLessonAttendanceDetail = ({
   const [participationScores, setParticipationScores] = useState({});
   const [showParticipationSelect, setShowParticipationSelect] = useState({});
 
-  // ── Dark mode (mismo mecanismo que el original) ──────────────────────────
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    const checkDark = () => {
-      setIsDarkMode(
-        document.documentElement.classList.contains("dark-mode") ||
-          document.documentElement.classList.contains("dark"),
-      );
-    };
-    checkDark();
-    const observer = new MutationObserver(checkDark);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    return () => observer.disconnect();
-  }, []);
-
   // ── Carga defensiva de datos ─────────────────────────────────────────────
   const loadContent = useCallback(async () => {
     // Extraer IDs de cualquier fuente posible

@@ -18,7 +18,6 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
-import { MemberDetailModal } from "../components/MemberDetailModal";
 import MemberNavigator from "../components/MemberNavigator";
 import { ModalAddMember } from "../components/ModalAddMember";
 import { EnrollmentHistoryModal } from "../components/EnrollmentHistoryModal"; // ← NEW

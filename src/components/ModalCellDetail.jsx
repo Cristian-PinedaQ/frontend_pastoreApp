@@ -155,16 +155,6 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     }
   }, [initialCell]);
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      if (activeTab === "members" || activeTab === "add") loadMembers();
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, activeTab, cell?.id]);
-
   // Cerrar panel de líderes al cambiar de pestaña
   useEffect(() => {
     setLeaderPanel(null);
@@ -184,6 +174,16 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
       setLoadingMembers(false);
     }
   }, [cell?.id]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      if (activeTab === "members" || activeTab === "add") loadMembers();
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, activeTab, cell?.id, loadMembers]);
 
   // ── Handlers existentes ───────────────────────────────────────────────────
 

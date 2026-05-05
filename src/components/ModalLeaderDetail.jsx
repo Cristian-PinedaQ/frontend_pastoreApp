@@ -85,7 +85,7 @@ const ModalLeaderDetail = ({
     if (!isOpen) {
       setActiveTab('identity');
       setEditMode(false);
-      setConfirmation({ ...confirmation, isOpen: false });
+      setConfirmation(prev => ({ ...prev, isOpen: false }));
     }
   }, [isOpen]);
 

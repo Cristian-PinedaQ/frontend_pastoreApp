@@ -34,7 +34,6 @@ const getMemberLevelCode = (member) => {
 
 const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
   const confirm = useConfirmation();
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [step, setStep] = useState(1);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [studentsByLevel, setStudentsByLevel] = useState([]);
@@ -62,16 +61,6 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     { value: "ADIESTRAMIENTO",          label: "Adiestramiento",            order: 10, color: 'amber' },
     { value: "GRADUACION",              label: "Graduación",                order: 11, color: 'purple' },
   ];
-
-  // ─── Theme Detection ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const checkDark = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark') || localStorage.getItem('theme') === 'dark');
-    };
-    checkDark();
-    const invoker = setInterval(checkDark, 1000);
-    return () => clearInterval(invoker);
-  }, []);
 
   const handleReset = useCallback(() => {
     setStep(1);

@@ -35,7 +35,7 @@ const { getDisplayName } = nameHelper;
 console.log("LEADERS PAGE UPDATED - NO CALENDAR");
 
 const LeadersPage = () => {
-  const { user, hasAnyRole } = useAuth();
+  const { hasAnyRole } = useAuth();
   
   const LEADER_TYPE_CONFIG = {
     SERVANT: { 
@@ -94,7 +94,6 @@ const LeadersPage = () => {
   const [allLeaders, setAllLeaders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState("grid"); // grid, list
@@ -118,11 +117,8 @@ const LeadersPage = () => {
   const loadLeaders = useCallback(async () => {
     try {
       setLoading(true);
-      setError("");
       const data = await apiService.getLeaders();
       setAllLeaders(data || []);
-    } catch (err) {
-      setError("No se pudieron sincronizar los líderes");
     } finally {
       setLoading(false);
     }
@@ -174,7 +170,7 @@ const LeadersPage = () => {
       loadLeaders();
       setTimeout(() => setSuccessMessage(""), 5000);
     } catch (err) {
-      setError("Error en verificación masiva");
+      console.error("Error en verificación masiva:", err);
     } finally {
       setLoading(false);
     }

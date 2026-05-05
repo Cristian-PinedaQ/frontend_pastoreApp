@@ -79,7 +79,6 @@ const ParticipantDetailModal = ({
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [memberDetails, setMemberDetails] = useState(null);
   const [contributionData, setContributionData] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const [itemDelivered, setItemDelivered] = useState(
     contribution?.itemDelivered ?? participant?.itemDelivered ?? false,
   );
@@ -227,7 +226,6 @@ const ParticipantDetailModal = ({
   const refreshContributionData = async () => {
     const contributionId = contribution?.id || participant.contributionId;
     if (!contributionId) return;
-    setRefreshing(true);
     try {
       await fetchPaymentHistory();
       try {
@@ -241,8 +239,6 @@ const ParticipantDetailModal = ({
     } catch (err) {
       console.error("❌ Error al recargar contribución:", err);
       return contributionData || contribution || participant;
-    } finally {
-      setRefreshing(false);
     }
   };
 

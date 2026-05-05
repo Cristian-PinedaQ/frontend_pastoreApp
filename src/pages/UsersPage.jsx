@@ -194,7 +194,7 @@ const UsersPage = () => {
   };
 
   const handleDelete = throttle(async (userId, username) => {
-    const isConfirmed = await confirm({
+    await confirm({
       title: '¿Eliminar Usuario?',
       message: `Esta acción eliminará permanentemente a "${username}". No se puede deshacer.`,
       type: 'danger',

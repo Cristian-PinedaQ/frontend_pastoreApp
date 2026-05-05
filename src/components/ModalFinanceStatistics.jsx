@@ -6,7 +6,7 @@
 // ✅ Números en millones correctamente formateados en gráficas
 // ✅ Convertido a Tailwind CSS y Lucide Icons
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer

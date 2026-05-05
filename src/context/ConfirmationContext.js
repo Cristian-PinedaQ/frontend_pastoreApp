@@ -60,6 +60,7 @@ export const ConfirmationProvider = ({ children }) => {
       resolver.current = null;
       setConfirmState(prev => ({ ...prev, isOpen: false, isExecuting: false }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [confirmState.onConfirm]);
 
   const handleCancel = useCallback(() => {

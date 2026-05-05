@@ -22,13 +22,12 @@ const ItemDeliveryToggle = ({
   const [delivered, setDelivered] = useState(initialDelivered);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [animating, setAnimating] = useState(false);
 
   const handleToggle = async () => {
     if (loading || disabled) return;
 
     const newValue = !delivered;
-    const isConfirmed = await confirm({
+    await confirm({
       title: newValue ? "Confirmar Entrega" : "¿Rectificar Entrega?",
       message: newValue 
         ? `¿Confirmas que el artículo fue entregado a ${memberName || "este participante"}?`
@@ -38,7 +37,6 @@ const ItemDeliveryToggle = ({
       onConfirm: async () => {
         setLoading(true);
         setError("");
-        setAnimating(true);
 
         try {
           await apiService.request(
@@ -57,7 +55,6 @@ const ItemDeliveryToggle = ({
           setTimeout(() => setError(""), 4000);
         } finally {
           setLoading(false);
-          setTimeout(() => setAnimating(false), 400);
         }
       }
     });

@@ -13,7 +13,7 @@ import {
   UserPlus
 } from "lucide-react";
 import apiService from "../apiService";
-import { logUserAction, logSecurityEvent } from "../utils/securityLogger";
+import { logUserAction } from "../utils/securityLogger";
 
 const MEETING_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const DISTRICTS = [

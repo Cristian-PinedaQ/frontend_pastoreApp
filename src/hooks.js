@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { useAuth } from './context/AuthContext';
 import { useConfirmation } from './context/ConfirmationContext';
-import apiService from './apiService';
 
 /**
  * 📡 Hook para manejar requests a la API

@@ -79,6 +79,7 @@ const isPastor = (name) => {
   );
 };
 
+// eslint-disable-next-line no-unused-vars
 const getRootPastor = (member) => {
   let current = member;
   const visited = new Set();
@@ -425,6 +426,7 @@ const LeadershipTreeViewer = ({ member, allMembers = [], onNavigateToMember }) =
 
   const currentRole = getMemberRole(member);
   const currentConfig = getRoleConfig(currentRole);
+  // eslint-disable-next-line no-unused-vars
   const memberFullName = getDisplayName(
     member.name || `${member.firstName || ""} ${member.lastName || ""}`.trim()
   );

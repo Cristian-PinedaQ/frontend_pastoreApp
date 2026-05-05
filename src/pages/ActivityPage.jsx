@@ -884,7 +884,7 @@ const ActivityPage = () => {
         initialData={modals.edit ? selectedActivity : null}
         isEditing={modals.edit}
       />
-      // ✅ Modal con balance
+      {/* ✅ Modal con balance */}
 <ModalActivityDetails
   isOpen={modals.details}
   onClose={() => {

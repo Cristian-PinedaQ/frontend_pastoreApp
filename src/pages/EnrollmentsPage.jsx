@@ -135,8 +135,9 @@ const resolveG12Hierarchy = (m, allLeaders) => {
       if (is12(nextName)) {
           return { pastor, networkLeader: nextName, directLeader: rawDl };
       }
+      const searchName = nextName;
       currentName = nextName;
-      currentObj = allLeaders.find(l => (l.name || l.memberName || "").toUpperCase().includes(currentName));
+      currentObj = allLeaders.find(l => (l.name || l.memberName || "").toUpperCase().includes(searchName));
       safety++;
   }
 
