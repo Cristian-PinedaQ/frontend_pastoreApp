@@ -484,6 +484,53 @@ class ApiService {
     }
   }
 
+  /**
+   * Matricula automáticamente a estudiantes aprobados al siguiente nivel,
+   * solo si el siguiente nivel NO requiere pago.
+   * POST /api/v1/enrollment/cohorts/{cohortId}/auto-enroll-next
+   * @param {number} cohortId - ID de la cohorte
+   * @returns {Object} Resumen de matrículas (enrolled, alreadyEnrolled, noCohortAvailable, errors, requiresPayment)
+   */
+  async autoEnrollNext(cohortId) {
+    try {
+      validateId(cohortId, 'cohortId');
+
+      log('🚀 [autoEnrollNext] Ejecutando auto-matrícula para cohorte:', cohortId);
+
+      const response = await this.request(`/enrollment/cohorts/${cohortId}/auto-enroll-next`, {
+        method: 'POST',
+      });
+
+      log('✅ [autoEnrollNext] Resultado:', response);
+      return response;
+    } catch (error) {
+      logError('❌ [autoEnrollNext] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene los estudiantes aprobados de una cohorte.
+   * GET /api/v1/enrollment/cohorts/{cohortId}/approved-students
+   * @param {number} cohortId - ID de la cohorte
+   * @returns {Array} Lista de estudiantes aprobados
+   */
+  async getApprovedStudents(cohortId) {
+    try {
+      validateId(cohortId, 'cohortId');
+
+      log('📋 [getApprovedStudents] Obteniendo aprobados de cohorte:', cohortId);
+
+      const response = await this.request(`/enrollment/cohorts/${cohortId}/approved-students`);
+
+      log('✅ [getApprovedStudents] Éxito -', response?.length || 0, 'estudiantes');
+      return response;
+    } catch (error) {
+      logError('❌ [getApprovedStudents] Error:', error.message);
+      throw error;
+    }
+  }
+
 
   // ========== 📚 NIVELES FORMATIVOS ==========
 

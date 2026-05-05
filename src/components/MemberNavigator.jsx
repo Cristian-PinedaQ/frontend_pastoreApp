@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { MemberDetailModal } from "./MemberDetailModal";
 
-export default function MemberNavigator({ initialMember, allMembers = [], onClose }) {
+export default function MemberNavigator({ initialMember, allMembers = [], onClose, onEdit }) {
   const [currentMember, setCurrentMember] = useState(initialMember);
 
   useEffect(() => {
@@ -19,6 +19,7 @@ export default function MemberNavigator({ initialMember, allMembers = [], onClos
       member={currentMember}
       allMembers={allMembers}
       onClose={onClose}
+      onEdit={onEdit}
       onNavigateToMember={goToMember}
     />
   );

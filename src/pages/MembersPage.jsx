@@ -126,6 +126,13 @@ const MembersPage = () => {
     setSelectedMember(null);
   }, []);
 
+  const handleEditMember = useCallback((member) => {
+    setShowMemberModal(false);
+    setSelectedMember(null);
+    setMemberToEdit(member);
+    setIsAddMemberModalOpen(true);
+  }, []);
+
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-10 lg:p-14 space-y-12 animate-in fade-in duration-700">
       
@@ -353,6 +360,7 @@ const MembersPage = () => {
           initialMember={selectedMember}
           allMembers={allMembers}
           onClose={handleCloseMemberModal}
+          onEdit={handleEditMember}
         />
       )}
 

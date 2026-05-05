@@ -17,6 +17,7 @@ import { generateCohortPDF } from "../services/generateCohortPDF";
 import { generateAttendancePDF } from "../services/attendanceCohortsPdfGenerator";
 import { generateCohortAttendanceFullPDF } from "../services/generateCohortAttendanceFullPDF";
 import { generateApprovedStudentsPDF } from "../services/generateApprovedStudentsPDF";
+import AutoEnrollButton from "../components/AutoEnrollButton";
 import {
   BookOpen,
   Users,
@@ -1683,20 +1684,26 @@ const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail,
       </div>
        <div className="p-3 bg-slate-50 dark:bg-slate-950/40 space-y-2" onClick={(e) => e.stopPropagation()}>
         
-        {/* 🚀 MODIFICADO: Grid dinámico (4 columnas si está completado, 3 si no) */}
-        <div className={`grid ${enrollment.status === 'COMPLETED' ? 'grid-cols-4' : 'grid-cols-3'} gap-2`}>
-          <CardActionBtn icon={<ClipboardCheck size={13} />} label="Asis."   onClick={onRecordAttendance} hoverClass="hover:bg-slate-900 hover:text-white dark:hover:bg-indigo-600" />
-          <CardActionBtn icon={<Search size={13} />}         label="Detalle" onClick={onViewDetail}       hoverClass="hover:bg-violet-600 hover:text-white" />
-          <CardActionBtn icon={<FileDown size={13} />}       label="PDF"     onClick={onExportPDF}        hoverClass="hover:bg-indigo-600 hover:text-white" />
-          
+        {/* 🚀 MODIFICADO: Flex-wrap responsive */}
+        <div className="flex flex-wrap gap-2">
+          <CardActionBtn className="flex-1 min-w-[120px]" icon={<ClipboardCheck size={13} />} label="Asis."   onClick={onRecordAttendance} hoverClass="hover:bg-slate-900 hover:text-white dark:hover:bg-indigo-600" />
+          <CardActionBtn className="flex-1 min-w-[120px]" icon={<Search size={13} />}         label="Detalle" onClick={onViewDetail}       hoverClass="hover:bg-violet-600 hover:text-white" />
+          <CardActionBtn className="flex-1 min-w-[120px]" icon={<FileDown size={13} />}       label="PDF"     onClick={onExportPDF}        hoverClass="hover:bg-indigo-600 hover:text-white" />
+
           {/* NUEVO BOTÓN: Acta de aprobados (solo visible en COMPLETED) */}
           {enrollment.status === 'COMPLETED' && (
-            <CardActionBtn 
-              icon={<Award size={13} />} 
-              label="Acta" 
-              onClick={onExportApproved} 
-              hoverClass="hover:bg-amber-500 hover:text-white dark:hover:bg-amber-600 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20" 
+            <CardActionBtn
+              className="flex-1 min-w-[120px]"
+              icon={<Award size={13} />}
+              label="Acta"
+              onClick={onExportApproved}
+              hoverClass="hover:bg-amber-500 hover:text-white dark:hover:bg-amber-600 text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-900/20"
             />
+          )}
+
+          {/* 🚀 BOTÓN: Auto-matrícula aprobados (solo visible en COMPLETED) */}
+          {enrollment.status === 'COMPLETED' && (
+            <AutoEnrollButton cohortId={enrollment.id} />
           )}
         </div>
  
@@ -1724,10 +1731,10 @@ const EnrollmentCard = ({ enrollment, onClick, onRecordAttendance, onViewDetail,
   );
 };
 
-const CardActionBtn = ({ icon, label, onClick, hoverClass }) => (
+const CardActionBtn = ({ icon, label, onClick, hoverClass, className = "" }) => (
   <button
     onClick={onClick}
-    className={`flex items-center justify-center gap-1.5 py-3 bg-white dark:bg-slate-800 rounded-xl text-slate-500 text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${hoverClass}`}
+    className={`flex items-center justify-center gap-1.5 py-3 bg-white dark:bg-slate-800 rounded-xl text-slate-500 text-xs font-black uppercase tracking-widest transition-all shadow-sm active:scale-95 ${hoverClass} ${className}`}
   >
     {icon} {label}
   </button>

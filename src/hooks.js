@@ -1,7 +1,7 @@
 // 🎣 Custom Hooks - Utilidades reutilizables
 
 import { useState, useCallback } from 'react';
-import { useAuth } from './AuthContext';
+import { useAuth } from './context/AuthContext';
 import { useConfirmation } from './context/ConfirmationContext';
 import apiService from './apiService';
 
