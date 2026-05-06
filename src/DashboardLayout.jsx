@@ -2,17 +2,19 @@
 // DashboardLayout.jsx - ELITE MODERN EDITION
 // ============================================
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useConfirmation } from "./context/ConfirmationContext";
 import { 
   Users, HeartHandshake, GraduationCap, 
   UserStar, Church, CheckSquare, Music, Rocket, 
-  Calendar, Landmark, ChartPie, SlidersHorizontal, UserCircle, LogOut, Menu, X, Flame, MessageCircleQuestionMark, NotebookPen
+  Calendar, Landmark, ChartPie, SlidersHorizontal, UserCircle, LogOut, Menu, X, Flame, MessageCircleQuestionMark, NotebookPen,
+  Sun, Moon
 } from 'lucide-react';
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
+import { useTheme } from "./hooks/useTheme";
 import logoBlanco from './assets/Pastoreapp_blanco.png';
 import logoNegro from './assets/Pastoreappnegro.png';
 
@@ -41,28 +43,10 @@ const SCROLLBAR_STYLES = `
 const DashboardLayoutComponent = () => {
   const { user, logout, hasRole, hasAnyRole } = useAuth();
   const confirm = useConfirmation();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [, setIsDarkMode] = useState(false);
-
-  // ========== SYNC DARK MODE ==========
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-      document.documentElement.classList.add('dark', 'dark-mode');
-    } else if (savedTheme === 'light') {
-      document.documentElement.classList.remove('dark', 'dark-mode');
-    }
-
-    const checkDark = () => {
-      setIsDarkMode(document.documentElement.classList.contains("dark"));
-    };
-    checkDark();
-    const observer = new MutationObserver(checkDark);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
 
   // ✅ FIX: logout usa el boolean retornado por confirm(), no onConfirm callback
   const handleLogout = async () => {
@@ -230,6 +214,25 @@ const DashboardLayoutComponent = () => {
 
           {/* RIGHT — siempre visible, tamaño natural */}
           <div className="flex items-center gap-2 lg:gap-4">
+            <button
+              onClick={toggleTheme}
+              aria-label="Cambiar tema"
+              aria-pressed={isDark}
+              className="relative p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-all duration-300 active:scale-95 shrink-0"
+            >
+              <div className="relative w-5 h-5">
+                <Sun
+                  className={`absolute inset-0 w-5 h-5 text-amber-500 transition-all duration-300 ${
+                    isDark ? 'scale-0 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'
+                  }`}
+                />
+                <Moon
+                  className={`absolute inset-0 w-5 h-5 text-indigo-400 transition-all duration-300 ${
+                    isDark ? 'scale-100 rotate-0 opacity-100' : 'scale-0 -rotate-90 opacity-0'
+                  }`}
+                />
+              </div>
+            </button>
             <div className="hidden md:flex flex-col items-end">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Sesión activa</span>
               <span className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[120px]">{user?.username}</span>

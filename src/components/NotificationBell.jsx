@@ -161,16 +161,16 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
         type="button"
         onClick={handleBellClick}
         className={`
-          relative w-11 h-11 rounded-2xl flex items-center justify-center shrink-0
+          relative w-15 h-15 flex items-center justify-center shrink-0
           transition-all duration-300
           ${open
-            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}
+            ? 'text-white shadow-lg shadow-indigo-600/30'
+            : ' text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}
         `}
       >
         <Bell size={20} strokeWidth={open ? 2.5 : 2} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[1.25rem] h-5 px-1 bg-rose-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center shadow-md z-10 leading-none">
+          <span className="absolute -top-0.5 min-w-[1.25rem] h-5 px-1 bg-rose-500 text-white text-[10px] font-black rounded-full border-2 border-white dark:border-slate-900 flex items-center justify-center shadow-md z-10 leading-none">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
