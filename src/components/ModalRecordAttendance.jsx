@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-  X,
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
@@ -16,6 +15,7 @@ import {
   CalendarCheck2
 } from "lucide-react";
 import apiService from "../apiService";
+import ModalHeader from "../components/ModalHeader";
 import { useAuth } from '../context/AuthContext';
 import { logUserAction } from "../utils/securityLogger";
 
@@ -142,32 +142,21 @@ const ModalRecordAttendance = ({
     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-0 sm:p-6 bg-slate-900/60 backdrop-blur-xl animate-in fade-in duration-300">
       <div className="w-full max-w-lg bg-white dark:bg-[#0f172a] sm:rounded-[2.5rem] shadow-2xl flex flex-col h-full sm:h-auto sm:max-h-[90vh] overflow-hidden border border-slate-200 dark:border-white/10 animate-in slide-in-from-bottom-8 duration-500">
         
-        {/* HEADER */}
-        <div className="relative pt-8 pb-6 px-8 bg-white dark:bg-[#0f172a] shrink-0 border-b border-slate-100 dark:border-white/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <CalendarCheck2 className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Asistencia</h2>
-                <div className="flex items-center gap-2 mt-0.5">
-                   <p className="text-slate-500 dark:text-indigo-400 text-[9px] font-black uppercase tracking-[0.2em]">{lessonTitle || "Registro Administrativo"}</p>
-                </div>
-              </div>
-            </div>
-            <button onClick={handleClose} className="p-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-rose-500 rounded-xl transition-all"><X size={18} /></button>
-          </div>
+        <ModalHeader
+          icon={CalendarCheck2}
+          title="Asistencia"
+          subtitle={lessonTitle || "Registro Administrativo"}
+          onClose={handleClose}
+        />
 
-          {statsTotal !== null && (
-            <div className="mt-6 flex items-center gap-3">
-               <div className="flex-1 h-3 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-600 rounded-full transition-all duration-1000" style={{ width: `${statsPercentage}%` }} />
-               </div>
-               <span className="text-[10px] font-black text-slate-500 dark:text-indigo-400 uppercase tracking-widest">{statsPresent}/{statsTotal} ({statsPercentage}%)</span>
-            </div>
-          )}
-        </div>
+        {statsTotal !== null && (
+          <div className="px-8 py-4 flex items-center gap-3 bg-white dark:bg-[#0f172a] border-b border-slate-100 dark:border-white/5">
+             <div className="flex-1 h-3 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-600 rounded-full transition-all duration-1000" style={{ width: `${statsPercentage}%` }} />
+             </div>
+             <span className="text-[10px] font-black text-slate-500 dark:text-indigo-400 uppercase tracking-widest">{statsPresent}/{statsTotal} ({statsPercentage}%)</span>
+          </div>
+        )}
 
         {/* BODY */}
         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-slate-50/50 dark:bg-black/20">

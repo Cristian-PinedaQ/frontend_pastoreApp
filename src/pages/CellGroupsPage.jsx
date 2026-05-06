@@ -10,6 +10,8 @@ import ModalCreateCell from '../components/ModalCreateCell';
 import ModalCellStatistics from '../components/ModalCellStatistics';
 import ModalCellDetail from '../components/ModalCellDetail';
 import ModalLeaderDetail from '../components/ModalLeaderDetail';
+import PageHeader from '../components/PageHeader';
+import StatsBar from '../components/StatsBar';
 import { 
   Home, House, MapPin, MoreHorizontal, HousePlus,
   FileDown, BarChart3, ShieldCheck, Clock, TrendingUp,
@@ -127,54 +129,46 @@ const CellGroupsPage = () => {
         </div>
       )}
 
-      {/* HEADER */}
-      <div className="bg-white dark:bg-slate-900 p-6 md:p-8 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-8 md:gap-10">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
-              <Home size={22} strokeWidth={2.5}/>
-            </div>
-            <div className="text-[10px] sm:text-xs font-black text-indigo-500 uppercase tracking-[0.3em] sm:tracking-[0.4em]">Red de Cuidado Familiar</div>
+      <PageHeader
+        icon={Home}
+        title="Grupos de Altar"
+        eyebrow="Red de Cuidado Familiar"
+        subtitleVariant="eyebrow"
+        actions={
+          <>
+            <button
+              onClick={handleExportPDF}
+              className="group flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 sm:px-8 py-3.5 sm:py-5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 shadow-sm whitespace-nowrap"
+            >
+              <FileDown size={18} className="group-hover:translate-y-0.5 transition-transform"/>
+              <span className="hidden sm:inline">Exportar Planilla</span><span className="sm:hidden">Exportar</span>
+            </button>
+            <button
+              onClick={openStats}
+              className="flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 sm:px-8 py-3.5 sm:py-5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-[2rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all border border-indigo-100 dark:border-indigo-800/30 whitespace-nowrap"
+            >
+              <BarChart3 size={18}/>
+              <span className="hidden sm:inline">Panel de Métricas</span><span className="sm:hidden">Métricas</span>
+            </button>
+            <button
+              onClick={() => setModals(m => ({ ...m, create: true }))}
+              className="flex w-full sm:w-auto justify-center items-center gap-2 px-6 sm:px-10 py-3.5 sm:py-5 bg-indigo-600 text-white rounded-[2rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all whitespace-nowrap"
+            >
+              <HousePlus size={18} strokeWidth={3}/> Aperturar Altar
+            </button>
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+        <StatsBar>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+            <House size={14} className="text-emerald-500"/> {allCells.length} hogares
           </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter text-slate-900 dark:text-white leading-none">
-            Grupos de <span className="text-indigo-600 dark:text-indigo-500">Altar</span>
-          </h1>
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6 mt-2">
-            <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <House size={14} className="text-emerald-500"/> {allCells.length} hogares
-            </p>
-            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 hidden sm:block"/>
-            <p className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <ShieldCheck size={14} className="text-indigo-500"/> Cobertura Total
-            </p>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+            <ShieldCheck size={14} className="text-indigo-500"/> Cobertura Total
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3 sm:gap-4">
-          <button
-            onClick={handleExportPDF}
-            className="group flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 sm:px-8 py-3.5 sm:py-5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-slate-100 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 shadow-sm whitespace-nowrap"
-          >
-            <FileDown size={18} className="group-hover:translate-y-0.5 transition-transform"/>
-            <span className="hidden sm:inline">Exportar Planilla</span><span className="sm:hidden">Exportar</span>
-          </button>
-
-          {/* ✅ FIX: eliminado className duplicado */}
-          <button
-            onClick={openStats}
-            className="flex flex-1 sm:flex-none justify-center items-center gap-2 px-5 sm:px-8 py-3.5 sm:py-5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-[2rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all border border-indigo-100 dark:border-indigo-800/30 whitespace-nowrap"
-          >
-            <BarChart3 size={18}/>
-            <span className="hidden sm:inline">Panel de Métricas</span><span className="sm:hidden">Métricas</span>
-          </button>
-
-          <button
-            onClick={() => setModals(m => ({ ...m, create: true }))}
-            className="flex w-full sm:w-auto justify-center items-center gap-2 px-6 sm:px-10 py-3.5 sm:py-5 bg-indigo-600 text-white rounded-[2rem] font-bold text-[10px] sm:text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all whitespace-nowrap"
-          >
-            <HousePlus size={18} strokeWidth={3}/> Aperturar Altar
-          </button>
-        </div>
+        </StatsBar>
       </div>
 
       {/* SEARCH & CONTROLS */}

@@ -4494,6 +4494,84 @@ class ApiService {
     }
   }
 
+  // ============================================================
+  // 📊 MÓDULO COHORT PROGRESS (G12)
+  // ============================================================
+
+  async generateCohortProgressReport(payload) {
+    try {
+      log("📊 [generateCohortProgressReport] Generando reporte");
+      const response = await this.request("/cohort-progress/report", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      log("✅ [generateCohortProgressReport] Éxito");
+      return response;
+    } catch (error) {
+      logError("❌ [generateCohortProgressReport] Error:", error.message);
+      throw error;
+    }
+  }
+
+  // ============================================================
+  // 🌐 MÓDULO G12 — Health & Configuración
+  // Base URL: /actuator/health/g12
+  // ============================================================
+
+  /**
+   * Verifica el estado de configuración del sistema G12.
+   * GET /actuator/health/g12
+   *
+   * Respuesta OK:
+   *   { status: "UP", details: { pastorId: number, pastoraId: number } }
+   *
+   * Respuesta ERROR:
+   *   {
+   *     status: "DOWN",
+   *     details: { error: string, invalidField?: string, value?: number,
+   *                reason?: string, hint?: string }
+   *   }
+   */
+  async getG12Health() {
+    try {
+      log("🌐 [getG12Health] Consultando health del módulo G12");
+
+      const actuatorUrl = `${API_BASE_URL.replace(/\/api\/v1\/?$/, "")}/actuator/health/g12`;
+      const token = sessionStorage.getItem("token");
+
+      const res = await fetch(actuatorUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (res.status === 401) {
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("user");
+        window.dispatchEvent(new CustomEvent("authTokenExpired"));
+        throw new Error("Sesión expirada");
+      }
+
+      // Spring Boot Actuator devuelve JSON incluso con 503 (DOWN).
+      // Intentamos parsear siempre antes de tirar.
+      let body = null;
+      try {
+        body = await res.json();
+      } catch (e) {
+        // No es JSON (raro en Actuator)
+      }
+
+      if (body && typeof body === "object") {
+        log("✅ [getG12Health] status:", body?.status, "| http:", res.status);
+        return body;
+      }
+
+      // No hubo body parseable → tirar con el status HTTP
+      throw new Error(`Error ${res.status}`);
+    } catch (error) {
+      logError("❌ [getG12Health] Error:", error.message);
+      throw error;
+    }
+  }
+
 } // Fin de la clase ApiService
 
 const apiService = new ApiService();

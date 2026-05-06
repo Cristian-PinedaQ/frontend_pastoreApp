@@ -8,7 +8,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useConfirmation } from "../context/ConfirmationContext";
 import {
-  X,
   CheckCircle2,
   AlertCircle,
   Banknote,
@@ -21,6 +20,7 @@ import {
   Gift,
 } from "lucide-react";
 import apiService from "../apiService";
+import ModalHeader from "../components/ModalHeader";
 import { transformForDisplay } from "../services/nameHelper";
 
 const ModalAddFinance = ({
@@ -316,23 +316,11 @@ const ModalAddFinance = ({
         className="w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-[2rem] shadow-2xl overflow-visible border border-gray-200 dark:border-blue-900/30 flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-5 border-b border-gray-100 dark:border-blue-900/30 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
-              <Banknote size={20} />
-            </div>
-            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-              {isEditing ? "Editar Ingreso" : "Registrar Ingreso"}
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
+        <ModalHeader
+          icon={Banknote}
+          title={isEditing ? "Editar Ingreso" : "Registrar Ingreso"}
+          onClose={onClose}
+        />
 
         {/* Body */}
         <form

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import apiService from "../apiService";
-import { useAuth } from "../context/AuthContext";
+import PageHero from "../components/PageHero";
 import { 
   Music, 
   Calendar, 
@@ -28,7 +28,6 @@ const unwrap = (data) => {
 };
 
 const WorshipPage = () => {
-  const { user } = useAuth();
   const canManageWorship = true; // Permiso hardcodeado según lógica previa de administración
 
   const [activeTab, setActiveTab] = useState("SCHEDULE");
@@ -117,61 +116,25 @@ const WorshipPage = () => {
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0b0e14] p-4 md:p-8 pt-20 transition-all duration-500">
       <div className="max-w-[1600px] mx-auto space-y-10 animate-in">
         
-        {/* ── HEADER SUPREMO ── */}
-        <header className="relative bg-slate-900 overflow-hidden rounded-[3.5rem] p-8 md:p-14 shadow-[0_32px_80px_rgba(0,0,0,0.4)] border border-white/5 group">
-           {/* Animated Background Orbs */}
-           <div className="absolute top-0 right-0 w-[700px] h-[700px] bg-indigo-600 opacity-[0.15] blur-[140px] -mr-48 -mt-48 transition-all duration-1000 group-hover:scale-110 pointer-events-none" />
-           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-violet-600 opacity-[0.08] blur-[120px] -ml-32 -mb-32 pointer-events-none" />
-           
-           <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
-              <div className="flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
-                 <div className="w-24 h-24 rounded-[2.5rem] bg-indigo-600 flex items-center justify-center text-white shadow-[0_20px_50px_rgba(79,70,229,0.5)] transition-all duration-700 hover:rotate-[10deg] hover:scale-110 border-4 border-white/10 group-hover:bg-indigo-500">
-                    <Music size={48} strokeWidth={2.5} className="animate-pulse" />
-                 </div>
-                 <div className="space-y-3">
-                    <div className="flex flex-col">
-                       <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter uppercase italic leading-[0.9] group-hover:text-indigo-50 transition-colors">
-                          Ministerio <br />
-                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400 not-italic">de Alabanza</span>
-                       </h1>
-                    </div>
-                    <div className="flex items-center justify-center md:justify-start gap-4">
-                       <p className="text-[10px] font-black text-indigo-200/40 uppercase tracking-[0.5em] flex items-center gap-3">
-                          <Sparkles size={12} className="text-amber-400" /> Excelencia Musical & Litúrgica
-                       </p>
-                       <div className="h-4 w-px bg-white/10" />
-                       <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                          <span className="text-[10px] font-black text-emerald-400/60 uppercase tracking-widest">Sistema Live</span>
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-6">
-                 {/* Profile Dashboard Card */}
-                 <div className="flex items-center gap-5 px-8 py-4 bg-white/5 backdrop-blur-2xl rounded-[2rem] border border-white/10 shadow-inner group/card hover:bg-white/[0.08] transition-all">
-                    <div className="flex flex-col text-right">
-                       <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] leading-none mb-1">Director en Turno</span>
-                       <span className="text-sm font-black text-white uppercase tracking-tighter italic">{user?.username || "Pastor Admin"}</span>
-                    </div>
-                    <div className="relative">
-                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20 flex items-center justify-center text-indigo-400 border border-indigo-500/30 group-hover/card:scale-110 transition-transform shadow-lg">
-                          <ShieldCheck size={28} />
-                       </div>
-                    </div>
-                 </div>
-
-                 <button 
-                   onClick={handleRefresh}
-                   disabled={loading}
-                   className="group/sync bg-white/5 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-[1.8rem] flex items-center justify-center border border-white/5 transition-all duration-500 active:scale-90 shadow-lg hover:shadow-indigo-600/40"
-                 >
-                    <RefreshCw size={28} className={`${loading ? "animate-spin" : "group-hover/sync:rotate-180"} transition-all duration-700`} />
-                 </button>
-              </div>
-           </div>
-        </header>
+        <PageHero
+          variant="dark"
+          size="large"
+          title="Ministerio"
+          highlight="de Alabanza"
+          stats={[
+            { label: "Excelencia Musical & Litúrgica", variant: "amber", icon: Sparkles },
+            { label: "Sistema Live", variant: "emerald", icon: ShieldCheck },
+          ]}
+          actions={
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="p-4 bg-white/5 hover:bg-indigo-600 text-slate-400 hover:text-white rounded-[1.5rem] border border-white/5 transition-all duration-500 active:scale-90 shadow-lg hover:shadow-indigo-600/40"
+            >
+              <RefreshCw size={24} className={`${loading ? "animate-spin" : "group-hover:rotate-180"} transition-all duration-700`} />
+            </button>
+          }
+        />
 
         {/* ── ALERTS SYSTEM ── */}
         <div className="space-y-4">

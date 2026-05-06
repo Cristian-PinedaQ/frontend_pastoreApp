@@ -13,9 +13,10 @@ import {
 } from 'recharts';
 import { generateFilteredFinancePDF } from '../services/financepdfgenerator';
 import {
-  X, BarChart3, PieChart as PieChartIcon, LayoutList, Download, 
+  BarChart3, PieChart as PieChartIcon, LayoutList, Download,
   Filter, LineChart as LineChartIcon, DollarSign, Activity, CheckCircle, Clock
 } from 'lucide-react';
+import ModalHeader from "../components/ModalHeader";
 
 // ========== CONSTANTES GLOBALES ==========
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -285,20 +286,11 @@ const ModalFinanceStatistics = ({ isOpen, onClose, data, onExportPDF, allFinance
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
-        <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700/50 p-6 z-10 shrink-0 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            Estadísticas Financieras
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        <ModalHeader
+          title="Estadísticas Financieras"
+          icon={BarChart3}
+          onClose={onClose}
+        />
 
         {/* CONTENIDO DESLIZABLE */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 space-y-6">

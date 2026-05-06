@@ -6,9 +6,9 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
 import nameHelper from "../services/nameHelper";
+import ModalHeader from "../components/ModalHeader";
 import { generateStudentsByLevelPDF } from "../services/studentsByLevelPdfGenerator";
 import { 
-  X, 
   ChevronRight, 
   ChevronLeft, 
   Search, 
@@ -263,23 +263,12 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
       
       <div className="relative bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden animate-in zoom-in-95">
         
-        {/* Header */}
-        <div className="px-8 py-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-950/50">
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20`}>
-              <GraduationCap size={24} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
-                {step === 1 ? "Inscripción: Paso 1" : step === 2 ? "Inscripción: Paso 2" : "Inscripción: Paso 3"}
-              </h2>
-              <p className="text-sm text-slate-500 font-medium mt-1">
-                {step === 1 ? "Selecciona el nivel académico" : step === 2 ? "Selecciona los estudiantes" : "Selecciona la cohorte activa"}
-              </p>
-            </div>
-          </div>
-          <button onClick={handleReset} className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition-all"><X size={24} /></button>
-        </div>
+        <ModalHeader
+          icon={GraduationCap}
+          title={step === 1 ? "Inscripción: Paso 1" : step === 2 ? "Inscripción: Paso 2" : "Inscripción: Paso 3"}
+          subtitle={step === 1 ? "Selecciona el nivel académico" : step === 2 ? "Selecciona los estudiantes" : "Selecciona la cohorte activa"}
+          onClose={handleReset}
+        />
 
         {/* Progress Bar */}
         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800">

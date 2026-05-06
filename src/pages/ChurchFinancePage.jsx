@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import apiService from "../apiService";
+import PageHeader from "../components/PageHeader";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -73,47 +74,37 @@ const ChurchFinancePage = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-24 animate-in fade-in slide-in-from-bottom-8 duration-700">
       
-      {/* TREASURY PREMIUM HEADER */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-10 px-4">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-             <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-2xl shadow-indigo-600/30">
-                <Building2 size={22} strokeWidth={2.5} />
-             </div>
-             <div className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em]">Libro Colectivo</div>
-          </div>
-          <h1 className="text-5xl md:text-6xl font-black tracking-tighter text-slate-900 dark:text-white leading-none uppercase">
-            Tesorería <span className="text-indigo-600">Altar</span>
-          </h1>
-          <p className="text-slate-400 text-sm font-bold uppercase tracking-widest flex items-center gap-3">
-            <Lock size={16} className="text-amber-500" /> Auditoría General • {MONTH_NAMES[selectedMonth]} {selectedYear}
-          </p>
-        </div>
+      <PageHeader
+        icon={Building2}
+        title="Tesorería Altar"
+        eyebrow="Libro Colectivo"
+        subtitleVariant="eyebrow"
+      />
 
-        <div className="flex flex-wrap items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl">
-           <div className="flex items-center gap-2 p-1">
-              <select 
-                value={selectedMonth} 
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                className="bg-slate-50 dark:bg-slate-850 px-6 py-4 rounded-3xl font-black text-[10px] uppercase tracking-widest outline-none ring-2 ring-transparent focus:ring-indigo-500/10 transition-all border-none cursor-pointer appearance-none min-w-[140px]"
-              >
-                {MONTH_NAMES.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-              </select>
-              <select 
-                value={selectedYear} 
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                className="bg-slate-50 dark:bg-slate-850 px-6 py-4 rounded-3xl font-black text-[10px] uppercase tracking-widest outline-none ring-2 ring-transparent focus:ring-indigo-500/10 transition-all border-none cursor-pointer appearance-none"
-              >
-                {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-           </div>
-           <button 
-             onClick={loadData} 
-             className="w-14 h-14 flex items-center justify-center bg-indigo-600 text-white rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-600/20"
-           >
-             <RefreshCw size={20} strokeWidth={3} className={loading ? "animate-spin" : ""} />
-           </button>
-        </div>
+      {/* CONTROLES DE PERIODO */}
+      <div className="flex flex-wrap items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl px-4">
+         <div className="flex items-center gap-2 p-1">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              className="bg-slate-50 dark:bg-slate-850 px-6 py-4 rounded-3xl font-black text-[10px] uppercase tracking-widest outline-none ring-2 ring-transparent focus:ring-indigo-500/10 transition-all border-none cursor-pointer appearance-none min-w-[140px]"
+            >
+              {MONTH_NAMES.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="bg-slate-50 dark:bg-slate-850 px-6 py-4 rounded-3xl font-black text-[10px] uppercase tracking-widest outline-none ring-2 ring-transparent focus:ring-indigo-500/10 transition-all border-none cursor-pointer appearance-none"
+            >
+              {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+         </div>
+         <button
+           onClick={loadData}
+           className="w-14 h-14 flex items-center justify-center bg-indigo-600 text-white rounded-3xl hover:scale-110 active:scale-95 transition-all shadow-lg shadow-indigo-600/20"
+         >
+           <RefreshCw size={20} strokeWidth={3} className={loading ? "animate-spin" : ""} />
+         </button>
       </div>
 
       {/* FINANCIAL HEALTH - COCKPIT DESIGN */}

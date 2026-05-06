@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiService from '../apiService';
 import { useAuth } from '../context/AuthContext';
+import PageHero from '../components/PageHero';
 import { 
   Users, 
   Rose, 
@@ -109,29 +110,20 @@ const DashboardHome = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-[3rem] bg-slate-900 p-8 sm:p-12 text-white">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-indigo-500/20 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-96 h-96 bg-violet-600/10 rounded-full blur-[100px]"></div>
-        
-        <div className="relative flex flex-col md:flex-row items-center gap-8">
+      <PageHero
+        variant="dark"
+        size="medium"
+        icon={Sparkles}
+        eyebrow="Nivel de Gestión Élite"
+        title="Bienvenido de nuevo,"
+        highlight={`${user?.username?.split(" ")[0]}! 👋`}
+        description={`Tu ministerio hoy: ${stats.totalMembers} corazones bajo tu cuidado y ${stats.totalLessons} altares encendidos.`}
+        image={
           <div className="w-32 h-32 sm:w-40 sm:h-40 bg-white/5 backdrop-blur-xl rounded-[3rem] p-6 flex items-center justify-center border border-white/10 shadow-2xl">
             <img src={logoDora} alt="PastoreApp Logo" loading="lazy" className="w-full h-full object-contain filter drop-shadow-2xl" />
           </div>
-          <div className="flex-1 text-center md:text-left space-y-4">
-            <div className="flex items-center justify-center md:justify-start gap-2 text-indigo-400 font-black text-[10px] uppercase tracking-[0.3em]">
-              <Sparkles size={14} />
-              Nivel de Gestión Élite
-            </div>
-            <h1 className="text-4xl sm:text-5xl font-black tracking-tighter leading-tight">
-              ¡Bienvenido de nuevo, <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">{user?.username?.split(" ")[0]}</span>! 👋
-            </h1>
-            <p className="text-white/50 text-base font-medium max-w-xl">
-              Tu ministerio hoy: {stats.totalMembers} corazones bajo tu cuidado y {stats.totalLessons} altares encendidos.
-            </p>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {error && (
         <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl flex items-center gap-3 text-rose-600 font-bold animate-shake">

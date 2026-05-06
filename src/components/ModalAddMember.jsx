@@ -17,6 +17,7 @@ import {
   Search,
   UserCheck
 } from 'lucide-react';
+import ModalHeader from "../components/ModalHeader";
 import apiService from "../apiService";
 import nameHelper from "../services/nameHelper";
 
@@ -198,31 +199,19 @@ export const ModalAddMember = ({
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-bl-full -mr-32 -mt-32 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-48 h-48 bg-emerald-500/5 rounded-tr-full -ml-24 -mb-24 pointer-events-none"></div>
 
-        {/* Header con gradiente */}
-        <div className="relative pt-8 pb-6 px-8 md:px-12 border-b border-slate-100 dark:border-slate-800/80 shrink-0">
-          <div className="relative z-10 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4 md:gap-5">
-              <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-2xl md:rounded-[1.5rem] flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                <Users className="w-6 h-6 md:w-8 md:h-8 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl md:text-3xl font-black text-slate-900 dark:text-white leading-tight flex items-center gap-3">
-                  {isEditing ? 'Actualizar Perfil' : 'Registro de Miembro'}
-                  {isEditing && <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-wider">Modo Edición</span>}
-                </h2>
-                <p className="text-slate-500 font-bold uppercase text-[9px] md:text-[10px] tracking-widest mt-1 opacity-70">
-                  {isEditing ? 'Ajuste la información del integrante' : 'Complete los datos para el ingreso a la base pastoral'}
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={onClose}
-              className="p-3 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 rounded-2xl transition-all active:scale-90 group"
-            >
-              <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-            </button>
-          </div>
-        </div>
+        <ModalHeader
+          title={isEditing ? 'Actualizar Perfil' : 'Registro de Miembro'}
+          titleAddon={
+            isEditing && (
+              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                Modo Edición
+              </span>
+            )
+          }
+          subtitle={isEditing ? 'Ajuste la información del integrante' : 'Complete los datos para el ingreso a la base pastoral'}
+          icon={Users}
+          onClose={onClose}
+        />
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">

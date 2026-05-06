@@ -18,6 +18,8 @@ import { generateAttendancePDF } from "../services/attendanceCohortsPdfGenerator
 import { generateCohortAttendanceFullPDF } from "../services/generateCohortAttendanceFullPDF";
 import { generateApprovedStudentsPDF } from "../services/generateApprovedStudentsPDF";
 import AutoEnrollButton from "../components/AutoEnrollButton";
+import PageHeader from "../components/PageHeader";
+import StatsBar, { StatItem } from "../components/StatsBar";
 import {
   BookOpen,
   Users,
@@ -975,29 +977,12 @@ const EnrollmentsPage = () => {
         )}
 
         {/* ── HEADER ── */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
-              <GraduationCap size={28} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                Gestión de <span className="text-indigo-600">Cohortes</span>
-              </h1>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Academia de Obreros</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-6 w-full md:w-auto">
-            <div className="hidden lg:flex items-center gap-6 pr-6 border-r border-slate-100 dark:border-slate-800">
-              <div className="text-center">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Estudiantes</p>
-                <p className="text-2xl font-black text-slate-900 dark:text-white">{stats.totalStudents}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Activas</p>
-                <p className="text-2xl font-black text-emerald-500">{stats.active}</p>
-              </div>
-            </div>
+        <PageHeader
+          icon={GraduationCap}
+          title="Gestión de Cohortes"
+          eyebrow="Academia de Obreros"
+          subtitleVariant="eyebrow"
+          actions={
             <button
               onClick={() => setShowForm(!showForm)}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg"
@@ -1005,7 +990,15 @@ const EnrollmentsPage = () => {
               {showForm ? <X size={16} strokeWidth={3} /> : <Plus size={16} strokeWidth={3} />}
               {showForm ? "Cerrar" : "Nueva Cohorte"}
             </button>
-          </div>
+          }
+        />
+
+        {/* ── STATS BAR ── */}
+        <div className="hidden lg:flex items-center gap-6">
+          <StatsBar>
+            <StatItem label="Estudiantes" value={stats.totalStudents} />
+            <StatItem label="Activas" value={stats.active} color="emerald" />
+          </StatsBar>
         </div>
 
         {/* ── FORMULARIO CREACIÓN ── */}

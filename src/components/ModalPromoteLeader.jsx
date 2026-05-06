@@ -2,6 +2,7 @@
 // ModalPromoteLeader.jsx - ELITE MODERN EDITION
 // ============================================
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import ModalHeader from "../components/ModalHeader";
 import {
   X,
   Search,
@@ -256,20 +257,12 @@ const ModalPromoteLeader = ({ onClose, onSuccess }) => {
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -ml-32 -mb-32 pointer-events-none" />
 
-        <div className="flex justify-between items-center px-6 md:px-10 py-4 md:py-8 border-b border-slate-100 dark:border-slate-800 shrink-0 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-              <Award size={24} className="animate-pulse" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Promoción Ministerial</h2>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 dark:text-blue-400 mt-1">Niveles de Gobierno & Unción</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-2xl transition-all active:scale-90">
-            <X size={24} />
-          </button>
-        </div>
+        <ModalHeader
+          icon={Award}
+          title="Promoción Ministerial"
+          subtitle="Niveles de Gobierno & Unción"
+          onClose={onClose}
+        />
 
         <div className="flex-1 overflow-visible md:overflow-y-auto custom-scrollbar p-6 md:p-10 relative z-10">
           {renderProgress()}

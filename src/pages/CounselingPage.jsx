@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
+import PageHeader from "../components/PageHeader";
 import {
   Users,
   Calendar,
@@ -42,6 +43,7 @@ import {
   Ghost,
   ShieldCheck,
   Edit3,
+  HeartHandshake,
 } from "lucide-react";
 
 // ============================================================
@@ -1716,40 +1718,33 @@ const CounselingPage = () => {
   // ── RENDER ─────────────────────────────────────────────────
   return (
     <div className="max-w-[1500px] mx-auto p-4 md:p-10 space-y-10 animate-fade-in relative">
-      {/* HEADER */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
-        <div className="space-y-3">
-          <h1 className="text-4xl lg:text-6xl font-black tracking-tighter text-slate-900 dark:text-white flex items-center gap-4">
-            <div className="h-12 w-3 bg-indigo-600 rounded-full"></div>
-            Gabinete Pastoral
-          </h1>
-          <p className="text-slate-500 font-black flex items-center gap-3 ml-7 uppercase tracking-[0.2em] text-[10px] dark:text-slate-400">
-            <Users className="w-5 h-5 text-indigo-500" />
-            Atención Espiritual y Consejería Familiar
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={handleManagementPdf}
-            className="flex items-center gap-3 px-8 py-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:border-indigo-500 transition-all active:scale-95 shadow-sm shadow-indigo-500/5 group"
-          >
-            <Download className="w-5 h-5 text-indigo-500 group-hover:scale-125 transition-transform" />
-            Informe Maestro
-          </button>
-          <button
-            onClick={() => {
-              setIsEditing(false);
-              setActiveSession(null);
-              setShowSchedule(true);
-            }}
-            className="flex items-center gap-3 px-10 py-5 bg-indigo-600 text-white rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-all active:scale-95 shadow-2xl shadow-indigo-600/30"
-          >
-            <Plus className="w-6 h-6" />
-            Agendar Consejeria
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        icon={HeartHandshake}
+        title="Gabinete Pastoral"
+        subtitle="Atención Espiritual y Consejería Familiar"
+        actions={
+          <>
+            <button
+              onClick={handleManagementPdf}
+              className="flex items-center gap-3 px-8 py-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:border-indigo-500 transition-all active:scale-95 shadow-sm shadow-indigo-500/5 group"
+            >
+              <Download className="w-5 h-5 text-indigo-500 group-hover:scale-125 transition-transform" />
+              Informe Maestro
+            </button>
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setActiveSession(null);
+                setShowSchedule(true);
+              }}
+              className="flex items-center gap-3 px-10 py-5 bg-indigo-600 text-white rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-all active:scale-95 shadow-2xl shadow-indigo-600/30"
+            >
+              <Plus className="w-6 h-6" />
+              Agendar Consejeria
+            </button>
+          </>
+        }
+      />
 
       {/* STATISTICS CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

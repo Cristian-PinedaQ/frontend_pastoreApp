@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import apiService from "../apiService";
 import {
-  X,
   Zap,
   Calendar,
   Users,
@@ -17,7 +16,7 @@ import {
   ChevronRight,
   RefreshCw,
 } from "lucide-react";
-
+import ModalHeader from "../components/ModalHeader";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const getLevelCode = (level) => {
   if (!level) return null;
@@ -251,34 +250,13 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
         className="bg-white dark:bg-slate-900 w-full sm:max-w-2xl h-full sm:h-auto sm:max-h-[90vh] sm:rounded-[3rem] shadow-[0_40px_100px_-15px_rgba(0,0,0,0.4)] border-x-0 sm:border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* ── HEADER ───────────────────────────────────────────────────── */}
-        <div className="p-6 sm:p-10 pb-4 sm:pb-6 flex justify-between items-center relative shrink-0">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500" />
-          <div className="flex items-center gap-3 sm:gap-5">
-            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/20">
-              {isEditing ? (
-                <Settings className="w-5 h-5 sm:w-7 sm:h-7" />
-              ) : (
-                <Plus className="w-5 h-5 sm:w-7 sm:h-7" />
-              )}
-            </div>
-            <div>
-              <h2 className="text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none">
-                {isEditing ? "Ajustar Actividad" : "Nueva Actividad"}
-              </h2>
-              <p className="text-[8px] sm:text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">
-                Gestión de Agenda Ministerial
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            disabled={loading}
-            className="p-2 sm:p-3 bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 rounded-xl sm:rounded-2xl transition-all hover:rotate-90 disabled:opacity-50"
-          >
-            <X size={20} className="sm:w-6 sm:h-6" />
-          </button>
-        </div>
+        <ModalHeader
+          title={isEditing ? "Ajustar Actividad" : "Nueva Actividad"}
+          subtitle="Gestión de Agenda Ministerial"
+          icon={isEditing ? Settings : Plus}
+          onClose={onClose}
+          closeDisabled={loading}
+        />
 
         {/* ── FORM BODY ────────────────────────────────────────────────── */}
         <form

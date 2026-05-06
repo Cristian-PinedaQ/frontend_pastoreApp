@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import apiService from "../apiService";
+import PageHeader from "../components/PageHeader";
 import { 
   Settings, 
   BookOpen, 
@@ -301,27 +302,21 @@ const LevelsConfigPage = () => {
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0f172a] p-4 md:p-8 pt-20 transition-colors duration-500">
       <div className="max-w-[1600px] mx-auto space-y-8 animate-in">
         
-        {/* ── HEADER CONSOLA ── */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white dark:bg-slate-900/50 backdrop-blur-xl p-8 rounded-[3rem] border border-slate-200 dark:border-white/5 shadow-2xl shadow-slate-200/50 dark:shadow-none">
-          <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-3xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30">
-              <Settings size={32} />
-            </div>
-            <div className="space-y-1">
-              <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase leading-none">
-                Gestión <span className="text-indigo-600">Curricular</span>
-              </h1>
-              <p className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em]">Arquitectura • Niveles • Lecciones</p>
-            </div>
-          </div>
-          <button 
-            onClick={handleOpenCreateLevel}
-            className="group px-8 py-5 bg-slate-900 dark:bg-white text-white dark:text-indigo-900 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:scale-105 active:scale-95 flex items-center gap-3 shadow-xl"
-          >
-            <Plus size={18} strokeWidth={3} className="transition-transform group-hover:rotate-90" />
-            Nuevo Nivel de Formación
-          </button>
-        </div>
+        <PageHeader
+          icon={Settings}
+          title="Gestión Curricular"
+          eyebrow="Arquitectura • Niveles • Lecciones"
+          subtitleVariant="eyebrow"
+          actions={
+            <button
+              onClick={handleOpenCreateLevel}
+              className="group px-8 py-5 bg-slate-900 dark:bg-white text-white dark:text-indigo-900 rounded-[2rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:scale-105 active:scale-95 flex items-center gap-3 shadow-xl"
+            >
+              <Plus size={18} strokeWidth={3} className="transition-transform group-hover:rotate-90" />
+              Nuevo Nivel de Formación
+            </button>
+          }
+        />
 
         {/* ── ALERTS ZONE ── */}
         {(error || success) && (

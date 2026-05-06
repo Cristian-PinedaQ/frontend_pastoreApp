@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  X,
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
@@ -12,6 +11,7 @@ import {
   ShieldCheck,
   UserPlus
 } from "lucide-react";
+import ModalHeader from "../components/ModalHeader";
 import apiService from "../apiService";
 import { logUserAction } from "../utils/securityLogger";
 
@@ -164,30 +164,12 @@ const ModalCreateCell = ({ isOpen, onClose, onCreateSuccess }) => {
         className="w-full max-w-2xl bg-white dark:bg-[#0f172a] sm:rounded-[2.5rem] shadow-2xl flex flex-col h-full sm:h-auto sm:max-h-[95vh] overflow-hidden border border-slate-200 dark:border-white/10 animate-in slide-in-from-bottom-8 duration-500"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* HEADER */}
-        <div className="relative pt-10 pb-8 px-10 bg-white dark:bg-[#0f172a] shrink-0 overflow-hidden">
-          <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative z-10 flex items-center justify-between">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center border border-white/10 shadow-2xl shadow-indigo-500/20">
-                <UserPlus className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight tracking-tighter uppercase">Apertura de Altar</h2>
-                <div className="flex items-center gap-2 mt-1">
-                   <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                   <p className="text-slate-500 dark:text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] opacity-80">Configuración de Grupo Familiar</p>
-                </div>
-              </div>
-            </div>
-            <button
-               onClick={() => step === 3 && createResult ? handleFinalize() : (resetModal(), onClose())}
-               className="p-4 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-rose-500 dark:hover:text-white rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-all active:scale-95"
-            >
-              <X size={20} />
-            </button>
-          </div>
-        </div>
+        <ModalHeader
+          title="Apertura de Altar"
+          subtitle="Configuración de Grupo Familiar"
+          icon={UserPlus}
+          onClose={() => step === 3 && createResult ? handleFinalize() : (resetModal(), onClose())}
+        />
 
         {/* STEP INDICATOR */}
         <div className="px-10 pb-8 bg-white dark:bg-[#0f172a]">

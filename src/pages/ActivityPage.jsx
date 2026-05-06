@@ -5,6 +5,7 @@ import {
 } from "../utils/roleLevelPermissions";
 import { useAuth } from "../context/AuthContext"; // ← ajusta según tu contexto de auth
 import apiService from "../apiService";
+import PageHero from "../components/PageHero";
 import ModalAddActivity from "../components/ModalAddActivity";
 import ModalActivityDetails from "../components/ModalActivityDetails";
 import ModalActivityParticipants from "../components/ModalActivityParticipants";
@@ -333,63 +334,33 @@ const ActivityPage = () => {
 
   return (
     <div className="max-w-[1600px] mx-auto p-3 sm:p-6 md:p-10 space-y-6 md:space-y-10 animate-in fade-in duration-700">
-      {/* ── HEADER ── */}
-      <div className="relative p-6 sm:p-10 md:p-16 bg-white dark:bg-[#0f172a] rounded-3xl sm:rounded-[3rem] md:rounded-[5rem] border border-slate-200 dark:border-white/10 shadow-lg overflow-hidden group">
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 sm:w-96 md:w-[500px] h-64 sm:h-96 md:h-[500px] bg-indigo-500/5 rounded-full blur-[80px] pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col gap-6 sm:gap-8">
-          {/* Title block */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="h-0.5 w-8 bg-indigo-600 rounded-full" />
-              <span className="text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-[0.4em]">
-                Agenda de Conquista
-              </span>
-            </div>
-            <h1
-              className="font-black tracking-[-0.05em] text-slate-950 dark:text-white uppercase leading-[0.9]"
-              style={{ fontSize: "clamp(2rem, 8vw, 6rem)" }}
-            >
-              Agenda <br />
-              <span className="bg-gradient-to-r from-indigo-600 to-indigo-400 bg-clip-text text-transparent italic">
-                Ministerial
-              </span>
-            </h1>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <div className="px-3 py-2 sm:px-5 sm:py-2.5 bg-slate-100 dark:bg-white/5 rounded-xl flex items-center gap-2 border border-white/5">
-                <Zap className="text-indigo-500 w-4 h-4 shrink-0" />
-                <span className="text-[9px] sm:text-[10px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">
-                  {stats.active} Actividades Vigentes
-                </span>
-              </div>
-              <div className="px-3 py-2 sm:px-5 sm:py-2.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center gap-2 border border-emerald-500/20">
-                <Target className="w-4 h-4 shrink-0" />
-                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">
-                  Planificación Estratégica
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Action buttons — full width row on mobile */}
-          <div className="flex flex-row gap-3 sm:gap-4 w-full">
+      <PageHero
+        eyebrow="Agenda de Conquista"
+        title="Agenda"
+        highlight="Ministerial"
+        stats={[
+          { label: `${stats.active} Actividades Vigentes`, variant: "indigo", icon: Zap },
+          { label: "Planificación Estratégica", variant: "emerald", icon: Target },
+        ]}
+        actions={
+          <div className="flex flex-row gap-3 sm:gap-4 w-full lg:w-auto">
             <button
               onClick={handleExportPDF}
-              className="flex-1 py-4 sm:py-5 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white rounded-2xl sm:rounded-3xl font-black text-[9px] sm:text-[10px] uppercase tracking-[0.15em] border-2 border-slate-100 dark:border-white/5 transition-all flex flex-col items-center justify-center gap-1.5 group"
+              className="flex-1 lg:flex-none py-4 sm:py-5 px-6 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-900 dark:text-white rounded-2xl sm:rounded-3xl font-black text-[9px] sm:text-[10px] uppercase tracking-[0.15em] border-2 border-slate-100 dark:border-white/5 transition-all flex flex-col items-center justify-center gap-1.5 group"
             >
               <Download className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-500 group-hover:scale-110 transition-transform" />
               <span>Informe PDF</span>
             </button>
             <button
               onClick={() => setModals({ ...modals, add: true })}
-              className="flex-1 py-4 sm:py-5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl sm:rounded-3xl font-black text-[9px] sm:text-xs uppercase tracking-[0.15em] shadow-2xl shadow-indigo-500/30 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 group"
+              className="flex-1 lg:flex-none py-4 sm:py-5 px-6 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl sm:rounded-3xl font-black text-[9px] sm:text-xs uppercase tracking-[0.15em] shadow-2xl shadow-indigo-500/30 transition-all active:scale-95 flex flex-col items-center justify-center gap-1.5 group"
             >
               <Plus className="w-6 h-6 sm:w-7 sm:h-7 group-hover:scale-125 transition-transform" />
               <span>Nueva Actividad</span>
             </button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* ── KPI DASHBOARD (FILAS) ── */}
       <div className="grid grid-cols-1 gap-4 md:gap-6">

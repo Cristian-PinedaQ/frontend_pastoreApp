@@ -29,6 +29,7 @@ import {
   X,
   Info
 } from "lucide-react";
+import PageHeader from "../components/PageHeader";
 
 const ERROR_MESSAGES = {
   UNAUTHORIZED: "No tienes permisos para acceder a esta página",
@@ -233,28 +234,22 @@ const UsersPage = () => {
   return (
     <div className="max-w-[1400px] mx-auto p-4 md:p-8 animate-fade-in">
       {/* HEADER SECTION */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-12">
-        <div className="space-y-2">
-          <h1 className="text-4xl lg:text-5xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-4">
-            <div className="h-12 w-2 bg-indigo-600 rounded-full"></div>
-            Gestión de Usuarios
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 flex items-center gap-2 font-medium ml-6">
-            <Users className="w-4 h-4 opacity-70" />
-            Administración completa de accesos y roles institucionales
-          </p>
-        </div>
-
-        {!showForm && (
-          <button 
-            onClick={() => setShowForm(true)}
-            className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-700 hover:from-indigo-500 hover:to-violet-600 text-white rounded-[2rem] font-black shadow-xl shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-1 active:scale-95 whitespace-nowrap"
-          >
-            <UserPlus className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-            Nuevo Usuario
-          </button>
-        )}
-      </div>
+      <PageHeader
+        title="Gestión de Usuarios"
+        subtitle="Administración completa de accesos y roles institucionales"
+        icon={Users}
+        actions={
+          !showForm && (
+            <button 
+              onClick={() => setShowForm(true)}
+              className="group flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-violet-700 hover:from-indigo-500 hover:to-violet-600 text-white rounded-[2rem] font-black shadow-xl shadow-indigo-500/20 transition-all duration-300 hover:-translate-y-1 active:scale-95 whitespace-nowrap"
+            >
+              <UserPlus className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+              Nuevo Usuario
+            </button>
+          )
+        }
+      />
 
       {/* FEEDBACK MESSAGES */}
       {error && (

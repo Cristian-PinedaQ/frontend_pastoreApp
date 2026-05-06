@@ -5,6 +5,7 @@ import nameHelper from "../services/nameHelper";
 import ModalPromoteLeader from "../components/ModalPromoteLeader";
 import ModalLeaderStatistics from "../components/ModalLeaderStatistics";
 import ModalLeaderDetail from "../components/ModalLeaderDetail";
+import PageHero from "../components/PageHero";
 import { useAuth } from "../context/AuthContext";
 import { 
   Users,
@@ -297,51 +298,40 @@ const LeadersPage = () => {
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-6 duration-1000 p-4 md:p-8">
       
-      {/* ── TOP HEADER ── */}
-      <div className="bg-white dark:bg-slate-900 p-8 md:p-10 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-2xl shadow-blue-500/5 flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-blue-500/10 to-transparent rounded-bl-full -mr-10 -mt-10 group-hover:scale-110 transition-transform duration-1000 pointer-events-none" />
-        
-        <div className="space-y-4 relative z-10">
-          <div className="flex items-center gap-3 text-blue-600 dark:text-blue-400 font-black text-xs uppercase tracking-[0.4em]">
-            <Crown size={16} className="animate-pulse" /> Gobierno & Visión
-          </div>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-slate-900 dark:text-white leading-tight">
-            Gestión de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Liderazgo</span>
-          </h1>
-          <div className="flex items-center gap-4">
-            <div className="bg-emerald-50 dark:bg-emerald-900/30 px-4 py-2 rounded-2xl flex items-center gap-2 border border-emerald-100 dark:border-emerald-800/50">
-              <Users size={18} className="text-emerald-500" />
-              <span className="text-emerald-700 dark:text-emerald-400 font-bold text-sm tracking-tight">{allLeaders.length} Líderes en Total</span>
-            </div>
-            <div className="hidden sm:flex items-center gap-2 text-slate-400 dark:text-slate-500 text-xs font-bold uppercase tracking-widest">
-              <Zap size={14} className="text-amber-500" /> Sistema de Auditoría Activo
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-4 relative z-10">
-          <button 
-            onClick={handleExportPDF}
-            className="flex items-center gap-3 px-6 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] font-black text-sm hover:bg-slate-100 dark:hover:bg-slate-700 hover:shadow-xl hover:-translate-y-1 transition-all group/btn"
-          >
-            <FileText size={20} className="group-hover/btn:rotate-12 transition-transform" /> Exportar Censo
-          </button>
-          <button 
-            onClick={openStatsModal}
-            className="flex items-center gap-3 px-6 py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-[1.5rem] font-black text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/60 hover:shadow-xl hover:-translate-y-1 transition-all group/btn"
-          >
-            <BarChart3 size={20} className="group-hover/btn:scale-110 transition-transform" /> Analíticas
-          </button>
-          {canManage && (
-            <button 
-              onClick={() => setModals({ ...modals, promote: true })}
-              className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-[1.5rem] font-black text-sm shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-1 active:scale-95 transition-all group/btn"
+      <PageHero
+        icon={Crown}
+        eyebrow="Gobierno & Visión"
+        title="Gestión de"
+        highlight="Liderazgo"
+        stats={[
+          { label: `${allLeaders.length} Líderes en Total`, variant: "emerald", icon: Users },
+          { label: "Sistema de Auditoría Activo", variant: "amber", icon: Zap },
+        ]}
+        actions={
+          <>
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-3 px-6 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-[1.5rem] font-black text-sm hover:bg-slate-100 dark:hover:bg-slate-700 hover:shadow-xl hover:-translate-y-1 transition-all group/btn"
             >
-              <UserPlus size={20} className="group-hover/btn:scale-110 transition-transform" /> Promover Líder
+              <FileText size={20} className="group-hover/btn:rotate-12 transition-transform" /> Exportar Censo
             </button>
-          )}
-        </div>
-      </div>
+            <button
+              onClick={openStatsModal}
+              className="flex items-center gap-3 px-6 py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-[1.5rem] font-black text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/60 hover:shadow-xl hover:-translate-y-1 transition-all group/btn"
+            >
+              <BarChart3 size={20} className="group-hover/btn:scale-110 transition-transform" /> Analíticas
+            </button>
+            {canManage && (
+              <button
+                onClick={() => setModals({ ...modals, promote: true })}
+                className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-[1.5rem] font-black text-sm shadow-2xl shadow-blue-500/30 hover:shadow-blue-500/50 hover:-translate-y-1 active:scale-95 transition-all group/btn"
+              >
+                <UserPlus size={20} className="group-hover/btn:scale-110 transition-transform" /> Promover Líder
+              </button>
+            )}
+          </>
+        }
+      />
 
       {/* ── KPI GRID ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">

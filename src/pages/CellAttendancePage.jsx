@@ -9,6 +9,7 @@ import apiService from "../apiService";
 import { useAuth } from "../context/AuthContext";
 import { logUserAction } from "../utils/securityLogger";
 import nameHelper from "../services/nameHelper";
+import PageHeader from "../components/PageHeader";
 import CellAttendanceStatsModal from "../components/CellAttendanceStatsModal";
 import CellGroupOverviewModal from "../components/CellGroupOverviewModal";
 import CreateAttendanceEventModal from "../components/CreateAttendanceEventModal";
@@ -729,76 +730,68 @@ const CellAttendancePage = () => {
       <Toast toasts={toasts} onDismiss={dismissToast} />
 
       <div className="max-w-[1500px] mx-auto p-4 md:p-6 lg:p-10 space-y-6 md:space-y-8 animate-fade-in relative z-0">
-        {/* ── HEADER ── */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 lg:gap-8">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-900 dark:bg-white/5 backdrop-blur-xl rounded-[1.5rem] md:rounded-[2rem] flex items-center justify-center text-indigo-500 shadow-2xl shadow-indigo-500/10 border border-white/5 shrink-0">
-              <Users className="w-8 h-8 md:w-10 md:h-10" />
-            </div>
-            <div>
-              <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter">
-                Agenda Asistencia
-              </h1>
-              {/* Cell selector */}
-              <div className="relative mt-2 flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm group focus-within:border-indigo-500 transition-colors">
-                <MapPin className="w-4 h-4 text-indigo-500 shrink-0" />
-                <select
-                  value={selectedCellId || ""}
-                  onChange={(e) => {
-                    setSelectedCellId(e.target.value);
-                    setSelectedDate("");
-                  }}
-                  className="bg-transparent border-none text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 outline-none cursor-pointer focus:text-indigo-600 dark:focus:text-indigo-400 transition-colors w-full min-w-[200px] appearance-none"
+        <PageHeader
+          icon={Users}
+          title="Agenda Asistencia"
+          actions={
+            <>
+              {isLeaderShip && (
+                <button
+                  onClick={() => setShowEventModal(true)}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-[1.5rem] font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-xl shadow-indigo-600/20 hover:shadow-indigo-600/40 hover:-translate-y-1 active:scale-95 transition-all group"
                 >
-                  <option value="">-- Selecciona Altar de Vida --</option>
-                  {userCells.map((c) => (
-                    <option
-                      key={c.id}
-                      value={c.id}
-                      className="bg-white dark:bg-slate-900"
-                    >
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 pointer-events-none" />
-              </div>
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full lg:w-auto">
-            {isLeaderShip && (
-              <button
-                onClick={() => setShowEventModal(true)}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-[1.5rem] font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-xl shadow-indigo-600/20 hover:shadow-indigo-600/40 hover:-translate-y-1 active:scale-95 transition-all group"
-              >
-                <Zap className="w-4 h-4 fill-white animate-pulse group-hover:scale-125 transition-transform" />
-                <span className="whitespace-nowrap">Evento Especial</span>
-              </button>
-            )}
-            <button
-              onClick={() => setShowStatsModal(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:-translate-y-1 active:scale-95 transition-all group"
-            >
-              <TrendingUp className="w-4 h-4 text-indigo-500 group-hover:scale-125 transition-transform" />
-              <span className="whitespace-nowrap">
-                {selectedCellId ? "Estadísticas" : "Estadísticas Globales"}
-              </span>
-            </button>
-            <button
-              onClick={handleMonthlyReport}
-              disabled={generating || !selectedCellId}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-gradient-to-br from-slate-800 to-slate-900 dark:from-indigo-900/40 dark:to-slate-800 text-white rounded-[1.5rem] font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-2xl hover:from-black hover:to-slate-800 transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
-            >
-              {generating ? (
-                <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
-              ) : (
-                <Download className="w-4 h-4 text-indigo-400 group-hover:translate-y-0.5 transition-transform" />
+                  <Zap className="w-4 h-4 fill-white animate-pulse group-hover:scale-125 transition-transform" />
+                  <span className="whitespace-nowrap">Evento Especial</span>
+                </button>
               )}
-              <span className="whitespace-nowrap">Reporte Mes</span>
-            </button>
-          </div>
+              <button
+                onClick={() => setShowStatsModal(true)}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:-translate-y-1 active:scale-95 transition-all group"
+              >
+                <TrendingUp className="w-4 h-4 text-indigo-500 group-hover:scale-125 transition-transform" />
+                <span className="whitespace-nowrap">
+                  {selectedCellId ? "Estadísticas" : "Estadísticas Globales"}
+                </span>
+              </button>
+              <button
+                onClick={handleMonthlyReport}
+                disabled={generating || !selectedCellId}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-gradient-to-br from-slate-800 to-slate-900 dark:from-indigo-900/40 dark:to-slate-800 text-white rounded-[1.5rem] font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-2xl hover:from-black hover:to-slate-800 transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+              >
+                {generating ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
+                ) : (
+                  <Download className="w-4 h-4 text-indigo-400 group-hover:translate-y-0.5 transition-transform" />
+                )}
+                <span className="whitespace-nowrap">Reporte Mes</span>
+              </button>
+            </>
+          }
+        />
+
+        {/* CELL SELECTOR */}
+        <div className="relative flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-2xl border border-slate-200 dark:border-white/5 shadow-sm group focus-within:border-indigo-500 transition-colors w-fit">
+          <MapPin className="w-4 h-4 text-indigo-500 shrink-0" />
+          <select
+            value={selectedCellId || ""}
+            onChange={(e) => {
+              setSelectedCellId(e.target.value);
+              setSelectedDate("");
+            }}
+            className="bg-transparent border-none text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300 outline-none cursor-pointer focus:text-indigo-600 dark:focus:text-indigo-400 transition-colors w-full min-w-[200px] appearance-none"
+          >
+            <option value="">-- Selecciona Altar de Vida --</option>
+            {userCells.map((c) => (
+              <option
+                key={c.id}
+                value={c.id}
+                className="bg-white dark:bg-slate-900"
+              >
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 pointer-events-none" />
         </div>
 
         {/* ── DATE SELECTOR ── */}

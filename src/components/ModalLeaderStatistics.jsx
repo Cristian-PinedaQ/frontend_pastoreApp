@@ -2,8 +2,8 @@
 // ModalLeaderStatistics.jsx - ELITE MODERN EDITION
 // ============================================
 import React, { useEffect } from 'react';
+import ModalHeader from "../components/ModalHeader";
 import { 
-  X, 
   BarChart3, 
   Users, 
   CheckCircle2, 
@@ -59,20 +59,12 @@ const ModalLeaderStatistics = ({ onClose, stats }) => {
         <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl -mr-40 -mt-40 pointer-events-none" />
         <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -ml-40 -mb-40 pointer-events-none" />
 
-        <div className="px-8 md:px-10 py-6 md:py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 shrink-0 relative z-10">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-lg border border-indigo-100 dark:border-indigo-800/50">
-              <BarChart3 size={24} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">Analíticas de Gobierno</h2>
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 dark:text-blue-400 mt-1">Visión & Estrategia Ministerial</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-3 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 rounded-2xl transition-all active:scale-90">
-            <X size={24} />
-          </button>
-        </div>
+        <ModalHeader
+          icon={BarChart3}
+          title="Analíticas de Gobierno"
+          subtitle="Visión & Estrategia Ministerial"
+          onClose={onClose}
+        />
 
         <div className="p-8 md:p-10 overflow-y-auto flex-1 custom-scrollbar space-y-10 relative z-10">
           

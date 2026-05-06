@@ -36,6 +36,7 @@ import {
   Edit3,
   Trash2,
 } from "lucide-react";
+import PageHeader from "../components/PageHeader";
 
 // ✅ CONSTANTES
 const INCOME_CONCEPTS = [
@@ -476,41 +477,36 @@ const FinancesPage = () => {
   return (
     <div className="max-w-[1500px] mx-auto p-4 md:p-6 lg:p-10 space-y-6 md:space-y-10 animate-fade-in relative z-0">
       {/* HEADER SECTION */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tighter text-slate-900 dark:text-white flex items-center gap-3 md:gap-4">
-            <div className="h-8 md:h-10 w-2.5 bg-indigo-600 rounded-full"></div>
-            Gestión Financiera
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 flex items-center gap-2 font-bold ml-6 uppercase tracking-widest text-[10px] md:text-xs">
-            <CircleDollarSign className="w-4 h-4 text-emerald-500" />
-            Transacciones e Ingresos
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3 w-full lg:w-auto">
-          <button
-            onClick={() => {
-              setEditingFinance(null);
-              setShowAddModal(true);
-            }}
-            className="flex-1 lg:flex-none justify-center flex items-center gap-2 px-6 lg:px-8 py-3.5 lg:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] lg:rounded-[2rem] font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95 text-xs lg:text-sm whitespace-nowrap"
-          >
-            <Plus className="w-5 h-5 lg:w-6 lg:h-6" />
-            Nuevo Registro
-          </button>
-          <button
-            onClick={() => {
-              setStatisticsData(calculateDetailedStats());
-              setShowStatisticsModal(true);
-            }}
-            className="flex-1 lg:flex-none justify-center flex items-center gap-2 px-5 lg:px-6 py-3.5 lg:py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-[1.5rem] lg:rounded-[2rem] font-bold hover:border-indigo-500 dark:hover:border-indigo-500 transition-all active:scale-95 shadow-sm text-xs lg:text-sm whitespace-nowrap"
-          >
-            <BarChart3 className="w-4 h-4 lg:w-5 lg:h-5 text-indigo-500" />
-            Estadísticas
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Gestión Financiera"
+        subtitle="Transacciones e Ingresos"
+        subtitleVariant="eyebrow"
+        icon={CircleDollarSign}
+        actions={
+          <>
+            <button
+              onClick={() => {
+                setEditingFinance(null);
+                setShowAddModal(true);
+              }}
+              className="flex items-center gap-2 px-6 lg:px-8 py-3.5 lg:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] lg:rounded-[2rem] font-bold shadow-lg shadow-indigo-500/20 transition-all active:scale-95 text-xs lg:text-sm whitespace-nowrap"
+            >
+              <Plus className="w-5 h-5 lg:w-6 lg:h-6" />
+              Nuevo Registro
+            </button>
+            <button
+              onClick={() => {
+                setStatisticsData(calculateDetailedStats());
+                setShowStatisticsModal(true);
+              }}
+              className="flex items-center gap-2 px-5 lg:px-6 py-3.5 lg:py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-[1.5rem] lg:rounded-[2rem] font-bold hover:border-indigo-500 dark:hover:border-indigo-500 transition-all active:scale-95 shadow-sm text-xs lg:text-sm whitespace-nowrap"
+            >
+              <BarChart3 className="w-4 h-4 lg:w-5 lg:h-5 text-indigo-500" />
+              Estadísticas
+            </button>
+          </>
+        }
+      />
 
       {/* STATS OVERVIEW */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">

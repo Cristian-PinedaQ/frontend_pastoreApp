@@ -8,8 +8,9 @@
 // ============================================
 
 import React, { useState, useEffect, useMemo } from 'react';
+import ModalHeader from "../components/ModalHeader";
 import {
-  X, BarChart2, Users, Home, Sprout, Settings,
+  BarChart2, Users, Home, Sprout, Settings,
   TrendingUp, Activity, AlertTriangle, PauseCircle,
   StopCircle, CheckCircle2, Calendar, MapPin, Trophy,
   Info, Zap,
@@ -186,25 +187,12 @@ const ModalCellStatistics = ({ isOpen, onClose, data, isDarkMode }) => {
         style={{ animation: 'slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}
         onClick={e => e.stopPropagation()}
       >
-        {/* HEADER */}
-        <div className="relative shrink-0 flex items-center justify-between px-5 sm:px-8 py-5 sm:py-6 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-white/6">
-          <div className="absolute -top-10 -right-10 w-48 h-48 bg-indigo-500/6 rounded-full blur-3xl pointer-events-none" />
-          <div className="flex items-center gap-3 sm:gap-4 relative z-10">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 flex-shrink-0">
-              <BarChart2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight leading-none uppercase">Visiometría de Células</h2>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] text-slate-400 dark:text-indigo-400">Dashboard CBI</p>
-              </div>
-            </div>
-          </div>
-          <button onClick={onClose} className="relative z-10 p-2.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-400 hover:text-red-500 border border-transparent hover:border-red-100 dark:hover:border-red-500/20 transition-all active:scale-90">
-            <X size={18} />
-          </button>
-        </div>
+        <ModalHeader
+          icon={BarChart2}
+          title="Visiometría de Células"
+          subtitle="Dashboard CBI"
+          onClose={onClose}
+        />
 
         {/* TABS */}
         <div className="shrink-0 bg-slate-50 dark:bg-black/20 border-b border-slate-100 dark:border-white/5 overflow-x-auto no-scrollbar">

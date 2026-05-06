@@ -10,6 +10,7 @@ import ModalStatistics from '../components/ModalStatistics';
 import { generatePDF } from '../services/Pdfgenerator';
 import { logUserAction } from '../utils/securityLogger';
 import nameHelper from '../services/nameHelper';
+import PageHeader from '../components/PageHeader';
 import { 
   Users,
   Calendar, 
@@ -344,33 +345,28 @@ const StudentsPage = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 transition-colors duration-300">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-              <Users className="text-indigo-600" size={40} />
-              Gestión de Estudiantes
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 font-medium">
-              Control académico, niveles de formación y cohortes activas
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button 
-              onClick={() => setShowEnrollModal(true)}
-              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/25 active:scale-95"
-            >
-              <UserPlus size={20} />
-              Nueva Inscripción
-            </button>
-            <button 
-              onClick={loadStudents}
-              className={`p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all ${loading ? 'animate-spin' : ''}`}
-            >
-              <RefreshCw size={20} />
-            </button>
-          </div>
-        </header>
+        <PageHeader
+          icon={Users}
+          title="Gestión de Estudiantes"
+          subtitle="Control académico, niveles de formación y cohortes activas"
+          actions={
+            <>
+              <button
+                onClick={() => setShowEnrollModal(true)}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/25 active:scale-95"
+              >
+                <UserPlus size={20} />
+                Nueva Inscripción
+              </button>
+              <button
+                onClick={loadStudents}
+                className={`p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all ${loading ? 'animate-spin' : ''}`}
+              >
+                <RefreshCw size={20} />
+              </button>
+            </>
+          }
+        />
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

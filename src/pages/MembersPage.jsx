@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiService from "../apiService";
 import nameHelper from "../services/nameHelper";
+import PageHero from "../components/PageHero";
 import { 
   Search, 
   Filter, 
@@ -135,56 +136,37 @@ const MembersPage = () => {
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-10 lg:p-14 space-y-12 animate-in fade-in duration-700">
       
-      {/* ─────────────────────────────────────────────
-          HERO HEADER
-      ───────────────────────────────────────────── */}
-      <div className="relative p-6 sm:p-10 md:p-16 lg:p-20 bg-white dark:bg-[#0f172a] rounded-[2.5rem] md:rounded-[4.5rem] border border-slate-200 dark:border-white/10 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.08)] overflow-hidden group">
-         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none group-hover:bg-indigo-500/10 transition-all duration-1000" />
-         
-         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 md:gap-12 relative z-10">
-            <div className="space-y-6 md:space-y-8 max-w-2xl">
-               <div className="flex items-center gap-4">
-                  <div className="h-0.5 w-8 md:w-12 bg-indigo-600 rounded-full" />
-                  <span className="text-indigo-600 dark:text-indigo-400 font-black text-[10px] md:text-xs uppercase tracking-[0.4em]">Altar Ministerial</span>
-               </div>
-               <h1 className="text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-black tracking-[-0.05em] text-slate-950 dark:text-white leading-[0.9] md:leading-[0.85]">
-                  Membresía <br />
-                  <span className="bg-gradient-to-r from-indigo-600 to-indigo-400 bg-clip-text text-transparent">General</span>
-               </h1>
-               <div className="flex flex-wrap items-center gap-3 md:gap-4">
-                  <div className="px-4 md:px-6 py-2 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center gap-3 border border-white/5 backdrop-blur-md">
-                     <Users className="text-indigo-500" size={16} />
-                     <span className="text-[10px] md:text-[11px] font-black text-slate-500 dark:text-slate-300 uppercase tracking-widest">{stats.total} Integrantes en Red</span>
-                  </div>
-                  <div className="px-4 md:px-6 py-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center gap-3 border border-emerald-500/20">
-                     <ShieldCheck size={16} />
-                     <span className="text-[10px] md:text-[11px] font-black uppercase tracking-widest">Verificación Global</span>
-                  </div>
-               </div>
-            </div>
+      <PageHero
+        size="medium"
+        eyebrow="Altar Ministerial"
+        title="Membresía"
+        highlight="General"
+        stats={[
+          { label: `${stats.total} Integrantes en Red`, variant: "indigo", icon: Users },
+          { label: "Verificación Global", variant: "emerald", icon: ShieldCheck },
+        ]}
+        actions={
+          <button
+            onClick={() => { setMemberToEdit(null); setIsAddMemberModalOpen(true); }}
+            className="flex items-center gap-3 px-6 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[1.5rem] font-black text-sm shadow-2xl shadow-indigo-500/30 transition-all hover:-translate-y-1 active:scale-95 group"
+          >
+            <UserPlus size={20} className="group-hover:rotate-12 transition-transform" />
+            Nuevo Registro
+          </button>
+        }
+      />
 
-            <div className="flex flex-col gap-4 md:gap-6 w-full xl:w-[380px] shrink-0">
-               <div className="w-full flex items-center justify-around gap-8 md:gap-12 px-6 md:px-10 py-6 md:py-8 bg-slate-50 dark:bg-black/20 rounded-[2rem] md:rounded-[2.5rem] border-2 border-slate-100 dark:border-white/5 shadow-inner">
-                  <div className="text-center">
-                     <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1 md:mb-2">Hombres</p>
-                     <p className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.men}</p>
-                  </div>
-                  <div className="w-px h-10 md:h-12 bg-slate-200 dark:bg-white/10" />
-                  <div className="text-center">
-                     <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1 md:mb-2 text-rose-500/70">Mujeres</p>
-                     <p className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.women}</p>
-                  </div>
-               </div>
-               
-               <button 
-                  onClick={() => { setMemberToEdit(null); setIsAddMemberModalOpen(true); }}
-                  className="w-full px-8 md:px-12 py-6 md:py-8 bg-indigo-600 hover:bg-indigo-500 text-white rounded-[2rem] md:rounded-[2.5rem] font-black text-xs md:text-sm uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/30 transition-all hover:-translate-y-2 active:scale-95 flex items-center justify-center gap-4 group"
-               >
-                  <UserPlus className="w-6 h-6 md:w-8 md:h-8 group-hover:rotate-12 transition-transform" />
-                  <span>Nuevo Registro</span>
-               </button>
-            </div>
-         </div>
+      {/* Gender Stats Bar */}
+      <div className="flex items-center justify-around gap-6 md:gap-10 px-4 md:px-6 py-3 md:py-4 bg-white dark:bg-slate-900 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="text-center">
+          <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-0.5">Hombres</p>
+          <p className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.men}</p>
+        </div>
+        <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
+        <div className="text-center">
+          <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-0.5 text-rose-500/70">Mujeres</p>
+          <p className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-none tracking-tighter">{stats.women}</p>
+        </div>
       </div>
 
       {/* ─────────────────────────────────────────────

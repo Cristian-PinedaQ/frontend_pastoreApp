@@ -6,17 +6,35 @@ import React, { useState, useMemo } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useConfirmation } from "./context/ConfirmationContext";
-import { 
-  Users, HeartHandshake, GraduationCap, 
-  UserStar, Church, CheckSquare, Music, Rocket, 
-  Calendar, Landmark, ChartPie, SlidersHorizontal, UserCircle, LogOut, Menu, X, Flame, MessageCircleQuestionMark, NotebookPen,
-  Sun, Moon
-} from 'lucide-react';
+import {
+  Users,
+  HeartHandshake,
+  GraduationCap,
+  UserStar,
+  Church,
+  CheckSquare,
+  Music,
+  Rocket,
+  Calendar,
+  Landmark,
+  ChartPie,
+  SlidersHorizontal,
+  UserCircle,
+  LogOut,
+  Menu,
+  X,
+  Flame,
+  MessageCircleQuestionMark,
+  NotebookPen,
+  Sun,
+  Moon,
+  CirclePile,
+} from "lucide-react";
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
 import { useTheme } from "./hooks/useTheme";
-import logoBlanco from './assets/Pastoreapp_blanco.png';
-import logoNegro from './assets/Pastoreappnegro.png';
+import logoBlanco from "./assets/Pastoreapp_blanco.png";
+import logoNegro from "./assets/Pastoreappnegro.png";
 
 const SCROLLBAR_STYLES = `
   .custom-scrollbar::-webkit-scrollbar {
@@ -52,7 +70,8 @@ const DashboardLayoutComponent = () => {
   const handleLogout = async () => {
     const isConfirmed = await confirm({
       title: "¿Cerrar Sesión?",
-      message: "¿Estás seguro de que deseas salir del sistema? Deberás autenticarte nuevamente para acceder.",
+      message:
+        "¿Estás seguro de que deseas salir del sistema? Deberás autenticarte nuevamente para acceder.",
       type: "info",
       confirmLabel: "Finalizar Sesión",
     });
@@ -70,24 +89,147 @@ const DashboardLayoutComponent = () => {
     }
   };
 
-  const menuItems = useMemo(() => [
-    { label: "Inicio",           path: "/dashboard",                  icon: Church,                    visible: true },
-    { label: "Membresía",        path: "/dashboard/members",           icon: Users,                     visible: true },
-    { label: "Consejería",       path: "/dashboard/Counseling",        icon: HeartHandshake,            visible: hasAnyRole(["ROLE_PASTORES"]) },
-    { label: "Formaciones",      path: "/dashboard/enrollments",       icon: NotebookPen,               visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_PROFESORES"]) },
-    { label: "Estudiantes",      path: "/dashboard/students",          icon: GraduationCap,             visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
-    { label: "Servidores",       path: "/dashboard/leadership",        icon: UserStar,                  visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_DESPLIEGUE"]) },
-    { label: "Altares de Vida",  path: "/dashboard/cellgroups",        icon: Flame,                     visible: hasAnyRole(["ROLE_PASTORES", "ROLE_CONEXION", "ROLE_DESPLIEGUE"]) },
-    { label: "Asistencias",      path: "/dashboard/cellgroups-atendance", icon: CheckSquare,            visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]) },
-    { label: "Alabanza",         path: "/dashboard/worshipPage",       icon: Music,                     visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]) },
-    { label: "Ministerios",      path: "/dashboard/ministeriesPage",   icon: Rocket,                    visible: hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE", "ROLE_PROTOCOLO", "ROLE_MINISTERIOS"]) },
-    { label: "Actividades",      path: "/dashboard/activity",          icon: Calendar,                  visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA"]) },
-    { label: "Finanzas",         path: "/dashboard/finances",          icon: Landmark,                  visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]) },
-    { label: "Contabilidad",     path: "/dashboard/financesChurch",    icon: ChartPie,                  visible: hasAnyRole(["ROLE_PASTORES"]) },
-    { label: "Configuración",    path: "/dashboard/LevelsConfig",      icon: SlidersHorizontal,         visible: hasRole("ROLE_PASTORES") },
-    { label: "Manual Raiz Viva", path: "/dashboard/ManualRaizViva",    icon: MessageCircleQuestionMark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_LIDER"]) },
-    { label: "Usuarios",         path: "/dashboard/users",             icon: UserCircle,                visible: hasRole("ROLE_PASTORES") },
-  ], [hasRole, hasAnyRole]);
+  const menuItems = useMemo(
+    () => [
+      { label: "Inicio", path: "/dashboard", icon: Church, visible: true },
+      {
+        label: "Membresía",
+        path: "/dashboard/members",
+        icon: Users,
+        visible: true,
+      },
+      {
+        label: "Consejería",
+        path: "/dashboard/Counseling",
+        icon: HeartHandshake,
+        visible: hasAnyRole(["ROLE_PASTORES"]),
+      },
+      {
+        label: "Formaciones",
+        path: "/dashboard/enrollments",
+        icon: NotebookPen,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_CONEXION",
+          "ROLE_CIMIENTO",
+          "ROLE_ESENCIA",
+          "ROLE_PROFESORES",
+        ]),
+      },
+      {
+        label: "Estudiantes",
+        path: "/dashboard/students",
+        icon: GraduationCap,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_CONEXION",
+          "ROLE_CIMIENTO",
+          "ROLE_ESENCIA",
+        ]),
+      },
+      {
+        label: "Segumiento",
+        path: "/dashboard/g12",
+        icon: CirclePile,
+        visible: hasRole("ROLE_PASTORES"),
+      },
+      {
+        label: "Servidores",
+        path: "/dashboard/leadership",
+        icon: UserStar,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_CONEXION",
+          "ROLE_CIMIENTO",
+          "ROLE_ESENCIA",
+          "ROLE_DESPLIEGUE",
+        ]),
+      },
+      {
+        label: "Altares de Vida",
+        path: "/dashboard/cellgroups",
+        icon: Flame,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_CONEXION",
+          "ROLE_DESPLIEGUE",
+        ]),
+      },
+      {
+        label: "Asistencias",
+        path: "/dashboard/cellgroups-atendance",
+        icon: CheckSquare,
+        visible: hasAnyRole(["ROLE_PASTORES", "ROLE_LIDER", "ROLE_CONEXION"]),
+      },
+      {
+        label: "Alabanza",
+        path: "/dashboard/worshipPage",
+        icon: Music,
+        visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ALABANZA"]),
+      },
+      {
+        label: "Ministerios",
+        path: "/dashboard/ministeriesPage",
+        icon: Rocket,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_DESPLIEGUE",
+          "ROLE_PROTOCOLO",
+          "ROLE_MINISTERIOS",
+        ]),
+      },
+      {
+        label: "Actividades",
+        path: "/dashboard/activity",
+        icon: Calendar,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_ECONOMICO",
+          "ROLE_CONEXION",
+          "ROLE_CIMIENTO",
+          "ROLE_ESENCIA",
+        ]),
+      },
+      {
+        label: "Finanzas",
+        path: "/dashboard/finances",
+        icon: Landmark,
+        visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO"]),
+      },
+      {
+        label: "Contabilidad",
+        path: "/dashboard/financesChurch",
+        icon: ChartPie,
+        visible: hasAnyRole(["ROLE_PASTORES"]),
+      },
+      {
+        label: "Configuración",
+        path: "/dashboard/LevelsConfig",
+        icon: SlidersHorizontal,
+        visible: hasRole("ROLE_PASTORES"),
+      },
+      {
+        label: "Manual Raiz Viva",
+        path: "/dashboard/ManualRaizViva",
+        icon: MessageCircleQuestionMark,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_ECONOMICO",
+          "ROLE_CONEXION",
+          "ROLE_CIMIENTO",
+          "ROLE_ESENCIA",
+          "ROLE_LIDER",
+        ]),
+      },
+      {
+        label: "Usuarios",
+        path: "/dashboard/users",
+        icon: UserCircle,
+        visible: hasRole("ROLE_PASTORES"),
+      },
+    ],
+    [hasRole, hasAnyRole],
+  );
 
   const filteredMenu = menuItems.filter((item) => item.visible);
 
@@ -104,13 +246,15 @@ const DashboardLayoutComponent = () => {
       )}
 
       {/* SIDEBAR */}
-      <aside className={`
+      <aside
+        className={`
         fixed inset-y-0 left-0 z-[70] w-72 bg-white dark:bg-slate-900
         border-r border-slate-200 dark:border-white/5
         flex flex-col transform transition-all duration-300 ease-in-out
         lg:sticky lg:top-0 lg:h-screen lg:translate-x-0
-        ${sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
-      `}>
+        ${sidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"}
+      `}
+      >
         {/* MOBILE CLOSE BUTTON */}
         <button
           className="lg:hidden absolute top-5 right-4 w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 transition-transform active:scale-95"
@@ -124,13 +268,23 @@ const DashboardLayoutComponent = () => {
           <div className="flex items-center gap-1">
             <div className="relative w-14 h-14 flex items-center justify-center overflow-hidden shrink-0">
               <picture>
-                  <source srcSet={logoNegro} type="image/png" />
-                  <img src={logoNegro} alt="PastoreApp Logo" loading="lazy" className="block dark:hidden w-full h-full object-contain" />
-                </picture>
-                <picture>
-                  <source srcSet={logoBlanco} type="image/png" />
-                  <img src={logoBlanco} alt="PastoreApp Logo" loading="lazy" className="hidden dark:block w-full h-full object-contain" />
-                </picture>
+                <source srcSet={logoNegro} type="image/png" />
+                <img
+                  src={logoNegro}
+                  alt="PastoreApp Logo"
+                  loading="lazy"
+                  className="block dark:hidden w-full h-full object-contain"
+                />
+              </picture>
+              <picture>
+                <source srcSet={logoBlanco} type="image/png" />
+                <img
+                  src={logoBlanco}
+                  alt="PastoreApp Logo"
+                  loading="lazy"
+                  className="hidden dark:block w-full h-full object-contain"
+                />
+              </picture>
             </div>
             <h2 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tighter leading-tight">
               PastoreApp
@@ -149,13 +303,17 @@ const DashboardLayoutComponent = () => {
                 onClick={() => handleNavClick(item.path)}
                 className={`
                   w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all duration-200 group
-                  ${isActive
-                    ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400'}
+                  ${
+                    isActive
+                      ? "bg-indigo-600 text-white shadow-xl shadow-indigo-600/20"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400"
+                  }
                 `}
               >
                 <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                <span className={`text-sm font-bold tracking-tight ${isActive ? 'text-white' : ''}`}>
+                <span
+                  className={`text-sm font-bold tracking-tight ${isActive ? "text-white" : ""}`}
+                >
                   {item.label}
                 </span>
                 {isActive && (
@@ -171,10 +329,12 @@ const DashboardLayoutComponent = () => {
           <div className="bg-slate-50 dark:bg-slate-800/50 rounded-[2rem] p-4 space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold uppercase">
-                {user?.name?.charAt(0) || 'U'}
+                {user?.name?.charAt(0) || "U"}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-black text-slate-900 dark:text-white truncate">{user?.name}</p>
+                <p className="text-sm font-black text-slate-900 dark:text-white truncate">
+                  {user?.name}
+                </p>
                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase truncate">
                   {user?.roles?.map((r) => r.name || r).join(" • ")}
                 </p>
@@ -193,11 +353,15 @@ const DashboardLayoutComponent = () => {
 
       {/* MAIN CONTENT AREA — sin overflow propio, cada página maneja su scroll */}
       <main className="flex-1 flex flex-col min-w-0">
-
         {/* TOPBAR — CSS Grid: columna izquierda flexible, derecha fija */}
         <header
           className="h-20 px-4 lg:px-10 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-slate-100 dark:border-white/5 sticky top-0 z-50 transition-all"
-          style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: "1rem" }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            alignItems: "center",
+            gap: "1rem",
+          }}
         >
           {/* LEFT — se trunca si no hay espacio, nunca empuja la derecha */}
           <div className="flex items-center gap-2 lg:gap-4 min-w-0 overflow-hidden">
@@ -223,19 +387,27 @@ const DashboardLayoutComponent = () => {
               <div className="relative w-5 h-5">
                 <Sun
                   className={`absolute inset-0 w-5 h-5 text-amber-500 transition-all duration-300 ${
-                    isDark ? 'scale-0 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'
+                    isDark
+                      ? "scale-0 rotate-90 opacity-0"
+                      : "scale-100 rotate-0 opacity-100"
                   }`}
                 />
                 <Moon
                   className={`absolute inset-0 w-5 h-5 text-indigo-400 transition-all duration-300 ${
-                    isDark ? 'scale-100 rotate-0 opacity-100' : 'scale-0 -rotate-90 opacity-0'
+                    isDark
+                      ? "scale-100 rotate-0 opacity-100"
+                      : "scale-0 -rotate-90 opacity-0"
                   }`}
                 />
               </div>
             </button>
             <div className="hidden md:flex flex-col items-end">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Sesión activa</span>
-              <span className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[120px]">{user?.username}</span>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                Sesión activa
+              </span>
+              <span className="text-xs font-black text-slate-900 dark:text-white truncate max-w-[120px]">
+                {user?.username}
+              </span>
             </div>
             <NotificationBell username={user?.username} pollInterval={30000} />
           </div>

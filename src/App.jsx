@@ -31,6 +31,7 @@ const ManualRaizViva    = React.lazy(() => import('./pages/ManualRaizViva.jsx'))
 const LevelsConfigPage  = React.lazy(() => import('./pages/LevelsConfigPage.jsx'));
 const WorshipPage       = React.lazy(() => import('./pages/WorshipPage.jsx'));
 const MinisteriesPage   = React.lazy(() => import('./pages/MinisteriesPage.jsx'));
+const G12DashboardPage  = React.lazy(() => import('./pages/G12DashboardPage'));
 
 function App() {
   return (
@@ -182,6 +183,15 @@ function App() {
                     <ProtectedRoute
                       element={<ManualRaizViva />}
                       requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_LIDER']}
+                    />
+                  </Suspense>
+                } />
+
+                <Route path="g12" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<G12DashboardPage />}
+                      requiredRoles={['ROLE_PASTORES']}
                     />
                   </Suspense>
                 } />
