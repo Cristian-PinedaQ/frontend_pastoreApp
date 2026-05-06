@@ -5,8 +5,9 @@
 // ✅ FIX CONCURRENCIA: Protección contra doble submit con useRef
 // ✅ Integrado con nameHelper
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useConfirmation } from "../context/ConfirmationContext";
+import { useMembers } from "../hooks/useMembers";
 import {
   CheckCircle2,
   AlertCircle,
@@ -19,7 +20,6 @@ import {
   Info,
   Gift,
 } from "lucide-react";
-import apiService from "../apiService";
 import ModalHeader from "../components/ModalHeader";
 import { transformForDisplay } from "../services/nameHelper";
 
@@ -31,6 +31,7 @@ const ModalAddFinance = ({
   isEditing,
 }) => {
   const confirm = useConfirmation();
+  const { data: membersData, isLoading: loadingMembers } = useMembers();
   const [formData, setFormData] = useState({
     memberId: "",
     memberName: "",
@@ -42,13 +43,17 @@ const ModalAddFinance = ({
     isVerified: true,
   });
 
-  const [members, setMembers] = useState([]);
+  const members = useMemo(() => {
+    return Array.isArray(membersData)
+      ? membersData.map((member) => transformForDisplay(member, ["name"]))
+      : [];
+  }, [membersData]);
+
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [showMemberList, setShowMemberList] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [loadingMembers, setLoadingMembers] = useState(false);
   const [recordedBy, setRecordedBy] = useState("");
 
   const submitting = useRef(false);
@@ -98,7 +103,6 @@ const ModalAddFinance = ({
   useEffect(() => {
     if (isOpen) {
       submitting.current = false;
-      loadMembers();
       
       const user = getRecordedBy();
       setRecordedBy(user);
@@ -146,22 +150,6 @@ const ModalAddFinance = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isEditing, initialData]);
-
-  const loadMembers = async () => {
-    try {
-      setLoadingMembers(true);
-      const data = await apiService.getAllMembers();
-      const transformedMembers = Array.isArray(data)
-        ? data.map((member) => transformForDisplay(member, ["name"]))
-        : [];
-      setMembers(transformedMembers);
-    } catch (error) {
-      console.error("Error cargando miembros:", error.message);
-      setMembers([]);
-    } finally {
-      setLoadingMembers(false);
-    }
-  };
 
   const handleMemberSearch = (value) => {
     setSearchTerm(value);

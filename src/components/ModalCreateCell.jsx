@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ChevronRight,
   ChevronLeft,
@@ -12,6 +12,7 @@ import {
   UserPlus
 } from "lucide-react";
 import ModalHeader from "../components/ModalHeader";
+import { useLeaders } from "../hooks/useLeaders";
 import apiService from "../apiService";
 import { logUserAction } from "../utils/securityLogger";
 
@@ -26,8 +27,28 @@ const DISTRICTS = [
 const ModalCreateCell = ({ isOpen, onClose, onCreateSuccess }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [leaders, setLeaders] = useState([]);
-  const [loadingLeaders, setLoadingLeaders] = useState(false);
+  const { data: leadersData, isLoading: loadingLeaders } = useLeaders();
+
+  const leaders = useMemo(() => {
+    if (!Array.isArray(leadersData)) return [];
+    const leadersList = leadersData.map((leader) => ({
+      id: leader.id,
+      name: leader.memberName || `ID: ${leader.id}`,
+      type: leader.leaderType,
+      typeDisplay: leader.leaderTypeDisplay,
+      isLeader12: leader.leaderType === "LEADER_12",
+      isLeader144: leader.leaderType === "LEADER_144",
+      isServant: leader.leaderType === "SERVANT",
+    }));
+
+    leadersList.sort((a, b) => {
+      if (a.isLeader12 && !b.isLeader12) return -1;
+      if (!a.isLeader12 && b.isLeader12) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return leadersList;
+  }, [leadersData]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -51,38 +72,9 @@ const ModalCreateCell = ({ isOpen, onClose, onCreateSuccess }) => {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      if (step === 2 && leaders.length === 0) loadLeaders();
     }
     return () => { document.body.style.overflow = ''; };
-  }, [isOpen, step, leaders.length]);
-
-  const loadLeaders = async () => {
-    setLoadingLeaders(true);
-    try {
-      const activeLeaders = await apiService.getActiveLeaders();
-      const leadersList = activeLeaders.map((leader) => ({
-        id: leader.id,
-        name: leader.memberName || `ID: ${leader.id}`,
-        type: leader.leaderType,
-        typeDisplay: leader.leaderTypeDisplay,
-        isLeader12: leader.leaderType === "LEADER_12",
-        isLeader144: leader.leaderType === "LEADER_144",
-        isServant: leader.leaderType === "SERVANT",
-      }));
-
-      leadersList.sort((a, b) => {
-        if (a.isLeader12 && !b.isLeader12) return -1;
-        if (!a.isLeader12 && b.isLeader12) return 1;
-        return a.name.localeCompare(b.name);
-      });
-
-      setLeaders(leadersList);
-    } catch (err) {
-      setError("Error al sincronizar liderazgo ministerial");
-    } finally {
-      setLoadingLeaders(false);
-    }
-  };
+  }, [isOpen]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

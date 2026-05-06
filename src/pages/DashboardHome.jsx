@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import apiService from '../apiService';
 import { useAuth } from '../context/AuthContext';
+import { useMembers } from '../hooks/useMembers';
+import { useLeaders } from '../hooks/useLeaders';
 import PageHero from '../components/PageHero';
 import { 
   Users, 
@@ -66,47 +68,48 @@ const QuickAction = ({ href, title, description, icon: Icon, variant }) => {
 
 const DashboardHome = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState({
-    totalMembers: 0,
-    totalMembersFemale: 0,
-    totalMembersMale: 0,
-    totalEnrollments: 0,
-    totalLessons: 0,
-    totalAttendance: 0,
-  });
-  
-  const [loading, setLoading] = useState(true);
+  const { data: membersData, isLoading: membersLoading } = useMembers();
+  const { data: leadersData, isLoading: leadersLoading } = useLeaders();
+  const [enrollments, setEnrollments] = useState([]);
+  const [cells, setCells] = useState([]);
+  const [extraLoading, setExtraLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchExtraData = async () => {
       try {
-        setLoading(true);
-        const [members, enrollments, leaders, cells] = await Promise.all([
-          apiService.getAllMembers(),
+        setExtraLoading(true);
+        const [enrollmentsData, cellsData] = await Promise.all([
           apiService.getEnrollments(),
-          apiService.getActiveLeaders().catch(() => apiService.getLeaders()),
           apiService.getCells()
         ]);
-
-        const activeMembers = members?.filter(m => m.isActive) || [];
-        
-        setStats({
-          totalMembers: activeMembers.length,
-          totalMembersFemale: activeMembers.filter(m => m.gender === "FEMENINO").length,
-          totalMembersMale: activeMembers.filter(m => m.gender === "MASCULINO").length,
-          totalEnrollments: enrollments?.filter(e => e.status === 'PENDING' || e.status === 'ACTIVE').length || 0,
-          totalLessons: Array.isArray(cells) ? cells.filter(c => c.status === 'ACTIVE' || c.isActive).length : 0,
-          totalAttendance: Array.isArray(leaders) ? leaders.length : 0,
-        });
+        setEnrollments(enrollmentsData || []);
+        setCells(cellsData || []);
       } catch (err) {
         setError("Error al sincronizar datos pastorales");
       } finally {
-        setLoading(false);
+        setExtraLoading(false);
       }
     };
-    fetchStats();
+    fetchExtraData();
   }, []);
+
+  const loading = membersLoading || leadersLoading || extraLoading;
+
+  const stats = useMemo(() => {
+    const members = Array.isArray(membersData) ? membersData : [];
+    const leaders = Array.isArray(leadersData) ? leadersData : [];
+    const activeMembers = members.filter(m => m.isActive);
+    
+    return {
+      totalMembers: activeMembers.length,
+      totalMembersFemale: activeMembers.filter(m => m.gender === "FEMENINO").length,
+      totalMembersMale: activeMembers.filter(m => m.gender === "MASCULINO").length,
+      totalEnrollments: enrollments?.filter(e => e.status === 'PENDING' || e.status === 'ACTIVE').length || 0,
+      totalLessons: Array.isArray(cells) ? cells.filter(c => c.status === 'ACTIVE' || c.isActive).length : 0,
+      totalAttendance: leaders.length,
+    };
+  }, [membersData, leadersData, enrollments, cells]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">

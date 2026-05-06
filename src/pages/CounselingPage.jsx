@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
+import { useMembers } from "../hooks/useMembers";
 import PageHeader from "../components/PageHeader";
 import {
   Users,
@@ -1371,9 +1372,13 @@ function ModalCancelSession({ isOpen, onClose, onSave, session }) {
 // ============================================================
 const CounselingPage = () => {
   const confirm = useConfirmation();
+  const { data: membersData } = useMembers();
   const [sessions, setSessions] = useState([]);
-  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const members = useMemo(() => {
+    return Array.isArray(membersData) ? membersData : [];
+  }, [membersData]);
 
   // Filtros
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -1426,19 +1431,9 @@ const CounselingPage = () => {
     }
   }, []);
 
-  const loadMembers = useCallback(async () => {
-    try {
-      const data = await apiService.getAllMembers();
-      setMembers(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error cargando miembros", err);
-    }
-  }, []);
-
   useEffect(() => {
     loadSessions();
-    loadMembers();
-  }, [loadSessions, loadMembers]);
+  }, [loadSessions]);
 
   // ── FILTERS ────────────────────────────────────────────────
   const filtered = useMemo(() => {

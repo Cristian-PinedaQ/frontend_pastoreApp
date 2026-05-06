@@ -2,11 +2,11 @@
 // FinancesPage.jsx - ELITE MODERN EDITION
 // ============================================
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
+import { useLeaders } from "../hooks/useLeaders";
 import ModalAddFinance from "../components/ModalAddFinance";
-import ModalFinanceStatistics from "../components/ModalFinanceStatistics";
 import ModalDailyReportOptions from "../components/ModalDailyReportOptions";
 import {
   generateFinancePDF,
@@ -37,6 +37,8 @@ import {
   Trash2,
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
+
+const ModalFinanceStatistics = lazy(() => import("../components/ModalFinanceStatistics"));
 
 // ✅ CONSTANTES
 const INCOME_CONCEPTS = [
@@ -129,6 +131,7 @@ const parseLocalDate = (dateString) => {
 
 const FinancesPage = () => {
   const confirm = useConfirmation();
+  const { data: leadersData } = useLeaders();
   const [allFinances, setAllFinances] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -141,7 +144,10 @@ const FinancesPage = () => {
   const [endDate, setEndDate] = useState("");
 
   const [selectedLeaderType, setSelectedLeaderType] = useState("ALL");
-  const [leaders, setLeaders] = useState([]);
+
+  const leaders = useMemo(() => {
+    return Array.isArray(leadersData) ? leadersData : [];
+  }, [leadersData]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
@@ -150,19 +156,6 @@ const FinancesPage = () => {
   const [editingFinance, setEditingFinance] = useState(null);
 
   const operationInProgress = React.useRef(false);
-
-  // ========== INIT LOAD ==========
-  useEffect(() => {
-    const fetchLeaders = async () => {
-      try {
-        const leaderData = await apiService.getLeaders();
-        setLeaders(leaderData || []);
-      } catch (err) {
-        console.error("No se pudieron cargar líderes para filtro", err);
-      }
-    };
-    fetchLeaders();
-  }, []);
 
   const loadFinances = useCallback(async () => {
     if (operationInProgress.current) return;
@@ -949,21 +942,23 @@ const FinancesPage = () => {
         isEditing={!!editingFinance}
       />
 
-      <ModalFinanceStatistics
-        isOpen={showStatisticsModal}
-        onClose={() => setShowStatisticsModal(false)}
-        data={statisticsData}
-        allFinances={allFinances}
-        onExportPDF={() => {
-          generateFinancePDF(
-            {
-              statistics: calculateDetailedStats(),
-              title: "Estadísticas Globales",
-            },
-            "finance-full-stats",
-          );
-        }}
-      />
+      <Suspense fallback={null}>
+        <ModalFinanceStatistics
+          isOpen={showStatisticsModal}
+          onClose={() => setShowStatisticsModal(false)}
+          data={statisticsData}
+          allFinances={allFinances}
+          onExportPDF={() => {
+            generateFinancePDF(
+              {
+                statistics: calculateDetailedStats(),
+                title: "Estadísticas Globales",
+              },
+              "finance-full-stats",
+            );
+          }}
+        />
+      </Suspense>
 
       <ModalDailyReportOptions
         isOpen={showReportModal}

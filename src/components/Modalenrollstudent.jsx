@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
+import { useMembers } from "../hooks/useMembers";
 import nameHelper from "../services/nameHelper";
 import ModalHeader from "../components/ModalHeader";
 import { generateStudentsByLevelPDF } from "../services/studentsByLevelPdfGenerator";
@@ -34,6 +35,7 @@ const getMemberLevelCode = (member) => {
 
 const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
   const confirm = useConfirmation();
+  const { data: membersData } = useMembers();
   const [step, setStep] = useState(1);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [studentsByLevel, setStudentsByLevel] = useState([]);
@@ -44,9 +46,12 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
   const [error, setError] = useState("");
   const [searchStudent, setSearchStudent] = useState("");
   const [enrollingStatus, setEnrollingStatus] = useState({});
-  const [allMembers, setAllMembers] = useState([]);
   const [confirmedExternal, setConfirmedExternal] = useState([]);
   const isEnrolling = useRef(false);
+
+  const allMembers = useMemo(() => {
+    return Array.isArray(membersData) ? membersData : [];
+  }, [membersData]);
 
   const LEVELS = [
     { value: "PREENCUENTRO",            label: "Pre-encuentro",            order: 1,  color: 'blue' },
@@ -76,22 +81,8 @@ const ModalEnrollStudent = ({ isOpen, onClose, onEnrollmentSuccess }) => {
     onClose();
   }, [onClose]);
 
-  const loadAllMembers = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await apiService.getAllMembers();
-      setAllMembers(data || []);
-    } catch (err) {
-      setError("Error al cargar miembros: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    if (isOpen) loadAllMembers();
-    else handleReset();
+    if (!isOpen) handleReset();
   }, [isOpen, handleReset]);
 
   const generatePDFByLevel = async (level) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   X,
   Home,
@@ -25,6 +25,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import apiService from "../apiService";
+import { useLeaders } from "../hooks/useLeaders";
 import { logUserAction } from "../utils/securityLogger";
 import { generateCellDetailPDF } from "../services/cellDetailPdfGenerator";
 
@@ -139,9 +140,12 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
   // leaderPanel = { role: 'groupLeader'|'host'|'timoteo' } o null
   const [leaderPanel, setLeaderPanel] = useState(null);
   const [leaderSearch, setLeaderSearch] = useState("");
-  const [availableLeaders, setAvailableLeaders] = useState([]);
-  const [loadingLeaders, setLoadingLeaders] = useState(false);
+  const { data: leadersData, isLoading: loadingLeaders } = useLeaders();
   const [leaderActionLoading, setLeaderActionLoading] = useState(false);
+
+  const availableLeaders = useMemo(() => {
+    return Array.isArray(leadersData) ? leadersData : [];
+  }, [leadersData]);
 
   // ── NUEVO: cambio de estado ───────────────────────────────────────────────
   const [statusLoading, setStatusLoading] = useState(false);
@@ -159,7 +163,6 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
   useEffect(() => {
     setLeaderPanel(null);
     setLeaderSearch("");
-    setAvailableLeaders([]);
   }, [activeTab]);
 
   const loadMembers = useCallback(async () => {
@@ -294,32 +297,16 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     }
   };
 
-  // ── NUEVO: Cargar líderes activos para el panel de reemplazo ─────────────
-
-  const loadActiveLeaders = useCallback(async () => {
-    setLoadingLeaders(true);
-    try {
-      const leaders = await apiService.getActiveLeaders();
-      setAvailableLeaders(leaders || []);
-    } catch (err) {
-      setError("Error al cargar líderes disponibles");
-    } finally {
-      setLoadingLeaders(false);
-    }
-  }, []);
-
   // ── NUEVO: Abrir panel de gestión de un líder ─────────────────────────────
 
   const openLeaderPanel = (role) => {
     setLeaderPanel(role);
     setLeaderSearch("");
-    loadActiveLeaders();
   };
 
   const closeLeaderPanel = () => {
     setLeaderPanel(null);
     setLeaderSearch("");
-    setAvailableLeaders([]);
   };
 
   // ── NUEVO: Desvincular un líder (groupLeader, host, timoteo) ─────────────

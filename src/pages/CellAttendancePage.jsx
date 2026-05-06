@@ -4,6 +4,8 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  lazy,
+  Suspense,
 } from "react";
 import apiService from "../apiService";
 import { useAuth } from "../context/AuthContext";
@@ -11,7 +13,6 @@ import { logUserAction } from "../utils/securityLogger";
 import nameHelper from "../services/nameHelper";
 import PageHeader from "../components/PageHeader";
 import CellAttendanceStatsModal from "../components/CellAttendanceStatsModal";
-import CellGroupOverviewModal from "../components/CellGroupOverviewModal";
 import CreateAttendanceEventModal from "../components/CreateAttendanceEventModal";
 import { generateAttendancePDF } from "../services/attendancePdfGenerator";
 import {
@@ -42,6 +43,8 @@ import {
   User,
   Home,
 } from "lucide-react";
+
+const CellGroupOverviewModal = lazy(() => import("../components/CellGroupOverviewModal"));
 
 const { getDisplayName } = nameHelper;
 
@@ -1232,18 +1235,20 @@ const CellAttendancePage = () => {
       )}
 
       {showOverviewModal && (
-        <CellGroupOverviewModal
-          isOpen={showOverviewModal}
-          onClose={() => setShowOverviewModal(false)}
-          userCells={userCells}
-          apiService={apiService}
-          logUserAction={logUserAction}
-          onSelectCell={(cellId) => {
-            setSelectedCellId(cellId);
-            setShowOverviewModal(false);
-            setShowStatsModal(true);
-          }}
-        />
+        <Suspense fallback={null}>
+          <CellGroupOverviewModal
+            isOpen={showOverviewModal}
+            onClose={() => setShowOverviewModal(false)}
+            userCells={userCells}
+            apiService={apiService}
+            logUserAction={logUserAction}
+            onSelectCell={(cellId) => {
+              setSelectedCellId(cellId);
+              setShowOverviewModal(false);
+              setShowStatsModal(true);
+            }}
+          />
+        </Suspense>
       )}
 
       <style
