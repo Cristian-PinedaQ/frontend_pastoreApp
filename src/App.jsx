@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ConfirmationProvider } from './context/ConfirmationContext';
+import { QueryProvider } from './providers/QueryProvider';
 
 import ErrorBoundary from './components/ErrorBoundary';
 import PageLoader from './components/PageLoader';
@@ -35,16 +36,17 @@ const G12DashboardPage  = React.lazy(() => import('./pages/G12DashboardPage'));
 
 function App() {
   return (
-    <BrowserRouter
-      future={{
-        v7_relativeSplatPath: true,
-        v7_startTransition: true,
-      }}
-    >
-      <AuthProvider>
-        <ConfirmationProvider>
-          <ErrorBoundary>
-            <Routes>
+    <QueryProvider>
+      <BrowserRouter
+        future={{
+          v7_relativeSplatPath: true,
+          v7_startTransition: true,
+        }}
+      >
+        <AuthProvider>
+          <ConfirmationProvider>
+            <ErrorBoundary>
+              <Routes>
 
               {/* ========== RUTAS PÚBLICAS (eager) ========== */}
               <Route path="/login" element={<LoginPage />} />
@@ -215,6 +217,7 @@ function App() {
         </ConfirmationProvider>
       </AuthProvider>
     </BrowserRouter>
+    </QueryProvider>
   );
 }
 

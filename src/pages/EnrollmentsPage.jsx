@@ -264,7 +264,6 @@ const EnrollmentsPage = () => {
   });
 
   const [enrollments, setEnrollments] = useState([]);
-  const [filteredEnrollments, setFilteredEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterLevel, setFilterLevel] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -506,30 +505,29 @@ const EnrollmentsPage = () => {
   };
 
   // ── Fetch y filtrado de cohortes ──────────────────────────────────────────
-  const applyFilters = useCallback((data, level, status, search) => {
-    try {
-      let filtered = data;
-      if (level && level.trim() !== "") {
-        if (!isValidLevel(level, levels)) { handleError("VALIDATION_ERROR", "invalid_level"); setFilteredEnrollments([]); return; }
-        filtered = filtered.filter((e) => e.levelCode === level);
-      }
-      if (status && status.trim() !== "") {
-        if (!isValidStatus(status, STATUSES)) { handleError("VALIDATION_ERROR", "invalid_status"); setFilteredEnrollments([]); return; }
-        filtered = filtered.filter((e) => e.status === status);
-      }
-      if (search && search.trim() !== "") {
-        const q = search.toLowerCase().trim();
-        filtered = filtered.filter((e) =>
-          (e.cohortName || "").toLowerCase().includes(q) ||
-          (e.levelDisplayName || "").toLowerCase().includes(q)
-        );
-      }
-      setFilteredEnrollments(filtered);
-    } catch (error) {
-      logError("Error aplicando filtros:", error);
-      setFilteredEnrollments(data);
+  const filteredEnrollments = useMemo(() => {
+    let filtered = enrollments;
+
+    if (filterLevel && filterLevel.trim() !== "") {
+      if (!isValidLevel(filterLevel, levels)) return [];
+      filtered = filtered.filter((e) => e.levelCode === filterLevel);
     }
-  }, [levels, handleError]);
+
+    if (filterStatus && filterStatus.trim() !== "") {
+      if (!isValidStatus(filterStatus, STATUSES)) return [];
+      filtered = filtered.filter((e) => e.status === filterStatus);
+    }
+
+    if (searchTerm && searchTerm.trim() !== "") {
+      const q = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((e) =>
+        (e.cohortName || "").toLowerCase().includes(q) ||
+        (e.levelDisplayName || "").toLowerCase().includes(q)
+      );
+    }
+
+    return filtered;
+  }, [enrollments, filterLevel, filterStatus, searchTerm, levels]);
 
   const fetchEnrollments = useCallback(async () => {
     try {
@@ -588,14 +586,13 @@ const EnrollmentsPage = () => {
         : normalized;
 
       setEnrollments(roleFiltered);
-      applyFilters(roleFiltered, filterLevel, filterStatus, searchTerm);
     } catch (err) {
       handleError("FETCH_ENROLLMENTS", "fetchEnrollments");
       logError("Error obteniendo cohortes:", err);
     } finally {
       setLoading(false);
     }
-  }, [filterLevel, filterStatus, searchTerm, handleError, allowedLevels, levels, applyFilters]);
+  }, [handleError, allowedLevels, levels]);
 
   useEffect(() => {
     if (!levelsLoading) {
@@ -696,14 +693,13 @@ const EnrollmentsPage = () => {
   // ── Handlers de filtros ───────────────────────────────────────────────────
   const handleFilterChange = (type, value) => {
     setError("");
-    if (type === "level") { setFilterLevel(value); applyFilters(enrollments, value, filterStatus, searchTerm); }
-    else if (type === "status") { setFilterStatus(value); applyFilters(enrollments, filterLevel, value, searchTerm); }
-    else if (type === "search") { setSearchTerm(value); applyFilters(enrollments, filterLevel, filterStatus, value); }
+    if (type === "level") setFilterLevel(value);
+    else if (type === "status") setFilterStatus(value);
+    else if (type === "search") setSearchTerm(value);
   };
 
   const clearFilters = () => {
     setFilterLevel(""); setFilterStatus(""); setSearchTerm("");
-    applyFilters(enrollments, "", "", "");
   };
 
   // ── Handlers de modal principal ───────────────────────────────────────────

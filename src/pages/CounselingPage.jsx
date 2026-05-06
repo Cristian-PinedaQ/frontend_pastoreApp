@@ -1372,7 +1372,6 @@ function ModalCancelSession({ isOpen, onClose, onSave, session }) {
 const CounselingPage = () => {
   const confirm = useConfirmation();
   const [sessions, setSessions] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -1442,7 +1441,7 @@ const CounselingPage = () => {
   }, [loadSessions, loadMembers]);
 
   // ── FILTERS ────────────────────────────────────────────────
-  useEffect(() => {
+  const filtered = useMemo(() => {
     let result = [...sessions];
     result.sort((a, b) => new Date(b.scheduledAt) - new Date(a.scheduledAt));
     if (filterStatus !== "ALL")
@@ -1461,7 +1460,7 @@ const CounselingPage = () => {
       result = result.filter((s) => s.scheduledAt >= filterDateFrom);
     if (filterDateTo)
       result = result.filter((s) => s.scheduledAt <= filterDateTo + "T23:59");
-    setFiltered(result);
+    return result;
   }, [
     sessions,
     filterStatus,

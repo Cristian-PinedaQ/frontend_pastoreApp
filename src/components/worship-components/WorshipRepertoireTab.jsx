@@ -7,7 +7,6 @@ import { createPortal } from "react-dom";
 import apiService from "../../apiService";
 import { useConfirmation } from "../../context/ConfirmationContext";
 import nameHelper from "../../services/nameHelper";
-import { FaYoutube } from "react-icons/fa";
 import {
   Plus,
   FileText,
@@ -23,6 +22,12 @@ import {
   ChevronRight,
   RefreshCw,
 } from "lucide-react";
+
+const YoutubeIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
 
 const { getDisplayName } = nameHelper;
 const MUSICAL_KEYS = [
@@ -300,7 +305,7 @@ const WorshipRepertoireTab = ({
                     rel="noreferrer"
                     className="flex-1 flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-500 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-violet-600/20 transition-all active:scale-95"
                   >
-                    <FaYoutube className="w-3.5 h-3.5 stroke-[2.5px]" /> Video
+                    <YoutubeIcon className="w-3.5 h-3.5 stroke-[2.5px]" /> Video
                   </a>
                 )}
                 {song.chordsLink && (
@@ -589,7 +594,7 @@ const WorshipRepertoireTab = ({
                         </label>
                         <div className="relative flex">
                           <div className="flex items-center justify-center w-14 bg-red-500/10 dark:bg-red-500/20 border border-red-500/20 border-r-0 rounded-l-2xl text-red-600 dark:text-red-400">
-                            <FaYoutube className="w-5 h-5" />
+                            <YoutubeIcon className="w-5 h-5" />
                           </div>
                           <input
                             type="url"

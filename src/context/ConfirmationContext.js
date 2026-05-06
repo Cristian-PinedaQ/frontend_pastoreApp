@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useRef } from 'react';
 import ConfirmationModal from '../components/ConfirmationModal';
 
 const ConfirmationContext = createContext();
@@ -71,8 +71,10 @@ export const ConfirmationProvider = ({ children }) => {
     }
   }, []);
 
+  const contextValue = useMemo(() => ({ confirm }), [confirm]);
+
   return (
-    <ConfirmationContext.Provider value={{ confirm }}>
+    <ConfirmationContext.Provider value={contextValue}>
       {children}
       <ConfirmationModal
         isOpen={confirmState.isOpen}

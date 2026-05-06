@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authService from '../services/authService';
-import logoBlancoImg from '../assets/Pastoreapp_blanco.png';
+import logoBlancoImg from '../assets/Pastoreapp_blanco.webp';
 import { 
   ShieldAlert, CheckCircle2, 
   Eye, EyeOff, Save, Loader2, Info, 

@@ -130,7 +130,6 @@ const parseLocalDate = (dateString) => {
 const FinancesPage = () => {
   const confirm = useConfirmation();
   const [allFinances, setAllFinances] = useState([]);
-  const [filteredFinances, setFilteredFinances] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -222,7 +221,7 @@ const FinancesPage = () => {
   }, [loadFinances]);
 
   // ========== FILTER LOGIC ==========
-  const applyFilters = useCallback(() => {
+  const filteredFinances = useMemo(() => {
     let filtered = [...allFinances];
 
     // Search
@@ -283,7 +282,7 @@ const FinancesPage = () => {
         parseLocalDate(b.registrationDate) - parseLocalDate(a.registrationDate),
     );
 
-    setFilteredFinances(filtered);
+    return filtered;
   }, [
     allFinances,
     searchText,
@@ -295,10 +294,6 @@ const FinancesPage = () => {
     startDate,
     endDate,
   ]);
-
-  useEffect(() => {
-    applyFilters();
-  }, [applyFilters]);
 
   // ========== STATISTICS CALCULATION ==========
   const stats = useMemo(() => {

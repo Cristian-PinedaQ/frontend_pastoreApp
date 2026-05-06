@@ -2,7 +2,7 @@
 // AuthContext.js - SEGURIDAD MEJORADA
 // ============================================
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import authService from "../services/authService";
 import { logSecurityEvent } from "../utils/securityLogger";
 import { jwtDecode } from "jwt-decode";
@@ -184,7 +184,7 @@ export const AuthProvider = ({ children }) => {
   }, [setupTokenRefreshTimer, clearTokenRefreshTimer, isTokenExpired]);
 
   // ✅ Login CON SEGURIDAD MEJORADA
-  const login = async (username, password) => {
+  const login = useCallback(async (username, password) => {
     setError(null);
     setLoading(true);
 
@@ -280,9 +280,9 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isTokenExpired, setupTokenRefreshTimer]);
 
-  const register = async (userData) => {
+  const register = useCallback(async (userData) => {
     setError(null);
     setLoading(true);
 
@@ -311,7 +311,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
 
 
@@ -380,7 +380,7 @@ export const AuthProvider = ({ children }) => {
     return sessionStorage.getItem("token");
   }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     loading,
     error,
@@ -393,7 +393,9 @@ export const AuthProvider = ({ children }) => {
     hasAllRoles,
     isTokenExpired,
     getToken,
-  };
+  }), [user, loading, error, login, register, logout,
+       isAuthenticated, hasRole, hasAnyRole, hasAllRoles,
+       isTokenExpired, getToken]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

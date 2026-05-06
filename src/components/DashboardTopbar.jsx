@@ -1,6 +1,6 @@
 import React from 'react';
-import logoBlanco from '../assets/Pastoreapp_blanco.png';
-import logoNegro from '../assets/Pastoreappnegro.png';
+import logoBlanco from '../assets/Pastoreapp_blanco.webp';
+import logoNegro from '../assets/Pastoreappnegro.webp';
 
 const DashboardTopbar = ({ user }) => {
   return (

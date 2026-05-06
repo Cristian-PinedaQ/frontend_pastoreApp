@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import apiService from "../apiService";
 import nameHelper from "../services/nameHelper";
 import PageHero from "../components/PageHero";
+import { useMembers } from "../hooks/useMembers";
 import { 
   Search, 
   Filter, 
@@ -27,11 +28,9 @@ import { generateMembersPDF } from "../services/generateMembersPDF";
 const { getDisplayName } = nameHelper;
 
 const MembersPage = () => {
-  const [allMembers, setAllMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: membersData, isLoading, refetch, isRefetching } = useMembers();
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({ gender: "ALL", district: "ALL" });
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [memberToEdit, setMemberToEdit] = useState(null);
 
@@ -41,26 +40,19 @@ const MembersPage = () => {
     history: [],
     memberName: "",
   });
-
+  
   // ── MemberDetailModal state (reutilizable para miembro y líder) ───────────────
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
 
-  const loadMembers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await apiService.getAllMembers();
-      const list = Array.isArray(data) ? data : (data?.content || []);
-      setAllMembers(list);
-    } catch (err) {
-      console.error("Error cargando miembros:", err);
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+  const allMembers = useMemo(() => {
+    const data = membersData;
+    return Array.isArray(data) ? data : (data?.content || []);
+  }, [membersData]);
 
-  useEffect(() => { loadMembers(); }, [loadMembers]);
+  const handleRefresh = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
 
   const filteredMembers = useMemo(() => {
     return allMembers.filter(m => {
@@ -224,10 +216,10 @@ const MembersPage = () => {
 
          <div className="lg:col-span-3 flex gap-4 h-18 pb-0.5">
             <button 
-               onClick={() => { setIsRefreshing(true); loadMembers(); }}
+               onClick={handleRefresh}
                className="h-full w-18 bg-white dark:bg-[#1a2332] border-2 border-slate-100 dark:border-white/5 rounded-[2rem] flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-500 transition-all active:scale-95 shadow-sm"
             >
-               <RefreshCw className={`${isRefreshing ? 'animate-spin' : ''}`} size={24} />
+               <RefreshCw className={`${isRefetching ? 'animate-spin' : ''}`} size={24} />
             </button>
             <button 
                onClick={handleExportPDF}
@@ -242,7 +234,7 @@ const MembersPage = () => {
           MEMBERS GRID
       ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-8">
-         {loading ? (
+         {isLoading ? (
             [...Array(8)].map((_, i) => (
                <div key={i} className="h-96 bg-white dark:bg-[#1a2332] rounded-[3rem] border-2 border-slate-100 dark:border-white/5 animate-pulse" />
             ))
@@ -320,7 +312,7 @@ const MembersPage = () => {
          })}
       </div>
 
-      {filteredMembers.length === 0 && !loading && (
+      {filteredMembers.length === 0 && !isLoading && (
          <div className="py-40 text-center space-y-8 bg-white dark:bg-[#0f172a] rounded-[4rem] border-2 border-slate-100 dark:border-white/5 shadow-2xl shadow-slate-500/5 px-10">
             <div className="w-32 h-32 bg-slate-100 dark:bg-white/5 rounded-[3rem] flex items-center justify-center mx-auto text-slate-400 group animate-pulse">
                <Search className="w-16 h-16 group-hover:scale-110 transition-transform" />
@@ -348,7 +340,7 @@ const MembersPage = () => {
       <ModalAddMember
         isOpen={isAddMemberModalOpen}
         onClose={() => setIsAddMemberModalOpen(false)}
-        onSave={() => loadMembers()}
+        onSave={refetch}
         initialData={memberToEdit}
         isEditing={!!memberToEdit}
         allMembers={allMembers}

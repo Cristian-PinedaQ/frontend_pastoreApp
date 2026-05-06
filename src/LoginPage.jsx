@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import logoBlancoImg from './assets/Pastoreapp_blanco.png';
+import logoBlancoImg from './assets/Pastoreapp_blanco.webp';
 import { 
   Eye, EyeOff, LogIn, Loader2, ShieldAlert, CheckCircle2 
 } from 'lucide-react';

@@ -33,8 +33,8 @@ import {
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
 import { useTheme } from "./hooks/useTheme";
-import logoBlanco from "./assets/Pastoreapp_blanco.png";
-import logoNegro from "./assets/Pastoreappnegro.png";
+import logoBlanco from "./assets/Pastoreapp_blanco.webp";
+import logoNegro from "./assets/Pastoreappnegro.webp";
 
 const SCROLLBAR_STYLES = `
   .custom-scrollbar::-webkit-scrollbar {

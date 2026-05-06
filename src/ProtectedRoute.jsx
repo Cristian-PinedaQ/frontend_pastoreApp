@@ -5,8 +5,8 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import logoBlancoImg from './assets/Pastoreapp_blanco.png';
-import logoNegroImg from './assets/Pastoreappnegro.png';
+import logoBlancoImg from './assets/Pastoreapp_blanco.webp';
+import logoNegroImg from './assets/Pastoreappnegro.webp';
 import './css/Protectedroute.css';
 import RequiredPasswordChange from './components/RequiredPasswordChange';
 
