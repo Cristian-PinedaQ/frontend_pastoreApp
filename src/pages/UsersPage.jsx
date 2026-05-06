@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { useConfirmation } from "../context/ConfirmationContext";
 import authService from "../services/authService";
 import { logError } from "../utils/securityLogger";
-import { throttle } from "lodash";
+import throttle from "lodash/throttle";
 import { 
   UserPlus, 
   Users,

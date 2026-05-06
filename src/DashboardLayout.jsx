@@ -2,7 +2,7 @@
 // DashboardLayout.jsx - ELITE MODERN EDITION
 // ============================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { useConfirmation } from "./context/ConfirmationContext";
@@ -38,7 +38,7 @@ const SCROLLBAR_STYLES = `
   }
 `;
 
-export const DashboardLayout = () => {
+const DashboardLayoutComponent = () => {
   const { user, logout, hasRole, hasAnyRole } = useAuth();
   const confirm = useConfirmation();
   const navigate = useNavigate();
@@ -86,7 +86,7 @@ export const DashboardLayout = () => {
     }
   };
 
-  const menuItems = [
+  const menuItems = useMemo(() => [
     { label: "Inicio",           path: "/dashboard",                  icon: Church,                    visible: true },
     { label: "Membresía",        path: "/dashboard/members",           icon: Users,                     visible: true },
     { label: "Consejería",       path: "/dashboard/Counseling",        icon: HeartHandshake,            visible: hasAnyRole(["ROLE_PASTORES"]) },
@@ -103,7 +103,7 @@ export const DashboardLayout = () => {
     { label: "Configuración",    path: "/dashboard/LevelsConfig",      icon: SlidersHorizontal,         visible: hasRole("ROLE_PASTORES") },
     { label: "Manual Raiz Viva", path: "/dashboard/ManualRaizViva",    icon: MessageCircleQuestionMark, visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ECONOMICO", "ROLE_CONEXION", "ROLE_CIMIENTO", "ROLE_ESENCIA", "ROLE_LIDER"]) },
     { label: "Usuarios",         path: "/dashboard/users",             icon: UserCircle,                visible: hasRole("ROLE_PASTORES") },
-  ];
+  ], [hasRole, hasAnyRole]);
 
   const filteredMenu = menuItems.filter((item) => item.visible);
 
@@ -139,12 +139,18 @@ export const DashboardLayout = () => {
         <div className="h-20 flex items-center px-8 border-b border-slate-100 dark:border-white/5 shrink-0">
           <div className="flex items-center gap-1">
             <div className="relative w-14 h-14 flex items-center justify-center overflow-hidden shrink-0">
-              <img src={logoNegro} alt="Logo" className="block dark:hidden w-full h-full object-contain" />
-              <img src={logoBlanco} alt="Logo" className="hidden dark:block w-full h-full object-contain" />
+              <picture>
+                  <source srcSet={logoNegro} type="image/png" />
+                  <img src={logoNegro} alt="PastoreApp Logo" loading="lazy" className="block dark:hidden w-full h-full object-contain" />
+                </picture>
+                <picture>
+                  <source srcSet={logoBlanco} type="image/png" />
+                  <img src={logoBlanco} alt="PastoreApp Logo" loading="lazy" className="hidden dark:block w-full h-full object-contain" />
+                </picture>
             </div>
-            <h1 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tighter leading-tight">
+            <h2 className="text-2xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tighter leading-tight">
               PastoreApp
-            </h1>
+            </h2>
           </div>
         </div>
 
@@ -243,4 +249,7 @@ export const DashboardLayout = () => {
   );
 };
 
+const DashboardLayout = React.memo(DashboardLayoutComponent);
+
+export { DashboardLayout };
 export default DashboardLayout;

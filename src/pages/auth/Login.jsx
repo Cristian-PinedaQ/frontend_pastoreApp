@@ -83,8 +83,8 @@ const Login = () => {
         {/* LOGO AREA */}
         <div className="flex flex-col items-center mb-8">
           <div className="p-4 bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl shadow-indigo-500/20 mb-4 border border-slate-100 dark:border-slate-800 transition-transform duration-500 hover:scale-110">
-            <img src={logoNegro} alt="Logo" className="h-12 w-auto block dark:hidden" />
-            <img src={logoBlanco} alt="Logo" className="h-12 w-auto hidden dark:block" />
+            <img src={logoNegro} alt="PastoreApp Logo" loading="lazy" className="h-12 w-auto block dark:hidden" />
+            <img src={logoBlanco} alt="PastoreApp Logo" loading="lazy" className="h-12 w-auto hidden dark:block" />
           </div>
           <div className="text-center">
             <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">

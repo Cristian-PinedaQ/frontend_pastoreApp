@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
 
   const tokenRefreshTimer = useRef(null);
 
-  const isTokenExpired = (token) => {
+  const isTokenExpired = useCallback((token) => {
     try {
       if (!token) return true;
       const decoded = jwtDecode(token);
@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }) => {
       logError("❌ Error decodificando token:", error.message);
       return true;
     }
-  };
+  }, []);
 
   const clearTokenRefreshTimer = useCallback(() => {
     if (tokenRefreshTimer.current) {
@@ -181,7 +181,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       clearTokenRefreshTimer();
     };
-  }, [setupTokenRefreshTimer, clearTokenRefreshTimer]);
+  }, [setupTokenRefreshTimer, clearTokenRefreshTimer, isTokenExpired]);
 
   // ✅ Login CON SEGURIDAD MEJORADA
   const login = async (username, password) => {
@@ -317,8 +317,7 @@ export const AuthProvider = ({ children }) => {
 
 
 
-  const isAuthenticated = () => {
-    // ✅ Solo sessionStorage
+  const isAuthenticated = useCallback(() => {
     const token = sessionStorage.getItem("token");
 
     if (!token || !user) {
@@ -331,9 +330,9 @@ export const AuthProvider = ({ children }) => {
     }
 
     return true;
-  };
+  }, [user, isTokenExpired, logout]);
 
-  const hasRole = (requiredRole) => {
+  const hasRole = useCallback((requiredRole) => {
     if (!user || !user.roles || user.roles.length === 0) {
       return false;
     }
@@ -359,28 +358,27 @@ export const AuthProvider = ({ children }) => {
 
       return false;
     });
-  };
+  }, [user]);
 
-  const hasAnyRole = (requiredRoles) => {
+  const hasAnyRole = useCallback((requiredRoles) => {
     if (!Array.isArray(requiredRoles)) {
       return hasRole(requiredRoles);
     }
 
     return requiredRoles.some((role) => hasRole(role));
-  };
+  }, [hasRole]);
 
-  const hasAllRoles = (requiredRoles) => {
+  const hasAllRoles = useCallback((requiredRoles) => {
     if (!Array.isArray(requiredRoles)) {
       return hasRole(requiredRoles);
     }
 
     return requiredRoles.every((role) => hasRole(role));
-  };
+  }, [hasRole]);
 
-  const getToken = () => {
-    // ✅ Solo sessionStorage
+  const getToken = useCallback(() => {
     return sessionStorage.getItem("token");
-  };
+  }, []);
 
   const value = {
     user,

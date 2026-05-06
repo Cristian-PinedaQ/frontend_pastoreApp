@@ -42,12 +42,14 @@ const DashboardTopbar = ({ user }) => {
         <div className="relative flex items-center h-10">
           <img
             src={logoNegro}
-            alt="Logo"
+            alt="PastoreApp Logo"
+            loading="lazy"
             className="block dark:hidden h-full w-auto object-contain transition-transform duration-300 group-hover:scale-105"
           />
           <img
             src={logoBlanco}
-            alt="Logo"
+            alt="PastoreApp Logo"
+            loading="lazy"
             className="hidden dark:block h-full w-auto object-contain transition-transform duration-300 group-hover:scale-105"
           />
         </div>

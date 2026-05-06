@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useConfirmation } from "../context/ConfirmationContext";
 import apiService from "../apiService";
 import { logSecurityEvent } from "../utils/securityLogger";
-import { throttle } from "lodash";
+import throttle from "lodash/throttle";
 import ModalCreateLesson from "../components/ModalCreateLesson";
 import ModalRecordAttendance from "../components/ModalRecordAttendance";
 import ModalLessonAttendanceDetail from "../components/ModalLessonAttendanceDetail";

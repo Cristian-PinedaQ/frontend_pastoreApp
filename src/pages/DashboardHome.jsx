@@ -116,7 +116,7 @@ const DashboardHome = () => {
         
         <div className="relative flex flex-col md:flex-row items-center gap-8">
           <div className="w-32 h-32 sm:w-40 sm:h-40 bg-white/5 backdrop-blur-xl rounded-[3rem] p-6 flex items-center justify-center border border-white/10 shadow-2xl">
-            <img src={logoDora} alt="Logo" className="w-full h-full object-contain filter drop-shadow-2xl" />
+            <img src={logoDora} alt="PastoreApp Logo" loading="lazy" className="w-full h-full object-contain filter drop-shadow-2xl" />
           </div>
           <div className="flex-1 text-center md:text-left space-y-4">
             <div className="flex items-center justify-center md:justify-start gap-2 text-indigo-400 font-black text-[10px] uppercase tracking-[0.3em]">

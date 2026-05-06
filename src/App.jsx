@@ -1,36 +1,36 @@
-// ✅ App.jsx - VERSIÓN DEFINITIVA PARA TU PROYECTO
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ConfirmationProvider } from './context/ConfirmationContext';
 
-// ✅ CORRECCIÓN 1: RegisterPage es NAMED EXPORT (con {})
-import LoginPage from './LoginPage';
-import { RegisterPage } from './RegisterPage';  // ← Con {}
+import ErrorBoundary from './components/ErrorBoundary';
+import PageLoader from './components/PageLoader';
 
-// ✅ ProtectedRoute con UnauthorizedPage
+// ── Páginas públicas (eager — punto de entrada, poco peso) ────────────
+import LoginPage from './LoginPage';
+import { RegisterPage } from './RegisterPage';
 import ProtectedRoute, { UnauthorizedPage } from './ProtectedRoute';
 
-// Layouts
+// ── Layout (eager — estructura base) ──────────────────────────────────
 import { DashboardLayout } from './DashboardLayout';
 
-// Páginas del dashboard
-import DashboardHome from './pages/DashboardHome';
-import MembersPage from './pages/MembersPage';
-import EnrollmentsPage from './pages/EnrollmentsPage';
-import StudentsPage from './pages/StudentsPage';
-import UsersPage from './pages/UsersPage';
-import FinancesPage from './pages/FinancesPage';
-import ActivityPage from './pages/ActivityPage';
-import LeadersPage from './pages/LeadersPage';
-import CellGroupsPage from './pages/CellGroupsPage';
-import CellAttendancePage from './pages/CellAttendancePage.jsx';
-import ChurchFinancePage from './pages/ChurchFinancePage.jsx';
-import CounselingPage from './pages/CounselingPage.jsx';
-import ManualRaizViva from './pages/ManualRaizViva.jsx';
-import LevelsConfigPage from './pages/LevelsConfigPage.jsx';
-import WorshipPage from './pages/WorshipPage.jsx';
-import MinisteriesPage from './pages/MinisteriesPage.jsx';
+// ── Páginas del dashboard (lazy — code splitting por ruta) ────────────
+const DashboardHome     = React.lazy(() => import('./pages/DashboardHome'));
+const MembersPage       = React.lazy(() => import('./pages/MembersPage'));
+const EnrollmentsPage   = React.lazy(() => import('./pages/EnrollmentsPage'));
+const StudentsPage      = React.lazy(() => import('./pages/StudentsPage'));
+const UsersPage         = React.lazy(() => import('./pages/UsersPage'));
+const FinancesPage      = React.lazy(() => import('./pages/FinancesPage'));
+const ActivityPage      = React.lazy(() => import('./pages/ActivityPage'));
+const LeadersPage       = React.lazy(() => import('./pages/LeadersPage'));
+const CellGroupsPage    = React.lazy(() => import('./pages/CellGroupsPage'));
+const CellAttendancePage= React.lazy(() => import('./pages/CellAttendancePage.jsx'));
+const ChurchFinancePage = React.lazy(() => import('./pages/ChurchFinancePage.jsx'));
+const CounselingPage    = React.lazy(() => import('./pages/CounselingPage.jsx'));
+const ManualRaizViva    = React.lazy(() => import('./pages/ManualRaizViva.jsx'));
+const LevelsConfigPage  = React.lazy(() => import('./pages/LevelsConfigPage.jsx'));
+const WorshipPage       = React.lazy(() => import('./pages/WorshipPage.jsx'));
+const MinisteriesPage   = React.lazy(() => import('./pages/MinisteriesPage.jsx'));
 
 function App() {
   return (
@@ -42,192 +42,166 @@ function App() {
     >
       <AuthProvider>
         <ConfirmationProvider>
-          <Routes>
-            {/* ========== RUTAS PÚBLICAS ========== */}
+          <ErrorBoundary>
+            <Routes>
 
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />  {/* ← RegisterPage */}
-            <Route path="/unauthorized" element={<UnauthorizedPage />} />
+              {/* ========== RUTAS PÚBLICAS (eager) ========== */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-            {/* ========== DASHBOARD PROTEGIDO ========== */}
-
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute element={<DashboardLayout />} />
-              }
-            >
-              {/* Dashboard Home */}
-              <Route index element={<DashboardHome />} />
-
-              {/* Miembros */}
+              {/* ========== DASHBOARD PROTEGIDO ========== */}
               <Route
-                path="members"
+                path="/dashboard"
                 element={
-                  <ProtectedRoute element={<MembersPage />} />
+                  <ProtectedRoute element={<DashboardLayout />} />
                 }
-              />
+              >
+                <Route index element={
+                  <Suspense fallback={<PageLoader />}>
+                    <DashboardHome />
+                  </Suspense>
+                } />
 
-              {/* Inscripciones */}
-              <Route
-                path="enrollments"
-                element={
-                  <ProtectedRoute
-                    element={<EnrollmentsPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_PROFESORES']}
-                  />
-                }
-              />
+                <Route path="members" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute element={<MembersPage />} />
+                  </Suspense>
+                } />
 
-              {/* Estudiantes */}
-              <Route
-                path="students"
-                element={
-                  <ProtectedRoute
-                    element={<StudentsPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
-                  />
-                }
-              />
-              {/* Liderazgo */}
-              <Route
-                path="leadership"
-                element={
-                  <ProtectedRoute
-                    element={<LeadersPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA','ROLE_DESPLIEGUE']}
-                  />
-                }
-              />
+                <Route path="enrollments" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<EnrollmentsPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_PROFESORES']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* celulas */}
-              <Route
-                path="cellgroups"
-                element={
-                  <ProtectedRoute
-                    element={<CellGroupsPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION','ROLE_DESPLIEGUE']}
-                  />
-                }
-              />
+                <Route path="students" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<StudentsPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
+                    />
+                  </Suspense>
+                } />
 
-              <Route
-                path="cellgroups-atendance"
-                element={
-                  <ProtectedRoute
-                    element={<CellAttendancePage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_LIDER']}
-                  />
-                }
-              />
+                <Route path="leadership" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<LeadersPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA','ROLE_DESPLIEGUE']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* ALABANZA */}
+                <Route path="cellgroups" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<CellGroupsPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION','ROLE_DESPLIEGUE']}
+                    />
+                  </Suspense>
+                } />
 
-              <Route
-                path="worshipPage"
-                element={
-                  <ProtectedRoute
-                    element={<WorshipPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_ALABANZA']}
-                  />
-                }
-              />
+                <Route path="cellgroups-atendance" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<CellAttendancePage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION', 'ROLE_LIDER']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* Ministerios */}
+                <Route path="worshipPage" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<WorshipPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_ALABANZA']}
+                    />
+                  </Suspense>
+                } />
 
-              <Route
-                path="ministeriesPage"
-                element={
-                  <ProtectedRoute
-                    element={<MinisteriesPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_DESPLIEGUE', 'ROLE_PROTOCOLO', 'ROLE_MINISTERIOS']}
-                  />
-                }
-              />
+                <Route path="ministeriesPage" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<MinisteriesPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_DESPLIEGUE', 'ROLE_PROTOCOLO', 'ROLE_MINISTERIOS']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* Concejeria */}
-              <Route
-                path="Counseling"
-                element={
-                  <ProtectedRoute
-                    element={<CounselingPage />}
-                    requiredRoles={['ROLE_PASTORES']}
-                  />
-                }
-              />
+                <Route path="Counseling" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<CounselingPage />}
+                      requiredRoles={['ROLE_PASTORES']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* Finanzas */}
-              <Route
-                path="finances"
-                element={
-                  <ProtectedRoute
-                    element={<FinancesPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
-                  />
-                }
-              />
+                <Route path="finances" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<FinancesPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO']}
+                    />
+                  </Suspense>
+                } />
 
-              <Route
-                path="financesChurch"
-                element={
-                  <ProtectedRoute
-                    element={<ChurchFinancePage />}
-                    requiredRoles={['ROLE_PASTORES']}
-                  />
-                }
-              />
+                <Route path="financesChurch" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<ChurchFinancePage />}
+                      requiredRoles={['ROLE_PASTORES']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* Finanzas */}
-              <Route
-                path="Activity"
-                element={
-                  <ProtectedRoute
-                    element={<ActivityPage />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
-                  />
-                }
-              />
+                <Route path="Activity" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<ActivityPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* Configuracion niveles y lecciones */}
-              <Route
-                path="LevelsConfig"
-                element={
-                  <ProtectedRoute
-                    element={<LevelsConfigPage />}
-                    requiredRoles={['ROLE_PASTORES']}
-                  />
-                }
-              />
+                <Route path="LevelsConfig" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<LevelsConfigPage />}
+                      requiredRoles={['ROLE_PASTORES']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* ManualRaizViva */}
-              <Route
-                path="ManualRaizViva"
-                element={
-                  <ProtectedRoute
-                    element={<ManualRaizViva />}
-                    requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_LIDER']}
-                  />
-                }
-              />
+                <Route path="ManualRaizViva" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<ManualRaizViva />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_ECONOMICO', 'ROLE_CONEXION', 'ROLE_CIMIENTO', 'ROLE_ESENCIA', 'ROLE_DESPLIEGUE', 'ROLE_LIDER']}
+                    />
+                  </Suspense>
+                } />
 
-              {/* Usuarios */}
-              <Route
-                path="users"
-                element={
-                  <ProtectedRoute
-                    element={<UsersPage />}
-                    requiredRoles={['ROLE_PASTORES']}
-                    requireAll={true}
-                  />
-                }
-              />
-            </Route>
+                <Route path="users" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<UsersPage />}
+                      requiredRoles={['ROLE_PASTORES']}
+                      requireAll={true}
+                    />
+                  </Suspense>
+                } />
+              </Route>
 
-            {/* ========== REDIRECCIONES ========== */}
-
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
+              {/* ========== REDIRECCIONES ========== */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </ErrorBoundary>
         </ConfirmationProvider>
       </AuthProvider>
     </BrowserRouter>

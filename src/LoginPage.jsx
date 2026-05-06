@@ -149,7 +149,7 @@ const LoginPage = () => {
             <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
             <div className="relative flex flex-col items-center">
               <div className="w-60 h-60 md:w-80 md:h-80 backdrop-blur-md rounded-2xl transition-transform hover:scale-105 duration-500 overflow-hidden">
-                <img src={logoBlancoImg} alt="Logo" className="w-full h-full object-contain" />
+                <img src={logoBlancoImg} alt="PastoreApp Logo" loading="lazy" className="w-full h-full object-contain" />
               </div>
               <h1 className="text-4xl -mt-14 font-black text-white tracking-tighter leading-none relative z-10">PastoreApp</h1>
               <p className="text-indigo-100/50 text-[8px] font-black uppercase tracking-[0.5em] -mt-3 relative z-10">Sistema de Gestión Pastoral</p>

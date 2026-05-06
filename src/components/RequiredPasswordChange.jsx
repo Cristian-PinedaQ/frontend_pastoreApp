@@ -72,7 +72,7 @@ const RequiredPasswordChange = ({ accessToken, onPasswordChanged }) => {
           <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10" />
           <div className="relative z-10 flex flex-col items-center">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-white/20 backdrop-blur-md rounded-2xl p-3 mb-4 ring-1 ring-white/30">
-              <img src={logoBlancoImg} alt="Logo" className="w-full h-full object-contain" />
+              <img src={logoBlancoImg} alt="PastoreApp Logo" loading="lazy" className="w-full h-full object-contain" />
             </div>
             <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight uppercase">Activar mi Cuenta</h1>
             <p className="text-indigo-100/80 text-xs md:text-sm font-medium mt-1">Por seguridad, debes establecer una contraseña personal</p>
