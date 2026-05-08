@@ -26,7 +26,8 @@ import {
   Download,
   Activity,
   Layers,
-  Award
+  Award,
+  Search
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -137,6 +138,7 @@ const StudentsPage = () => {
 
   const [showEnrollModal,     setShowEnrollModal]     = useState(false);
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
+  const [showMobileSearch,     setShowMobileSearch]     = useState(false);
 
   const [statisticsData,    setStatisticsData]    = useState(null);
   const [hasFiltersApplied, setHasFiltersApplied] = useState(false);
@@ -330,20 +332,20 @@ const StudentsPage = () => {
 
   // ─── Render Components ────────────────────────────────────────────────────────────
   const StatCard = ({ icon: Icon, label, value, color }) => (
-    <div className="p-4 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 shadow-sm flex items-center gap-4 transition-all hover:scale-105">
-      <div className={`p-3 rounded-2xl bg-${color}-500/10 text-${color}-600 dark:text-${color}-400`}>
-        <Icon size={24} />
+    <div className="bg-white dark:bg-slate-900/50 p-4 sm:p-5 lg:p-8 rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 sm:gap-4 transition-all hover:scale-105">
+      <div className={`hidden sm:flex w-10 h-10 lg:w-12 lg:h-12 rounded-xl lg:rounded-2xl bg-${color}-500/10 text-${color}-600 dark:text-${color}-400 items-center justify-center shrink-0`}>
+        <Icon size={18} />
       </div>
-      <div>
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{label}</p>
-        <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight">{value}</p>
+      <div className="min-w-0">
+        <p className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">{label}</p>
+        <p className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white leading-tight">{value}</p>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 p-4 md:p-8 transition-colors duration-300">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pb-24 space-y-4 sm:space-y-6 lg:space-y-8">
         
         <PageHeader
           icon={Users}
@@ -353,53 +355,191 @@ const StudentsPage = () => {
             <>
               <button
                 onClick={() => setShowEnrollModal(true)}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-500/25 active:scale-95"
+                title="Nueva Inscripción"
+                className="flex items-center gap-2 px-3 py-3 lg:px-5 lg:py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-[9px] lg:text-xs uppercase tracking-wide shadow-lg shadow-indigo-500/25 active:scale-95 transition-all shrink-0"
               >
-                <UserPlus size={20} />
-                Nueva Inscripción
+                <UserPlus size={16} className="shrink-0" />
+                <span className="hidden lg:inline">Nueva Inscripción</span>
               </button>
               <button
                 onClick={loadStudents}
-                className={`p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all ${loading ? 'animate-spin' : ''}`}
+                title="Recargar"
+                className={`flex items-center justify-center w-10 h-10 lg:w-11 lg:h-11 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shrink-0 ${loading ? 'animate-spin' : ''}`}
               >
-                <RefreshCw size={20} />
+                <RefreshCw size={16} />
               </button>
             </>
           }
         />
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
           <StatCard icon={Users} label="Total Estudiantes" value={totalStats.total} color="indigo" />
           <StatCard icon={CheckCircle2} label="Aprobados" value={totalStats.passed} color="emerald" />
           <StatCard icon={XCircle} label="Reprobados" value={totalStats.failed} color="rose" />
           <StatCard icon={Clock} label="En Proceso" value={totalStats.pending} color="amber" />
         </div>
 
-        {/* Filters Panel */}
-        <section className="bg-white dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-xl">
-          <div className="flex flex-col lg:flex-row gap-6">
-            
-            {/* Search */}
-            <div className="flex-1 relative">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
-              </div>
-              <input
-                type="text"
-                placeholder="Buscar por nombre, documento o nivel..."
-                className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/50 transition-all font-medium"
-                value={searchText}
-                onChange={(e) => setSearchText(validateSearchText(e.target.value))}
-              />
+        {/* ── FILTERS PANEL ── */}
+        <section className="bg-white dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden">
+
+          {/* ── MOBILE TOOLBAR (lg:hidden) ── */}
+          <div className="lg:hidden">
+            {/* Toolbar row */}
+            <div className="flex items-center gap-2 p-3 border-b border-slate-100 dark:border-slate-800">
+              {/* Search toggle */}
+              <button
+                onClick={() => setShowMobileSearch(!showMobileSearch)}
+                className={`flex items-center justify-center rounded-2xl border transition-all shrink-0 ${
+                  showMobileSearch || searchText
+                    ? 'bg-indigo-600 text-white border-indigo-700'
+                    : 'bg-white dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Search size={17}/>
+              </button>
+
+              {/* Year select */}
+              <select
+                value={selectedYear}
+                onChange={(e) => { setSelectedYear(e.target.value); setSelectedLevel('ALL'); }}
+                className="flex-1 min-w-0 h-11 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-3 text-xs font-bold outline-none appearance-none text-slate-800 dark:text-slate-200"
+              >
+                <option value="ALL">Todos los Años</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+
+              {/* Level select */}
+              <select
+                value={selectedLevel}
+                onChange={(e) => setSelectedLevel(e.target.value)}
+                className="flex-1 min-w-0 h-11 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-3 text-xs font-bold outline-none appearance-none text-slate-800 dark:text-slate-200"
+              >
+                <option value="ALL">Todos los Niveles</option>
+                {availableLevels.map(lvl => <option key={lvl.value} value={lvl.value}>{lvl.label}</option>)}
+              </select>
+
+              {/* Result select */}
+              <select
+                value={selectedResultFilter}
+                onChange={(e) => setSelectedResultFilter(e.target.value)}
+                className="flex-1 min-w-0 h-11 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-3 text-xs font-bold outline-none appearance-none text-slate-800 dark:text-slate-200"
+              >
+                <option value="ALL">Estados</option>
+                <option value="PASSED">Aprobados</option>
+                <option value="FAILED">Reprobados</option>
+                <option value="PENDING">Pendientes</option>
+                <option value="CANCELLED">Cancelados</option>
+              </select>
             </div>
 
-            {/* Selects */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:w-[60%]">
-              <div className="relative group">
+            {/* Expandable search */}
+            {showMobileSearch && (
+              <div className="px-3 pb-3 animate-in slide-in-from-top-2 duration-200">
+                <div className="relative">
+                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Buscar por nombre..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(validateSearchText(e.target.value))}
+                    className="w-full h-11 pl-10 pr-9 bg-slate-50 dark:bg-slate-950/50 rounded-2xl font-medium text-sm outline-none border border-slate-200 dark:border-slate-800 focus:border-indigo-400 transition-all text-slate-800 dark:text-slate-100"
+                  />
+                  {searchText && (
+                    <button
+                      onClick={() => { setSearchText(''); setShowMobileSearch(false); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Active filter pills */}
+            {hasFiltersApplied && (
+              <div className="flex items-center gap-2 px-3 pb-3 overflow-x-auto">
+                {searchText && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-black bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-full px-3 py-1.5 whitespace-nowrap">
+                    "{searchText.slice(0, 12)}{searchText.length > 12 ? '…' : ''}"
+                    <button onClick={() => setSearchText('')}><XCircle size={10} /></button>
+                  </span>
+                )}
+                {selectedYear !== 'ALL' && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full px-3 py-1.5 whitespace-nowrap">
+                    {selectedYear}
+                    <button onClick={() => setSelectedYear('ALL')}><XCircle size={10} /></button>
+                  </span>
+                )}
+                {selectedLevel !== 'ALL' && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full px-3 py-1.5 whitespace-nowrap">
+                    {ALL_LEVEL_ENROLLMENTS.find(l => l.value === selectedLevel)?.label}
+                    <button onClick={() => setSelectedLevel('ALL')}><XCircle size={10} /></button>
+                  </span>
+                )}
+                {selectedResultFilter !== 'ALL' && (
+                  <span className="flex items-center gap-1.5 text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full px-3 py-1.5 whitespace-nowrap">
+                    {RESULT_FILTER_MAP[selectedResultFilter]}
+                    <button onClick={() => setSelectedResultFilter('ALL')}><XCircle size={10} /></button>
+                  </span>
+                )}
+                <button
+                  onClick={() => { setSearchText(''); setSelectedYear('ALL'); setSelectedLevel('ALL'); setSelectedResultFilter('ALL'); setShowMobileSearch(false); }}
+                  className="ml-auto text-[10px] font-black text-indigo-600 dark:text-indigo-400 whitespace-nowrap"
+                >
+                  Limpiar
+                </button>
+              </div>
+            )}
+
+            {/* Mobile action buttons */}
+            <div className="flex items-center gap-2 px-3 pb-3">
+              <button
+                onClick={handleShowStatistics}
+                className="flex-1 flex items-center justify-center gap-2 h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95"
+              >
+                <BarChart3 size={14} />
+                Estadísticas
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className="flex-1 flex items-center justify-center gap-2 h-10 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all active:scale-95"
+              >
+                <Download size={14} />
+                Exportar
+              </button>
+              <span className="flex items-center justify-center h-10 px-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl text-[10px] font-black text-indigo-600 dark:text-indigo-400">
+                {filteredStudents.length}
+              </span>
+            </div>
+          </div>
+
+          {/* ── DESKTOP TOOLBAR (hidden lg:block) ── */}
+          <div className="hidden lg:block p-5 lg:p-6 space-y-4">
+
+            {/* Row 1: Search + Year + State */}
+            <div className="flex items-end gap-6">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400">
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, documento o nivel..."
+                  className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-950 border-none rounded-2xl text-slate-900 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/50 transition-all font-medium"
+                  value={searchText}
+                  onChange={(e) => setSearchText(validateSearchText(e.target.value))}
+                />
+              </div>
+
+              {/* Year select */}
+              <div className="relative group w-48 shrink-0">
                 <div className="absolute left-4 inset-y-0 flex items-center text-slate-400 group-focus-within:text-indigo-500 transition-colors">
                   <Calendar size={18} />
                 </div>
-                <select 
+                <select
                   className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 appearance-none rounded-2xl border-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700 dark:text-slate-200"
                   value={selectedYear}
                   onChange={(e) => { setSelectedYear(e.target.value); setSelectedLevel('ALL'); }}
@@ -410,26 +550,12 @@ const StudentsPage = () => {
                 <ChevronDown className="absolute right-4 inset-y-0 my-auto text-slate-400 pointer-events-none" size={18} />
               </div>
 
-              <div className="relative group">
-                <div className="absolute left-4 inset-y-0 flex items-center text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                  <Layers size={18} />
-                </div>
-                <select 
-                  className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 appearance-none rounded-2xl border-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700 dark:text-slate-200"
-                  value={selectedLevel}
-                  onChange={(e) => setSelectedLevel(e.target.value)}
-                >
-                  <option value="ALL">Todos los Niveles</option>
-                  {availableLevels.map(lvl => <option key={lvl.value} value={lvl.value}>{lvl.label}</option>)}
-                </select>
-                <ChevronDown className="absolute right-4 inset-y-0 my-auto text-slate-400 pointer-events-none" size={18} />
-              </div>
-
-              <div className="relative group">
+              {/* State select */}
+              <div className="relative group w-48 shrink-0">
                 <div className="absolute left-4 inset-y-0 flex items-center text-slate-400 group-focus-within:text-indigo-500 transition-colors">
                   <Award size={18} />
                 </div>
-                <select 
+                <select
                   className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 appearance-none rounded-2xl border-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700 dark:text-slate-200"
                   value={selectedResultFilter}
                   onChange={(e) => setSelectedResultFilter(e.target.value)}
@@ -443,35 +569,57 @@ const StudentsPage = () => {
                 <ChevronDown className="absolute right-4 inset-y-0 my-auto text-slate-400 pointer-events-none" size={18} />
               </div>
             </div>
-          </div>
 
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-800 pt-6">
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 font-medium">
-              <span className="flex items-center justify-center w-6 h-6 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold">
-                {filteredStudents.length}
-              </span>
-              Estudiantes encontrados
-              {hasFiltersApplied && (
-                <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full text-xs animate-pulse">
-                  Filtros activos
+            {/* Row 2: Level + Result count + Actions */}
+            <div className="flex items-center justify-between gap-6">
+              {/* Level select */}
+              <div className="relative group w-64 shrink-0">
+                <div className="absolute left-4 inset-y-0 flex items-center text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                  <Layers size={18} />
+                </div>
+                <select
+                  className="w-full pl-12 pr-10 py-4 bg-slate-50 dark:bg-slate-950 appearance-none rounded-2xl border-none focus:ring-2 focus:ring-indigo-500 font-bold text-slate-700 dark:text-slate-200"
+                  value={selectedLevel}
+                  onChange={(e) => setSelectedLevel(e.target.value)}
+                >
+                  <option value="ALL">Todos los Niveles</option>
+                  {availableLevels.map(lvl => <option key={lvl.value} value={lvl.value}>{lvl.label}</option>)}
+                </select>
+                <ChevronDown className="absolute right-4 inset-y-0 my-auto text-slate-400 pointer-events-none" size={18} />
+              </div>
+
+              {/* Result count */}
+              <div className="flex items-center gap-3">
+                <span className="flex items-center justify-center w-6 h-6 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-lg text-xs font-bold">
+                  {filteredStudents.length}
                 </span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button 
-                onClick={handleShowStatistics}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95"
-              >
-                <BarChart3 size={16} />
-                Estadísticas
-              </button>
-              <button 
-                onClick={handleExportPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95"
-              >
-                <Download size={16} />
-                Exportar PDF
-              </button>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Estudiantes encontrados</p>
+                {hasFiltersApplied && (
+                  <span className="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full text-xs animate-pulse">
+                    Filtros activos
+                  </span>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleShowStatistics}
+                  title="Estadísticas"
+                  className="flex items-center gap-2 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95"
+                >
+                  <BarChart3 size={16} />
+                  <span className="hidden xl:inline">Estadísticas</span>
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  title="Exportar PDF"
+                  className="flex items-center gap-2 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95"
+                >
+                  <Download size={16} />
+                  <span className="hidden xl:inline">Exportar PDF</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -484,8 +632,92 @@ const StudentsPage = () => {
           </div>
         )}
 
-        {/* Table/Content */}
-        <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        {/* ── TABLE / CONTENT ── */}
+        <>
+          {/* Mobile — compact touch-friendly rows */}
+          <div className="lg:hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/50">
+            {loading ? (
+              <div className="flex flex-col items-center gap-4 py-20">
+                <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-600 rounded-full animate-spin"></div>
+                <span className="font-bold tracking-tight text-slate-400">Sincronizando...</span>
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="flex flex-col items-center gap-4 py-20 px-6 text-center">
+                <GraduationCap size={60} strokeWidth={1} className="text-slate-300 dark:text-slate-700" />
+                <div className="space-y-1">
+                  <p className="text-lg font-bold dark:text-slate-400">No hay registros académicos</p>
+                  <p className="text-xs text-slate-400">Ajusta los filtros o realiza una nueva inscripción</p>
+                </div>
+              </div>
+            ) : (
+              filteredStudents.map((student) => {
+                const statusInfo = STATUS_MAP[student.status] || STATUS_MAP.PENDING;
+                const StatusIcon = statusInfo.icon;
+                return (
+                  <div
+                    key={student.id}
+                    className="flex items-start gap-3 px-4 py-4 active:bg-slate-50 dark:active:bg-slate-800/30 cursor-pointer group"
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-black text-sm shrink-0">
+                      {student.studentName.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-black text-sm text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors uppercase tracking-tight truncate">
+                            {student.studentName}
+                          </p>
+                          <p className="text-[9px] text-slate-400 mt-0.5">
+                            Inscrito: {student.enrollmentDate ? new Date(student.enrollmentDate).toLocaleDateString('es-CO') : '-'}
+                          </p>
+                        </div>
+                        <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[9px] font-black bg-${statusInfo.color}-500/10 text-${statusInfo.color}-600 dark:text-${statusInfo.color}-400 shrink-0`}>
+                          <StatusIcon size={11} />
+                          {statusInfo.label}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-${ALL_LEVEL_ENROLLMENTS.find(l => l.value === student.levelEnrollment)?.color || 'slate'}-500/10 text-${ALL_LEVEL_ENROLLMENTS.find(l => l.value === student.levelEnrollment)?.color || 'slate'}-600 dark:text-${ALL_LEVEL_ENROLLMENTS.find(l => l.value === student.levelEnrollment)?.color || 'slate'}-400`}>
+                          {ALL_LEVEL_ENROLLMENTS.find(l => l.value === student.levelEnrollment)?.label || 'Sin Nivel'}
+                        </div>
+                        <div className="flex items-center gap-1 text-[9px] text-slate-400">
+                          <Layers size={10} />
+                          {student.cohortName}
+                        </div>
+                        {student.passed === true && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-600 uppercase tracking-widest">
+                            <Award size={10} strokeWidth={3} /> Aprobado
+                          </span>
+                        )}
+                        {student.passed === false && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-rose-500 uppercase tracking-widest">
+                            <Ban size={10} strokeWidth={3} /> Reprobado
+                          </span>
+                        )}
+                      </div>
+                      {/* Attendance bar */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${student.attendancePercentage || 0}%` }} />
+                        </div>
+                        <span className="text-[9px] font-black text-slate-500">{student.attendancePercentage?.toFixed(1) || 0}%</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleCancelEnrollment(student.id); }}
+                      className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-all shrink-0"
+                      title="Cancelar Inscripción"
+                    >
+                      <Ban size={16} />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop — full table */}
+          <div className="hidden lg:block overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800">
@@ -602,7 +834,8 @@ const StudentsPage = () => {
               )}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       </div>
 
       <ModalEnrollStudent

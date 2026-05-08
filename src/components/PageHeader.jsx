@@ -10,7 +10,7 @@ export const PageHeader = ({ title, subtitle, subtitleVariant = "description", i
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tighter text-slate-900 dark:text-white whitespace-nowrap">
             {title}
           </h1>
           {subtitle && (
@@ -27,7 +27,7 @@ export const PageHeader = ({ title, subtitle, subtitleVariant = "description", i
         </div>
       </div>
       {actions && (
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {actions}
         </div>
       )}

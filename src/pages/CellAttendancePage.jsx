@@ -741,32 +741,35 @@ const CellAttendancePage = () => {
               {isLeaderShip && (
                 <button
                   onClick={() => setShowEventModal(true)}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-[1.5rem] font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-xl shadow-indigo-600/20 hover:shadow-indigo-600/40 hover:-translate-y-1 active:scale-95 transition-all group"
+                  title="Evento Especial"
+                  className="flex items-center gap-2 px-3 py-3 xl:px-5 xl:py-3 bg-gradient-to-br from-indigo-600 to-indigo-700 text-white rounded-2xl font-black text-[9px] xl:text-xs uppercase tracking-wide shadow-xl shadow-indigo-600/20 hover:shadow-indigo-600/40 hover:-translate-y-1 active:scale-95 transition-all group shrink-0"
                 >
-                  <Zap className="w-4 h-4 fill-white animate-pulse group-hover:scale-125 transition-transform" />
-                  <span className="whitespace-nowrap">Evento Especial</span>
+                  <Zap className="w-4 h-4 fill-white animate-pulse group-hover:scale-125 transition-transform shrink-0" />
+                  <span className="hidden lg:inline whitespace-nowrap">Evento Especial</span>
                 </button>
               )}
               <button
                 onClick={() => setShowStatsModal(true)}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-[1.5rem] border border-slate-200 dark:border-slate-700 font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:-translate-y-1 active:scale-95 transition-all group"
+                title={selectedCellId ? "Estadísticas" : "Estadísticas Globales"}
+                className="flex items-center gap-2 px-3 py-3 xl:px-5 xl:py-3 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-2xl border border-slate-200 dark:border-slate-700 font-black text-[9px] xl:text-xs uppercase tracking-wide shadow-lg hover:bg-slate-50 dark:hover:bg-slate-700 hover:-translate-y-1 active:scale-95 transition-all group shrink-0"
               >
-                <TrendingUp className="w-4 h-4 text-indigo-500 group-hover:scale-125 transition-transform" />
-                <span className="whitespace-nowrap">
+                <TrendingUp className="w-4 h-4 text-indigo-500 group-hover:scale-125 transition-transform shrink-0" />
+                <span className="hidden xl:inline whitespace-nowrap">
                   {selectedCellId ? "Estadísticas" : "Estadísticas Globales"}
                 </span>
               </button>
               <button
                 onClick={handleMonthlyReport}
                 disabled={generating || !selectedCellId}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-8 py-3.5 md:py-4 bg-gradient-to-br from-slate-800 to-slate-900 dark:from-indigo-900/40 dark:to-slate-800 text-white rounded-[1.5rem] font-black text-[8.5px] md:text-xs uppercase tracking-widest md:tracking-[0.2em] shadow-2xl hover:from-black hover:to-slate-800 transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group"
+                title="Reporte Mes"
+                className="flex items-center gap-2 px-3 py-3 xl:px-5 xl:py-3 bg-gradient-to-br from-slate-800 to-slate-900 dark:from-indigo-900/40 dark:to-slate-800 text-white rounded-2xl font-black text-[9px] xl:text-xs uppercase tracking-wide shadow-2xl hover:from-black hover:to-slate-800 transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group shrink-0"
               >
                 {generating ? (
                   <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />
                 ) : (
                   <Download className="w-4 h-4 text-indigo-400 group-hover:translate-y-0.5 transition-transform" />
                 )}
-                <span className="whitespace-nowrap">Reporte Mes</span>
+                <span className="hidden xl:inline whitespace-nowrap">Reporte Mes</span>
               </button>
             </>
           }
