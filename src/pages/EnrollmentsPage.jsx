@@ -439,13 +439,88 @@ const EnrollmentsPage = () => {
     }
   };
 
-  const handlePrintLessonAttendance = async (lesson, currentStudents, attendedEnrollmentIds) => {
+  const getActiveStudentsForSelectedEnrollment = async () => {
+    if (!selectedEnrollment?.id) return [];
+
+    if (students.length > 0) {
+      return students;
+    }
+
+    const data = await apiService.getStudentEnrollmentsByEnrollment(selectedEnrollment.id);
+    const activeStudents = (data || []).filter((s) => s.status !== "CANCELLED");
+    setStudents(activeStudents.map((s) => ({ ...s, memberName: escapeHtml(s.memberName || "") })));
+    return activeStudents;
+  };
+
+  const getLessonsForSelectedEnrollment = async () => {
+    if (!selectedEnrollment?.id) return [];
+
+    if (lessons.length > 0) {
+      return lessons;
+    }
+
+    if (attendanceSummary.length > 0) {
+      return attendanceSummary;
+    }
+
+    const data = await apiService.getLessonsByEnrollment(selectedEnrollment.id);
+    const normalizedLessons = (data || []).map((l) => ({
+      ...l,
+      lessonName: escapeHtml(l.lessonName),
+      description: escapeHtml(l.description || ""),
+    }));
+    setLessons(normalizedLessons);
+    return normalizedLessons;
+  };
+
+  const getPresentMemberIdsByLesson = async (lessonId, currentStudents = []) => {
+    const records = await apiService.getAttendancesByLesson(lessonId);
+    const studentsByEnrollmentId = new Map(
+      currentStudents.map((student) => [Number(student.id), student])
+    );
+    const presentMemberIds = new Set();
+
+    (records || []).forEach((attendance) => {
+      if (!attendance?.present) return;
+
+      const enrollmentId = Number(
+        attendance.studentEnrollmentId ?? attendance.studentEnrollment?.id
+      );
+      const currentStudent = studentsByEnrollmentId.get(enrollmentId);
+      const memberId = Number(
+        attendance.studentEnrollment?.memberId ??
+          attendance.memberId ??
+          currentStudent?.memberId ??
+          currentStudent?.member?.id
+      );
+
+      if (Number.isFinite(memberId) && memberId > 0) {
+        presentMemberIds.add(memberId);
+      }
+    });
+
+    return presentMemberIds;
+  };
+
+  const handlePrintLessonAttendance = async (lesson) => {
+    if (!selectedEnrollment || !lesson?.id) return;
+
+    setExportingPDF(true);
+    setError("");
     try {
+      const currentStudents = await getActiveStudentsForSelectedEnrollment();
+      if (currentStudents.length === 0) {
+        setError("No hay estudiantes activos para generar el informe.");
+        return;
+      }
+
+      const attendedMemberIds = await getPresentMemberIdsByLesson(lesson.id, currentStudents);
+
       const enrichedStudents = await Promise.all(
         currentStudents.map(async (student) => {
-          const hasAttended = attendedEnrollmentIds.has(Number(student.id));
+          const mId = Number(student.memberId || student.member?.id);
+          const hasAttended = Number.isFinite(mId) ? attendedMemberIds.has(mId) : false;
           try {
-            const mId = student.memberId || student.member?.id;
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
@@ -453,31 +528,69 @@ const EnrollmentsPage = () => {
 
             return {
               ...student,
+              memberId: mId,
               memberName: student.memberName || m.name || `Miembro ${mId}`,
               isActuallyPresent: hasAttended,
               directLeader,
               networkLeader,
+              mainLeader: networkLeader || pastor,
               pastor
             };
           } catch (e) {
-            return { ...student, isActuallyPresent: hasAttended, directLeader: "Sin Líder Directo", networkLeader: "Sin Líder de Red", pastor: "Ministerio General" };
+            return {
+              ...student,
+              memberId: mId,
+              isActuallyPresent: hasAttended,
+              directLeader: "Sin Líder Directo",
+              networkLeader: "Sin Líder de Red",
+              mainLeader: "RED GENERAL",
+              pastor: "Ministerio General"
+            };
           }
         })
       );
-      generateAttendancePDF(selectedEnrollment, lesson, enrichedStudents, Array.from(attendedEnrollmentIds));
+      generateAttendancePDF(selectedEnrollment, lesson, enrichedStudents, Array.from(attendedMemberIds));
     } catch (error) {
       console.error(error);
+      setError("No se pudo generar el informe de la lección.");
+    } finally {
+      setExportingPDF(false);
     }
   };
 
   const handlePrintCohortAttendance = async () => {
-    if (!selectedEnrollment || lessons.length === 0) return;
+    if (!selectedEnrollment) return;
+
     setExportingPDF(true);
+    setError("");
     try {
+      const [currentLessons, currentStudents] = await Promise.all([
+        getLessonsForSelectedEnrollment(),
+        getActiveStudentsForSelectedEnrollment(),
+      ]);
+
+      if (currentLessons.length === 0) {
+        setError("No hay lecciones registradas para generar el listado.");
+        return;
+      }
+
+      if (currentStudents.length === 0) {
+        setError("No hay estudiantes activos para generar el listado.");
+        return;
+      }
+
+      const matrixEntries = await Promise.all(
+        currentLessons.map(async (lesson) => {
+          const presentMemberIds = await getPresentMemberIdsByLesson(lesson.id, currentStudents);
+          return [lesson.id, presentMemberIds];
+        })
+      );
+      const attendanceMatrix = new Map(matrixEntries);
+
       const enrichedStudents = await Promise.all(
-        students.map(async (student) => {
+        currentStudents.map(async (student) => {
+          const mId = Number(student.memberId || student.member?.id);
           try {
-            const mId = student.memberId || student.member?.id;
             const res = await apiService.getMemberById(mId);
             const m = res?.data || res || {};
 
@@ -485,20 +598,30 @@ const EnrollmentsPage = () => {
 
             return {
               ...student,
+              memberId: mId,
               memberName: student.memberName || m.name || student.member?.name || `Miembro ${mId}`,
               directLeader,
               networkLeader,
+              mainLeader: networkLeader || pastor,
               pastor,
               averageScore: student.averageScore || 0.0
             };
           } catch (e) {
-            return { ...student, directLeader: "Sin Líder Directo", networkLeader: "Sin Líder de Red", pastor: "Ministerio General" };
+            return {
+              ...student,
+              memberId: mId,
+              directLeader: "Sin Líder Directo",
+              networkLeader: "Sin Líder de Red",
+              mainLeader: "RED GENERAL",
+              pastor: "Ministerio General"
+            };
           }
         })
       );
-      generateCohortAttendanceFullPDF(selectedEnrollment, lessons, enrichedStudents, attendanceSummary);
+      generateCohortAttendanceFullPDF(selectedEnrollment, currentLessons, enrichedStudents, attendanceMatrix);
     } catch (error) {
       console.error(error);
+      setError("No se pudo generar el informe general de asistencias.");
     } finally {
       setExportingPDF(false);
     }
@@ -674,7 +797,9 @@ const EnrollmentsPage = () => {
         }
         case "attendance": {
           const data = await apiService.getLessonsByEnrollment(selectedEnrollment.id);
-          setAttendanceSummary((data || []).map((l) => ({ ...l, lessonName: escapeHtml(l.lessonName) })));
+          const normalizedLessons = (data || []).map((l) => ({ ...l, lessonName: escapeHtml(l.lessonName) }));
+          setAttendanceSummary(normalizedLessons);
+          setLessons(normalizedLessons);
           break;
         }
         default: break;
