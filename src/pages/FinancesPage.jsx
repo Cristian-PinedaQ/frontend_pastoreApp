@@ -2,7 +2,14 @@
 // FinancesPage.jsx - ELITE MODERN EDITION
 // ============================================
 
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  lazy,
+  Suspense,
+} from "react";
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
 import { useLeaders } from "../hooks/useLeaders";
@@ -38,7 +45,9 @@ import {
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 
-const ModalFinanceStatistics = lazy(() => import("../components/ModalFinanceStatistics"));
+const ModalFinanceStatistics = lazy(
+  () => import("../components/ModalFinanceStatistics"),
+);
 
 // ✅ CONSTANTES
 const INCOME_CONCEPTS = [
@@ -125,8 +134,21 @@ const LEADER_TYPE_LABELS = {
 
 const parseLocalDate = (dateString) => {
   if (!dateString) return null;
+
   const [year, month, day] = dateString.split("-");
-  return new Date(year, month - 1, day); // LOCAL, no UTC
+  return new Date(year, month - 1, day);
+};
+
+const formatLocalDate = (dateString) => {
+  const date = parseLocalDate(dateString);
+
+  if (!date) return "";
+
+  return date.toLocaleDateString("es-CO", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
 };
 
 const FinancesPage = () => {
@@ -375,7 +397,7 @@ const FinancesPage = () => {
     const d = {
       title: "Reporte de Ingresos",
       totalAmount: stats.total,
-      date: new Date().toLocaleDateString("es-CO"),
+      date: new Date().toISOString(),
       finances: filteredFinances,
       statistics: calculateDetailedStats(),
     };
@@ -391,25 +413,56 @@ const FinancesPage = () => {
       byConcept: {},
       finances: filteredFinances,
     };
+
     filteredFinances.forEach((f) => {
       const c = f.concept || "OTRO";
-      if (!s.byConcept[c])
-        s.byConcept[c] = { count: 0, total: 0, verified: 0, pending: 0 };
+
+      if (!s.byConcept[c]) {
+        s.byConcept[c] = {
+          count: 0,
+          total: 0,
+          verified: 0,
+          pending: 0,
+        };
+      }
+
       s.byConcept[c].count++;
       s.byConcept[c].total += f.amount;
-      if (f.isVerified) s.byConcept[c].verified++;
-      else s.byConcept[c].pending++;
+
+      if (f.isVerified) {
+        s.byConcept[c].verified++;
+      } else {
+        s.byConcept[c].pending++;
+      }
     });
+
+    let periodText = null;
+
+    if (startDate && endDate) {
+      periodText = `${formatLocalDate(startDate)} - ${formatLocalDate(endDate)}`;
+    } else if (startDate) {
+      periodText = formatLocalDate(startDate);
+    } else if (endDate) {
+      periodText = formatLocalDate(endDate);
+    }
 
     generateDailyFinancePDF(
       {
         finances: filteredFinances,
         reportType: type,
         statistics: s,
-        config: { title: "Reporte Específico de Finanzas" },
+
+        // 👇 IMPORTANTE
+        date: parseLocalDate(startDate || endDate) || new Date(),
+        dateRange: periodText,
+
+        config: {
+          title: "Reporte Específico de Finanzas",
+        },
       },
       "reporte-personalizado",
     );
+
     setShowReportModal(false);
   };
 

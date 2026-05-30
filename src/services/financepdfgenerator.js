@@ -19,33 +19,33 @@
 // Paleta de colores y constantes de diseño
 // ============================================
 const COLORS = {
-  primary:   '#1e40af',     // Azul oscuro
-  accent:    '#3b82f6',     // Azul brillante
-  success:   '#10b981',     // Verde
-  warning:   '#f59e0b',     // Amarillo
-  danger:    '#ef4444',     // Rojo
-  inactive:  '#6b7280',     // Gris
-  dark:      '#1e293b',     // Azul muy oscuro
-  light:     '#f8fafc',     // Gris muy claro
-  border:    '#e2e8f0',     // Gris borde
-  textMain:  '#1e293b',     // Texto principal
-  textSub:   '#64748b',     // Texto secundario
-  white:     '#ffffff',
-  
+  primary: '#1e40af',     // Azul oscuro
+  accent: '#3b82f6',     // Azul brillante
+  success: '#10b981',     // Verde
+  warning: '#f59e0b',     // Amarillo
+  danger: '#ef4444',     // Rojo
+  inactive: '#6b7280',     // Gris
+  dark: '#1e293b',     // Azul muy oscuro
+  light: '#f8fafc',     // Gris muy claro
+  border: '#e2e8f0',     // Gris borde
+  textMain: '#1e293b',     // Texto principal
+  textSub: '#64748b',     // Texto secundario
+  white: '#ffffff',
+
   // Colores específicos para finanzas
-  income:    '#10b981',     // Verde para ingresos
-  verified:  '#10b981',     // Verde para verificado
-  pending:   '#f59e0b',     // Amarillo para pendiente
-  cash:      '#3b82f6',     // Azul para efectivo
-  transfer:  '#8b5cf6',     // Púrpura para transferencia
+  income: '#10b981',     // Verde para ingresos
+  verified: '#10b981',     // Verde para verificado
+  pending: '#f59e0b',     // Amarillo para pendiente
+  cash: '#3b82f6',     // Azul para efectivo
+  transfer: '#8b5cf6',     // Púrpura para transferencia
 };
 
 // 📏 TAMAÑO CARTA (Letter) - 216mm x 279mm
 //const PAGE = { 
- // W: 216,        // Ancho carta en mm
- // H: 279,        // Alto carta en mm
+// W: 216,        // Ancho carta en mm
+// H: 279,        // Alto carta en mm
 //  marginX: 18,   // Margen horizontal
- // marginY: 20    // Margen vertical
+// marginY: 20    // Margen vertical
 //};
 // Nota: contentW está disponible si se necesita en el futuro
 // const contentW = PAGE.W - PAGE.marginX * 2;
@@ -83,34 +83,75 @@ const formatCurrency = (amount) => {
 
 const formatDateFull = (date) => {
   try {
-    if (!date) return 'Sin fecha';
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) return date;
-    
-    return dateObj.toLocaleDateString('es-CO', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    if (!date) return "Sin fecha";
+
+    let dateObj;
+
+    // Fecha Firestore Timestamp
+    if (date?.seconds) {
+      dateObj = new Date(date.seconds * 1000);
+    }
+    // Fecha tipo YYYY-MM-DD
+    else if (
+      typeof date === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(date)
+    ) {
+      const [year, month, day] = date.split("-").map(Number);
+
+      // Crear fecha local evitando UTC
+      dateObj = new Date(year, month - 1, day);
+    }
+    // Date normal
+    else if (date instanceof Date) {
+      dateObj = date;
+    }
+    // Otros formatos
+    else {
+      dateObj = new Date(date);
+    }
+
+    if (isNaN(dateObj.getTime())) {
+      return "Fecha inválida";
+    }
+
+    return dateObj.toLocaleDateString("es-CO", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "America/Bogota",
     });
-  } catch (error) {
-    return date || 'Sin fecha';
+  } catch {
+    return "Sin fecha";
   }
 };
 
 const formatDateTime = (dateString) => {
-  if (!dateString) return '-';
+  if (!dateString) return "-";
+
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-CO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    let date;
+
+    if (
+      typeof dateString === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(dateString)
+    ) {
+      const [year, month, day] = dateString.split("-").map(Number);
+      date = new Date(year, month - 1, day);
+    } else {
+      date = new Date(dateString);
+    }
+
+    return date.toLocaleString("es-CO", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Bogota",
     });
-  } catch (e) {
-    return '-';
+  } catch {
+    return "-";
   }
 };
 
@@ -199,7 +240,7 @@ export const generateFinancePdf = ({
   // ============================================
   // Construir HTML del documento
   // ============================================
-  
+
   // Función para generar filas de KPIs
   const kpiRow = (label, value, subValue, color = COLORS.primary) => `
     <div style="flex:1;background:${COLORS.light};border:1px solid ${COLORS.border};border-radius:10px;padding:14px;border-top:3px solid ${color}">
@@ -315,8 +356,8 @@ export const generateFinancePdf = ({
   <div style="display:flex;gap:12px;margin-bottom:20px">
     ${kpiRow('Total Ingresos', formatCurrency(stats.totalAmount), 'Suma total', COLORS.income)}
     ${kpiRow('Registros', stats.totalRecords, 'Aportes realizados', COLORS.accent)}
-    ${kpiRow('Verificados', stats.verifiedCount, `${((stats.verifiedCount/stats.totalRecords)*100 || 0).toFixed(1)}% del total`, COLORS.success)}
-    ${kpiRow('Pendientes', stats.pendingCount, `${((stats.pendingCount/stats.totalRecords)*100 || 0).toFixed(1)}% del total`, COLORS.warning)}
+    ${kpiRow('Verificados', stats.verifiedCount, `${((stats.verifiedCount / stats.totalRecords) * 100 || 0).toFixed(1)}% del total`, COLORS.success)}
+    ${kpiRow('Pendientes', stats.pendingCount, `${((stats.pendingCount / stats.totalRecords) * 100 || 0).toFixed(1)}% del total`, COLORS.warning)}
   </div>
 
   <!-- ══ DOS COLUMNAS: INFORMACIÓN + ESTADÍSTICAS ══ -->
@@ -328,7 +369,14 @@ export const generateFinancePdf = ({
         📍 Información del Reporte
       </div>
       ${infoRow('Tipo de Reporte', reportType === 'summary' ? 'Resumen' : 'Detallado con Miembros')}
-      ${infoRow('Período', dateRange || formatDateFull(selectedDate) || 'No especificado')}
+      ${infoRow(
+    'Período',
+    dateRange
+      ? dateRange
+      : selectedDate
+        ? formatDateFull(selectedDate)
+        : 'No especificado'
+  )}
       ${infoRow('Fecha Generación', formatDateTime(currentDate))}
       ${infoRow('Total Conceptos', Object.keys(stats.byConcept).length.toString())}
     </div>
@@ -341,7 +389,7 @@ export const generateFinancePdf = ({
       ${infoRow('Monto Verificado', formatCurrency(stats.byConcept.TITHE?.total || 0), COLORS.success)}
       ${infoRow('Monto Pendiente', formatCurrency(stats.totalAmount - (stats.byConcept.TITHE?.total || 0)), COLORS.warning)}
       ${infoRow('Promedio por Registro', formatCurrency(stats.totalAmount / (stats.totalRecords || 1)), COLORS.textMain)}
-      ${infoRow('Tasa de Verificación', `${((stats.verifiedCount/stats.totalRecords)*100 || 0).toFixed(1)}%`, COLORS.success)}
+      ${infoRow('Tasa de Verificación', `${((stats.verifiedCount / stats.totalRecords) * 100 || 0).toFixed(1)}%`, COLORS.success)}
     </div>
   </div>
 
@@ -484,11 +532,11 @@ export const handlePdfExport = async ({
     return true;
   } catch (error) {
     console.error('Error en exportación PDF:', error);
-    
+
     if (onError && typeof onError === 'function') {
       onError(error.message || 'Error al generar PDF');
     }
-    
+
     return false;
   }
 };

@@ -157,7 +157,13 @@ const ModalDailyReportOptions = ({ isOpen, onClose, onConfirm, selectedDate, fin
     if (dateRange && typeof dateRange === 'string') {
       displayDate = dateRange;
     } else if (selectedDate && typeof selectedDate === 'string') {
-      displayDate = new Date(selectedDate).toLocaleDateString('es-CO');
+      const [year, month, day] = selectedDate.split("T")[0].split("-");
+
+displayDate = new Date(
+  Number(year),
+  Number(month) - 1,
+  Number(day)
+).toLocaleDateString("es-CO");
     }
   } catch (error) {
     logError('Error formateando fecha:', error);
