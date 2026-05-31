@@ -26,8 +26,7 @@ import {
   MoreVertical,
   AlertCircle,
   Save,
-  X,
-  Info
+  X
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 
@@ -41,6 +40,7 @@ const ERROR_MESSAGES = {
 };
 
 const ROLE_OPTIONS = [
+  { value: "ADMIN", label: "Administrador", icon: "🛡️", color: "indigo" },
   { value: "PASTORES", label: "Pastores", icon: "🐑", color: "indigo" },
   { value: "CONEXION", label: "Conexión", icon: "🔗", color: "violet" },
   { value: "CIMIENTO", label: "Cimiento", icon: "🏗️", color: "amber" },
@@ -50,6 +50,9 @@ const ROLE_OPTIONS = [
   { value: "LIDER", label: "Líder", icon: "⚔️", color: "red" },
   { value: "PROFESORES", label: "Profesores", icon: "📚", color: "blue" },
   { value: "ALABANZA", label: "Alabanza", icon: "🎹", color: "fuchsia" },
+  { value: "SECRETARIA", label: "Secretaria", icon: "💼", color: "slate" },
+  { value: "MINISTERIOS", label: "Ministerios", icon: "🏛️", color: "emerald" },
+  { value: "PROTOCOLO", label: "Protocolo", icon: "🤝", color: "violet" },
 ];
 
 const UsersPage = () => {
@@ -69,7 +72,7 @@ const UsersPage = () => {
     username: "",
     email: "",
     password: "",
-    role: "PROFESORES",
+    roles: ["PROFESORES"],
   });
 
   // ========== SEGURIDAD & UTILIDADES ==========
@@ -130,7 +133,7 @@ const UsersPage = () => {
   }, [handleError]);
 
   useEffect(() => {
-    if (hasRole("PASTORES")) loadUsers();
+    if (hasRole("PASTORES") || hasRole("ADMIN") || hasRole("ROLE_PASTORES") || hasRole("ROLE_ADMIN")) loadUsers();
   }, [hasRole, loadUsers]);
 
   // ========== FILTRADO ==========
@@ -157,13 +160,18 @@ const UsersPage = () => {
     setError("");
     setSuccess("");
     
+    if (!formData.roles || formData.roles.length === 0) {
+      setError("Debes seleccionar al menos un rol para el usuario");
+      return;
+    }
+
     setLoading(true);
     try {
       if (editingId) {
-        await authService.updateUser(editingId, formData.username, formData.email, formData.password);
+        await authService.updateUser(editingId, formData.username, formData.email, formData.password, formData.roles);
         setSuccess("Usuario actualizado con éxito");
       } else {
-        await authService.register(formData.username, formData.email, formData.password, formData.role);
+        await authService.register(formData.username, formData.email, formData.password, formData.roles);
         setSuccess("Nuevo usuario registrado correctamente");
       }
       handleCancel();
@@ -181,9 +189,9 @@ const UsersPage = () => {
       const userData = await authService.getUserById(userId);
       setFormData({
         username: userData.username || "",
-        email: maskEmail(userData.email) || "",
+        email: userData.email || "",
         password: "",
-        role: userData.roles?.[0] || "PROFESORES",
+        roles: userData.roles || ["PROFESORES"],
       });
       setEditingId(userId);
       setShowForm(true);
@@ -210,14 +218,14 @@ const UsersPage = () => {
 
 
   const handleCancel = () => {
-    setFormData({ username: "", email: "", password: "", role: "PROFESORES" });
+    setFormData({ username: "", email: "", password: "", roles: ["PROFESORES"] });
     setEditingId(null);
     setShowForm(false);
     setShowPassword(false);
     setError("");
   };
 
-  if (!hasRole("PASTORES")) {
+  if (!hasRole("PASTORES") && !hasRole("ADMIN") && !hasRole("ROLE_PASTORES") && !hasRole("ROLE_ADMIN")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
         <div className="w-24 h-24 bg-red-50 dark:bg-red-500/10 rounded-[2.5rem] flex items-center justify-center mb-6 border border-red-100 dark:border-red-500/20">
@@ -353,39 +361,54 @@ const UsersPage = () => {
 
               {/* ROLE SELECTION */}
               <div className="space-y-3">
-                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4">Rol en el Sistema</label>
-                {!editingId ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {ROLE_OPTIONS.map((role) => (
+                <label className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-4">Roles en el Sistema</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {ROLE_OPTIONS.map((role) => {
+                    const isSelected = formData.roles?.includes(role.value);
+                    const handleRoleToggle = () => {
+                      let updatedRoles;
+                      if (isSelected) {
+                        updatedRoles = formData.roles.filter(r => r !== role.value);
+                      } else {
+                        updatedRoles = [...(formData.roles || []), role.value];
+                      }
+                      setFormData({ ...formData, roles: updatedRoles });
+                    };
+
+                    const selectedColors = {
+                      indigo: "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/20",
+                      violet: "bg-violet-600 border-violet-600 text-white shadow-lg shadow-violet-500/20",
+                      amber: "bg-amber-600 border-amber-600 text-white shadow-lg shadow-amber-500/20",
+                      purple: "bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-500/20",
+                      emerald: "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20",
+                      slate: "bg-slate-600 border-slate-600 text-white shadow-lg shadow-slate-500/20",
+                      red: "bg-red-600 border-red-600 text-white shadow-lg shadow-red-500/20",
+                      blue: "bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-500/20",
+                      fuchsia: "bg-fuchsia-600 border-fuchsia-600 text-white shadow-lg shadow-fuchsia-500/20",
+                    };
+
+                    const activeClass = selectedColors[role.color] || selectedColors.indigo;
+
+                    return (
                       <button
                         key={role.value}
                         type="button"
-                        onClick={() => setFormData({...formData, role: role.value})}
-                        className={`flex items-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all ${
-                          formData.role === role.value 
-                            ? `bg-${role.color}-600 border-${role.color}-600 text-white shadow-lg` 
-                            : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400'
+                        onClick={handleRoleToggle}
+                        className={`flex items-center gap-2 p-3 rounded-2xl border text-xs font-bold transition-all active:scale-95 duration-200 ${
+                          isSelected 
+                            ? activeClass 
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-indigo-400 dark:hover:border-indigo-500'
                         }`}
                       >
                         <span className="text-base">{role.icon}</span>
                         <span className="truncate">{role.label}</span>
                       </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-xl">
-                        {ROLE_OPTIONS.find(r => r.value === formData.role)?.icon || '👤'}
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rol asignado</p>
-                        <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{formData.role}</p>
-                      </div>
-                    </div>
-                    <Info className="w-5 h-5 text-slate-300 dark:text-slate-600" />
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-4 mt-2">
+                  Puedes seleccionar uno o más roles para este usuario.
+                </p>
               </div>
 
               <div className="md:col-span-2 pt-6 flex flex-col sm:flex-row gap-4">

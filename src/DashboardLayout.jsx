@@ -29,6 +29,7 @@ import {
   Sun,
   Moon,
   CirclePile,
+  Ticket,
 } from "lucide-react";
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
@@ -102,7 +103,7 @@ const DashboardLayoutComponent = () => {
         label: "Consejería",
         path: "/dashboard/Counseling",
         icon: HeartHandshake,
-        visible: hasAnyRole(["ROLE_PASTORES"]),
+        visible: hasAnyRole(["ROLE_PASTORES", "ROLE_SECRETARIA"]),
       },
       {
         label: "Formaciones",
@@ -132,6 +133,18 @@ const DashboardLayoutComponent = () => {
         path: "/dashboard/g12",
         icon: CirclePile,
         visible: hasRole("ROLE_PASTORES"),
+      },
+      {
+        label: "Ticket",
+        path: "/dashboard/tickets",
+        icon: Ticket,
+        visible: true,
+      },
+      {
+        label: "Config. Tickets",
+        path: "/dashboard/tickets/configs",
+        icon: SlidersHorizontal,
+        visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ADMIN"]),
       },
       {
         label: "Servidores",
@@ -225,7 +238,7 @@ const DashboardLayoutComponent = () => {
         label: "Usuarios",
         path: "/dashboard/users",
         icon: UserCircle,
-        visible: hasRole("ROLE_PASTORES"),
+        visible: hasAnyRole(["ROLE_PASTORES", "ROLE_ADMIN"]),
       },
     ],
     [hasRole, hasAnyRole],

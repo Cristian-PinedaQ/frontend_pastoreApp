@@ -12,6 +12,7 @@ import React, {
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
 import { useMembers } from "../hooks/useMembers";
+import { useAuth } from "../context/AuthContext";
 import PageHeader from "../components/PageHeader";
 import {
   Users,
@@ -76,6 +77,7 @@ const EMPTY_SESSION_FORM = {
   location: "",
   topic: "OTHER",
   objectives: "",
+  pastorId: "",
 };
 
 const EMPTY_COMPLETE_FORM = {
@@ -137,11 +139,15 @@ function ModalScheduleSession({
   initialData,
   members,
   isEditing,
+  pastors,
 }) {
   const confirm = useConfirmation();
+  const { hasRole } = useAuth();
   const [form, setForm] = useState(EMPTY_SESSION_FORM);
   const [memberSearch, setMemberSearch] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const isSecretaria = hasRole("SECRETARIA");
 
   useEffect(() => {
     if (isOpen) {
@@ -153,6 +159,7 @@ function ModalScheduleSession({
           location: initialData.location || "",
           topic: initialData.topic || "OTHER",
           objectives: initialData.objectives || "",
+          pastorId: initialData.pastorId || "",
         });
         setMemberSearch(initialData.memberName || "");
       } else {
@@ -199,6 +206,15 @@ function ModalScheduleSession({
       });
       return;
     }
+    if (isSecretaria && !form.pastorId) {
+      await confirm({
+        title: "Dato Requerido",
+        message: "Por favor, selecciona el pastor responsable para la consejería.",
+        type: "warning",
+        confirmLabel: "Entendido",
+      });
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -208,7 +224,10 @@ function ModalScheduleSession({
         location: form.location || null,
         topic: form.topic,
         objectives: form.objectives || null,
+        pastorId: isSecretaria && form.pastorId ? Number(form.pastorId) : null,
       });
+    } catch (err) {
+      console.error(err);
     } finally {
       setSaving(false);
     }
@@ -362,6 +381,32 @@ function ModalScheduleSession({
               </select>
             </div>
           </div>
+
+          {isSecretaria && (
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">
+                Pastor Responsable *
+              </label>
+              <div className="relative">
+                <UserCheck className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <select
+                  value={form.pastorId}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, pastorId: e.target.value }))
+                  }
+                  className="w-full pl-14 pr-10 py-4 bg-slate-50 dark:bg-slate-800/50 border border-transparent focus:border-indigo-500 rounded-3xl text-sm font-bold transition-all outline-none cursor-pointer appearance-none"
+                >
+                  <option value="">Selecciona un Pastor...</option>
+                  {pastors && pastors.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.displayName}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-4">
@@ -1069,7 +1114,10 @@ function ModalSessionDetail({
   onPdf,
   onStart,
 }) {
+  const { hasRole } = useAuth();
   if (!isOpen || !session) return null;
+
+  const isSecretaria = hasRole("SECRETARIA");
 
   const status = COUNSELING_STATUS[session.status] || {
     label: session.status,
@@ -1079,6 +1127,16 @@ function ModalSessionDetail({
   const isActive =
     session.status === "SCHEDULED" || session.status === "RESCHEDULED";
   const isOngoing = session.status === "IN_PROGRESS";
+
+  const caps = session.capabilities || {
+    canReschedule: isActive,
+    canCancel: isActive,
+    canStart: (isOngoing || isActive) && !isSecretaria,
+    canComplete: (isOngoing || isActive) && !isSecretaria,
+    canViewNotes: !isSecretaria,
+    canEdit: isActive,
+    canAssignPastor: isSecretaria,
+  };
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -1165,6 +1223,14 @@ function ModalSessionDetail({
                     {COUNSELING_TOPICS[session.topic] || session.topic}
                   </span>
                 </p>
+                {session.pastorDisplayName && (
+                  <p className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                    <UserCheck className="w-3.5 h-3.5" /> PASTOR:{" "}
+                    <span className="text-slate-900 dark:text-white font-black">
+                      {session.pastorDisplayName}
+                    </span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1180,7 +1246,7 @@ function ModalSessionDetail({
             </div>
           )}
 
-          {session.notes && (
+          {caps.canViewNotes && session.notes && (
             <div className="bg-emerald-50 dark:bg-emerald-500/5 p-8 rounded-[2.5rem] border border-emerald-100 dark:border-emerald-500/20 shadow-inner">
               <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-2">
                 <ClipboardList className="w-4 h-4" /> Resultado y Acuerdos
@@ -1191,7 +1257,7 @@ function ModalSessionDetail({
             </div>
           )}
 
-          {session.cancellationReason && (
+          {caps.canViewNotes && session.cancellationReason && (
             <div className="bg-rose-50 dark:bg-rose-500/5 p-8 rounded-[2.5rem] border border-rose-100 dark:border-rose-500/20 shadow-inner">
               <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-3 flex items-center gap-2">
                 <XCircle className="w-4 h-4" /> Reporte de Cancelación
@@ -1205,19 +1271,21 @@ function ModalSessionDetail({
 
         {/* Actions Footer */}
         <div className="p-10 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-4 items-center justify-between">
-          <button
-            onClick={() => {
-              onPdf(session);
-              onClose();
-            }}
-            className="px-6 py-4 border-2 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-500 hover:text-indigo-600 rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3"
-          >
-            <Download className="w-4 h-4" />
-            Expediente PDF
-          </button>
+          {caps.canViewNotes && (
+            <button
+              onClick={() => {
+                onPdf(session);
+                onClose();
+              }}
+              className="px-6 py-4 border-2 border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:border-indigo-500 hover:text-indigo-600 rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3"
+            >
+              <Download className="w-4 h-4" />
+              Expediente PDF
+            </button>
+          )}
 
           <div className="flex gap-3">
-            {isOngoing && (
+            {isOngoing && caps.canStart && (
               <button
                 onClick={() => {
                   onStart(session);
@@ -1228,41 +1296,49 @@ function ModalSessionDetail({
                 Retomar Sesión
               </button>
             )}
-            {isActive && (
+            {(caps.canStart || caps.canEdit || caps.canComplete || caps.canCancel) && (
               <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => {
-                    onStart(session);
-                  }}
-                  className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center gap-2"
-                >
-                  <Zap className="w-4 h-4" />
-                  Iniciar
-                </button>
-                <button
-                  onClick={() => {
-                    onEdit(session);
-                  }}
-                  className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
-                >
-                  <Edit3 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => {
-                    onComplete(session);
-                  }}
-                  className="px-6 py-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all"
-                >
-                  Cerrar
-                </button>
-                <button
-                  onClick={() => {
-                    onCancel(session);
-                  }}
-                  className="px-6 py-4 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all"
-                >
-                  Anular
-                </button>
+                {caps.canStart && !isOngoing && (
+                  <button
+                    onClick={() => {
+                      onStart(session);
+                    }}
+                    className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 shadow-xl shadow-indigo-600/20 flex items-center gap-2"
+                  >
+                    <Zap className="w-4 h-4" />
+                    Iniciar
+                  </button>
+                )}
+                {caps.canEdit && (
+                  <button
+                    onClick={() => {
+                      onEdit(session);
+                    }}
+                    className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                )}
+                {caps.canComplete && (
+                  <button
+                    onClick={() => {
+                      onComplete(session);
+                    }}
+                    className="px-6 py-4 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-emerald-500 hover:text-white transition-all"
+                  >
+                    Cerrar
+                  </button>
+                )}
+                {caps.canCancel && (
+                  <button
+                    onClick={() => {
+                      onCancel(session);
+                    }}
+                    className="px-6 py-4 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-[2rem] font-black text-[10px] uppercase tracking-widest hover:bg-rose-600 hover:text-white transition-all"
+                  >
+                    Anular
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1372,9 +1448,22 @@ function ModalCancelSession({ isOpen, onClose, onSave, session }) {
 // ============================================================
 const CounselingPage = () => {
   const confirm = useConfirmation();
+  const { hasRole } = useAuth();
   const { data: membersData } = useMembers();
+  
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // Paginación y pastores para la secretaría
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [pastors, setPastors] = useState([]);
+
+  useEffect(() => {
+    if (hasRole("SECRETARIA")) {
+      apiService.getPastors().then(setPastors).catch(console.error);
+    }
+  }, [hasRole]);
 
   const members = useMemo(() => {
     return Array.isArray(membersData) ? membersData : [];
@@ -1401,10 +1490,27 @@ const CounselingPage = () => {
 
   const opInProgress = useRef(false);
 
-  const handleOpenDetail = useCallback((session) => {
-    setActiveSession(session);
-    setShowDetail(true);
-  }, []);
+  const handleOpenDetail = useCallback(
+    async (session) => {
+      if (opInProgress.current) return;
+      opInProgress.current = true;
+      try {
+        let detail;
+        if (hasRole("SECRETARIA")) {
+          detail = await apiService.getCounselingScheduleById(session.id);
+        } else {
+          detail = await apiService.getCounselingSessionById(session.id);
+        }
+        setActiveSession(detail);
+        setShowDetail(true);
+      } catch (err) {
+        console.error("❌ Error al obtener detalle de la sesión:", err);
+      } finally {
+        opInProgress.current = false;
+      }
+    },
+    [hasRole],
+  );
 
   // ── LOADERS ────────────────────────────────────────────────
   const loadSessions = useCallback(async () => {
@@ -1412,10 +1518,16 @@ const CounselingPage = () => {
     opInProgress.current = true;
     setLoading(true);
     try {
-      const data = await apiService.getMySessions();
-      const list = Array.isArray(data)
-        ? data
-        : data?.content || data?.sessions || [];
+      let list = [];
+      if (hasRole("SECRETARIA")) {
+        const data = await apiService.getCounselingSchedule(page, 20);
+        list = data?.content || [];
+        setTotalPages(data?.totalPages || 0);
+      } else {
+        const data = await apiService.getMySessions();
+        list = Array.isArray(data) ? data : data?.content || data?.sessions || [];
+        setTotalPages(1);
+      }
       setSessions(list);
       if (list.length === 0) {
         console.warn(
@@ -1429,7 +1541,7 @@ const CounselingPage = () => {
       setLoading(false);
       opInProgress.current = false;
     }
-  }, []);
+  }, [page, hasRole]);
 
   useEffect(() => {
     loadSessions();
@@ -1718,13 +1830,15 @@ const CounselingPage = () => {
         subtitle="Atención Espiritual y Consejería Familiar"
         actions={
           <>
-            <button
-              onClick={handleManagementPdf}
-              className="flex items-center gap-3 px-8 py-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:border-indigo-500 transition-all active:scale-95 shadow-sm shadow-indigo-500/5 group"
-            >
-              <Download className="w-5 h-5 text-indigo-500 group-hover:scale-125 transition-transform" />
-              Informe Maestro
-            </button>
+            {!hasRole("SECRETARIA") && (
+              <button
+                onClick={handleManagementPdf}
+                className="flex items-center gap-3 px-8 py-5 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 text-slate-700 dark:text-slate-300 rounded-[2.5rem] font-black text-[11px] uppercase tracking-widest hover:border-indigo-500 transition-all active:scale-95 shadow-sm shadow-indigo-500/5 group"
+              >
+                <Download className="w-5 h-5 text-indigo-500 group-hover:scale-125 transition-transform" />
+                Informe Maestro
+              </button>
+            )}
             <button
               onClick={() => {
                 setIsEditing(false);
@@ -1983,6 +2097,12 @@ const CounselingPage = () => {
                       <Zap className={`w-4 h-4 text-${status.color}-500`} />
                       {COUNSELING_TOPICS[session.topic] || session.topic}
                     </div>
+                    {session.pastorDisplayName && (
+                      <div className="flex items-center gap-3 text-xs font-bold text-slate-500 dark:text-slate-400">
+                        <UserCheck className={`w-4 h-4 text-${status.color}-500`} />
+                        Pastor: {session.pastorDisplayName}
+                      </div>
+                    )}
                     {session.location && (
                       <div className="flex items-center gap-3 text-xs font-bold text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap">
                         <MapPin
@@ -2009,6 +2129,30 @@ const CounselingPage = () => {
                 </div>
               );
             })}
+          </div>
+        )}
+        {/* PAGINACIÓN (Solo SECRETARIA) */}
+        {hasRole("SECRETARIA") && totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-12 mb-8 bg-white dark:bg-slate-900/60 backdrop-blur-2xl p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <span className="text-xs font-bold text-slate-500">
+              Página <strong className="text-slate-900 dark:text-white font-black">{page + 1}</strong> de <strong className="text-slate-900 dark:text-white font-black">{totalPages}</strong>
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="px-6 py-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-slate-50 dark:disabled:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 border border-slate-100 dark:border-slate-700"
+              >
+                Anterior
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:hover:bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-indigo-600/10"
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -2066,6 +2210,7 @@ const CounselingPage = () => {
         initialData={activeSession}
         members={members}
         isEditing={isEditing}
+        pastors={pastors}
       />
 
       <ModalCompleteSession

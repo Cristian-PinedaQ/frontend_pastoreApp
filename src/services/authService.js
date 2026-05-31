@@ -162,7 +162,7 @@ class authService {
 
   // ✅ CORREGIDO: Registro de nuevo usuario
   // ✅ CORREGIDO: Registro de nuevo usuario usando apiClient
-async register(username, email, password, role) {
+async register(username, email, password, roles) {
   try {
 
     // mantener tus validaciones
@@ -170,18 +170,23 @@ async register(username, email, password, role) {
     validateEmail(email);
     validatePassword(password);
 
-    if (!role || typeof role !== "string") {
-      throw new Error("Rol inválido");
-    }
-
-    log("📨 [register] Registrando usuario:", { username, email });
-
-    const response = await apiClient.post("/auth/register", {
+    const payload = {
       username,
       email,
-      password,
-      roleName: role.toUpperCase()
-    });
+      password
+    };
+
+    if (Array.isArray(roles)) {
+      payload.roles = roles.map(r => r.toUpperCase());
+    } else if (typeof roles === "string") {
+      payload.roles = [roles.toUpperCase()];
+    } else {
+      throw new Error("Roles inválidos");
+    }
+
+    log("📨 [register] Registrando usuario:", { username, email, roles: payload.roles });
+
+    const response = await apiClient.post("/auth/register", payload);
 
     log("✅ [register] Usuario registrado correctamente");
 
@@ -410,7 +415,7 @@ async register(username, email, password, role) {
    * @param {string} password - Nueva contraseña (opcional)
    * @returns {Promise<Object>} Datos del usuario actualizado
    */
-  async updateUser(userId, username, email, password) {
+  async updateUser(userId, username, email, password, roles) {
     try {
       // ✅ Validación de entrada
       validateUserId(userId);
@@ -428,6 +433,15 @@ async register(username, email, password, role) {
       if (password) {
         validatePassword(password);
         body.password = password;
+      }
+      if (roles) {
+        if (Array.isArray(roles)) {
+          body.roles = roles.map(r => r.toUpperCase());
+        } else if (typeof roles === "string") {
+          body.roles = [roles.toUpperCase()];
+        } else {
+          throw new Error('Roles inválidos');
+        }
       }
 
       if (Object.keys(body).length === 0) {

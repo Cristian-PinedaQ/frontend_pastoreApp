@@ -33,6 +33,9 @@ const LevelsConfigPage  = React.lazy(() => import('./pages/LevelsConfigPage.jsx'
 const WorshipPage       = React.lazy(() => import('./pages/WorshipPage.jsx'));
 const MinisteriesPage   = React.lazy(() => import('./pages/MinisteriesPage.jsx'));
 const G12DashboardPage  = React.lazy(() => import('./pages/G12DashboardPage'));
+const TicketsPage       = React.lazy(() => import('./pages/TicketsPage'));
+const TicketDetailPage   = React.lazy(() => import('./pages/TicketDetailPage'));
+const TicketConfigsPage  = React.lazy(() => import('./pages/TicketConfigsPage'));
 
 function App() {
   return (
@@ -139,7 +142,7 @@ function App() {
                   <Suspense fallback={<PageLoader />}>
                     <ProtectedRoute
                       element={<CounselingPage />}
-                      requiredRoles={['ROLE_PASTORES']}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_SECRETARIA']}
                     />
                   </Suspense>
                 } />
@@ -198,12 +201,33 @@ function App() {
                   </Suspense>
                 } />
 
+                <Route path="tickets" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute element={<TicketsPage />} />
+                  </Suspense>
+                } />
+
+                <Route path="tickets/:id" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute element={<TicketDetailPage />} />
+                  </Suspense>
+                } />
+
+                <Route path="tickets/configs" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<TicketConfigsPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_ADMIN']}
+                    />
+                  </Suspense>
+                } />
+
                 <Route path="users" element={
                   <Suspense fallback={<PageLoader />}>
                     <ProtectedRoute
                       element={<UsersPage />}
-                      requiredRoles={['ROLE_PASTORES']}
-                      requireAll={true}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_ADMIN']}
+                      requireAll={false}
                     />
                   </Suspense>
                 } />

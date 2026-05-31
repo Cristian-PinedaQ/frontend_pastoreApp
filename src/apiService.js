@@ -3217,6 +3217,55 @@ class ApiService {
   }
 
   /**
+   * Obtener lista simplificada de pastores activos en el sistema.
+   * GET /auth/users/pastors
+   * Retorna: PastorResponse[]
+   */
+  async getPastors() {
+    try {
+      log('📋 [getPastors] Obteniendo pastores activos');
+      const response = await this.request('/auth/users/pastors');
+      return response;
+    } catch (error) {
+      logError('❌ [getPastors] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener agenda administrativa de consejerías de forma segura (paginado).
+   * GET /counseling/schedule?page={page}&size={size}
+   * Retorna: Page<CounselingScheduleResponse>
+   */
+  async getCounselingSchedule(page = 0, size = 20) {
+    try {
+      log(`📋 [getCounselingSchedule] Obteniendo agenda (pág: ${page}, tamaño: ${size})`);
+      const response = await this.request(`/counseling/schedule?page=${page}&size=${size}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCounselingSchedule] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtener detalle seguro de la agenda para una sesión específica.
+   * GET /counseling/schedule/{id}
+   * Retorna: CounselingScheduleResponse
+   */
+  async getCounselingScheduleById(id) {
+    try {
+      validateId(id, 'sessionId');
+      log('🔍 [getCounselingScheduleById] Buscando detalle seguro ID:', id);
+      const response = await this.request(`/counseling/schedule/${id}`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCounselingScheduleById] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Listar todas las sesiones del pastor autenticado.
    * GET /counseling
    * Retorna: CounselingSessionResponse[]
