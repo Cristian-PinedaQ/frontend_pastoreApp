@@ -45,6 +45,7 @@ const ModalLeaderStatistics = ({ onClose, stats }) => {
 
   const typeConfig = {
     SERVANT: { label: 'Servidores', color: 'indigo', iconColor: 'text-blue-500', icon: <Star size={16} /> },
+    AUXILIARY_SERVANT: { label: 'Servidores Auxiliares', color: 'teal', iconColor: 'text-teal-500', icon: <Star size={16} /> },
     LEADER_144: { label: 'Líderes 144', color: 'violet', iconColor: 'text-amber-500', icon: <Users size={16} /> },
     LEADER_12: { label: 'Líderes 12', color: 'emerald', iconColor: 'text-green-500', icon: <Award size={16} /> },
   };

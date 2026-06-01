@@ -45,6 +45,19 @@ const LEADER_TYPES = [
     text: "text-blue-600 dark:text-blue-400"
   },
   {
+    value: "AUXILIARY_SERVANT",
+    label: "Servidor auxiliar",
+    icon: <Star size={24} />,
+    description: "Nivel mínimo: ESENCIA 2 o superior (Permite Unión Libre)",
+    requiredLevelCode: "ESENCIA_2",
+    requiredLevelOrder: 6,
+    color: "teal",
+    gradient: "from-teal-500/20 to-emerald-600/20",
+    accent: "bg-teal-600",
+    border: "border-teal-200 dark:border-teal-800/50",
+    text: "text-teal-600 dark:text-teal-400"
+  },
+  {
     value: "LEADER_144",
     label: "Líder 144",
     icon: <Users size={24} />,
@@ -159,6 +172,7 @@ const ModalPromoteLeader = ({ onClose, onSuccess }) => {
         ...member,
         eligibility: {
           SERVANT: checkBasicEligibility(member, "SERVANT"),
+          AUXILIARY_SERVANT: checkBasicEligibility(member, "AUXILIARY_SERVANT"),
           LEADER_144: checkBasicEligibility(member, "LEADER_144"),
           LEADER_12: checkBasicEligibility(member, "LEADER_12"),
         },

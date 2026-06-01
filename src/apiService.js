@@ -1288,7 +1288,7 @@ class ApiService {
   async getLeadersByType(leaderType) {
     try {
       validateString(leaderType, 'leaderType', 1, 50);
-      if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+      if (!['SERVANT', 'AUXILIARY_SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
         throw new Error('Tipo de líder inválido');
       }
       log('🔍 [getLeadersByType] Buscando líderes tipo:', leaderType);
@@ -1304,8 +1304,8 @@ class ApiService {
     try {
       validateId(memberId, 'memberId');
       validateString(leaderType, 'leaderType', 1, 50);
-      if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
-        throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
+      if (!['SERVANT', 'AUXILIARY_SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+        throw new Error('Tipo de líder inválido. Debe ser SERVANT, AUXILIARY_SERVANT, LEADER_144 o LEADER_12');
       }
 
       const params = new URLSearchParams();
@@ -1332,8 +1332,8 @@ class ApiService {
     try {
       validateId(memberId, 'memberId');
       validateString(leaderType, 'leaderType', 1, 50);
-      if (!['SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
-        throw new Error('Tipo de líder inválido. Debe ser SERVANT, LEADER_144 o LEADER_12');
+      if (!['SERVANT', 'AUXILIARY_SERVANT', 'LEADER_144', 'LEADER_12'].includes(leaderType)) {
+        throw new Error('Tipo de líder inválido. Debe ser SERVANT, AUXILIARY_SERVANT, LEADER_144 o LEADER_12');
       }
 
       log('🔍 [checkEligibility] Verificando miembro:', { memberId, leaderType });

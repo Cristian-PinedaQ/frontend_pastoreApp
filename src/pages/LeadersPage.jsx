@@ -49,6 +49,15 @@ const LeadersPage = () => {
       accent: "bg-blue-600",
       shadow: "shadow-blue-500/20",
     },
+    AUXILIARY_SERVANT: {
+      label: "Servidor auxiliar",
+      color: "teal",
+      icon: <Star size={16} />,
+      gradient: "from-teal-500/20 to-emerald-600/20",
+      iconColor: "text-teal-600 dark:text-teal-400",
+      accent: "bg-teal-600",
+      shadow: "shadow-teal-500/20",
+    },
     LEADER_144: {
       label: "Líder 144",
       color: "violet",

@@ -128,6 +128,7 @@ const METHOD_LABELS = {
 
 const LEADER_TYPE_LABELS = {
   SERVANT: "Servidor",
+  AUXILIARY_SERVANT: "Servidor auxiliar",
   LEADER_144: "Líder 144",
   LEADER_12: "Líder 12",
 };

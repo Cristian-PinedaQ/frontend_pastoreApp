@@ -6,12 +6,14 @@
 
 const LEADER_TYPE_COLORS = {
   SERVANT: '#3b82f6',
+  AUXILIARY_SERVANT: '#14b8a6',
   LEADER_12: '#10b981',
   LEADER_144: '#8b5cf6',
 };
 
 const LEADER_TYPE_LABELS = {
   SERVANT: 'Servidor',
+  AUXILIARY_SERVANT: 'Servidor Auxiliar',
   LEADER_12: 'Líder 12',
   LEADER_144: 'Líder 144',
 };
@@ -109,11 +111,13 @@ export const generateLeadersPDF = (data) => {
 
   // ========== DISTRIBUCIÓN POR TIPO ==========
   const servantCount = leaders.filter(l => l.leaderType === 'SERVANT').length;
+  const auxiliaryServantCount = leaders.filter(l => l.leaderType === 'AUXILIARY_SERVANT').length;
   const leader12Count = leaders.filter(l => l.leaderType === 'LEADER_12').length;
   const leader144Count = leaders.filter(l => l.leaderType === 'LEADER_144').length;
 
   const typeDist = [
     { key: 'SERVANT', count: servantCount, color: LEADER_TYPE_COLORS.SERVANT, label: LEADER_TYPE_LABELS.SERVANT },
+    { key: 'AUXILIARY_SERVANT', count: auxiliaryServantCount, color: LEADER_TYPE_COLORS.AUXILIARY_SERVANT, label: LEADER_TYPE_LABELS.AUXILIARY_SERVANT },
     { key: 'LEADER_12', count: leader12Count, color: LEADER_TYPE_COLORS.LEADER_12, label: LEADER_TYPE_LABELS.LEADER_12 },
     { key: 'LEADER_144', count: leader144Count, color: LEADER_TYPE_COLORS.LEADER_144, label: LEADER_TYPE_LABELS.LEADER_144 },
   ].filter(t => t.count > 0);

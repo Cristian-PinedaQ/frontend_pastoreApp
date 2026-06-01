@@ -31,6 +31,7 @@ import {
 
 const LEADER_TYPE_MAP = {
   SERVANT: { label: 'Servidor', color: 'blue', text: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/40', border: 'border-blue-100 dark:border-blue-800/50', icon: <Star size={16} /> },
+  AUXILIARY_SERVANT: { label: 'Servidor auxiliar', color: 'teal', text: 'text-teal-600 dark:text-teal-400', bg: 'bg-teal-50 dark:bg-teal-900/40', border: 'border-teal-100 dark:border-teal-800/50', icon: <Star size={16} /> },
   LEADER_144: { label: 'Líder 144', color: 'amber', text: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/40', border: 'border-amber-100 dark:border-amber-800/50', icon: <Users size={16} /> },
   LEADER_12: { label: 'Líder 12', color: 'emerald', text: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/40', border: 'border-emerald-100 dark:border-emerald-800/50', icon: <Award size={16} /> },
 };
@@ -420,6 +421,7 @@ const ModalLeaderDetail = ({
                           className="w-full h-16 px-6 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-100 dark:border-slate-800 font-bold outline-none focus:border-blue-500 transition-all text-slate-800 dark:text-white appearance-none"
                        >
                           <option value="SERVANT">Servidor</option>
+                          <option value="AUXILIARY_SERVANT">Servidor auxiliar</option>
                           <option value="LEADER_144">Líder 144</option>
                           <option value="LEADER_12">Líder 12</option>
                        </select>

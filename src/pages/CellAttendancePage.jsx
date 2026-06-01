@@ -54,6 +54,7 @@ const LEADER_TYPE_MAP = {
   LEADER_12: { label: "Líder 12", icon: ShieldUser, color: "indigo" },
   LEADER_144: { label: "Líder Rama", icon: CircleUserRound, color: "blue" },
   SERVANT: { label: "Servidor", icon: UserStar, color: "emerald" },
+  AUXILIARY_SERVANT: { label: "Servidor Auxiliar", icon: UserStar, color: "teal" },
   LEADER_GROUP: { label: "Líder Grupo", icon: Home, color: "amber" },
 };
 
