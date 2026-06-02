@@ -22,6 +22,8 @@ import {
   CalendarClock,
   Share2,
   ClipboardCheck,
+  BarChart2,
+  Printer,
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -124,13 +126,32 @@ const MinisteriesPage = () => {
     statusUpdate: false,
     eventCreate: false,
     eventAssign: false,
-    eventAttendance: false, // <-- Añadido eventAttendance
+    eventAttendance: false,
+    generateSchedule: false, // <-- Nuevo modal de generación parametrizada
+    statistics: false, // <-- Nuevo modal de estadísticas
+    pdfExport: false, // <-- Nuevo modal de exportación PDF
+    publishConfirm: false, // <-- Modal de confirmación de publicación
   });
 
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTeam, setIsEditingTeam] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedMinisteryId, setSelectedMinisteryId] = useState("");
+
+  // Estados nuevos para el control de Horarios Recurrentes y Generación
+  const [scheduleConfigs, setScheduleConfigs] = useState([]);
+  const [specialDates, setSpecialDates] = useState([]);
+  const [generationParams, setGenerationParams] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 2 > 12 ? 1 : new Date().getMonth() + 2, // Siguiente mes por defecto
+  });
+  const [pdfParams, setPdfParams] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1, // Mes actual por defecto
+  });
+  
+  // Estado nuevo para Estadísticas
+  const [ministryStats, setMinistryStats] = useState(null);
 
   const defaultForm = {
     name: "",
@@ -139,6 +160,7 @@ const MinisteriesPage = () => {
     level: "LEVEL_1",
     roleIds: [],
     active: true,
+    frequency: "BY_EVENT", // <-- Añadido frequency por defecto
   };
   const [formData, setFormData] = useState(defaultForm);
   const [eventAssignments, setEventAssignments] = useState({});
@@ -259,12 +281,13 @@ const MinisteriesPage = () => {
         name: role.name,
         description: role.description || "",
         active: role.active,
+        frequency: role.frequency || "BY_EVENT",
       });
       setIsEditing(true);
     } else {
       setSelectedItem(null);
       setSelectedMinisteryId(defaultMinisteryId);
-      setFormData({ ...defaultForm });
+      setFormData({ ...defaultForm, frequency: "BY_EVENT" });
       setIsEditing(false);
     }
     setModals({ ...modals, role: true });
@@ -275,19 +298,18 @@ const MinisteriesPage = () => {
     if (!selectedMinisteryId && !isEditing) return;
     setActionLoading(true);
     try {
-      if (isEditing)
-        await apiService.updateMinisteryRole(
-          selectedItem.id,
-          formData.name,
-          formData.description,
-          formData.active,
-        );
-      else
-        await apiService.addRoleToMinistery(
-          selectedMinisteryId,
-          formData.name,
-          formData.description,
-        );
+      const roleData = {
+        name: formData.name,
+        description: formData.description,
+        frequency: formData.frequency,
+        active: formData.active,
+      };
+
+      if (isEditing) {
+        await apiService.updateMinisteryRole(selectedItem.id, roleData);
+      } else {
+        await apiService.addRoleToMinistery(selectedMinisteryId, roleData);
+      }
       await loadData();
       setModals({ ...modals, role: false });
       showSuccess(isEditing ? "Rol actualizado" : "Rol creado");
@@ -496,6 +518,143 @@ const MinisteriesPage = () => {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // --- CONFIGURACIÓN DE HORARIOS Y GENERACIÓN PARAMETRIZADA (NUEVOS) ---
+  const openScheduleConfigModal = async () => {
+    if (!scheduleMinisteryId) return;
+    setActionLoading(true);
+    try {
+      const configs = await apiService.getMinistryScheduleConfig(scheduleMinisteryId);
+      setScheduleConfigs(configs || []);
+      setSpecialDates([]); // Limpiar fechas especiales anteriores
+      setModals((prev) => ({ ...prev, generateSchedule: true }));
+    } catch (err) {
+      alert("Error al cargar horarios recurrentes: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSaveScheduleConfig = async (configsPayload) => {
+    setActionLoading(true);
+    try {
+      await apiService.saveMinistryScheduleConfig(scheduleMinisteryId, configsPayload);
+      showSuccess("Horarios recurrentes guardados");
+      // Recargar localmente
+      const configs = await apiService.getMinistryScheduleConfig(scheduleMinisteryId);
+      setScheduleConfigs(configs || []);
+    } catch (err) {
+      alert("Error al guardar horarios recurrentes: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleGenerateSchedule = async (e) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      const payload = {
+        year: parseInt(generationParams.year),
+        month: parseInt(generationParams.month),
+        specialDates: specialDates.map((d) => ({
+          dateTime: d.dateTime + ":00", // Asegurar segundos
+          eventName: d.eventName,
+        })),
+      };
+
+      const result = await apiService.generateCustomSchedule(scheduleMinisteryId, payload);
+      alert(`¡Programación Generada exitosamente!\n\nMes: ${result.targetMonth}\nEventos creados: ${result.eventsCreated}\nAsignaciones creadas: ${result.assignmentsCreated}`);
+      setModals((prev) => ({ ...prev, generateSchedule: false }));
+      loadEvents(scheduleMinisteryId);
+    } catch (err) {
+      alert(err.message || "Error al generar la programación");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // --- EXPORTACIÓN DE PDF DE PROGRAMACIÓN ---
+  const handleDownloadPdf = async () => {
+    setActionLoading(true);
+    try {
+      const blob = await apiService.downloadMinistrySchedulePdf(
+        scheduleMinisteryId,
+        pdfParams.year,
+        pdfParams.month
+      );
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+
+      const ministryName = scheduleMinisteryData?.name?.toLowerCase().replace(/\s+/g, "_") || "ministerio";
+      const monthNames = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+      ];
+      const monthName = monthNames[pdfParams.month - 1];
+
+      link.setAttribute("download", `programacion_${ministryName}_${monthName}_${pdfParams.year}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+
+      // Limpieza
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    setModals((prev) => ({ ...prev, pdfExport: false }));
+      showSuccess("PDF de programación descargado exitosamente");
+    } catch (err) {
+      alert("Error al descargar el PDF de programación: " + err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // --- PUBLICACIÓN MANUAL DE PROGRAMACIÓN ---
+  const handlePublishSchedule = async () => {
+    setActionLoading(true);
+    try {
+      await apiService.publishMinistrySchedule(
+        scheduleMinisteryId,
+        pdfParams.year,
+        pdfParams.month
+      );
+      setModals((prev) => ({ ...prev, publishConfirm: false }));
+      showSuccess("✅ Programación publicada. Las notificaciones de Telegram fueron enviadas.");
+      loadEvents(scheduleMinisteryId); // Recargar para reflejar estado PUBLISHED
+    } catch (err) {
+      setModals((prev) => ({ ...prev, publishConfirm: false }));
+      if (err.status === 409) {
+        // Ya publicada — informativo, no es un error crítico
+        alert(`ℹ️ ${err.message}`);
+      } else if (err.status === 422) {
+        // Estado de dominio inválido: el ministerio existe pero no hay borradores en ese periodo
+        alert(`⚠️ ${err.message}`);
+      } else {
+        alert(`❌ Error al publicar: ${err.message || "Error desconocido"}`);
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+
+
+  // --- ESTADÍSTICAS DEL MINISTERIO (NUEVO) ---
+  const openMinistryStatistics = async (ministeryId) => {
+    setActionLoading(true);
+    try {
+      const stats = await apiService.getMinistryStatistics(ministeryId);
+      setMinistryStats(stats);
+      setModals((prev) => ({ ...prev, statistics: true }));
+    } catch (err) {
+      alert("Error al cargar estadísticas del ministerio: " + err.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -802,51 +961,47 @@ const MinisteriesPage = () => {
                 </select>
               </div>
 
-              {canManage && (
+              {scheduleMinisteryId && (
                 <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
                   <button
-                    onClick={async () => {
-                      if (
-                        !window.confirm(
-                          "Se generarán los cultos (Miércoles y Domingos) del mes siguiente para TODOS los ministerios. ¿Continuar?",
-                        )
-                      )
-                        return;
-                      setActionLoading(true);
-                      try {
-                        const result =
-                          await apiService.autoGenerateMinisterySchedule();
-                        alert(
-                          `¡Éxito! Mes: ${result.targetMonth} | Eventos: ${result.eventsCreated} | Asignaciones: ${result.assignmentsCreated}`,
-                        );
-                        if (scheduleMinisteryId)
-                          loadEvents(scheduleMinisteryId);
-                      } catch (err) {
-                        alert(err.message);
-                      } finally {
-                        setActionLoading(false);
-                      }
-                    }}
-                    disabled={actionLoading}
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg hover:bg-emerald-700 hover:-translate-y-1 transition-all w-full md:w-auto disabled:opacity-50"
+                    onClick={() => setModals((prev) => ({ ...prev, pdfExport: true }))}
+                    className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-700 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-850 hover:-translate-y-1 transition-all w-full md:w-auto"
                   >
-                    <RefreshCcw
-                      size={18}
-                      className={actionLoading ? "animate-spin" : ""}
-                    />{" "}
-                    Generar Mes Siguiente
+                    <Printer size={18} />
+                    Imprimir PDF
                   </button>
 
-                  {scheduleMinisteryId && (
+                  {/* Botón de Publicar Programación: solo si hay borradores */}
+                  {canManage && events.some((ev) => ev.status === 'DRAFT') && (
                     <button
-                      onClick={() => {
-                        setFormData({ name: "", description: "" });
-                        setModals({ ...modals, eventCreate: true });
-                      }}
-                      className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 hover:-translate-y-1 transition-all w-full md:w-auto"
+                      onClick={() => setModals((prev) => ({ ...prev, publishConfirm: true }))}
+                      className="flex items-center justify-center gap-2 px-6 py-4 bg-violet-600 text-white rounded-2xl font-bold shadow-lg hover:bg-violet-700 hover:-translate-y-1 transition-all w-full md:w-auto"
                     >
-                      <CalendarDays size={18} /> Agendar Culto Extra
+                      <CheckCircle2 size={18} />
+                      Publicar Programación
                     </button>
+                  )}
+
+                  {canManage && (
+                    <>
+                      <button
+                        onClick={openScheduleConfigModal}
+                        className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg hover:bg-emerald-700 hover:-translate-y-1 transition-all w-full md:w-auto"
+                      >
+                        <Settings2 size={18} />
+                        Horarios & Generar Mes
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setFormData({ name: "", description: "" });
+                          setModals({ ...modals, eventCreate: true });
+                        }}
+                        className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 hover:-translate-y-1 transition-all w-full md:w-auto"
+                      >
+                        <CalendarDays size={18} /> Agendar Culto Extra
+                      </button>
+                    </>
                   )}
                 </div>
               )}
@@ -884,22 +1039,33 @@ const MinisteriesPage = () => {
                   const isPastOrToday = eventDateObj.getTime() <= new Date().getTime() + 86400000;
 
                   return (
-                    <div
-                      key={ev.id}
-                      className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700"
-                    >
+                    <div key={ev.id} className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h4 className="text-xl font-black text-slate-900 dark:text-white">
-                            {ev.name}
-                          </h4>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-xl font-black text-slate-900 dark:text-white">
+                              {ev.name}
+                            </h4>
+                            {/* Insignia de estado DRAFT / PUBLISHED */}
+                            {ev.status === 'PUBLISHED' ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                                Publicado
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                                Borrador
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 text-sm font-bold text-blue-600 dark:text-blue-400 mt-1">
                             <CalendarClock size={16} />{" "}
                             {/* 🛠️ FIX 2: Renderizamos la fecha limpia */}
                             {formatEventDateStr(ev.eventDate)}
                           </div>
                         </div>
-                        {canManage && (
+                        {canManage && ev.status !== 'PUBLISHED' && (
                           <button
                             onClick={() => handleDeleteEvent(ev.id)}
                             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl transition-colors"
@@ -942,12 +1108,19 @@ const MinisteriesPage = () => {
                                 </button>
                               )}
 
-                              <button
-                                onClick={() => openEventAssignModal(ev)}
-                                className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 shadow-sm transition-all"
-                              >
-                                Organizar
-                              </button>
+                              {/* BOTÓN ORGANIZAR: Solo disponible si el evento NO ha sido publicado */}
+                              {ev.status !== 'PUBLISHED' ? (
+                                <button
+                                  onClick={() => openEventAssignModal(ev)}
+                                  className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 shadow-sm transition-all"
+                                >
+                                  Organizar
+                                </button>
+                              ) : (
+                                <span className="px-4 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50">
+                                  ✅ Publicado
+                                </span>
+                              )}
                             </>
                           )}
                         </div>
@@ -1007,6 +1180,13 @@ const MinisteriesPage = () => {
                       Activos
                     </td>
                     <td className="px-8 py-6 text-right space-x-2">
+                      <button
+                        onClick={() => openMinistryStatistics(m.id)}
+                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-xl transition-all"
+                        title="Ver Estadísticas"
+                      >
+                        <BarChart2 size={18} />
+                      </button>
                       {isPastor && (
                         <>
                           <button
@@ -1071,10 +1251,19 @@ const MinisteriesPage = () => {
                       className="group flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700/50 transition-all hover:border-indigo-200 dark:hover:border-indigo-800"
                     >
                       <div className="pr-4">
-                        <p className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                          {role.name}
+                        <p className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center flex-wrap gap-2">
+                          <span>{role.name}</span>
+                          {role.frequency === "MONTHLY" ? (
+                            <span className="text-[9px] font-black bg-indigo-50 border border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-400 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                              Mensual
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-black bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-400 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                              Por Culto
+                            </span>
+                          )}
                           {!role.active && (
-                            <span className="text-[10px] bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-300 dark:border-slate-700 px-2 py-0.5 rounded-md uppercase tracking-widest">
+                            <span className="text-[9px] bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-300 dark:border-slate-700 px-2 py-0.5 rounded-md uppercase tracking-widest">
                               Inactivo
                             </span>
                           )}
@@ -1513,6 +1702,25 @@ const MinisteriesPage = () => {
                   className="w-full h-24 p-5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-sm outline-none focus:border-indigo-500 text-slate-800 dark:text-white resize-none"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">
+                  Frecuencia de Uso
+                </label>
+                <select
+                  required
+                  value={formData.frequency || "BY_EVENT"}
+                  onChange={(e) =>
+                    setFormData({ ...formData, frequency: e.target.value })
+                  }
+                  className="w-full h-14 px-5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-sm outline-none focus:border-indigo-500 text-slate-800 dark:text-white"
+                >
+                  <option value="BY_EVENT">Por Culto / Evento (Rotativo)</option>
+                  <option value="MONTHLY">Mensual (Mismo servidor todo el mes)</option>
+                </select>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-bold">
+                  * Los roles mensuales mantendrán al mismo servidor asignado en todas las reuniones generadas en el mes.
+                </p>
+              </div>
               {isEditing && (
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
                   <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-3">
@@ -1778,6 +1986,528 @@ const MinisteriesPage = () => {
             >
               Cerrar Ventana
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIGURACIÓN DE HORARIOS Y GENERACIÓN PARAMETRIZADA (NUEVO) */}
+      {modals.generateSchedule && scheduleMinisteryData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-slate-800 my-8 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-8 pb-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
+              <div>
+                <span className="text-xs font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider">Configuración del Ministerio</span>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                  {scheduleMinisteryData.name}
+                </h3>
+              </div>
+              <button
+                onClick={() => setModals({ ...modals, generateSchedule: false })}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-xl"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Scrollable Body */}
+            <div className="p-8 space-y-8 overflow-y-auto flex-1">
+              
+              {/* Sección 1: Configurar Cultos Recurrentes */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <h4 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                    <CalendarClock size={20} className="text-emerald-500" />
+                    1. Configurar Cultos Recurrentes
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScheduleConfigs([
+                        ...scheduleConfigs,
+                        { dayOfWeek: "SUNDAY", eventTime: "09:00:00", eventName: "Culto Dominical" }
+                      ]);
+                    }}
+                    className="text-xs font-black text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Agregar Horario
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  Configure los días recurrentes de servicio de este ministerio para evitar configurarlos de nuevo en el futuro.
+                </p>
+
+                {scheduleConfigs.length === 0 ? (
+                  <div className="p-6 text-center text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                    No hay horarios recurrentes configurados.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {scheduleConfigs.map((config, index) => (
+                      <div
+                        key={index}
+                        className="flex flex-col md:flex-row md:items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-slate-100 dark:border-slate-850"
+                      >
+                        <select
+                          value={config.dayOfWeek}
+                          onChange={(e) => {
+                            const updated = [...scheduleConfigs];
+                            updated[index].dayOfWeek = e.target.value;
+                            setScheduleConfigs(updated);
+                          }}
+                          className="h-12 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                        >
+                          <option value="MONDAY">Lunes</option>
+                          <option value="TUESDAY">Martes</option>
+                          <option value="WEDNESDAY">Miércoles</option>
+                          <option value="THURSDAY">Jueves</option>
+                          <option value="FRIDAY">Viernes</option>
+                          <option value="SATURDAY">Sábado</option>
+                          <option value="SUNDAY">Domingo</option>
+                        </select>
+                        <input
+                          type="time"
+                          value={config.eventTime.length > 5 ? config.eventTime.substring(0, 5) : config.eventTime}
+                          onChange={(e) => {
+                            const updated = [...scheduleConfigs];
+                            updated[index].eventTime = e.target.value + ":00"; // Asegurar formato HH:mm:ss
+                            setScheduleConfigs(updated);
+                          }}
+                          className="h-12 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Nombre del Culto (ej: Culto Dominical)"
+                          value={config.eventName}
+                          onChange={(e) => {
+                            const updated = [...scheduleConfigs];
+                            updated[index].eventName = e.target.value;
+                            setScheduleConfigs(updated);
+                          }}
+                          className="flex-1 h-12 px-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScheduleConfigs(scheduleConfigs.filter((_, idx) => idx !== index));
+                          }}
+                          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveScheduleConfig(scheduleConfigs)}
+                    disabled={actionLoading}
+                    className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-black hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+                  >
+                    Guardar Horarios
+                  </button>
+                </div>
+              </div>
+
+              {/* Sección 2: Generador del Mes */}
+              <form onSubmit={handleGenerateSchedule} className="space-y-5 pt-6 border-t border-slate-100 dark:border-slate-850">
+                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <h4 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                    <CalendarDays size={20} className="text-blue-500" />
+                    2. Generar Programación del Mes
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSpecialDates([
+                        ...specialDates,
+                        { dateTime: "", eventName: "Culto Especial" }
+                      ]);
+                    }}
+                    className="text-xs font-black text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <Plus size={14} /> Agregar Fecha Especial
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  Seleccione el mes y año para la autogeneración. El sistema bloqueará si ya existe eventos y distribuirá el equipo de forma equitativa.
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">
+                      Año
+                    </label>
+                    <select
+                      value={generationParams.year}
+                      onChange={(e) => setGenerationParams({ ...generationParams, year: parseInt(e.target.value) })}
+                      className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                    >
+                      <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+                      <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">
+                      Mes
+                    </label>
+                    <select
+                      value={generationParams.month}
+                      onChange={(e) => setGenerationParams({ ...generationParams, month: parseInt(e.target.value) })}
+                      className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                    >
+                      <option value={1}>Enero</option>
+                      <option value={2}>Febrero</option>
+                      <option value={3}>Marzo</option>
+                      <option value={4}>Abril</option>
+                      <option value={5}>Mayo</option>
+                      <option value={6}>Junio</option>
+                      <option value={7}>Julio</option>
+                      <option value={8}>Agosto</option>
+                      <option value={9}>Septiembre</option>
+                      <option value={10}>Octubre</option>
+                      <option value={11}>Noviembre</option>
+                      <option value={12}>Diciembre</option>
+                    </select>
+                  </div>
+                </div>
+
+                {specialDates.length > 0 && (
+                  <div className="space-y-3">
+                    <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-1">
+                      Fechas Especiales del Mes
+                    </label>
+                    {specialDates.map((special, index) => (
+                      <div
+                        key={index}
+                        className="flex flex-col md:flex-row md:items-center gap-3 p-4 bg-blue-50/30 dark:bg-blue-900/10 rounded-2xl border border-blue-100/50"
+                      >
+                        <input
+                          type="datetime-local"
+                          required
+                          value={special.dateTime}
+                          onChange={(e) => {
+                            const updated = [...specialDates];
+                            updated[index].dateTime = e.target.value;
+                            setSpecialDates(updated);
+                          }}
+                          className="h-12 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                        />
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nombre del Evento Especial (ej: Vigilia de Oración)"
+                          value={special.eventName}
+                          onChange={(e) => {
+                            const updated = [...specialDates];
+                            updated[index].eventName = e.target.value;
+                            setSpecialDates(updated);
+                          }}
+                          className="flex-1 h-12 px-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSpecialDates(specialDates.filter((_, idx) => idx !== index));
+                          }}
+                          className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={actionLoading}
+                  className="w-full h-14 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl font-black text-sm hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCcw size={18} className={actionLoading ? "animate-spin" : ""} />
+                  {actionLoading ? "Generando Asignaciones..." : "Generar Programación Mensual"}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ESTADÍSTICAS DEL MINISTERIO (NUEVO) */}
+      {modals.statistics && ministryStats && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]">
+            
+            {/* Header */}
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4 mb-6 shrink-0">
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                <BarChart2 className="text-emerald-500" size={28} />
+                <span>Estadísticas de {ministryStats.ministryName}</span>
+              </h3>
+              <button
+                onClick={() => setModals({ ...modals, statistics: false })}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Scrollable Stats */}
+            <div className="space-y-6 overflow-y-auto flex-1 pr-2">
+              
+              {/* Contadores Generales */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-850 text-center">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Total Miembros</span>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{ministryStats.totalMembers}</p>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-850 text-center">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Eventos Activos</span>
+                  <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{ministryStats.totalEvents}</p>
+                </div>
+              </div>
+
+              {/* Desglose de Estado Operativo */}
+              <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-100 dark:border-slate-850 space-y-3">
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Estado Operativo de Miembros</h4>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center">
+                    <span className="text-[10px] font-bold text-slate-500">Activos</span>
+                    <p className="text-xl font-bold text-emerald-600 mt-0.5">{ministryStats.activeServers}</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[10px] font-bold text-slate-500">Suspendidos</span>
+                    <p className="text-xl font-bold text-amber-600 mt-0.5">{ministryStats.suspendedServers}</p>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-[10px] font-bold text-slate-500">Inactivos</span>
+                    <p className="text-xl font-bold text-slate-500 mt-0.5">{ministryStats.inactiveServers}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Distribución por Roles */}
+              <div className="space-y-4 pt-2">
+                <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider border-b border-slate-100 dark:border-slate-800 pb-2">Distribución por Roles Activos</h4>
+                
+                {ministryStats.roleCounts.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic text-center py-4">No hay roles con miembros activos en este momento.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {ministryStats.roleCounts.map((role) => {
+                      const percentage = ministryStats.activeServers > 0
+                        ? Math.min(100, Math.round((role.memberCount / ministryStats.activeServers) * 100))
+                        : 0;
+
+                      return (
+                        <div key={role.roleId} className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-bold text-slate-700 dark:text-slate-350">
+                            <span>{role.roleName}</span>
+                            <span>{role.memberCount} {role.memberCount === 1 ? 'líder' : 'líderes'} ({percentage}%)</span>
+                          </div>
+                          <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              style={{ width: `${percentage}%` }}
+                              className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-500"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setModals({ ...modals, statistics: false })}
+              className="w-full mt-6 h-14 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black rounded-2xl transition-colors shrink-0"
+            >
+              Cerrar Ventana
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EXPORTAR PROGRAMACIÓN A PDF */}
+      {modals.pdfExport && scheduleMinisteryData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4 mb-6">
+              <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                <Printer className="text-blue-500" size={28} />
+                <span>Exportar a PDF</span>
+              </h3>
+              <button
+                onClick={() => setModals({ ...modals, pdfExport: false })}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="space-y-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Seleccione el periodo para generar y descargar la programación oficial en PDF del ministerio <strong>{scheduleMinisteryData.name}</strong>.
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">
+                    Año
+                  </label>
+                  <select
+                    value={pdfParams.year}
+                    onChange={(e) => setPdfParams({ ...pdfParams, year: parseInt(e.target.value) })}
+                    className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white focus:border-blue-500"
+                  >
+                    <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+                    <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">
+                    Mes
+                  </label>
+                  <select
+                    value={pdfParams.month}
+                    onChange={(e) => setPdfParams({ ...pdfParams, month: parseInt(e.target.value) })}
+                    className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white focus:border-blue-500"
+                  >
+                    <option value={1}>Enero</option>
+                    <option value={2}>Febrero</option>
+                    <option value={3}>Marzo</option>
+                    <option value={4}>Abril</option>
+                    <option value={5}>Mayo</option>
+                    <option value={6}>Junio</option>
+                    <option value={7}>Julio</option>
+                    <option value={8}>Agosto</option>
+                    <option value={9}>Septiembre</option>
+                    <option value={10}>Octubre</option>
+                    <option value={11}>Noviembre</option>
+                    <option value={12}>Diciembre</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex gap-3 mt-8">
+              <button
+                type="button"
+                onClick={() => setModals({ ...modals, pdfExport: false })}
+                className="flex-1 h-14 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black rounded-2xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handleDownloadPdf}
+                className="flex-1 h-14 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20"
+              >
+                <Printer size={18} />
+                {actionLoading ? "Descargando..." : "Descargar PDF"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: CONFIRMAR PUBLICACIÓN ==================== */}
+      {modals.publishConfirm && scheduleMinisteryData && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-800 overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-violet-600 to-purple-700 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black">Publicar Programación</h3>
+                    <p className="text-violet-200 text-sm">{scheduleMinisteryData.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModals({ ...modals, publishConfirm: false })}
+                  className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50 rounded-2xl p-4">
+                <p className="text-sm font-bold text-violet-800 dark:text-violet-300 mb-1">⚠️ Esta acción es irreversible</p>
+                <p className="text-xs text-violet-600 dark:text-violet-400">
+                  Al publicar, los eventos pasarán de <strong>Borrador</strong> a <strong>Publicado</strong> y se enviarán notificaciones por Telegram a todos los servidores y sus líderes directos. No se podrán editar después.
+                </p>
+              </div>
+
+              {/* Selección del periodo a publicar */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">Año</label>
+                  <select
+                    value={pdfParams.year}
+                    onChange={(e) => setPdfParams({ ...pdfParams, year: parseInt(e.target.value) })}
+                    className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white focus:border-violet-500"
+                  >
+                    <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+                    <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">Mes</label>
+                  <select
+                    value={pdfParams.month}
+                    onChange={(e) => setPdfParams({ ...pdfParams, month: parseInt(e.target.value) })}
+                    className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white focus:border-violet-500"
+                  >
+                    <option value={1}>Enero</option><option value={2}>Febrero</option>
+                    <option value={3}>Marzo</option><option value={4}>Abril</option>
+                    <option value={5}>Mayo</option><option value={6}>Junio</option>
+                    <option value={7}>Julio</option><option value={8}>Agosto</option>
+                    <option value={9}>Septiembre</option><option value={10}>Octubre</option>
+                    <option value={11}>Noviembre</option><option value={12}>Diciembre</option>
+                  </select>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                Se publicarán todos los cultos en borrador del periodo seleccionado.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 pb-6">
+              <button
+                type="button"
+                onClick={() => setModals({ ...modals, publishConfirm: false })}
+                className="flex-1 h-14 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-black rounded-2xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={actionLoading}
+                onClick={handlePublishSchedule}
+                className="flex-1 h-14 bg-violet-600 hover:bg-violet-700 text-white font-black rounded-2xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-violet-500/20"
+              >
+                <CheckCircle2 size={18} />
+                {actionLoading ? "Publicando..." : "Confirmar y Publicar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

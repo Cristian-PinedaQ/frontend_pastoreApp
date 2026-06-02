@@ -4348,17 +4348,17 @@ class ApiService {
   /**
    * Añadir un rol a un ministerio
    */
-  async addRoleToMinistery(ministeryId, name, description = null) {
+  async addRoleToMinistery(ministeryId, roleData) {
     try {
       validateId(ministeryId, 'ministeryId');
-      validateString(name, 'name', 2, 100);
-
-      const params = new URLSearchParams();
-      params.append('name', name.trim());
-      if (description) params.append('description', description.trim());
+      if (!roleData || typeof roleData !== 'object') throw new Error('Datos de rol inválidos');
+      validateString(roleData.name, 'name', 2, 100);
 
       log('🏛️ [addRoleToMinistery] Añadiendo rol al ministerio ID:', ministeryId);
-      return await this.request(`/ministeries/${ministeryId}/roles?${params.toString()}`, { method: 'POST' });
+      return await this.request(`/ministeries/${ministeryId}/roles`, {
+        method: 'POST',
+        body: JSON.stringify(roleData)
+      });
     } catch (error) {
       logError('❌ [addRoleToMinistery] Error:', error.message);
       throw error;
@@ -4429,19 +4429,17 @@ class ApiService {
     }
   }
 
-  async updateMinisteryRole(roleId, name, description = null, active = null) {
+  async updateMinisteryRole(roleId, roleData) {
     try {
       validateId(roleId, 'roleId');
-      const params = new URLSearchParams();
-      params.append('name', name.trim());
-      if (description) params.append('description', description.trim());
+      if (!roleData || typeof roleData !== 'object') throw new Error('Datos de rol inválidos');
+      validateString(roleData.name, 'name', 2, 100);
 
-      // Añadir el estado a la URL si viene definido
-      if (active !== null && active !== undefined) {
-        params.append('active', active);
-      }
-
-      return await this.request(`/ministeries/roles/${roleId}?${params.toString()}`, { method: 'PUT' });
+      log('🏛️ [updateMinisteryRole] Actualizando rol ID:', roleId);
+      return await this.request(`/ministeries/roles/${roleId}`, {
+        method: 'PUT',
+        body: JSON.stringify(roleData)
+      });
     } catch (error) {
       logError('❌ [updateMinisteryRole] Error:', error.message);
       throw error;
@@ -4542,6 +4540,97 @@ class ApiService {
       throw error;
     }
   }
+
+  // Obtener la configuración recurrente de horarios
+  async getMinistryScheduleConfig(ministeryId) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('🏛️ [getMinistryScheduleConfig] Obteniendo horarios del ministerio:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/schedule/config`);
+    } catch (error) {
+      logError('❌ [getMinistryScheduleConfig] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Guardar la configuración recurrente de horarios
+  async saveMinistryScheduleConfig(ministeryId, configs) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('🏛️ [saveMinistryScheduleConfig] Guardando horarios del ministerio:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/schedule/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ configs })
+      });
+    } catch (error) {
+      logError('❌ [saveMinistryScheduleConfig] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Generación mensual parametrizada
+  async generateCustomSchedule(ministeryId, generationData) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('🏛️ [generateCustomSchedule] Generando programación para ministerio:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/schedule/generate`, {
+        method: 'POST',
+        body: JSON.stringify(generationData)
+      });
+    } catch (error) {
+      logError('❌ [generateCustomSchedule] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Descargar PDF de programación
+  async downloadMinistrySchedulePdf(ministeryId, year, month) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('🏛️ [downloadMinistrySchedulePdf] Descargando PDF de programación para ministerio:', ministeryId);
+      const token = this.getToken();
+      const response = await fetch(`${this.BASE_URL}/ministeries/${ministeryId}/schedule/pdf?year=${year}&month=${month}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('No se pudo descargar el PDF de programación');
+      }
+      return await response.blob();
+    } catch (error) {
+      logError('❌ [downloadMinistrySchedulePdf] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Publicar programación mensual y notificar por Telegram
+  async publishMinistrySchedule(ministeryId, year, month) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('📢 [publishMinistrySchedule] Publicando programación para ministerio:', ministeryId, year, month);
+      return await this.request(
+        `/ministeries/${ministeryId}/schedule/publish?year=${year}&month=${month}`,
+        { method: 'POST' }
+      );
+    } catch (error) {
+      logError('❌ [publishMinistrySchedule] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Obtener estadísticas del ministerio
+  async getMinistryStatistics(ministeryId) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('🏛️ [getMinistryStatistics] Obteniendo estadísticas del ministerio:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/statistics`);
+    } catch (error) {
+      logError('❌ [getMinistryStatistics] Error:', error.message);
+      throw error;
+    }
+  }
+
 
   // ============================================================
   // 📊 MÓDULO COHORT PROGRESS (G12)
