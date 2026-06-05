@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import apiService from "../apiService";
 import { useLeaders } from "../hooks/useLeaders";
+import { useAuth } from "../context/AuthContext";
 import { logUserAction } from "../utils/securityLogger";
 import { generateCellDetailPDF } from "../services/cellDetailPdfGenerator";
 
@@ -86,8 +87,15 @@ const DISTRICTS = [
   { value: "D3",       label: "Distrito 3" },
 ];
 
-// rol → campo ID en el DTO y campo de actualización en updateCell
 const LEADER_ROLE_META = {
+  mainLeader: {
+    label: "Líder de Red (12)",
+    idField: "mainLeaderId",
+    nameField: "mainLeaderName",
+    updateKey: "mainLeaderId",
+    icon: ShieldCheck,
+    color: "indigo",
+  },
   groupLeader: {
     label: "Líder de Grupo",
     idField: "groupLeaderId",
@@ -118,6 +126,8 @@ const LEADER_ROLE_META = {
 
 const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) => {
   const [cell, setCell] = useState(initialCell);
+  const { hasAnyRole } = useAuth();
+  const isPastorOrDespliegue = hasAnyRole(["PASTORES", "DESPLIEGUE"]);
   const [activeTab, setActiveTab] = useState("info");
   const [loading, setLoading] = useState(false);
   const [members, setMembers] = useState([]);
@@ -330,12 +340,22 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
         try {
           const result = await apiService.unlinkLeaderFromCell(cell.id, leaderId);
           // Actualizar el cell local limpiando el rol
-          setCell((prev) => ({
-            ...prev,
-            [meta.idField]: null,
-            [meta.nameField]: null,
-            status: result?.newCellStatus || prev.status,
-          }));
+          setCell((prev) => {
+            const updated = {
+              ...prev,
+              [meta.idField]: null,
+              [meta.nameField]: null,
+              status: result?.newCellStatus || prev.status,
+            };
+            setEditForm((prevEdit) => ({
+              ...prevEdit,
+              [meta.updateKey]: null,
+              [meta.idField]: null,
+              [meta.nameField]: null,
+              status: result?.newCellStatus || prevEdit.status,
+            }));
+            return updated;
+          });
           closeLeaderPanel();
           if (onCellChanged) onCellChanged();
           logUserAction("unlink_leader", { cellId: cell.id, role, leaderId });
@@ -357,11 +377,20 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
     setLeaderActionLoading(true);
     try {
       await apiService.updateCell(cell.id, { [meta.updateKey]: newLeader.id });
-      setCell((prev) => ({
-        ...prev,
-        [meta.idField]: newLeader.id,
-        [meta.nameField]: newLeader.member?.name || newLeader.memberName || newLeader.name,
-      }));
+      setCell((prev) => {
+        const updated = {
+          ...prev,
+          [meta.idField]: newLeader.id,
+          [meta.nameField]: newLeader.member?.name || newLeader.memberName || newLeader.name,
+        };
+        setEditForm((prevEdit) => ({
+          ...prevEdit,
+          [meta.updateKey]: newLeader.id,
+          [meta.idField]: newLeader.id,
+          [meta.nameField]: newLeader.member?.name || newLeader.memberName || newLeader.name,
+        }));
+        return updated;
+      });
       closeLeaderPanel();
       if (onCellChanged) onCellChanged();
       logUserAction("replace_leader", { cellId: cell.id, role: leaderPanel, newLeaderId: newLeader.id });
@@ -380,6 +409,9 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
 
   // Líderes filtrados por búsqueda en el panel
   const filteredLeaders = availableLeaders.filter((l) => {
+    if (leaderPanel === "mainLeader" && l.leaderType !== "LEADER_12") {
+      return false;
+    }
     const name = (l.member?.name || l.memberName || l.name || "").toLowerCase();
     const doc = (l.member?.document || l.document || "").toLowerCase();
     const q = leaderSearch.toLowerCase();
@@ -702,12 +734,13 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Equipo de Liderazgo</p>
-                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">Cambia o desvincula al Líder de Grupo, Anfitrión y Timoteo</p>
+                    <p className="text-[9px] font-bold text-slate-400 mt-0.5">Cambia o desvincula a los integrantes del equipo pastoral y cobertura</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   {[
+                    { role: "mainLeader",  color: "indigo"  },
                     { role: "groupLeader", color: "emerald" },
                     { role: "host",        color: "amber"   },
                     { role: "timoteo",     color: "violet"  },
@@ -735,25 +768,33 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
 
                           {/* Botones de acción */}
                           <div className="flex gap-2 shrink-0">
-                            <button
-                              onClick={() => isPanelOpen ? closeLeaderPanel() : openLeaderPanel(role)}
-                              className={`h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all border-2 ${
-                                isPanelOpen
-                                  ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20"
-                                  : "bg-white dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400"
-                              }`}
-                            >
-                              <ArrowLeftRight size={12} />
-                              <span className="hidden sm:inline">Cambiar</span>
-                            </button>
-                            <button
-                              onClick={() => handleUnlinkLeader(role)}
-                              disabled={!leaderId || leaderActionLoading}
-                              title={leaderId ? `Desvincular ${meta.label}` : "No hay líder asignado"}
-                              className="rounded-xl border-2 border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:border-rose-500 hover:text-white transition-all flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                            >
-                              <UserX size={14} />
-                            </button>
+                            {(role !== "mainLeader" || isPastorOrDespliegue) ? (
+                              <>
+                                <button
+                                  onClick={() => isPanelOpen ? closeLeaderPanel() : openLeaderPanel(role)}
+                                  className={`h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all border-2 ${
+                                    isPanelOpen
+                                      ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20"
+                                      : "bg-white dark:bg-black/20 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                                  }`}
+                                >
+                                  <ArrowLeftRight size={12} />
+                                  <span className="hidden sm:inline">Cambiar</span>
+                                </button>
+                                <button
+                                  onClick={() => handleUnlinkLeader(role)}
+                                  disabled={!leaderId || leaderActionLoading}
+                                  title={leaderId ? `Desvincular ${meta.label}` : "No hay líder asignado"}
+                                  className="rounded-xl border-2 border-rose-100 dark:border-rose-500/20 bg-rose-50 dark:bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:border-rose-500 hover:text-white transition-all flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                  <UserX size={14} />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3 py-1.5 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200/50 dark:border-white/5">
+                                Solo Pastores/Despliegue
+                              </span>
+                            )}
                           </div>
                         </div>
 
