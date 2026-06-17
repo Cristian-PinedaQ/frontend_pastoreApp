@@ -4589,7 +4589,7 @@ class ApiService {
       validateId(ministeryId, 'ministeryId');
       log('🏛️ [downloadMinistrySchedulePdf] Descargando PDF de programación para ministerio:', ministeryId);
       const token = sessionStorage.getItem('token');
-      const response = await fetch(`${this.BASE_URL}/ministeries/${ministeryId}/schedule/pdf?year=${year}&month=${month}`, {
+      const response = await fetch(`${API_BASE_URL}/ministeries/${ministeryId}/schedule/pdf?year=${year}&month=${month}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
