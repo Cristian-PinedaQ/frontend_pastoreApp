@@ -3,6 +3,7 @@ import apiService from "../apiService";
 import nameHelper from "../services/nameHelper";
 import ModalMinistryAttendance from "../components/ministry/ModalMinistryAttendance";
 import ExcellenceDashboard from "../components/ministry/ExcellenceDashboard";
+import ModalHeader from "../components/ModalHeader";
 import { useAuth } from "../context/AuthContext";
 import {
   Users,
@@ -26,6 +27,7 @@ import {
   ClipboardCheck,
   BarChart2,
   Printer,
+  Eye,
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -134,6 +136,7 @@ const MinisteriesPage = () => {
     pdfExport: false,
     publishConfirm: false,
     excellenceDashboard: false, // Panel de Excelencia Ministerial
+    eventDetail: false,
   });
 
   // Estado para el modal de evaluación de excelencia (nuevo)
@@ -676,6 +679,11 @@ const MinisteriesPage = () => {
     setModals((prev) => ({ ...prev, excellenceDashboard: true }));
   };
 
+  const openEventDetailModal = (event) => {
+    setSelectedItem(event);
+    setModals((prev) => ({ ...prev, eventDetail: true }));
+  };
+
   const handleToggleAttendance = async (assignmentId, currentStatus) => {
     // Si era true o null, lo mandamos. (Consideramos null como false visualmente)
     const newStatus = !currentStatus;
@@ -1100,6 +1108,14 @@ const MinisteriesPage = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openEventDetailModal(ev)}
+                            className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-xl transition-colors"
+                            title="Ver Detalles del Culto"
+                          >
+                            <Eye size={18} />
+                          </button>
+
                           <button
                             onClick={() => handleShareEvent(ev)}
                             className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 rounded-xl transition-colors"
@@ -2560,6 +2576,125 @@ const MinisteriesPage = () => {
             setTimeout(() => setSuccess(''), 4000);
           }}
         />
+      )}
+
+      {/* ====================================================
+          MODAL DETALLES DEL CULTO PROGRAMADO
+          ==================================================== */}
+      {modals.eventDetail && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+            <ModalHeader
+              title="Detalles del Culto"
+              subtitle={formatEventDateStr(selectedItem.eventDate)}
+              icon={CalendarClock}
+              onClose={() => setModals({ ...modals, eventDetail: false })}
+              titleAddon={
+                selectedItem.status === 'PUBLISHED' ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                    Publicado
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                    Borrador
+                  </span>
+                )
+              }
+            />
+
+            <div className="p-8 space-y-6 overflow-y-auto">
+              {/* Información de la Actividad */}
+              <div className="bg-slate-50 dark:bg-slate-800/30 p-6 rounded-2xl border border-slate-100 dark:border-slate-800/80 space-y-3">
+                <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                  Información de la Actividad
+                </h4>
+                <div className="space-y-2">
+                  <p className="text-lg font-black text-slate-800 dark:text-slate-200">
+                    {selectedItem.name}
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                    <CalendarDays className="text-blue-500 w-4 h-4" />
+                    <span>{formatEventDateStr(selectedItem.eventDate)}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Servidores Programados */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-wider">
+                  Servidores Programados por Rol
+                </h4>
+
+                {!selectedItem.assignments || selectedItem.assignments.length === 0 ? (
+                  <div className="p-8 text-center bg-amber-50/55 dark:bg-amber-950/10 rounded-2xl border border-dashed border-amber-200 dark:border-amber-900/30">
+                    <Users className="mx-auto text-amber-400 dark:text-amber-600/70 mb-2 w-8 h-8" />
+                    <p className="font-bold text-sm text-amber-800 dark:text-amber-300">
+                      Sin servidores asignados
+                    </p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400/80 mt-1">
+                      Aún no se ha programado el equipo para este servicio.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedItem.assignments.map((assignment) => {
+                      const initial = assignment.leaderName?.[0]?.toUpperCase() || "?";
+                      return (
+                        <div
+                          key={assignment.assignmentId}
+                          className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800/50 hover:border-blue-400 dark:hover:border-blue-500 transition-all"
+                        >
+                          {/* Avatar */}
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-base shadow-md">
+                            {initial}
+                          </div>
+
+                          {/* Detalles del Rol & Servidor */}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-black uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                              {assignment.roleName}
+                            </p>
+                            <p className="font-bold text-sm text-slate-800 dark:text-slate-200 mt-0.5 truncate">
+                              {getDisplayName(assignment.leaderName)}
+                            </p>
+                          </div>
+
+                          {/* Estado de Asistencia (Solo si el evento ya pasó o es hoy) */}
+                          {parseSafeDate(selectedItem.eventDate).getTime() <= new Date().getTime() + 86400000 && (
+                            <div className="shrink-0">
+                              {assignment.attended ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/30 uppercase tracking-wider">
+                                  Asistió
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 uppercase tracking-wider">
+                                  Sin Confirmar
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Botón de cierre */}
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setModals({ ...modals, eventDetail: false })}
+                  className="px-6 h-12 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ====================================================
