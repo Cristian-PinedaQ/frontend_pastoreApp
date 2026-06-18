@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import apiService from "../apiService";
 import nameHelper from "../services/nameHelper";
+import ModalMinistryAttendance from "../components/ministry/ModalMinistryAttendance";
+import ExcellenceDashboard from "../components/ministry/ExcellenceDashboard";
 import { useAuth } from "../context/AuthContext";
 import {
   Users,
@@ -127,11 +129,16 @@ const MinisteriesPage = () => {
     eventCreate: false,
     eventAssign: false,
     eventAttendance: false,
-    generateSchedule: false, // <-- Nuevo modal de generación parametrizada
-    statistics: false, // <-- Nuevo modal de estadísticas
-    pdfExport: false, // <-- Nuevo modal de exportación PDF
-    publishConfirm: false, // <-- Modal de confirmación de publicación
+    generateSchedule: false,
+    statistics: false,
+    pdfExport: false,
+    publishConfirm: false,
+    excellenceDashboard: false, // Panel de Excelencia Ministerial
   });
+
+  // Estado para el modal de evaluación de excelencia (nuevo)
+  const [attendanceEvent, setAttendanceEvent]   = useState(null);
+  const [excellenceMinistry, setExcellenceMinistry] = useState(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingTeam, setIsEditingTeam] = useState(false);
@@ -658,10 +665,15 @@ const MinisteriesPage = () => {
     }
   };
 
-  // --- CONTROL DE ASISTENCIA (NUEVO) ---
-  const openAttendanceModal = (event) => {
-    setSelectedItem(event);
-    setModals({ ...modals, eventAttendance: true });
+
+  // --- EVALUACIÓN DE EXCELENCIA ---
+  const openExcellenceAttendance = (event) => {
+    setAttendanceEvent(event);
+  };
+
+  const openExcellenceDashboard = (ministry) => {
+    setExcellenceMinistry(ministry);
+    setModals((prev) => ({ ...prev, excellenceDashboard: true }));
   };
 
   const handleToggleAttendance = async (assignmentId, currentStatus) => {
@@ -1098,13 +1110,14 @@ const MinisteriesPage = () => {
 
                           {canManage && (
                             <>
-                              {/* BOTÓN ASISTENCIA: Se muestra si el evento ya pasó o es hoy */}
+                              {/* BOTÓN ASISTENCIA + EVALUACIÓN: Se muestra si el evento ya pasó o es hoy */}
                               {isPastOrToday && ev.assignments?.length > 0 && (
                                 <button
-                                  onClick={() => openAttendanceModal(ev)}
-                                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-bold rounded-xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:text-emerald-600 shadow-sm transition-all flex items-center gap-2"
+                                  onClick={() => openExcellenceAttendance(ev)}
+                                  className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-sm font-bold rounded-xl border border-indigo-200 dark:border-indigo-700 hover:border-indigo-500 hover:bg-indigo-100 shadow-sm transition-all flex items-center gap-2"
+                                  title="Registrar asistencias y evaluar servidores"
                                 >
-                                  <ClipboardCheck size={16} /> Lista
+                                  <ClipboardCheck size={16} /> Registrar Asistencias
                                 </button>
                               )}
 
@@ -1186,6 +1199,13 @@ const MinisteriesPage = () => {
                         title="Ver Estadísticas"
                       >
                         <BarChart2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => openExcellenceDashboard(m)}
+                        className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-700 rounded-xl transition-all"
+                        title="Panel de Excelencia Ministerial"
+                      >
+                        <CheckCircle2 size={18} />
                       </button>
                       {isPastor && (
                         <>
@@ -2053,7 +2073,22 @@ const MinisteriesPage = () => {
                           value={config.dayOfWeek}
                           onChange={(e) => {
                             const updated = [...scheduleConfigs];
-                            updated[index].dayOfWeek = e.target.value;
+                            const newDay = e.target.value;
+                            
+                            const defaultNames = [
+                              "Culto de Lunes", "Culto de Martes", "Culto de Miércoles", 
+                              "Culto de Jueves", "Culto de Viernes", "Culto de Sábado", "Culto Dominical"
+                            ];
+                            
+                            if (!updated[index].eventName || defaultNames.includes(updated[index].eventName)) {
+                              const nameMap = {
+                                MONDAY: "Culto de Lunes", TUESDAY: "Culto de Martes", WEDNESDAY: "Culto de Miércoles",
+                                THURSDAY: "Culto de Jueves", FRIDAY: "Culto de Viernes", SATURDAY: "Culto de Sábado", SUNDAY: "Culto Dominical"
+                              };
+                              updated[index].eventName = nameMap[newDay] || "Culto";
+                            }
+                            
+                            updated[index].dayOfWeek = newDay;
                             setScheduleConfigs(updated);
                           }}
                           className="h-12 px-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
@@ -2510,6 +2545,32 @@ const MinisteriesPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ====================================================
+          MODAL EVALUACIÓN DE EXCELENCIA — Registrar asistencias
+          ==================================================== */}
+      {attendanceEvent && (
+        <ModalMinistryAttendance
+          event={attendanceEvent}
+          onClose={() => setAttendanceEvent(null)}
+          onSaved={() => {
+            setAttendanceEvent(null);
+            setSuccess('✅ Asistencias guardadas correctamente.');
+            setTimeout(() => setSuccess(''), 4000);
+          }}
+        />
+      )}
+
+      {/* ====================================================
+          PANEL DE EXCELENCIA MINISTERIAL
+          ==================================================== */}
+      {modals.excellenceDashboard && excellenceMinistry && (
+        <ExcellenceDashboard
+          ministryId={excellenceMinistry.id}
+          ministryName={excellenceMinistry.name}
+          onClose={() => setModals((prev) => ({ ...prev, excellenceDashboard: false }))}
+        />
       )}
     </div>
   );

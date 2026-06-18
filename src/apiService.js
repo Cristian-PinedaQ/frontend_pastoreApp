@@ -4631,6 +4631,78 @@ class ApiService {
     }
   }
 
+  // ============================================================
+  // ⭐ MÓDULO EVALUACIÓN DE EXCELENCIA MINISTERIAL
+  // ============================================================
+
+  /**
+   * Registra las asistencias y evaluaciones de todos los servidores de un culto.
+   * @param {number} eventId - ID del MinistryEvent
+   * @param {Array} records - Lista de MinistryAttendanceRequest
+   */
+  async saveMinistryEventAttendance(eventId, records) {
+    try {
+      validateId(eventId, 'eventId');
+      log('📋 [saveMinistryEventAttendance] Guardando asistencias del evento:', eventId);
+      return await this.request(
+        `/ministeries/events/${eventId}/attendance`,
+        {
+          method: 'POST',
+          body: JSON.stringify(records),
+        },
+        { 'Content-Type': 'application/json' }
+      );
+    } catch (error) {
+      logError('❌ [saveMinistryEventAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene el resumen de asistencias/evaluaciones de un culto.
+   * @param {number} eventId - ID del MinistryEvent
+   */
+  async getMinistryEventAttendance(eventId) {
+    try {
+      validateId(eventId, 'eventId');
+      log('📋 [getMinistryEventAttendance] Obteniendo asistencias del evento:', eventId);
+      return await this.request(`/ministeries/events/${eventId}/attendance`);
+    } catch (error) {
+      logError('❌ [getMinistryEventAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Dashboard de excelencia de todos los servidores de un ministerio.
+   * Ordenado por promedio ascendente (los de mayor riesgo primero).
+   * @param {number} ministryId - ID del ministerio
+   */
+  async getMinistryExcellenceDashboard(ministryId) {
+    try {
+      validateId(ministryId, 'ministryId');
+      log('⭐ [getMinistryExcellenceDashboard] Obteniendo dashboard:', ministryId);
+      return await this.request(`/ministeries/${ministryId}/excellence`);
+    } catch (error) {
+      logError('❌ [getMinistryExcellenceDashboard] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Perfil de excelencia individual de un servidor.
+   * @param {number} teamId - ID del MinistryTeam
+   */
+  async getMinistryMemberExcellence(teamId) {
+    try {
+      validateId(teamId, 'teamId');
+      log('⭐ [getMinistryMemberExcellence] Obteniendo perfil:', teamId);
+      return await this.request(`/ministeries/teams/${teamId}/excellence`);
+    } catch (error) {
+      logError('❌ [getMinistryMemberExcellence] Error:', error.message);
+      throw error;
+    }
+  }
 
   // ============================================================
   // 📊 MÓDULO COHORT PROGRESS (G12)
