@@ -10,7 +10,8 @@ export default function MemberNavigator({ initialMember, allMembers = [], onClos
 
   const goToMember = (member) => {
     if (member?.id) {
-      setCurrentMember(member);
+      const fullMember = allMembers.find(m => m.id === member.id);
+      setCurrentMember(fullMember || member);
     }
   };
 

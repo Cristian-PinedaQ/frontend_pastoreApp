@@ -254,7 +254,8 @@ class ApiService {
 
   async getAllMembers() {
     try {
-      return this.request('/member/findAll');
+      const response = await this.request('/member?page=0&limit=500');
+      return response.content || response;
     } catch (error) {
       logError('❌ [getAllMembers] Error:', error.message);
       throw error;
