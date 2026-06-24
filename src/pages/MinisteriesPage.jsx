@@ -28,6 +28,7 @@ import {
   BarChart2,
   Printer,
   Eye,
+  Search,
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -84,24 +85,24 @@ const MinisteriesPage = () => {
   const TEAM_STATUS_CONFIG = {
     ACTIVE: {
       label: "Activo",
-      textColor: "text-emerald-700",
-      bgColor: "bg-emerald-50",
+      textColor: "text-emerald-700 dark:text-emerald-400",
+      bgColor: "bg-emerald-50 dark:bg-emerald-900/30",
       dotColor: "bg-emerald-500",
-      border: "border-emerald-200",
+      border: "border-emerald-200 dark:border-emerald-800/60",
     },
     SUSPENDED: {
       label: "Suspendido",
-      textColor: "text-amber-700",
-      bgColor: "bg-amber-50",
+      textColor: "text-amber-700 dark:text-amber-400",
+      bgColor: "bg-amber-50 dark:bg-amber-900/30",
       dotColor: "bg-amber-500",
-      border: "border-amber-200",
+      border: "border-amber-200 dark:border-amber-800/60",
     },
     INACTIVE: {
       label: "Inactivo",
-      textColor: "text-slate-500",
-      bgColor: "bg-slate-100",
+      textColor: "text-slate-500 dark:text-slate-400",
+      bgColor: "bg-slate-100 dark:bg-slate-800",
       dotColor: "bg-slate-400",
-      border: "border-slate-200",
+      border: "border-slate-200 dark:border-slate-700",
     },
   };
 
@@ -766,30 +767,30 @@ const MinisteriesPage = () => {
               </span>
             </h1>
 
-            <div className="flex flex-wrap items-center gap-2 mt-6 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl w-fit">
+            <div className="flex items-center gap-2 mt-6 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl overflow-x-auto scrollbar-hide">
               <button
                 onClick={() => setActiveTab("TEAMS")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === "TEAMS" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all shrink-0 ${activeTab === "TEAMS" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
               >
-                <Users size={18} /> Equipos Activos
+                <Users size={16} /> Equipos Activos
               </button>
               <button
                 onClick={() => setActiveTab("SCHEDULE")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === "SCHEDULE" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all shrink-0 ${activeTab === "SCHEDULE" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
               >
-                <CalendarDays size={18} /> Programación
+                <CalendarDays size={16} /> Programación
               </button>
               <button
                 onClick={() => setActiveTab("MINISTERIES")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === "MINISTERIES" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all shrink-0 ${activeTab === "MINISTERIES" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
               >
-                <Building2 size={18} /> Ministerios
+                <Building2 size={16} /> Ministerios
               </button>
               <button
                 onClick={() => setActiveTab("ROLES")}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === "ROLES" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                className={`flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-bold text-xs sm:text-sm whitespace-nowrap transition-all shrink-0 ${activeTab === "ROLES" ? "bg-white dark:bg-slate-700 text-blue-600 shadow-md scale-105" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
               >
-                <Settings2 size={18} /> Roles de Equipo
+                <Settings2 size={16} /> Roles de Equipo
               </button>
             </div>
           </div>
@@ -817,15 +818,16 @@ const MinisteriesPage = () => {
             )}
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-8 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-4 sm:p-8 shadow-sm">
             <div className="mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="relative group md:col-span-1">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Buscar líder..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full h-14 pl-14 pr-8 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-sm outline-none focus:border-blue-400 text-slate-800 dark:text-slate-200"
+                  className="w-full h-14 pl-10 pr-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-sm outline-none focus:border-blue-400 text-slate-800 dark:text-slate-200"
                 />
               </div>
               <select
@@ -982,23 +984,23 @@ const MinisteriesPage = () => {
               </div>
 
               {scheduleMinisteryId && (
-                <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                   <button
                     onClick={() => setModals((prev) => ({ ...prev, pdfExport: true }))}
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-700 text-white rounded-2xl font-bold shadow-lg hover:bg-slate-850 hover:-translate-y-1 transition-all w-full md:w-auto"
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-slate-800 hover:-translate-y-0.5 transition-all w-full sm:w-auto"
                   >
-                    <Printer size={18} />
-                    Imprimir PDF
+                    <Printer size={16} />
+                    <span className="whitespace-nowrap">Imprimir PDF</span>
                   </button>
 
                   {/* Botón de Publicar Programación: solo si hay borradores */}
                   {canManage && events.some((ev) => ev.status === 'DRAFT') && (
                     <button
                       onClick={() => setModals((prev) => ({ ...prev, publishConfirm: true }))}
-                      className="flex items-center justify-center gap-2 px-6 py-4 bg-violet-600 text-white rounded-2xl font-bold shadow-lg hover:bg-violet-700 hover:-translate-y-1 transition-all w-full md:w-auto"
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-violet-600 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-violet-700 hover:-translate-y-0.5 transition-all w-full sm:w-auto"
                     >
-                      <CheckCircle2 size={18} />
-                      Publicar Programación
+                      <CheckCircle2 size={16} />
+                      <span className="whitespace-nowrap">Publicar Programación</span>
                     </button>
                   )}
 
@@ -1006,10 +1008,10 @@ const MinisteriesPage = () => {
                     <>
                       <button
                         onClick={openScheduleConfigModal}
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-lg hover:bg-emerald-700 hover:-translate-y-1 transition-all w-full md:w-auto"
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-600 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-emerald-700 hover:-translate-y-0.5 transition-all w-full sm:w-auto"
                       >
-                        <Settings2 size={18} />
-                        Horarios & Generar Mes
+                        <Settings2 size={16} />
+                        <span className="whitespace-nowrap">Horarios & Generar Mes</span>
                       </button>
 
                       <button
@@ -1017,9 +1019,10 @@ const MinisteriesPage = () => {
                           setFormData({ name: "", description: "" });
                           setModals({ ...modals, eventCreate: true });
                         }}
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 hover:-translate-y-1 transition-all w-full md:w-auto"
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-blue-700 hover:-translate-y-0.5 transition-all w-full sm:w-auto"
                       >
-                        <CalendarDays size={18} /> Agendar Culto Extra
+                        <CalendarDays size={16} />
+                        <span className="whitespace-nowrap">Agendar Culto Extra</span>
                       </button>
                     </>
                   )}
@@ -1176,52 +1179,130 @@ const MinisteriesPage = () => {
           </div>
 
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black">
-                  <th className="px-8 py-6">Ministerio Configurado</th>
-                  <th className="px-8 py-6">Estado Base</th>
-                  <th className="px-8 py-6">Roles Activos</th>
-                  <th className="px-8 py-6 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                {ministeries.map((m) => (
-                  <tr
-                    key={m.id}
-                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/20 transition-colors"
-                  >
-                    <td className="px-8 py-6 font-bold text-slate-900 dark:text-white flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center border border-blue-100 dark:border-blue-800/50">
+
+            {/* ── VISTA DESKTOP: tabla tradicional (≥768px) ── */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black">
+                    <th className="px-6 py-5">Ministerio Configurado</th>
+                    <th className="px-6 py-5">Estado Base</th>
+                    <th className="px-6 py-5">Roles Activos</th>
+                    <th className="px-6 py-5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                  {ministeries.map((m) => (
+                    <tr
+                      key={m.id}
+                      className="hover:bg-slate-50/80 dark:hover:bg-slate-800/20 transition-colors"
+                    >
+                      <td className="px-6 py-5 font-bold text-slate-900 dark:text-white">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center border border-blue-100 dark:border-blue-800/50 shrink-0">
+                            <Building2 size={18} />
+                          </div>
+                          {m.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span
+                          className={`text-[10px] font-black tracking-widest border px-3 py-1 rounded-lg uppercase ${
+                            m.active
+                              ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/50"
+                              : "text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                          }`}
+                        >
+                          {m.active ? "Operativo" : "Inactivo"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5 font-bold text-slate-500 dark:text-slate-400">
+                        {m.roles?.filter((r) => r.active).length || 0} Roles Activos
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openMinistryStatistics(m.id)}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-xl transition-all"
+                            title="Ver Estadísticas"
+                          >
+                            <BarChart2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => openExcellenceDashboard(m)}
+                            className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-700 rounded-xl transition-all"
+                            title="Panel de Excelencia Ministerial"
+                          >
+                            <CheckCircle2 size={18} />
+                          </button>
+                          {isPastor && (
+                            <>
+                              <button
+                                onClick={() => openMinisteryModal(m)}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-xl transition-all"
+                                title="Editar"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMinistery(m.id)}
+                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-xl transition-all"
+                                title="Eliminar"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── VISTA MÓVIL: cards (<768px) ── */}
+            <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800/50">
+              {ministeries.map((m) => (
+                <div key={m.id} className="p-4 space-y-3 hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                  {/* Header de la card */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center border border-blue-100 dark:border-blue-800/50 shrink-0">
                         <Building2 size={18} />
                       </div>
-                      {m.name}
-                    </td>
-                    <td className="px-8 py-6">
-                      <span
-                        className={`text-[10px] font-black tracking-widest border px-3 py-1 rounded-lg uppercase ${m.active ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-slate-500 bg-slate-100 border-slate-300"}`}
-                      >
-                        {m.active ? "Operativo" : "Inactivo"}
-                      </span>
-                    </td>
-                    <td className="px-8 py-6 font-bold text-slate-500 dark:text-slate-400">
-                      {m.roles?.filter((r) => r.active).length || 0} Roles
-                      Activos
-                    </td>
-                    <td className="px-8 py-6 text-right space-x-2">
+                      <div className="min-w-0">
+                        <p className="font-black text-slate-900 dark:text-white text-sm truncate">{m.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-[9px] font-black tracking-widest border px-2 py-0.5 rounded-md uppercase ${
+                            m.active
+                              ? "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800/50"
+                              : "text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700"
+                          }`}>
+                            {m.active ? "Operativo" : "Inactivo"}
+                          </span>
+                          <span className="text-xs font-bold text-slate-400 dark:text-slate-500">
+                            {m.roles?.filter((r) => r.active).length || 0} roles activos
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => openMinistryStatistics(m.id)}
                         className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-xl transition-all"
                         title="Ver Estadísticas"
                       >
-                        <BarChart2 size={18} />
+                        <BarChart2 size={16} />
                       </button>
                       <button
                         onClick={() => openExcellenceDashboard(m)}
                         className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-slate-700 rounded-xl transition-all"
-                        title="Panel de Excelencia Ministerial"
+                        title="Panel de Excelencia"
                       >
-                        <CheckCircle2 size={18} />
+                        <CheckCircle2 size={16} />
                       </button>
                       {isPastor && (
                         <>
@@ -1230,22 +1311,23 @@ const MinisteriesPage = () => {
                             className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-700 rounded-xl transition-all"
                             title="Editar"
                           >
-                            <Edit size={18} />
+                            <Edit size={16} />
                           </button>
                           <button
                             onClick={() => handleDeleteMinistery(m.id)}
                             className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-xl transition-all"
                             title="Eliminar"
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </button>
                         </>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
           </div>
         </div>
       ) : (

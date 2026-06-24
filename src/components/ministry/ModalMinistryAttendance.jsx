@@ -1,33 +1,78 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  ClipboardCheck,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  Loader2,
+  AlertTriangle,
+} from 'lucide-react';
+import ModalHeader from '../ModalHeader';
 import apiService from '../../apiService';
 
 // ============================================================
 // Helpers de UI
 // ============================================================
 const SCORE_LABELS = ['Deficiente', 'Regular', 'Bueno', 'Excelente'];
-const SCORE_COLORS = ['#ef4444', '#f97316', '#22c55e', '#3b82f6'];
 
+const SCORE_STYLES = {
+  0: 'bg-red-50 dark:bg-red-900/20 border-red-400 dark:border-red-600 text-red-700 dark:text-red-400',
+  1: 'bg-orange-50 dark:bg-orange-900/20 border-orange-400 dark:border-orange-600 text-orange-700 dark:text-orange-400',
+  2: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-400 dark:border-emerald-600 text-emerald-700 dark:text-emerald-400',
+  3: 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-400',
+};
+
+const SCORE_LABEL_STYLES = {
+  0: 'text-red-600 dark:text-red-400',
+  1: 'text-orange-600 dark:text-orange-400',
+  2: 'text-emerald-600 dark:text-emerald-400',
+  3: 'text-blue-600 dark:text-blue-400',
+};
+
+const parseSafeDate = (dateVal) => {
+  if (!dateVal) return new Date();
+  if (Array.isArray(dateVal)) {
+    const [y, m, day, h = 0, min = 0, s = 0] = dateVal;
+    return new Date(y, m - 1, day, h, min, s);
+  }
+  return new Date(dateVal);
+};
+
+// ============================================================
+// ScoreSelector — selector de puntuación 0-3
+// ============================================================
 function ScoreSelector({ label, value, onChange, disabled }) {
   return (
-    <div className="score-selector">
-      <span className="score-label">{label}</span>
-      <div className="score-buttons">
-        {[0, 1, 2, 3].map((score) => (
-          <button
-            key={score}
-            type="button"
-            disabled={disabled}
-            onClick={() => onChange(score)}
-            className={`score-btn ${value === score ? 'score-btn--active' : ''}`}
-            style={value === score ? { backgroundColor: SCORE_COLORS[score], color: '#fff', borderColor: SCORE_COLORS[score] } : {}}
-            title={SCORE_LABELS[score]}
-          >
-            {score}
-          </button>
-        ))}
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+      <div className="flex gap-1.5">
+        {[0, 1, 2, 3].map((score) => {
+          const isActive = value === score;
+          return (
+            <button
+              key={score}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(score)}
+              title={SCORE_LABELS[score]}
+              className={`w-9 h-9 rounded-xl border-2 font-black text-sm transition-all
+                ${isActive
+                  ? `${SCORE_STYLES[score]} scale-110 shadow-md`
+                  : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700/60'
+                }
+                focus:outline-none focus:ring-2 focus:ring-blue-400/50 dark:focus:ring-blue-500/40
+                disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              {score}
+            </button>
+          );
+        })}
       </div>
       {value !== null && value !== undefined && (
-        <span className="score-current" style={{ color: SCORE_COLORS[value] }}>
+        <span className={`text-[10px] font-black uppercase tracking-wider ${SCORE_LABEL_STYLES[value]}`}>
           {SCORE_LABELS[value]}
         </span>
       )}
@@ -35,140 +80,295 @@ function ScoreSelector({ label, value, onChange, disabled }) {
   );
 }
 
-function ServerRow({ assignment, record, onChange }) {
+// ============================================================
+// ServerRow — fila de un servidor con evaluación
+// ============================================================
+const ServerRow = React.memo(function ServerRow({ assignment, record, onChange }) {
   const attended = record.attended;
   const excused = record.excused;
 
   const handleAttended = (val) => {
     if (val) {
-      onChange({ ...record, attended: true, excused: null, punctuality: null, presentation: null, attitude: null });
+      onChange(assignment.assignmentId, { ...record, attended: true, excused: null, punctuality: null, presentation: null, attitude: null });
     } else {
-      onChange({ ...record, attended: false, excused: false, punctuality: 0, presentation: 0, attitude: 0 });
+      onChange(assignment.assignmentId, { ...record, attended: false, excused: false, punctuality: 0, presentation: 0, attitude: 0 });
     }
   };
 
   const handleExcused = (val) => {
     const autoScore = val ? 1 : 0;
-    onChange({ ...record, excused: val, punctuality: autoScore, presentation: autoScore, attitude: autoScore });
+    onChange(assignment.assignmentId, { ...record, excused: val, punctuality: autoScore, presentation: autoScore, attitude: autoScore });
   };
 
-
-  const isIncomplete = attended === null || attended === undefined ||
-    (attended === true && (record.punctuality === null || record.punctuality === undefined ||
+  const isIncomplete =
+    attended === null || attended === undefined ||
+    (attended === true && (
+      record.punctuality === null || record.punctuality === undefined ||
       record.presentation === null || record.presentation === undefined ||
-      record.attitude === null || record.attitude === undefined)) ||
+      record.attitude === null || record.attitude === undefined
+    )) ||
     !record.observations?.trim();
 
+  const initial = assignment.memberName?.[0]?.toUpperCase() || '?';
+
   return (
-    <div className={`server-row ${isIncomplete ? 'server-row--incomplete' : 'server-row--complete'}`}>
-      <div className="server-row__header">
-        <div className="server-info">
-          <span className="server-name">{assignment.memberName}</span>
-          <span className="server-role">{assignment.roleName}</span>
+    <div className={`rounded-2xl border-2 p-4 sm:p-5 transition-all space-y-4
+      ${isIncomplete
+        ? 'border-amber-300 dark:border-amber-700/60 bg-amber-50/30 dark:bg-amber-950/10'
+        : 'border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/20 dark:bg-emerald-950/10'
+      }`}
+    >
+      {/* Header del servidor */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-base shadow-md shrink-0">
+            {initial}
+          </div>
+          <div className="min-w-0">
+            {/* break-words para nombres muy largos */}
+            <p className="font-black text-slate-900 dark:text-white text-sm break-words leading-tight">
+              {assignment.memberName}
+            </p>
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5">
+              {assignment.roleName}
+            </p>
+          </div>
         </div>
 
-        {/* Toggle Asistió / No asistió */}
-        <div className="attendance-toggle">
+        {/* Toggle asistencia */}
+        <div className="flex gap-2 shrink-0">
           <button
             type="button"
-            className={`toggle-btn ${attended === true ? 'toggle-btn--yes' : ''}`}
             onClick={() => handleAttended(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-sm transition-all
+              focus:outline-none focus:ring-2 focus:ring-emerald-400/50
+              ${attended === true
+                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20'
+              }`}
           >
-            ✅ Asistió
+            <CheckCircle2 size={14} /> Asistió
           </button>
           <button
             type="button"
-            className={`toggle-btn ${attended === false ? 'toggle-btn--no' : ''}`}
             onClick={() => handleAttended(false)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-sm transition-all
+              focus:outline-none focus:ring-2 focus:ring-red-400/50
+              ${attended === false
+                ? 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 shadow-sm'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50/40 dark:hover:bg-red-950/20'
+              }`}
           >
-            ❌ No asistió
+            <XCircle size={14} /> No asistió
           </button>
         </div>
       </div>
 
       {/* Si no asistió → toggle excusado */}
       {attended === false && (
-        <div className="excused-row">
-          <span className="excused-label">Motivo de ausencia:</span>
+        <div className="flex flex-wrap items-center gap-3 pl-1">
+          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Motivo:</span>
           <button
             type="button"
-            className={`excused-btn ${excused === true ? 'excused-btn--excused' : ''}`}
             onClick={() => handleExcused(true)}
+            className={`px-3 py-1.5 rounded-xl border-2 font-bold text-xs transition-all
+              focus:outline-none focus:ring-2 focus:ring-blue-400/50
+              ${excused === true
+                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/40 dark:hover:bg-blue-950/20'
+              }`}
           >
             📝 Excusado
           </button>
           <button
             type="button"
-            className={`excused-btn ${excused === false ? 'excused-btn--unexcused' : ''}`}
             onClick={() => handleExcused(false)}
+            className={`px-3 py-1.5 rounded-xl border-2 font-bold text-xs transition-all
+              focus:outline-none focus:ring-2 focus:ring-red-400/50
+              ${excused === false
+                ? 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:border-red-300 dark:hover:border-red-700 hover:bg-red-50/40 dark:hover:bg-red-950/20'
+              }`}
           >
             🚫 Sin excusa
           </button>
-          <span className="auto-score-note">
-            Puntuación automática: {excused ? '1 (Regular)' : '0 (Deficiente)'}
-          </span>
+          {excused !== null && excused !== undefined && (
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">
+              Puntuación automática: {excused ? '1 (Regular)' : '0 (Deficiente)'}
+            </span>
+          )}
         </div>
       )}
 
       {/* Si asistió → criterios manuales */}
       {attended === true && (
-        <div className="scores-grid">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-white dark:bg-slate-800/40 rounded-xl border border-slate-100 dark:border-slate-700/50">
           <ScoreSelector
             label="Puntualidad"
             value={record.punctuality}
-            onChange={(v) => onChange({ ...record, punctuality: v })}
+            onChange={(v) => onChange(assignment.assignmentId, { ...record, punctuality: v })}
             disabled={false}
           />
           <ScoreSelector
             label="Presentación"
             value={record.presentation}
-            onChange={(v) => onChange({ ...record, presentation: v })}
+            onChange={(v) => onChange(assignment.assignmentId, { ...record, presentation: v })}
             disabled={false}
           />
           <ScoreSelector
             label="Actitud"
             value={record.attitude}
-            onChange={(v) => onChange({ ...record, attitude: v })}
+            onChange={(v) => onChange(assignment.assignmentId, { ...record, attitude: v })}
             disabled={false}
           />
         </div>
       )}
 
       {/* Observaciones — siempre obligatorio */}
-      <div className="observations-row">
-        <label className="obs-label">
-          Observaciones <span className="required">*</span>
+      <div className="space-y-1.5">
+        <label className="flex items-center gap-1 text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <FileText size={12} />
+          Observaciones <span className="text-red-500 dark:text-red-400 normal-case font-bold ml-1">*obligatorio</span>
         </label>
         <textarea
-          className={`obs-input ${!record.observations?.trim() ? 'obs-input--empty' : ''}`}
+          className={`w-full px-4 py-3 rounded-xl border-2 font-medium text-sm resize-none transition-all
+            outline-none focus:ring-2 focus:ring-blue-400/40 dark:focus:ring-blue-500/30
+            bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200
+            placeholder:text-slate-300 dark:placeholder:text-slate-400
+            focus:border-blue-500 dark:focus:border-blue-400
+            ${!record.observations?.trim()
+              ? 'border-amber-300 dark:border-amber-700/60'
+              : 'border-slate-200 dark:border-slate-700'
+            }`}
           placeholder="Escribe una observación del servicio (obligatorio)..."
           value={record.observations || ''}
-          onChange={(e) => onChange({ ...record, observations: e.target.value })}
+          onChange={(e) => onChange(assignment.assignmentId, { ...record, observations: e.target.value })}
           rows={2}
           maxLength={500}
         />
+        <p className="text-[10px] text-slate-400 dark:text-slate-500 text-right">
+          {(record.observations || '').length}/500
+        </p>
       </div>
     </div>
   );
-}
+});
 
-// ============================================================
-// Modal principal
-// ============================================================
+const DEFAULT_RECORD = {
+  attended: null,
+  excused: null,
+  punctuality: null,
+  presentation: null,
+  attitude: null,
+  observations: '',
+};
+
 export default function ModalMinistryAttendance({ event, onClose, onSaved }) {
   const [assignments, setAssignments] = useState([]);
-  const [records, setRecords] = useState({});   // key: assignmentId → MinistryAttendanceRequest
+  const [records, setRecords] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Refs para focus management y DOM
+  const modalRef = useRef(null);
+  const firstFocusableRef = useRef(null);
+  const triggerElementRef = useRef(null);
+
+  // ── Scroll lock robusto (iOS Safari compatible) ───────────
+  useEffect(() => {
+    // Guardamos la posición de scroll actual
+    const scrollY = window.scrollY;
+    const scrollX = window.scrollX;
+
+    // Guardamos el elemento activo antes de abrir (para restaurarlo al cerrar)
+    triggerElementRef.current = document.activeElement;
+
+    // Técnica compatible con iOS: fixed + top negativo
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      // Restaurar posición y scroll al desmontar
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.left = '';
+      document.body.style.right = '';
+      document.body.style.overflow = '';
+      window.scrollTo(scrollX, scrollY);
+
+      // Devolver foco al elemento disparador (botón "Registrar Asistencias")
+      triggerElementRef.current?.focus?.();
+    };
+  }, []);
+
+  // ── Focus Trap dinámico y control de Escape ──────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // 1. Escape (Cierre controlado)
+      if (e.key === 'Escape') {
+        if (saving) return; // Bloquear si está guardando
+        onClose?.();
+        return;
+      }
+
+      // 2. Tab (Focus Trap dinámico en caliente)
+      if (e.key === 'Tab') {
+        const modalEl = modalRef.current;
+        if (!modalEl) return;
+
+        // Calcular elementos enfocables en el instante del evento Tab
+        const focusableSelectors = 'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        const focusableEls = Array.from(modalEl.querySelectorAll(focusableSelectors));
+
+        if (focusableEls.length === 0) return;
+
+        const first = focusableEls[0];
+        const last = focusableEls[focusableEls.length - 1];
+
+        if (e.shiftKey) {
+          // Shift + Tab -> retroceder
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          // Tab -> avanzar
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, saving]);
+
+  // ── Focus al primer elemento al montar ──────────────────
+  useEffect(() => {
+    // Pequeño delay para asegurar que el portal ya se renderizó
+    const timer = setTimeout(() => {
+      firstFocusableRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ── Carga de datos ───────────────────────────────────────
   useEffect(() => {
     if (!event?.id) return;
     setLoading(true);
+    setError('');
+    setAssignments([]);
+    setRecords({});
+
     apiService.getMinistryEventAttendance(event.id)
       .then((data) => {
         setAssignments(data);
-        // Pre-cargar evaluaciones ya existentes
         const initial = {};
         data.forEach((a) => {
           initial[a.assignmentId] = {
@@ -187,15 +387,22 @@ export default function ModalMinistryAttendance({ event, onClose, onSaved }) {
       .finally(() => setLoading(false));
   }, [event?.id]);
 
-  const handleChange = (assignmentId, updated) => {
+  const handleChange = useCallback((assignmentId, updated) => {
     setRecords((prev) => ({ ...prev, [assignmentId]: updated }));
-  };
+  }, []);
 
   const allComplete = Object.values(records).every((r) =>
     r.attended !== null && r.attended !== undefined &&
-    (r.attended === false || (r.punctuality !== null && r.presentation !== null && r.attitude !== null)) &&
+    (r.attended === false || (
+      r.punctuality !== null && r.presentation !== null && r.attitude !== null
+    )) &&
     r.observations?.trim()
   );
+
+  const completedCount = Object.values(records).filter((r) =>
+    r.attended !== null && r.attended !== undefined && r.observations?.trim()
+  ).length;
+  const totalCount = Object.keys(records).length;
 
   const handleSave = async () => {
     if (!allComplete) {
@@ -215,111 +422,128 @@ export default function ModalMinistryAttendance({ event, onClose, onSaved }) {
     }
   };
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
+  // Fecha formateada del evento
+  const eventDateStr = event?.eventDate
+    ? parseSafeDate(event.eventDate).toLocaleString('es-ES', {
+        weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+      })
+    : '';
+
+  const modalContent = (
+    // Overlay — z-[9999] para superar cualquier z-index del sistema
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={(e) => {
+        // Solo cierra si se hace click exactamente en el overlay, y no se está guardando
+        if (e.target === e.currentTarget && !saving) onClose?.();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-attendance-title"
+    >
       <div
-        className="modal-attendance"
+        ref={modalRef}
+        className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: 720, maxHeight: '90vh', overflowY: 'auto' }}
       >
         {/* Header */}
-        <div className="modal-header">
-          <div>
-            <h2 className="modal-title">📋 Registro de Asistencias</h2>
-            <p className="modal-subtitle">
-              {event?.name} — {event?.eventDate
-                ? new Date(event.eventDate).toLocaleDateString('es-CO', {
-                    weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
-                  })
-                : ''}
-            </p>
-          </div>
-          <button className="modal-close-btn" onClick={onClose}>✕</button>
-        </div>
+        <ModalHeader
+          title="Registro de Asistencias"
+          titleId="modal-attendance-title"
+          subtitle={`${event?.name} · ${eventDateStr}`}
+          icon={ClipboardCheck}
+          onClose={onClose}
+          closeDisabled={saving}
+          titleAddon={
+            totalCount > 0 && (
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black
+                ${allComplete
+                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/50'
+                  : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/50'
+                }`}
+              >
+                {completedCount}/{totalCount}
+              </span>
+            )
+          }
+        />
 
-        {/* Body */}
-        <div className="modal-body" style={{ padding: '1rem' }}>
-          {loading && <p className="loading-text">Cargando servidores asignados...</p>}
-
-          {!loading && assignments.length === 0 && (
-            <p className="empty-text">No hay servidores asignados a este culto.</p>
+        {/* Body — scrollable */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          {/* Loading */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-16 space-y-4">
+              <Loader2 size={40} className="text-blue-500 animate-spin opacity-60" />
+              <p className="text-sm font-bold text-slate-400 dark:text-slate-500">
+                Cargando servidores asignados...
+              </p>
+            </div>
           )}
 
+          {/* Vacío */}
+          {!loading && assignments.length === 0 && !error && (
+            <div className="flex flex-col items-center justify-center py-16 space-y-3 bg-slate-50 dark:bg-slate-800/20 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+              <ClipboardCheck size={40} className="text-slate-300 dark:text-slate-600" />
+              <p className="font-bold text-slate-500 dark:text-slate-400 text-sm">
+                No hay servidores asignados a este culto.
+              </p>
+            </div>
+          )}
+
+          {/* Filas de servidores */}
           {!loading && assignments.map((a) => (
             <ServerRow
               key={a.assignmentId}
               assignment={a}
-              record={records[a.assignmentId] || { assignmentId: a.assignmentId }}
-              onChange={(updated) => handleChange(a.assignmentId, updated)}
+              record={records[a.assignmentId] || DEFAULT_RECORD}
+              onChange={handleChange}
             />
           ))}
 
+          {/* Error */}
           {error && (
-            <div className="error-banner" style={{ color: '#ef4444', marginTop: '0.75rem', fontSize: '0.875rem' }}>
-              ⚠️ {error}
+            <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 rounded-xl text-red-700 dark:text-red-400">
+              <AlertTriangle size={18} className="shrink-0" />
+              <p className="font-bold text-sm">{error}</p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="modal-footer" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', padding: '1rem', borderTop: '1px solid #e5e7eb' }}>
-          <button className="btn-secondary" onClick={onClose} disabled={saving}>
+        {/* Footer — sticky en mobile, siempre visible */}
+        <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex gap-3 bg-white dark:bg-slate-900 sticky bottom-0">
+          <button
+            ref={firstFocusableRef}
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 py-3.5 px-6 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700
+              text-slate-700 dark:text-slate-300 font-black rounded-2xl transition-colors
+              focus:outline-none focus:ring-2 focus:ring-slate-400/50 dark:focus:ring-slate-500/40
+              disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             Cancelar
           </button>
           <button
-            className="btn-primary"
+            type="button"
             onClick={handleSave}
             disabled={saving || !allComplete || loading}
+            className="flex-1 py-3.5 px-6 bg-gradient-to-r from-emerald-500 to-teal-600
+              hover:from-emerald-600 hover:to-teal-700
+              text-white font-black rounded-2xl transition-all
+              shadow-lg shadow-emerald-500/20
+              focus:outline-none focus:ring-2 focus:ring-emerald-400/50 dark:focus:ring-emerald-500/40
+              disabled:opacity-50 disabled:cursor-not-allowed
+              flex items-center justify-center gap-2"
           >
-            {saving ? '⏳ Guardando...' : '✅ Guardar evaluaciones'}
+            {saving
+              ? <><Loader2 size={16} className="animate-spin" /> Guardando...</>
+              : <><CheckCircle2 size={16} /> Guardar evaluaciones</>
+            }
           </button>
         </div>
       </div>
-
-      <style>{`
-        .server-row {
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 1rem;
-          margin-bottom: 1rem;
-          transition: border-color .2s;
-        }
-        .server-row--incomplete { border-color: #fbbf24; }
-        .server-row--complete   { border-color: #22c55e; }
-        .server-row__header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
-        .server-name { font-weight: 700; font-size: 1rem; display: block; }
-        .server-role { font-size: .8rem; color: #6b7280; }
-        .attendance-toggle { display: flex; gap: .5rem; }
-        .toggle-btn { padding: .35rem .8rem; border-radius: 8px; border: 2px solid #d1d5db; background: transparent; cursor: pointer; font-size: .85rem; transition: all .15s; }
-        .toggle-btn--yes { border-color: #22c55e; background: #dcfce7; color: #15803d; font-weight: 600; }
-        .toggle-btn--no  { border-color: #ef4444; background: #fee2e2; color: #b91c1c; font-weight: 600; }
-        .excused-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; flex-wrap: wrap; }
-        .excused-label { font-size: .85rem; font-weight: 600; }
-        .excused-btn { padding: .3rem .7rem; border-radius: 6px; border: 1.5px solid #d1d5db; background: transparent; cursor: pointer; font-size: .82rem; }
-        .excused-btn--excused   { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; font-weight: 600; }
-        .excused-btn--unexcused { border-color: #ef4444; background: #fee2e2; color: #b91c1c; font-weight: 600; }
-        .auto-score-note { font-size: .78rem; color: #6b7280; font-style: italic; }
-        .scores-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .75rem; margin-bottom: .75rem; }
-        .score-selector { display: flex; flex-direction: column; gap: .3rem; }
-        .score-label { font-size: .82rem; font-weight: 600; color: #374151; }
-        .score-buttons { display: flex; gap: .3rem; }
-        .score-btn { width: 36px; height: 36px; border-radius: 8px; border: 2px solid #d1d5db; background: #f9fafb; cursor: pointer; font-weight: 700; font-size: .9rem; transition: all .15s; }
-        .score-btn:disabled { opacity: .4; cursor: not-allowed; }
-        .score-btn--active { transform: scale(1.1); }
-        .score-current { font-size: .78rem; font-weight: 600; }
-        .observations-row { margin-top: .75rem; }
-        .obs-label { font-size: .82rem; font-weight: 600; color: #374151; display: block; margin-bottom: .3rem; }
-        .required { color: #ef4444; }
-        .obs-input { width: 100%; border: 1.5px solid #d1d5db; border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; resize: vertical; transition: border-color .15s; box-sizing: border-box; }
-        .obs-input:focus { outline: none; border-color: #3b82f6; }
-        .obs-input--empty { border-color: #fbbf24; }
-        .loading-text, .empty-text { color: #6b7280; text-align: center; padding: 2rem; }
-        .modal-attendance { background: white; border-radius: 16px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.18); }
-        .modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; }
-        .modal-title { font-size: 1.2rem; font-weight: 700; margin: 0 0 .2rem; }
-        .modal-subtitle { font-size: .85rem; color: #6b7280; margin: 0; text-transform: capitalize; }
-        .modal-close-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #6b7280; padding: .25rem; }
-      `}</style>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

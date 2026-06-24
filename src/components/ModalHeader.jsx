@@ -27,6 +27,7 @@ const SEMANTIC_STYLES = {
  */
 export const ModalHeader = ({
   title,
+  titleId,
   titleAddon,
   subtitle,
   icon: Icon,
@@ -61,7 +62,10 @@ export const ModalHeader = ({
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white truncate">
+            <h2
+              id={titleId}
+              className="text-2xl font-black tracking-tight text-slate-900 dark:text-white truncate"
+            >
               {title}
             </h2>
             {titleAddon && (
