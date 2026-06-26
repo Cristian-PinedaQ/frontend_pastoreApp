@@ -427,6 +427,23 @@ const MinisteriesPage = () => {
   // PROGRAMACIÓN DE SERVICIO (SCHEDULE)
   // ==========================================
 
+  const getSuggestedEventName = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    const dayOfWeek = date.getDay();
+    const nameMap = {
+      0: "Culto Dominical",
+      1: "Culto de Lunes",
+      2: "Culto de Martes",
+      3: "Culto de Miércoles",
+      4: "Culto de Jueves",
+      5: "Culto de Viernes",
+      6: "Culto de Sábado",
+    };
+    return nameMap[dayOfWeek] || "Culto";
+  };
+
   const handleCreateEvent = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.description) return;
@@ -1445,7 +1462,7 @@ const MinisteriesPage = () => {
                 <input
                   required
                   type="text"
-                  placeholder="Ej. Culto Dominical..."
+                  placeholder="Nombre del evento..."
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
@@ -1461,9 +1478,15 @@ const MinisteriesPage = () => {
                   required
                   type="datetime-local"
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const newDate = e.target.value;
+                    const suggestedName = getSuggestedEventName(newDate);
+                    setFormData({
+                      ...formData,
+                      description: newDate,
+                      name: formData.name && !formData.name.startsWith("Culto") ? formData.name : suggestedName,
+                    });
+                  }}
                   className="w-full h-14 px-5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl font-bold text-sm outline-none focus:border-blue-500 text-slate-800 dark:text-white"
                 />
               </div>
@@ -2211,7 +2234,7 @@ const MinisteriesPage = () => {
                         />
                         <input
                           type="text"
-                          placeholder="Nombre del Culto (ej: Culto Dominical)"
+                          placeholder="Nombre del evento..."
                           value={config.eventName}
                           onChange={(e) => {
                             const updated = [...scheduleConfigs];

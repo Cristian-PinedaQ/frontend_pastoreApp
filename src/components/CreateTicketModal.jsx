@@ -1,14 +1,35 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Loader2, AlertCircle, Sparkles, Send } from "lucide-react";
 import { useCreateTicketMutation } from "../hooks/mutations/useCreateTicketMutation";
 import { useActiveTicketConfigsQuery } from "../hooks/queries/useActiveTicketConfigsQuery";
 import { FieldRenderer } from "./FieldRenderer";
+import { useAuth } from "../context/AuthContext";
 
 export const CreateTicketModal = ({ isOpen, onClose, onSuccess }) => {
   const { data: activeConfigs = [], isLoading: isLoadingConfigs } = useActiveTicketConfigsQuery({
     enabled: isOpen,
   });
+
+  const { hasRole } = useAuth();
+
+  const filteredConfigs = useMemo(() => {
+    return activeConfigs.filter(config => {
+      // Pastores y Administradores tienen acceso a todas las categorías
+      if (hasRole("PASTORES") || hasRole("ADMIN")) {
+        return true;
+      }
+      // Si la categoría no tiene roles de creador asignados, nadie más la puede crear
+      if (!config.creatorRoles || config.creatorRoles.length === 0) {
+        return false;
+      }
+      // El usuario debe tener al menos uno de los roles permitidos
+      return config.creatorRoles.some(roleObj => {
+        const roleName = (typeof roleObj === "object" ? roleObj.name : roleObj) || "";
+        return hasRole(roleName);
+      });
+    });
+  }, [activeConfigs, hasRole]);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -33,7 +54,7 @@ export const CreateTicketModal = ({ isOpen, onClose, onSuccess }) => {
   });
 
   // Al cambiar la categoría seleccionada, inicializar o limpiar los metadatos
-  const selectedConfig = activeConfigs.find(c => c.id === parseInt(selectedConfigId));
+  const selectedConfig = filteredConfigs.find(c => c.id === parseInt(selectedConfigId));
   const requiredFields = selectedConfig?.requiredFields || [];
 
   useEffect(() => {
@@ -185,11 +206,15 @@ export const CreateTicketModal = ({ isOpen, onClose, onSuccess }) => {
                   }`}
                 >
                   <option value="">Selecciona una categoría...</option>
-                  {activeConfigs.map((config) => (
-                    <option key={config.id} value={config.id}>
-                      {config.name} ({config.description})
-                    </option>
-                  ))}
+                  {filteredConfigs.length === 0 ? (
+                    <option value="" disabled>No tienes categorías disponibles para tu rol</option>
+                  ) : (
+                    filteredConfigs.map((config) => (
+                      <option key={config.id} value={config.id}>
+                        {config.name} ({config.description})
+                      </option>
+                    ))
+                  )}
                 </select>
               )}
               {errors.configId && (
