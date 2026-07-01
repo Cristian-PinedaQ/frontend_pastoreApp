@@ -4569,17 +4569,65 @@ class ApiService {
     }
   }
 
-  // Generación mensual parametrizada
+  // ----------------------------------------------------
+  // ORQUESTADOR DE EJECUCIÓN (ROUTING)
+  // ----------------------------------------------------
+  async executeScheduleAction(ministeryId, payload) {
+    const { executionMode } = payload;
+    
+    // El payload que viaja al backend no necesita el executionMode (ya está implícito en la URL)
+    // Pero lo mandaremos igual por si el request body lo requiere.
+    if (executionMode === "SIMULATION_VARIANTS") {
+      return await this.simulateVariantsSchedule(ministeryId, payload);
+    } else if (executionMode === "SIMULATION") {
+      return await this.simulateSchedule(ministeryId, payload);
+    } else {
+      // LIVE (o fallback)
+      return await this.generateCustomSchedule(ministeryId, payload);
+    }
+  }
+
+  // Generación mensual (LIVE)
   async generateCustomSchedule(ministeryId, generationData) {
     try {
       validateId(ministeryId, 'ministeryId');
-      log('🏛️ [generateCustomSchedule] Generando programación para ministerio:', ministeryId);
+      log('🏛️ [generateCustomSchedule] Generando programación para ministerio (LIVE):', ministeryId);
       return await this.request(`/ministeries/${ministeryId}/schedule/generate`, {
         method: 'POST',
         body: JSON.stringify(generationData)
       });
     } catch (error) {
       logError('❌ [generateCustomSchedule] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Simulación Básica (SIMULATION)
+  async simulateSchedule(ministeryId, generationData) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('🏛️ [simulateSchedule] Simulando programación (Sin Variantes) para:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/schedule/simulate`, {
+        method: 'POST',
+        body: JSON.stringify(generationData)
+      });
+    } catch (error) {
+      logError('❌ [simulateSchedule] Error:', error.message);
+      throw error;
+    }
+  }
+
+  // Simulación Avanzada con Variantes (SIMULATION_VARIANTS)
+  async simulateVariantsSchedule(ministeryId, generationData) {
+    try {
+      validateId(ministeryId, 'ministeryId');
+      log('🏛️ [simulateVariantsSchedule] Simulando programación con Variantes para:', ministeryId);
+      return await this.request(`/ministeries/${ministeryId}/schedule/simulate-variants`, {
+        method: 'POST',
+        body: JSON.stringify(generationData)
+      });
+    } catch (error) {
+      logError('❌ [simulateVariantsSchedule] Error:', error.message);
       throw error;
     }
   }

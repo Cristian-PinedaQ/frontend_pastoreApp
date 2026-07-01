@@ -138,6 +138,7 @@ const MinisteriesPage = () => {
     publishConfirm: false,
     excellenceDashboard: false, // Panel de Excelencia Ministerial
     eventDetail: false,
+    simulationResults: false,
   });
 
   // Estado para el modal de evaluación de excelencia (nuevo)
@@ -156,6 +157,17 @@ const MinisteriesPage = () => {
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 2 > 12 ? 1 : new Date().getMonth() + 2, // Siguiente mes por defecto
   });
+  
+  const [simulationConfig, setSimulationConfig] = useState({
+    executionMode: "LIVE", // "LIVE" | "SIMULATION" | "SIMULATION_VARIANTS"
+    ruleVariants: {
+      historyWindowMonths: 2,
+      deterministicSeed: true,
+      prioritizeGlobalHistory: true
+    }
+  });
+  const [lastSimulationResult, setLastSimulationResult] = useState(null);
+  const [simulationModalTab, setSimulationModalTab] = useState("SUMMARY");
   const [pdfParams, setPdfParams] = useState({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1, // Mes actual por defecto
@@ -587,16 +599,26 @@ const MinisteriesPage = () => {
       const payload = {
         year: parseInt(generationParams.year),
         month: parseInt(generationParams.month),
+        executionMode: simulationConfig.executionMode,
+        ruleVariants: simulationConfig.executionMode === "SIMULATION_VARIANTS" ? simulationConfig.ruleVariants : null,
         specialDates: specialDates.map((d) => ({
           dateTime: d.dateTime + ":00", // Asegurar segundos
           eventName: d.eventName,
         })),
       };
 
-      const result = await apiService.generateCustomSchedule(scheduleMinisteryId, payload);
-      alert(`¡Programación Generada exitosamente!\n\nMes: ${result.targetMonth}\nEventos creados: ${result.eventsCreated}\nAsignaciones creadas: ${result.assignmentsCreated}`);
+      const result = await apiService.executeScheduleAction(scheduleMinisteryId, payload);
+      
       setModals((prev) => ({ ...prev, generateSchedule: false }));
-      loadEvents(scheduleMinisteryId);
+
+      if (simulationConfig.executionMode.includes("SIMULATION")) {
+        setLastSimulationResult(result);
+        setSimulationModalTab("SUMMARY");
+        setModals((prev) => ({ ...prev, simulationResults: true }));
+      } else {
+        alert(`¡Programación Generada exitosamente!\n\nMes: ${result.targetMonth}\nEventos creados: ${result.eventsCreated}\nAsignaciones creadas: ${result.assignmentsCreated}`);
+        loadEvents(scheduleMinisteryId); // Only reload in LIVE mode to avoid cache pollution
+      }
     } catch (err) {
       alert(err.message || "Error al generar la programación");
     } finally {
@@ -2293,7 +2315,7 @@ const MinisteriesPage = () => {
                   Seleccione el mes y año para la autogeneración. El sistema bloqueará si ya existe eventos y distribuirá el equipo de forma equitativa.
                 </p>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">
                       Año
@@ -2330,7 +2352,73 @@ const MinisteriesPage = () => {
                       <option value={12}>Diciembre</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 dark:text-slate-400 mb-2">
+                      Modo de Ejecución
+                    </label>
+                    <select
+                      value={simulationConfig.executionMode}
+                      onChange={(e) => setSimulationConfig({ ...simulationConfig, executionMode: e.target.value })}
+                      className="w-full h-12 px-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                    >
+                      <option value="LIVE">Producción (Guardar)</option>
+                      <option value="SIMULATION">Simulación Estándar (Dry-Run)</option>
+                      <option value="SIMULATION_VARIANTS">Simulación Avanzada (Variantes)</option>
+                    </select>
+                  </div>
                 </div>
+
+                {simulationConfig.executionMode === "SIMULATION_VARIANTS" && (
+                  <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800 rounded-2xl space-y-4">
+                    <h4 className="text-xs font-black uppercase text-indigo-600 dark:text-indigo-400">
+                      Variantes de Algoritmo (A/B Testing)
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
+                          Ventana de Historial (Meses)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="12"
+                          value={simulationConfig.ruleVariants.historyWindowMonths}
+                          onChange={(e) => setSimulationConfig({
+                            ...simulationConfig,
+                            ruleVariants: { ...simulationConfig.ruleVariants, historyWindowMonths: parseInt(e.target.value) }
+                          })}
+                          className="w-full h-10 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm outline-none text-slate-800 dark:text-white"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 justify-center mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={simulationConfig.ruleVariants.deterministicSeed}
+                            onChange={(e) => setSimulationConfig({
+                              ...simulationConfig,
+                              ruleVariants: { ...simulationConfig.ruleVariants, deterministicSeed: e.target.checked }
+                            })}
+                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Semilla Determinística</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={simulationConfig.ruleVariants.prioritizeGlobalHistory}
+                            onChange={(e) => setSimulationConfig({
+                              ...simulationConfig,
+                              ruleVariants: { ...simulationConfig.ruleVariants, prioritizeGlobalHistory: e.target.checked }
+                            })}
+                            className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Priorizar Historial Global</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {specialDates.length > 0 && (
                   <div className="space-y-3">
@@ -2388,6 +2476,160 @@ const MinisteriesPage = () => {
                   {actionLoading ? "Generando Asignaciones..." : "Generar Programación Mensual"}
                 </button>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RESULTADOS DE SIMULACION */}
+      {modals.simulationResults && lastSimulationResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[2.5rem] p-8 shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-4 mb-6 shrink-0">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                  <Activity className="text-indigo-500" size={28} />
+                  <span>Análisis de Simulación</span>
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  ID: <span className="font-mono text-xs">{lastSimulationResult.executionId || "N/A"}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setModals({ ...modals, simulationResults: false })}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800 mb-6 shrink-0">
+              <button
+                onClick={() => setSimulationModalTab("SUMMARY")}
+                className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
+                  simulationModalTab === "SUMMARY" 
+                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" 
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                📊 Summary
+              </button>
+              <button
+                onClick={() => setSimulationModalTab("CONFLICTS")}
+                className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
+                  simulationModalTab === "CONFLICTS" 
+                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" 
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                ⚠️ Conflicts
+                {lastSimulationResult.auditData?.summary?.totalConflicts > 0 && (
+                  <span className="ml-2 bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full">{lastSimulationResult.auditData.summary.totalConflicts}</span>
+                )}
+              </button>
+              <button
+                onClick={() => setSimulationModalTab("VACANT")}
+                className={`pb-3 text-sm font-bold border-b-2 transition-colors ${
+                  simulationModalTab === "VACANT" 
+                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400" 
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                🪑 Vacant Roles
+                {lastSimulationResult.auditData?.summary?.totalVacant > 0 && (
+                  <span className="ml-2 bg-amber-100 text-amber-600 text-xs px-2 py-0.5 rounded-full">{lastSimulationResult.auditData.summary.totalVacant}</span>
+                )}
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 pr-2">
+              {simulationModalTab === "SUMMARY" && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] font-black uppercase text-slate-400">Eventos</span>
+                      <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{lastSimulationResult.eventsCreated}</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] font-black uppercase text-slate-400">Asignaciones</span>
+                      <p className="text-3xl font-black text-slate-900 dark:text-white mt-1">{lastSimulationResult.assignmentsCreated}</p>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 text-center">
+                      <span className="text-[10px] font-black uppercase text-slate-400">Conflictos</span>
+                      <p className={`text-3xl font-black mt-1 ${lastSimulationResult.auditData?.summary?.totalConflicts > 0 ? "text-red-500" : "text-emerald-500"}`}>
+                        {lastSimulationResult.auditData?.summary?.totalConflicts || 0}
+                      </p>
+                    </div>
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-800 text-center">
+                      <span className="text-[10px] font-black uppercase text-indigo-500">Varianza de Carga</span>
+                      <p className="text-3xl font-black text-indigo-700 dark:text-indigo-400 mt-1">
+                        {lastSimulationResult.auditData?.summary?.loadVariance?.toFixed(2) || "0.00"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {simulationModalTab === "CONFLICTS" && (
+                <div className="space-y-4">
+                  {lastSimulationResult.auditData?.conflictLogs?.length > 0 ? (
+                    <div className="space-y-3">
+                      {lastSimulationResult.auditData.conflictLogs.map((conflict, i) => (
+                        <div key={i} className="p-4 bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/50 rounded-2xl flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-lg">
+                              {conflict.reasonCode}
+                            </span>
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-2">
+                              {conflict.reasonMessage}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              Leader ID: {conflict.leaderId} | Evento ID: {conflict.eventId}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <CheckCircle2 className="mx-auto text-emerald-400 mb-3" size={48} />
+                      <p className="text-slate-500 font-medium">No se detectaron conflictos de asignación.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {simulationModalTab === "VACANT" && (
+                <div className="space-y-4">
+                  {lastSimulationResult.auditData?.vacantRoles?.length > 0 ? (
+                    <div className="space-y-3">
+                      {lastSimulationResult.auditData.vacantRoles.map((vacant, i) => (
+                        <div key={i} className="p-4 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/50 rounded-2xl">
+                          <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                            Rol ID {vacant.roleId} quedó vacante en Evento ID {vacant.eventId}
+                          </p>
+                          <p className="text-xs text-amber-600/80 mt-1">Motivo: {vacant.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <CheckCircle2 className="mx-auto text-emerald-400 mb-3" size={48} />
+                      <p className="text-slate-500 font-medium">Todos los roles fueron asignados exitosamente.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 shrink-0">
+               <button
+                onClick={() => setModals({ ...modals, simulationResults: false, generateSchedule: true })}
+                className="h-12 px-6 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                Volver a Generación
+              </button>
             </div>
           </div>
         </div>
