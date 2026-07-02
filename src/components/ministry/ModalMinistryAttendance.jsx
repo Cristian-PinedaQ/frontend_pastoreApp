@@ -48,7 +48,7 @@ function ScoreSelector({ label, value, onChange, disabled }) {
       <span className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
         {label}
       </span>
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {[0, 1, 2, 3].map((score) => {
           const isActive = value === score;
           return (
@@ -119,14 +119,13 @@ const ServerRow = React.memo(function ServerRow({ assignment, record, onChange }
       }`}
     >
       {/* Header del servidor */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0 w-full md:w-auto">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-base shadow-md shrink-0">
             {initial}
           </div>
-          <div className="min-w-0">
-            {/* break-words para nombres muy largos */}
-            <p className="font-black text-slate-900 dark:text-white text-sm break-words leading-tight">
+          <div className="min-w-0 flex-1">
+            <p className="font-black text-slate-900 dark:text-white text-sm leading-tight [word-break:break-word] [overflow-wrap:anywhere] whitespace-normal">
               {assignment.memberName}
             </p>
             <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 mt-0.5">
@@ -136,11 +135,11 @@ const ServerRow = React.memo(function ServerRow({ assignment, record, onChange }
         </div>
 
         {/* Toggle asistencia */}
-        <div className="flex gap-2 shrink-0">
+        <div className="flex flex-wrap gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0">
           <button
             type="button"
             onClick={() => handleAttended(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-sm transition-all
+            className={`flex-1 md:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-sm transition-all
               focus:outline-none focus:ring-2 focus:ring-emerald-400/50
               ${attended === true
                 ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 shadow-sm'
@@ -152,7 +151,7 @@ const ServerRow = React.memo(function ServerRow({ assignment, record, onChange }
           <button
             type="button"
             onClick={() => handleAttended(false)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-sm transition-all
+            className={`flex-1 md:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-sm transition-all
               focus:outline-none focus:ring-2 focus:ring-red-400/50
               ${attended === false
                 ? 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 shadow-sm'
@@ -171,7 +170,7 @@ const ServerRow = React.memo(function ServerRow({ assignment, record, onChange }
           <button
             type="button"
             onClick={() => handleExcused(true)}
-            className={`px-3 py-1.5 rounded-xl border-2 font-bold text-xs transition-all
+            className={`flex-1 md:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-xs transition-all
               focus:outline-none focus:ring-2 focus:ring-blue-400/50
               ${excused === true
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
@@ -183,7 +182,7 @@ const ServerRow = React.memo(function ServerRow({ assignment, record, onChange }
           <button
             type="button"
             onClick={() => handleExcused(false)}
-            className={`px-3 py-1.5 rounded-xl border-2 font-bold text-xs transition-all
+            className={`flex-1 md:flex-none justify-center flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 font-bold text-xs transition-all
               focus:outline-none focus:ring-2 focus:ring-red-400/50
               ${excused === false
                 ? 'border-red-500 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400'
@@ -443,7 +442,7 @@ export default function ModalMinistryAttendance({ event, onClose, onSaved }) {
     >
       <div
         ref={modalRef}
-        className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[2.5rem] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-white dark:bg-slate-900 w-[min(95vw,1200px)] rounded-[2.5rem] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -510,7 +509,7 @@ export default function ModalMinistryAttendance({ event, onClose, onSaved }) {
         </div>
 
         {/* Footer — sticky en mobile, siempre visible */}
-        <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex gap-3 bg-white dark:bg-slate-900 sticky bottom-0">
+        <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 p-4 sm:p-5 flex flex-col sm:flex-row gap-3 bg-white dark:bg-slate-900 sticky bottom-0">
           <button
             ref={firstFocusableRef}
             type="button"

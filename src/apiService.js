@@ -4753,6 +4753,21 @@ class ApiService {
     }
   }
 
+  /**
+   * Obtiene las últimas 3 evaluaciones detalladas de un servidor.
+   * @param {number} teamId - ID del MinistryTeam
+   */
+  async getMinistryMemberEvaluations(teamId) {
+    try {
+      validateId(teamId, 'teamId');
+      log('⭐ [getMinistryMemberEvaluations] Obteniendo evaluaciones del servidor:', teamId);
+      return await this.request(`/ministeries/teams/${teamId}/evaluations`);
+    } catch (error) {
+      logError('❌ [getMinistryMemberEvaluations] Error:', error.message);
+      throw error;
+    }
+  }
+
   // ============================================================
   // 📊 MÓDULO COHORT PROGRESS (G12)
   // ============================================================
