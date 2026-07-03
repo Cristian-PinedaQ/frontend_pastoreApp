@@ -620,8 +620,8 @@ const MinisteriesPage = () => {
     }
   };
 
-  const handleGenerateSchedule = async (e) => {
-    e.preventDefault();
+  const handleGenerateSchedule = async (e, force = false) => {
+    if (e) e.preventDefault();
     setActionLoading(true);
     try {
       const payload = {
@@ -633,6 +633,7 @@ const MinisteriesPage = () => {
           dateTime: d.dateTime + ":00", // Asegurar segundos
           eventName: d.eventName,
         })),
+        forceReplace: force
       };
 
       const result = await apiService.executeScheduleAction(scheduleMinisteryId, payload);
@@ -648,7 +649,14 @@ const MinisteriesPage = () => {
         loadEvents(scheduleMinisteryId); // Only reload in LIVE mode to avoid cache pollution
       }
     } catch (err) {
-      alert(err.message || "Error al generar la programación");
+      if (err.status === 409 && !force) {
+        // 409 Conflict: Already exists a draft
+        if (window.confirm("⚠️ Ya existe un borrador activo para este mes.\n\n¿Deseas REEMPLAZARLO por uno nuevo?\n(El borrador anterior quedará anulado)")) {
+          return handleGenerateSchedule(null, true);
+        }
+      } else {
+        alert(err.message || "Error al generar la programación");
+      }
     } finally {
       setActionLoading(false);
     }
@@ -1051,7 +1059,7 @@ const MinisteriesPage = () => {
               </div>
 
               {scheduleMinisteryId && (
-                <div className="flex items-center justify-center gap-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 h-14 min-w-[200px]">
+                <div className="flex items-center justify-center gap-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl ">
                   <button 
                     onClick={handlePrevMonth}
                     className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-300"
@@ -1081,7 +1089,7 @@ const MinisteriesPage = () => {
                   </button>
 
                   {/* Botón de Publicar Programación: solo si hay borradores */}
-                  {canProtocolo && events.some((ev) => ev.status === 'DRAFT') && (
+                  {canProtocolo && scheduleMinisteryId !== 'ALL' && events.some((ev) => ev.status === 'DRAFT') && (
                     <button
                       onClick={() => setModals((prev) => ({ ...prev, publishConfirm: true }))}
                       className="flex items-center justify-center gap-2 px-4 py-3 bg-violet-600 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-violet-700 hover:-translate-y-0.5 transition-all w-full sm:w-auto"
@@ -1091,7 +1099,7 @@ const MinisteriesPage = () => {
                     </button>
                   )}
 
-                  {canProtocolo && (
+                  {canProtocolo && scheduleMinisteryId !== 'ALL' && (
                     <>
                       <button
                         onClick={openScheduleConfigModal}
@@ -1216,8 +1224,13 @@ const MinisteriesPage = () => {
 
                           {canProtocolo && (
                             <>
-                              {/* BOTÓN ASISTENCIA + EVALUACIÓN: Se muestra si el evento ya pasó o es hoy */}
-                              {isPastOrToday && ev.assignments?.length > 0 && (
+                              {/* BOTÓN ASISTENCIA + EVALUACIÓN: Se muestra si el evento ya pasó o es hoy, está publicado y es del mes en curso */}
+                              {(() => {
+                                const now = new Date();
+                                const isCurrentMonth = eventDateObj.getMonth() === now.getMonth() && eventDateObj.getFullYear() === now.getFullYear();
+                                const canMarkAttendance = isPastOrToday && isCurrentMonth && ev.status === 'PUBLISHED';
+                                return canMarkAttendance && ev.assignments?.length > 0;
+                              })() && (
                                 <button
                                   onClick={() => openExcellenceAttendance(ev)}
                                   className="w-full sm:w-auto justify-center px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 text-sm font-bold rounded-xl border border-indigo-200 dark:border-indigo-700 hover:border-indigo-500 hover:bg-indigo-100 shadow-sm transition-all flex items-center gap-2"
