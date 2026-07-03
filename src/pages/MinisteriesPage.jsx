@@ -29,6 +29,8 @@ import {
   Printer,
   Eye,
   Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 const { getDisplayName } = nameHelper;
@@ -55,8 +57,9 @@ const formatEventDateStr = (dateVal) => {
 
 const MinisteriesPage = () => {
   const { hasAnyRole } = useAuth();
-  const canManage = hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE"]);
-  const isPastor = hasAnyRole(["ROLE_PASTORES"]);
+  // CRUD completo del módulo: Protocolo + los gestores (eventos, asistencias, roles, ministerios)
+  const canProtocolo = hasAnyRole(["ROLE_PASTORES", "ROLE_DESPLIEGUE", "ROLE_PROTOCOLO"]);
+
 
   const MINISTERY_LEVEL_CONFIG = {
     LEVEL_1: {
@@ -123,7 +126,8 @@ const MinisteriesPage = () => {
     ministeryId: "ALL",
   });
   const [scheduleMinisteryId, setScheduleMinisteryId] = useState("");
-
+  const [scheduleYear, setScheduleYear] = useState(new Date().getFullYear());
+  const [scheduleMonth, setScheduleMonth] = useState(new Date().getMonth() + 1);
   const [modals, setModals] = useState({
     assign: false,
     ministery: false,
@@ -194,7 +198,7 @@ const MinisteriesPage = () => {
       const [teamsData, ministeriesData, leadersData] = await Promise.all([
         apiService.getMinisteryTeams(),
         apiService.getMinisteries(),
-        canManage ? apiService.getActiveLeaders() : Promise.resolve([]),
+        canProtocolo ? apiService.getActiveLeaders() : Promise.resolve([]),
       ]);
       setTeams(teamsData || []);
       setMinisteries(ministeriesData || []);
@@ -205,7 +209,7 @@ const MinisteriesPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [canManage]);
+  }, [canProtocolo]);
 
   useEffect(() => {
     loadData();
@@ -217,21 +221,45 @@ const MinisteriesPage = () => {
       scheduleMinisteryId &&
       scheduleMinisteryId !== "ALL"
     ) {
-      loadEvents(scheduleMinisteryId);
+      loadEvents(scheduleMinisteryId, scheduleYear, scheduleMonth);
     } else {
       setEvents([]);
     }
-  }, [activeTab, scheduleMinisteryId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, scheduleMinisteryId, scheduleYear, scheduleMonth]);
 
-  const loadEvents = async (minId) => {
+  const loadEvents = async (minId, year = scheduleYear, month = scheduleMonth) => {
     try {
       setLoading(true);
-      const data = await apiService.getMinisteryEvents(minId);
+      const data = await apiService.getMinisteryEvents(minId, year, month);
       setEvents(data || []);
     } catch (err) {
       console.error("Error cargando eventos", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getMonthName = (monthNum) => {
+    const date = new Date(2000, monthNum - 1, 1);
+    return date.toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, c => c.toUpperCase());
+  };
+
+  const handlePrevMonth = () => {
+    if (scheduleMonth === 1) {
+      setScheduleMonth(12);
+      setScheduleYear(scheduleYear - 1);
+    } else {
+      setScheduleMonth(scheduleMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (scheduleMonth === 12) {
+      setScheduleMonth(1);
+      setScheduleYear(scheduleYear + 1);
+    } else {
+      setScheduleMonth(scheduleMonth + 1);
     }
   };
 
@@ -847,7 +875,7 @@ const MinisteriesPage = () => {
         /* ==================== TAB 1: EQUIPOS (TEAMS) ==================== */
         <div className="space-y-6 animate-in fade-in">
           <div className="flex justify-end mb-4">
-            {canManage && (
+            {canProtocolo && (
               <button
                 onClick={openAssignModal}
                 className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-[1.5rem] font-black text-sm hover:shadow-lg hover:-translate-y-1 transition-all"
@@ -948,7 +976,7 @@ const MinisteriesPage = () => {
                           </span>
                         </div>
                       </div>
-                      {canManage && (
+                      {canProtocolo && (
                         <div className="flex gap-1">
                           <button
                             onClick={() => openTeamModal(team)}
@@ -1023,6 +1051,26 @@ const MinisteriesPage = () => {
               </div>
 
               {scheduleMinisteryId && (
+                <div className="flex items-center justify-center gap-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 h-14 min-w-[200px]">
+                  <button 
+                    onClick={handlePrevMonth}
+                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-300"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <span className="font-bold text-sm uppercase text-slate-700 dark:text-slate-200 min-w-[100px] text-center">
+                    {getMonthName(scheduleMonth)} {scheduleYear}
+                  </span>
+                  <button 
+                    onClick={handleNextMonth}
+                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-600 dark:text-slate-300"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              )}
+
+              {scheduleMinisteryId && (
                 <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                   <button
                     onClick={() => setModals((prev) => ({ ...prev, pdfExport: true }))}
@@ -1033,7 +1081,7 @@ const MinisteriesPage = () => {
                   </button>
 
                   {/* Botón de Publicar Programación: solo si hay borradores */}
-                  {canManage && events.some((ev) => ev.status === 'DRAFT') && (
+                  {canProtocolo && events.some((ev) => ev.status === 'DRAFT') && (
                     <button
                       onClick={() => setModals((prev) => ({ ...prev, publishConfirm: true }))}
                       className="flex items-center justify-center gap-2 px-4 py-3 bg-violet-600 text-white rounded-2xl font-bold text-sm shadow-lg hover:bg-violet-700 hover:-translate-y-0.5 transition-all w-full sm:w-auto"
@@ -1043,7 +1091,7 @@ const MinisteriesPage = () => {
                     </button>
                   )}
 
-                  {canManage && (
+                  {canProtocolo && (
                     <>
                       <button
                         onClick={openScheduleConfigModal}
@@ -1090,7 +1138,7 @@ const MinisteriesPage = () => {
                   className="mx-auto text-slate-300 dark:text-slate-600 mb-4"
                 />
                 <p className="font-bold text-slate-500">
-                  No hay eventos programados próximos para esta área.
+                  No hay programación para {getMonthName(scheduleMonth)} de {scheduleYear}
                 </p>
               </div>
             ) : (
@@ -1127,7 +1175,7 @@ const MinisteriesPage = () => {
                             {formatEventDateStr(ev.eventDate)}
                           </div>
                         </div>
-                        {canManage && ev.status !== 'PUBLISHED' && (
+                        {canProtocolo && ev.status !== 'PUBLISHED' && (
                           <button
                             onClick={() => handleDeleteEvent(ev.id)}
                             className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 rounded-xl transition-colors"
@@ -1166,7 +1214,7 @@ const MinisteriesPage = () => {
                             <Share2 size={18} />
                           </button>
 
-                          {canManage && (
+                          {canProtocolo && (
                             <>
                               {/* BOTÓN ASISTENCIA + EVALUACIÓN: Se muestra si el evento ya pasó o es hoy */}
                               {isPastOrToday && ev.assignments?.length > 0 && (
@@ -1207,7 +1255,7 @@ const MinisteriesPage = () => {
         /* ==================== TAB 2: GESTIÓN DE MINISTERIOS ==================== */
         <div className="space-y-6 animate-in fade-in">
           <div className="flex justify-end">
-            {isPastor && (
+            {canProtocolo && (
               <button
                 onClick={() => openMinisteryModal()}
                 className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-all hover:-translate-y-1"
@@ -1274,7 +1322,7 @@ const MinisteriesPage = () => {
                           >
                             <CheckCircle2 size={18} />
                           </button>
-                          {isPastor && (
+                          {canProtocolo && (
                             <>
                               <button
                                 onClick={() => openMinisteryModal(m)}
@@ -1343,7 +1391,7 @@ const MinisteriesPage = () => {
                       >
                         <CheckCircle2 size={16} />
                       </button>
-                      {isPastor && (
+                      {canProtocolo && (
                         <>
                           <button
                             onClick={() => openMinisteryModal(m)}
@@ -1373,7 +1421,7 @@ const MinisteriesPage = () => {
         /* ==================== TAB 3: ROLES ==================== */
         <div className="space-y-6 animate-in fade-in">
           <div className="flex justify-end">
-            {canManage && (
+            {canProtocolo && (
               <button
                 onClick={() => openRoleModal()}
                 className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg hover:bg-indigo-700 transition-all hover:-translate-y-1"
@@ -1393,12 +1441,14 @@ const MinisteriesPage = () => {
                   <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
                     <Building2 className="text-blue-500" size={20} /> {min.name}
                   </h3>
-                  <button
-                    onClick={() => openRoleModal(null, min.id)}
-                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
-                  >
-                    + Añadir Rol a {min.name}
-                  </button>
+                  {canProtocolo && (
+                    <button
+                      onClick={() => openRoleModal(null, min.id)}
+                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors"
+                    >
+                      + Añadir Rol a {min.name}
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-3">
@@ -1429,20 +1479,22 @@ const MinisteriesPage = () => {
                           {role.description || "Sin descripción configurada"}
                         </p>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => openRoleModal(role, min.id)}
-                          className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded-lg"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRole(role.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
+                      {canProtocolo && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openRoleModal(role, min.id)}
+                            className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded-lg"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRole(role.id)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {(!min.roles || min.roles.length === 0) && (

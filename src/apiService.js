@@ -4492,7 +4492,14 @@ class ApiService {
   }
 
   // --- EVENTOS (PROGRAMACIÓN) ---
-  async getMinisteryEvents(ministeryId) { return await this.request(`/ministeries/${ministeryId}/events`); }
+  async getMinisteryEvents(ministeryId, year, month) {
+    let url = `/ministeries/${ministeryId}/events`;
+    const params = new URLSearchParams();
+    if (year) params.append('year', year);
+    if (month) params.append('month', month);
+    if (params.toString()) url += `?${params.toString()}`;
+    return await this.request(url);
+  }
 
   async deleteMinisteryEvent(eventId) { return await this.request(`/ministeries/events/${eventId}`, { method: 'DELETE' }); }
 
