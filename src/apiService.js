@@ -4,10 +4,8 @@
 // ✅ Mensajes de error genéricos
 // ✅ Export con nombre (ESLint compliance)
 
-//Produccion
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://pastoreapp.cloud/api/v1';
-//desarrollo
-//const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
+//desarrollo / produccion configurable
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080/api/v1';
 
 // 🔐 Variable para habilitar/deshabilitar logs de debug
 const DEBUG = process.env.REACT_APP_DEBUG === "true";
@@ -4849,6 +4847,178 @@ class ApiService {
       throw new Error(`Error ${res.status}`);
     } catch (error) {
       logError("❌ [getG12Health] Error:", error.message);
+      throw error;
+    }
+  }
+
+  // ============================================================
+  // CITACIONES (MEETINGS)
+  // ============================================================
+
+  async getMeetings(filters = {}) {
+    try {
+      log('📅 [getMeetings] Listando citaciones con filtros:', filters);
+      let url = '/meetings';
+      const params = new URLSearchParams();
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.convocationType) params.append('convocationType', filters.convocationType);
+      
+      const paramStr = params.toString();
+      if (paramStr) {
+        url += `?${paramStr}`;
+      }
+      return await this.request(url);
+    } catch (error) {
+      logError('❌ [getMeetings] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getMeeting(id) {
+    try {
+      validateId(id, 'meetingId');
+      log('📅 [getMeeting] Detalle de citación ID:', id);
+      return await this.request(`/meetings/${id}`);
+    } catch (error) {
+      logError('❌ [getMeeting] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async createMeeting(data) {
+    try {
+      log('📅 [createMeeting] Creando citación:', data.subject);
+      return await this.request('/meetings', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }, { 'Content-Type': 'application/json' });
+    } catch (error) {
+      logError('❌ [createMeeting] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async cancelMeeting(id, data) {
+    try {
+      validateId(id, 'meetingId');
+      log('📅 [cancelMeeting] Cancelando citación ID:', id, '| Razón:', data.reason);
+      return await this.request(`/meetings/${id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }, { 'Content-Type': 'application/json' });
+    } catch (error) {
+      logError('❌ [cancelMeeting] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async rescheduleMeeting(id, data) {
+    try {
+      validateId(id, 'meetingId');
+      log('📅 [rescheduleMeeting] Reprogramando citación ID:', id, '| Nueva Fecha:', data.newDate);
+      return await this.request(`/meetings/${id}/reschedule`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }, { 'Content-Type': 'application/json' });
+    } catch (error) {
+      logError('❌ [rescheduleMeeting] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async finalizeMeeting(id) {
+    try {
+      validateId(id, 'meetingId');
+      log('📅 [finalizeMeeting] Finalizando citación ID:', id);
+      return await this.request(`/meetings/${id}/finalize`, {
+        method: 'POST'
+      });
+    } catch (error) {
+      logError('❌ [finalizeMeeting] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async updateMeetingAttendance(attendeeId, data) {
+    try {
+      validateId(attendeeId, 'attendeeId');
+      log('📅 [updateMeetingAttendance] Actualizando asistencia attendee:', attendeeId, '| Status:', data.status);
+      return await this.request(`/meetings/attendance/${attendeeId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }, { 'Content-Type': 'application/json' });
+    } catch (error) {
+      logError('❌ [updateMeetingAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async bulkUpdateMeetingAttendance(meetingId, items) {
+    try {
+      validateId(meetingId, 'meetingId');
+      log('📅 [bulkUpdateMeetingAttendance] Actualizando asistencia lote para citación ID:', meetingId, '| Items:', items.length);
+      return await this.request(`/meetings/${meetingId}/attendance/bulk`, {
+        method: 'POST',
+        body: JSON.stringify(items)
+      }, { 'Content-Type': 'application/json' });
+    } catch (error) {
+      logError('❌ [bulkUpdateMeetingAttendance] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async checkMeetingConflicts(data) {
+    try {
+      log('📅 [checkMeetingConflicts] Verificando conflictos preventivos para:', data.subject);
+      return await this.request('/meetings/conflicts', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }, { 'Content-Type': 'application/json' });
+    } catch (error) {
+      logError('❌ [checkMeetingConflicts] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getMeetingDashboard(filters = {}) {
+    try {
+      log('📅 [getMeetingDashboard] Consultando dashboard con filtros:', filters);
+      let url = '/meetings/dashboard';
+      const params = new URLSearchParams();
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
+      
+      const paramStr = params.toString();
+      if (paramStr) {
+        url += `?${paramStr}`;
+      }
+      return await this.request(url);
+    } catch (error) {
+      logError('❌ [getMeetingDashboard] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async getMeetingRanking(filters = {}, page = 0, size = 10) {
+    try {
+      log('📅 [getMeetingRanking] Consultando ranking con filtros:', filters, 'paginación:', { page, size });
+      let url = '/meetings/ranking';
+      const params = new URLSearchParams();
+      if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) params.append('dateTo', filters.dateTo);
+      if (filters.sortBy) params.append('sortBy', filters.sortBy);
+      params.append('page', page);
+      params.append('size', size);
+      
+      const paramStr = params.toString();
+      if (paramStr) {
+        url += `?${paramStr}`;
+      }
+      return await this.request(url);
+    } catch (error) {
+      logError('❌ [getMeetingRanking] Error:', error.message);
       throw error;
     }
   }

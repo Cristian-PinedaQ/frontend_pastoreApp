@@ -36,6 +36,7 @@ const G12DashboardPage  = React.lazy(() => import('./pages/G12DashboardPage'));
 const TicketsPage       = React.lazy(() => import('./pages/TicketsPage'));
 const TicketDetailPage   = React.lazy(() => import('./pages/TicketDetailPage'));
 const TicketConfigsPage  = React.lazy(() => import('./pages/TicketConfigsPage'));
+const MeetingsPage       = React.lazy(() => import('./pages/MeetingsPage'));
 
 function App() {
   return (
@@ -196,6 +197,15 @@ function App() {
                   <Suspense fallback={<PageLoader />}>
                     <ProtectedRoute
                       element={<G12DashboardPage />}
+                      requiredRoles={['ROLE_PASTORES']}
+                    />
+                  </Suspense>
+                } />
+
+                <Route path="meetings" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<MeetingsPage />}
                       requiredRoles={['ROLE_PASTORES']}
                     />
                   </Suspense>

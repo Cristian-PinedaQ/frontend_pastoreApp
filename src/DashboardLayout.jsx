@@ -16,6 +16,7 @@ import {
   Music,
   Rocket,
   Calendar,
+  CalendarCog,
   Landmark,
   ChartPie,
   SlidersHorizontal,
@@ -132,6 +133,12 @@ const DashboardLayoutComponent = () => {
         label: "Segumiento",
         path: "/dashboard/g12",
         icon: CirclePile,
+        visible: hasRole("ROLE_PASTORES"),
+      },
+      {
+        label: "Reuniones",
+        path: "/dashboard/meetings",
+        icon: CalendarCog,
         visible: hasRole("ROLE_PASTORES"),
       },
       {
