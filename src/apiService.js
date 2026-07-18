@@ -4899,7 +4899,6 @@ class ApiService {
       throw error;
     }
   }
-
   async cancelMeeting(id, data) {
     try {
       validateId(id, 'meetingId');
@@ -4910,6 +4909,19 @@ class ApiService {
       }, { 'Content-Type': 'application/json' });
     } catch (error) {
       logError('❌ [cancelMeeting] Error:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteMeeting(id) {
+    try {
+      validateId(id, 'meetingId');
+      log('📅 [deleteMeeting] Eliminando citación ID:', id);
+      return await this.request(`/meetings/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (error) {
+      logError('❌ [deleteMeeting] Error:', error.message);
       throw error;
     }
   }

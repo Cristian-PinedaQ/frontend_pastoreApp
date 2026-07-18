@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Calendar, Users, MapPin, Video, Clock, Search, Trash2, Edit3, 
+  Calendar, Users, MapPin, Video, Clock, Search, Trash2, Edit3, XCircle, 
   Check, X, Lock, Unlock, BarChart3, Flame, Sparkles, Plus, 
   RotateCcw, FileText, CheckSquare, Square, AlertTriangle, ChevronRight, Filter, ExternalLink
 } from 'lucide-react';
@@ -375,6 +375,28 @@ export default function MeetingsPage() {
       alert('❌ Citación cancelada con éxito. Se notificó a todos los convocados.');
     } catch (err) {
       alert('Error al cancelar: ' + err.message);
+    }
+  };
+
+  // Borrar Citación
+  const handleDelete = async () => {
+    const isConfirmed = await confirm({
+      title: "⚠ ¿Borrar Citación Definitivamente?",
+      message: "Esta acción eliminará definitivamente la citación.\n\nLos convocados recibirán una notificación de cancelación por Telegram.\n\nEsta acción no se puede deshacer. ¿Desea continuar?",
+      type: "danger",
+      confirmLabel: "Borrar Citación",
+      cancelLabel: "Cancelar"
+    });
+
+    if (!isConfirmed) return;
+
+    try {
+      await apiService.deleteMeeting(selectedMeeting.id);
+      setSelectedMeeting(null);
+      loadMeetings();
+      alert('🗑️ Citación eliminada con éxito. Se notificó a los convocados sobre la cancelación.');
+    } catch (err) {
+      alert('Error al borrar citación: ' + err.message);
     }
   };
 
@@ -1329,7 +1351,7 @@ export default function MeetingsPage() {
               </div>
               <button 
                 onClick={() => setIsDetailModalOpen(false)}
-                className="p-3 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-500 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm"
+                className="p-3 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 rounded-full border border-slate-100 dark:border-slate-700 shadow-sm"
               >
                 <X size={20} />
               </button>
@@ -1342,7 +1364,7 @@ export default function MeetingsPage() {
                 
                 <div className="p-6 bg-slate-50 dark:bg-slate-800/40 rounded-3xl space-y-4">
                   <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Detalles de Citación</h4>
-                  <div className="space-y-3 text-xs font-semibold text-slate-650 dark:text-slate-350">
+                  <div className="space-y-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <div className="flex items-center gap-3">
                       <Clock size={16} className="text-slate-400" />
                       <span>{selectedMeeting.meetingDate} de {selectedMeeting.startTime} a {selectedMeeting.endTime}</span>
@@ -1419,7 +1441,14 @@ export default function MeetingsPage() {
                         }}
                         className="w-full flex items-center justify-center gap-2 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/10 dark:hover:bg-rose-950/20 dark:text-rose-450 rounded-2xl font-black text-xs transition-all"
                       >
-                        <Trash2 size={14} /> Cancelar Citación
+                        <XCircle size={14} /> Cancelar Citación
+                      </button>
+
+                      <button
+                        onClick={handleDelete}
+                        className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black text-xs transition-all shadow-sm transition-all"
+                      >
+                        <Trash2 size={14} /> Borrar Citación
                       </button>
                     </>
                   )}
