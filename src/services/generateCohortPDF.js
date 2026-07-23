@@ -1,6 +1,6 @@
 // services/generateCohortPDF.js
-// Reporte de lista de estudiantes de una cohorte — agrupado por jerarquía G12
-// Estructura: Pastor → Líder de Red (G12) → Líder Directo → Estudiantes
+// Reporte de lista de estudiantes de una cohorte — agrupado por jerarquía G12 en árbol desde el backend
+// Estructura: Pastor → Líder de Red (12) → Líder de Rama (144) / Estudiantes Directos → Estudiantes
 
 const STATUS_LABELS = {
   ACTIVE:    'Activa',
@@ -32,8 +32,6 @@ const COLORS = {
   pink:        '#ec4899',
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 const normalizeGender = (value) => {
   if (!value) return 'N/A';
   const v = value.toString().toUpperCase().trim();
@@ -59,27 +57,18 @@ const getTeacherName = (teacher) => {
 };
 
 /**
- * Genera un PDF con la lista de estudiantes agrupada por jerarquía G12.
+ * Genera un PDF con la lista de estudiantes agrupada por jerarquía G12 (Árbol Homogéneo).
  *
  * @param {Object} enrollment   - Objeto cohorte normalizado
- * @param {Array}  students     - Estudiantes ya enriquecidos con:
- *                                  { memberName, memberId, gender/sex,
- *                                    pastor, networkLeader, directLeader,
- *                                    status, enrollmentDate, ... }
+ * @param {Object} reportData   - HierarchyReportDTO proveniente del backend
  * @param {Object} helpers      - { getLevelLabel, getStatusLabel, getTeacherName, getDisplayName }
  */
-export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
+export const generateCohortPDF = (enrollment, reportData = {}, helpers = {}) => {
   const { getLevelLabel, getStatusLabel, getDisplayName } = helpers;
   const display = getDisplayName || ((n) => n);
 
-  // ── Datos generales ────────────────────────────────────────────────────────
-  const cohortTitle =
-    enrollment.cohortName ||
-    (getLevelLabel ? getLevelLabel(enrollment.levelCode) : enrollment.levelCode) ||
-    `Cohorte ${enrollment.id}`;
-
-  const levelLabel  = getLevelLabel  ? getLevelLabel(enrollment.levelCode)
-                                     : (enrollment.levelDisplayName || enrollment.levelCode || '—');
+  const cohortTitle = reportData.cohortName || enrollment.cohortName || `Cohorte ${enrollment.id}`;
+  const levelLabel  = reportData.levelName || (getLevelLabel ? getLevelLabel(enrollment.levelCode) : '—');
   const statusLabel = getStatusLabel ? getStatusLabel(enrollment.status)
                                      : (STATUS_LABELS[enrollment.status] || enrollment.status || '—');
   const statusColor = STATUS_COLORS[enrollment.status] || '#6b7280';
@@ -87,130 +76,140 @@ export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
   const teacherRaw  = getTeacherName(enrollment.teacher);
   const teacherName = (teacherRaw && display) ? display(teacherRaw) : (teacherRaw || '—');
 
-  const activeStudents = students.filter(s => s.status !== 'CANCELLED');
-  const menCount    = activeStudents.filter(s => normalizeGender(s.gender ?? s.sex ?? s.genero ?? '') === 'Masculino').length;
-  const womenCount  = activeStudents.filter(s => normalizeGender(s.gender ?? s.sex ?? s.genero ?? '') === 'Femenino').length;
-  const noDataCount = activeStudents.length - menCount - womenCount;
+  // Estadísticas del resumen
+  const summary = reportData.summary || {};
+  const totalStudents = summary.totalStudents || 0;
+  const totalMen = summary.totalMen || 0;
+  const totalWomen = summary.totalWomen || 0;
 
-  // ── 1. Agrupación jerárquica G12 ───────────────────────────────────────────
-  // Pastor → Líder de Red → Líder Directo → [estudiantes]
-  const hierarchy = {};
-
-  activeStudents.forEach(student => {
-    const p   = student.pastor        || 'Ministerio General';
-    const net = student.networkLeader || 'Sin Líder de Red';
-    const dir = student.directLeader  || 'Sin Líder Directo';
-
-    if (!hierarchy[p])         hierarchy[p]         = {};
-    if (!hierarchy[p][net])    hierarchy[p][net]     = {};
-    if (!hierarchy[p][net][dir]) hierarchy[p][net][dir] = [];
-
-    hierarchy[p][net][dir].push(student);
-  });
-
-  const pastorsSorted = Object.keys(hierarchy).sort();
-
-  // ── 2. Construir filas de la tabla ─────────────────────────────────────────
+  // ── 1. Construir filas de la tabla jerárquicamente ─────────────────────────
   let tableRowsHtml = '';
   let globalCounter = 1;
 
-  pastorsSorted.forEach(pastor => {
-    // Fila: RAMA PASTORAL (nivel 1 — fondo oscuro)
+  const renderStudentRow = (student, idx) => {
+    const rowBg  = idx % 2 === 0 ? COLORS.white : COLORS.bgLight;
+    const gender = normalizeGender(student.gender);
+    const gColor = gender === 'Masculino' ? COLORS.accent
+                  : gender === 'Femenino'  ? COLORS.pink
+                  : COLORS.textSub;
+    const pct    = student.attendancePercentage !== undefined && student.attendancePercentage !== null
+                    ? Number(student.attendancePercentage).toFixed(0) + '%'
+                    : '—';
+    const score  = (student.averageScore !== undefined && student.averageScore !== null)
+                    ? Number(student.averageScore).toFixed(2)
+                    : '—';
+
+    return `
+      <tr style="background:${rowBg}; border-bottom:1px solid ${COLORS.border};">
+        <td style="padding:6px 10px; text-align:center; width:4%; color:${COLORS.textSub};
+            font-weight:600; font-size:10px;">${globalCounter++}</td>
+        <td style="padding:6px 10px; text-align:left; font-weight:800;
+            color:${COLORS.textMain}; text-transform:uppercase; font-size:10px;">
+          ${display(student.name)}
+          <span style="font-size:9px; font-weight:normal; color:${COLORS.textSub}; text-transform:none; margin-left:8px;">
+            (Líder: ${display(student.directLeaderName)})
+          </span>
+        </td>
+        <td style="padding:6px 10px; text-align:center; font-size:10px;">
+          <span style="background:${gColor}22; color:${gColor};
+              font-size:9px; padding:1px 7px; border-radius:10px; font-weight:700;">
+            ${gender}
+          </span>
+        </td>
+        <td style="padding:6px 10px; text-align:center; font-weight:700;
+            color:${COLORS.primaryBlue}; font-size:10px;">${pct}</td>
+        <td style="padding:6px 10px; text-align:center; font-weight:700;
+            color:${COLORS.textSub}; font-size:10px;">${score}</td>
+      </tr>
+    `;
+  };
+
+  const renderNetworkNode = (networkNode, networkLabel) => {
+    if (!networkNode) return;
+
+    // Fila: Pastor Principal (Nivel 1)
     tableRowsHtml += `
       <tr>
         <td colspan="5" style="background:${COLORS.primary}; color:${COLORS.white};
             padding:11px 15px; font-weight:900; font-size:11.5px;
             letter-spacing:1px; text-transform:uppercase; border-bottom:2px solid #334155;">
-          👑 RAMA PASTORAL: ${display(pastor)}
+          👑 RAMA PASTORAL (${networkLabel}): ${display(networkNode.name)}
         </td>
       </tr>
     `;
 
-    const nets = Object.keys(hierarchy[pastor]).sort();
-    nets.forEach(net => {
-      const netStudents = Object.values(hierarchy[pastor][net]).flat();
+    if (networkNode.children) {
+      networkNode.children.forEach(l12Node => {
+        const isUnassigned = l12Node.type === 'UNASSIGNED';
+        const l12Label = isUnassigned ? '⚠️ SIN RED DEFINIDA' : `💎 LÍDER DE RED (G12): ${display(l12Node.name)}`;
+        const l12Bg = isUnassigned ? '#475569' : COLORS.primaryBlue;
 
-      // Fila: LÍDER DE RED / G12 (nivel 2 — azul)
-      tableRowsHtml += `
-        <tr>
-          <td colspan="5" style="background:${COLORS.primaryBlue}; color:${COLORS.white};
-              padding:8px 15px; font-weight:800; font-size:10.5px;
-              letter-spacing:0.8px; text-transform:uppercase; border-bottom:1px solid #93c5fd;">
-            💎 LÍDER DE RED (G12): ${display(net)}
-            <span style="float:right; font-size:9.5px; font-weight:600; opacity:.85;">
-              ${netStudents.length} estudiante${netStudents.length !== 1 ? 's' : ''}
-            </span>
-          </td>
-        </tr>
-      `;
-
-      const dirs = Object.keys(hierarchy[pastor][net]).sort();
-      dirs.forEach(dir => {
-        const dirStudents = hierarchy[pastor][net][dir];
-        const isSameasNet = (net === dir || dir === 'Sin Líder Directo' || dir === 'Red Pastoral Directa');
-        const dirLabel = isSameasNet
-          ? '👤 DISCÍPULOS DIRECTOS DE LA RED'
-          : `👤 LÍDER DIRECTO: ${display(dir)}`;
-
-        // Fila: LÍDER DIRECTO (nivel 3 — dorado)
+        // Fila: Líder 12 (Nivel 2)
         tableRowsHtml += `
           <tr>
-            <td colspan="5" style="background:${COLORS.goldLight}; color:${COLORS.gold};
-                padding:5px 15px; font-weight:700; font-size:10px;
-                text-transform:uppercase; border-bottom:1px solid ${COLORS.gold};">
-              ${dirLabel}
-              <span style="float:right; color:${COLORS.textSub}; font-size:9px;">
-                (${dirStudents.length})
+            <td colspan="5" style="background:${l12Bg}; color:${COLORS.white};
+                padding:8px 15px; font-weight:800; font-size:10.5px;
+                letter-spacing:0.8px; text-transform:uppercase; border-bottom:1px solid #93c5fd;">
+              ${l12Label}
+              <span style="float:right; font-size:9.5px; font-weight:600; opacity:.85;">
+                ${l12Node.studentCount} estudiante${l12Node.studentCount !== 1 ? 's' : ''}
               </span>
             </td>
           </tr>
         `;
 
-        // Filas de estudiantes
-        dirStudents.forEach((student, idx) => {
-          const rowBg  = idx % 2 === 0 ? COLORS.white : COLORS.bgLight;
-          const gender = normalizeGender(student.gender ?? student.sex ?? student.genero ?? '');
-          const gColor = gender === 'Masculino' ? COLORS.accent
-                        : gender === 'Femenino'  ? COLORS.pink
-                        : COLORS.textSub;
-          const pct    = student.finalAttendancePercentage !== undefined
-                          ? Number(student.finalAttendancePercentage).toFixed(0) + '%'
-                          : '—';
-          const score  = (student.averageScore !== undefined && student.averageScore !== null)
-                          ? Number(student.averageScore).toFixed(2)
-                          : '—';
-
+        // Discípulos Directos del Líder 12 (Caso 1)
+        if (l12Node.students && l12Node.students.length > 0) {
           tableRowsHtml += `
-            <tr style="background:${rowBg}; border-bottom:1px solid ${COLORS.border};">
-              <td style="padding:6px 10px; text-align:center; width:4%; color:${COLORS.textSub};
-                  font-weight:600; font-size:10px;">${globalCounter++}</td>
-              <td style="padding:6px 10px; text-align:left; font-weight:800;
-                  color:${COLORS.textMain}; text-transform:uppercase; font-size:10px;">
-                ${display(student.memberName || `Miembro ${student.memberId}`)}
-              </td>
-              <td style="padding:6px 10px; text-align:center; font-size:10px;">
-                <span style="background:${gColor}22; color:${gColor};
-                    font-size:9px; padding:1px 7px; border-radius:10px; font-weight:700;">
-                  ${gender}
+            <tr>
+              <td colspan="5" style="background:${COLORS.goldLight}; color:${COLORS.gold};
+                  padding:5px 15px; font-weight:700; font-size:10px;
+                  text-transform:uppercase; border-bottom:1px solid ${COLORS.gold};">
+                👤 DISCÍPULOS DIRECTOS DE LA RED
+                <span style="float:right; color:${COLORS.textSub}; font-size:9px;">
+                  (${l12Node.students.length})
                 </span>
               </td>
-              <td style="padding:6px 10px; text-align:center; font-weight:700;
-                  color:${COLORS.primaryBlue}; font-size:10px;">${pct}</td>
-              <td style="padding:6px 10px; text-align:center; font-weight:700;
-                  color:${COLORS.textSub}; font-size:10px;">${score}</td>
             </tr>
           `;
-        });
-      });
-    });
-  });
+          l12Node.students.forEach((student, idx) => {
+            tableRowsHtml += renderStudentRow(student, idx);
+          });
+        }
 
-  // ── 3. KPI boxes ───────────────────────────────────────────────────────────
+        // Líderes 144 (Caso 2)
+        if (l12Node.children) {
+          l12Node.children.forEach(l144Node => {
+            tableRowsHtml += `
+              <tr>
+                <td colspan="5" style="background:${COLORS.goldLight}; color:${COLORS.gold};
+                    padding:5px 15px; font-weight:700; font-size:10px;
+                    text-transform:uppercase; border-bottom:1px solid ${COLORS.gold};">
+                  👤 LÍDER DE RAMA (144): ${display(l144Node.name)}
+                  <span style="float:right; color:${COLORS.textSub}; font-size:9px;">
+                    (${l144Node.students.length})
+                  </span>
+                </td>
+              </tr>
+            `;
+            l144Node.students.forEach((student, idx) => {
+              tableRowsHtml += renderStudentRow(student, idx);
+            });
+          });
+        }
+      });
+    }
+  };
+
+  // Renderizar ambas redes
+  renderNetworkNode(reportData.maleNetwork, 'RED DE HOMBRES');
+  renderNetworkNode(reportData.femaleNetwork, 'RED DE MUJERES');
+
+  // ── 2. KPI boxes ───────────────────────────────────────────────────────────
   const kpis = [
-    { label: 'Total Inscritos',  value: activeStudents.length, color: COLORS.primaryBlue },
-    { label: 'Hombres',          value: menCount,              color: COLORS.accent      },
-    { label: 'Mujeres',          value: womenCount,            color: COLORS.pink        },
-    { label: 'Sin dato género',  value: noDataCount,           color: COLORS.textSub     },
+    { label: 'Total Estudiantes',  value: totalStudents, color: COLORS.primaryBlue },
+    { label: 'Red de Hombres',     value: totalMen,      color: COLORS.accent      },
+    { label: 'Red de Mujeres',     value: totalWomen,    color: COLORS.pink        },
   ];
 
   const kpiBoxes = kpis.map(k => `
@@ -222,14 +221,14 @@ export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
     </div>
   `).join('');
 
-  // ── 4. Info panel de la cohorte ────────────────────────────────────────────
+  // ── 3. Info panel de la cohorte ────────────────────────────────────────────
   const infoItems = [
     { label: 'Nivel',             value: levelLabel },
     { label: 'Estado',            value: `<span style="background:${statusColor}22;color:${statusColor};font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700">${statusLabel}</span>` },
     { label: 'Maestro',           value: teacherName },
     { label: 'Fecha inicio',      value: fmtDate(enrollment.startDate) },
     { label: 'Fecha fin',         value: fmtDate(enrollment.endDate)   },
-    { label: 'Cupos',             value: `${activeStudents.length} / ${enrollment.maxStudents || '—'}` },
+    { label: 'Cupos',             value: `${totalStudents} / ${enrollment.maxStudents || '—'}` },
     { label: '% Asistencia mín.', value: `${enrollment.minAttendancePercentage ?? '—'}%` },
     { label: 'Calificación mín.', value: enrollment.minAverageScore != null ? Number(enrollment.minAverageScore).toFixed(1) : '—' },
   ];
@@ -242,24 +241,25 @@ export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
     </div>
   `).join('');
 
-  // ── 5. Mini barras de género ───────────────────────────────────────────────
-  const total = activeStudents.length || 1;
-  const genderBars = [
-    { label: 'Hombres',   count: menCount,   color: COLORS.accent   },
-    { label: 'Mujeres',   count: womenCount, color: COLORS.pink     },
-    { label: 'Sin dato',  count: noDataCount,color: COLORS.textSub  },
-  ].filter(g => g.count > 0).map(g => `
-    <div style="display:flex; align-items:center; gap:8px; margin-bottom:7px;">
-      <span style="font-size:9.5px; color:${COLORS.textSub}; min-width:70px;">${g.label}</span>
-      <div style="flex:1; background:${COLORS.border}; border-radius:4px; height:7px;">
-        <div style="width:${Math.round((g.count / total) * 100)}%; height:100%;
-            background:${g.color}; border-radius:4px;"></div>
-      </div>
-      <span style="font-size:9.5px; font-weight:700; color:${g.color}; min-width:20px; text-align:right;">${g.count}</span>
+  // ── 4. Panel de resumen estadístico detallado ────────────────────────────────
+  const statsItems = [
+    { label: 'Células Red Hombres',   value: summary.totalCellsMen || 0 },
+    { label: 'Células Red Mujeres',   value: summary.totalCellsWomen || 0 },
+    { label: 'Líderes 12 Hombres',     value: summary.totalLeaders12Men || 0 },
+    { label: 'Líderes 12 Mujeres',     value: summary.totalLeaders12Women || 0 },
+    { label: 'Líderes 144 Hombres',    value: summary.totalLeaders144Men || 0 },
+    { label: 'Líderes 144 Mujeres',    value: summary.totalLeaders144Women || 0 },
+  ];
+
+  const statsGrid = statsItems.map(item => `
+    <div style="display:flex; justify-content:space-between; padding:5px 0;
+        border-bottom:1px solid ${COLORS.border}; font-size:10.5px;">
+      <span style="color:${COLORS.textSub};">${item.label}</span>
+      <span style="font-weight:700; color:${COLORS.primaryBlue}; text-align:right;">${item.value}</span>
     </div>
   `).join('');
 
-  // ── 6. HTML completo ───────────────────────────────────────────────────────
+  // ── 5. HTML completo ───────────────────────────────────────────────────────
   const now = new Date().toLocaleString('es-CO');
 
   const html = `
@@ -306,7 +306,7 @@ export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
     ${kpiBoxes}
   </div>
 
-  <!-- DISTRIBUCIÓN GÉNERO + INFO COHORTE -->
+  <!-- RESUMEN ESTADÍSTICO + INFO COHORTE -->
   <div style="display:flex; gap:14px; margin-bottom:18px;">
 
     <div style="flex:1.2; background:${COLORS.white}; border:1px solid ${COLORS.border};
@@ -314,12 +314,12 @@ export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
       <div style="font-size:10px; font-weight:800; color:${COLORS.primaryBlue};
           text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;
           padding-bottom:5px; border-bottom:2px solid ${COLORS.accent};">
-        Distribución por Género
+        Resumen Estadístico Red G12
       </div>
-      ${genderBars || `<p style="font-size:10px;color:#94a3b8">Sin datos</p>`}
+      ${statsGrid}
     </div>
 
-    <div style="flex:2; background:${COLORS.white}; border:1px solid ${COLORS.border};
+    <div style="flex:1.8; background:${COLORS.white}; border:1px solid ${COLORS.border};
         border-radius:10px; padding:14px;">
       <div style="font-size:10px; font-weight:800; color:${COLORS.primaryBlue};
           text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;
@@ -342,10 +342,10 @@ export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
       </span>
       <span style="background:rgba(255,255,255,.2); color:#fff;
           padding:3px 12px; border-radius:12px; font-size:9px; font-weight:700;">
-        ${activeStudents.length} inscritos
+        ${totalStudents} inscritos
       </span>
     </div>
-    ${activeStudents.length === 0
+    ${totalStudents === 0
       ? `<div style="padding:30px; text-align:center; color:#94a3b8; font-size:12px;">
            No hay estudiantes inscritos en esta cohorte.
          </div>`
@@ -384,7 +384,7 @@ export const generateCohortPDF = (enrollment, students = [], helpers = {}) => {
     <div style="display:flex; gap:16px; font-size:9.5px; flex-wrap:wrap;">
       <span>👑 <strong>Rama Pastoral</strong> — Pastor o Pastora responsable</span>
       <span>💎 <strong>Líder de Red (G12)</strong> — Líder de 12</span>
-      <span>👤 <strong>Líder Directo</strong> — Discipulador inmediato</span>
+      <span>👤 <strong>Líder de Rama (144) / Líder Directo</strong> — Líder de discipulado</span>
     </div>
   </div>
 

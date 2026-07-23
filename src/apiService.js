@@ -757,6 +757,20 @@ class ApiService {
     }
   }
 
+  // ========== NUEVO MÉTODO PARA REPORTE JERÁRQUICO COHORTE ==========
+
+  async getCohortHierarchyReport(cohortId) {
+    try {
+      validateId(cohortId, 'cohortId');
+      log(`📊 [getCohortHierarchyReport] Obteniendo reporte jerárquico G12 para cohorte: ${cohortId}`);
+      const response = await this.request(`/student-enrollment/cohorts/${cohortId}/hierarchy-report`);
+      return response;
+    } catch (error) {
+      logError('❌ [getCohortHierarchyReport] Error:', error.message);
+      throw error;
+    }
+  }
+
   // ========== 📖 LECCIONES ==========
 
   async getLessons(page = 0, limit = 10) {
