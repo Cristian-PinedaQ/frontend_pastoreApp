@@ -138,6 +138,25 @@ export const generateCohortPDF = (enrollment, reportData = {}, helpers = {}) => 
       </tr>
     `;
 
+    // Discípulos Directos del Pastor/Pastora (Líderes 12 en formación u otros)
+    if (networkNode.students && networkNode.students.length > 0) {
+      tableRowsHtml += `
+        <tr>
+          <td colspan="5" style="background:${COLORS.goldLight}; color:${COLORS.gold};
+              padding:7px 15px; font-weight:900; font-size:11px;
+              text-transform:uppercase; border-bottom:1px solid ${COLORS.gold};">
+            👤 DISCÍPULOS DIRECTOS DE LA RAMA PASTORAL
+            <span style="float:right; color:${COLORS.textSub}; font-size:9.5px;">
+              (${networkNode.students.length})
+            </span>
+          </td>
+        </tr>
+      `;
+      networkNode.students.forEach((student, idx) => {
+        tableRowsHtml += renderStudentRow(student, idx);
+      });
+    }
+
     if (networkNode.children) {
       networkNode.children.forEach(l12Node => {
         const isUnassigned = l12Node.type === 'UNASSIGNED';

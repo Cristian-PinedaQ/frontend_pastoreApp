@@ -103,6 +103,28 @@ export const generateApprovedStudentsPDF = (enrollment, reportData = {}, helpers
       </tr>
     `;
 
+    // Discípulos Directos del Pastor/Pastora (Líderes 12 en formación u otros)
+    if (networkNode.students && networkNode.students.length > 0) {
+      const directApproved = networkNode.students.filter(s => s.passed === true);
+      if (directApproved.length > 0) {
+        tableRowsHtml += `
+          <tr>
+            <td colspan="4" style="background:${COLORS.goldLight}; color:${COLORS.gold};
+                padding:7px 16px; font-weight:900; font-size:11.5px;
+                text-transform:uppercase; border-bottom:1px solid ${COLORS.gold};">
+              👤 DISCÍPULOS DIRECTOS DE LA RAMA PASTORAL
+              <span style="float:right; color:${COLORS.textSub}; font-size:9.5px;">
+                (${directApproved.length})
+              </span>
+            </td>
+          </tr>
+        `;
+        networkNode.students.forEach((student, idx) => {
+          tableRowsHtml += renderStudentRow(student, idx);
+        });
+      }
+    }
+
     if (networkNode.children) {
       networkNode.children.forEach(l12Node => {
         const nodeApprovedCount = countApprovedStudents(l12Node);
