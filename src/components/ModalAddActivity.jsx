@@ -46,6 +46,7 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
     price: "",
     endDate: "",
     quantity: "",
+    maxParticipants: "",
     isActive: true,
     activityType: "STANDALONE",
     enrollmentId: null,
@@ -70,28 +71,29 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
       return;
     }
 
-    if (isEditing && initialData) {
-      setFormData({
-        activityName:  initialData.activityName  || "",
-        price:         initialData.price         || "",
-        endDate:       initialData.endDate
-                         ? String(initialData.endDate).split("T")[0]
-                         : "",
-        quantity:      initialData.quantity      || "",
-        isActive:      initialData.isActive !== undefined ? initialData.isActive : true,
-        activityType:  initialData.activityType  || "STANDALONE",
-        enrollmentId:  initialData.enrollmentId  || null,
-        requiredLevel: initialData.requiredLevel || null,
-      });
-      setErrors({});
-    } else if (!isEditing) {
-      setFormData({
-        activityName: "", price: "", endDate: "", quantity: "",
-        isActive: true, activityType: "STANDALONE",
-        enrollmentId: null, requiredLevel: null,
-      });
-      setErrors({});
-    }
+if (isEditing && initialData) {
+        setFormData({
+          activityName:  initialData.activityName  || "",
+          price:         initialData.price         || "",
+          endDate:       initialData.endDate
+                           ? String(initialData.endDate).split("T")[0]
+                           : "",
+          quantity:      initialData.quantity      || "",
+          maxParticipants: initialData.maxParticipants || "",
+          isActive:      initialData.isActive !== undefined ? initialData.isActive : true,
+          activityType:  initialData.activityType  || "STANDALONE",
+          enrollmentId:  initialData.enrollmentId  || null,
+          requiredLevel: initialData.requiredLevel || null,
+        });
+        setErrors({});
+      } else if (!isEditing) {
+        setFormData({
+          activityName: "", price: "", endDate: "", quantity: "", maxParticipants: "",
+          isActive: true, activityType: "STANDALONE",
+          enrollmentId: null, requiredLevel: null,
+        });
+        setErrors({});
+      }
   }, [isOpen, initialData, isEditing]);
 
   // Carga cohortes cuando el tipo cambia a ENROLLMENT
@@ -188,6 +190,8 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
         activityType:  value,
         enrollmentId:  value === "STANDALONE" ? null : prev.enrollmentId,
         requiredLevel: value === "STANDALONE" ? null : prev.requiredLevel,
+        quantity:      value === "ENROLLMENT" ? "1" : prev.quantity,
+        maxParticipants: value === "STANDALONE" ? "" : prev.maxParticipants,
       }));
     } else if (name === "enrollmentId") {
       const selected = cohorts.find((c) => String(c.id) === value);
@@ -221,6 +225,7 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
         activityType: formData.activityType,
         ...(formData.activityType === "ENROLLMENT" && {
           enrollmentId: Number(formData.enrollmentId),
+          maxParticipants: formData.maxParticipants ? Number(formData.maxParticipants) : null,
         }),
         ...(initialData?.id && { id: initialData.id }),
       };
@@ -464,41 +469,76 @@ const ModalAddActivity = ({ isOpen, onClose, onSave, initialData, isEditing }) =
                 )}
               </div>
 
-              {/* Capacidad */}
-              <div className="space-y-2 group">
-                <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
-                 <Users
-                    size={18}
-                    className="text-slate-300 group-focus-within:text-indigo-600 transition-colors"
-                  /> Cupos (Opcional)
-                </label>
-                <div className="relative">
-                  
-                  <input
-                    type="number"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleChange}
-                    placeholder="Ilimitados"
-                    min="0"
-                    disabled={loading}
-                    className={`w-full pl-12 sm:pl-16 pr-6 sm:pr-8 py-4 sm:py-5 bg-slate-50 dark:bg-slate-800/50 border-2 rounded-2xl sm:rounded-[1.8rem] text-sm font-black outline-none transition-all disabled:opacity-50 ${
-                      errors.quantity
-                        ? "border-rose-500/50"
-                        : "border-transparent focus:border-indigo-600/30"
-                    }`}
-                  />
-                </div>
-                {/* ✅ FIX #2: error de capacidad recuperado */}
-                {errors.quantity && (
-                  <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest ml-4 sm:ml-5">
-                    {errors.quantity}
+{/* ── Cantidad / Capacidad ───────────────────────────────────── */}
+              {formData.activityType === "STANDALONE" ? (
+                // STANDALONE: Cantidad por participante
+                <div className="space-y-2 group">
+                  <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+                    <Users
+                       size={18}
+                       className="text-slate-300 group-focus-within:text-indigo-600 transition-colors"
+                     /> Cantidad por participante
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={formData.quantity}
+                      onChange={handleChange}
+                      placeholder="1"
+                      min="1"
+                      disabled={loading}
+                      className={`w-full pl-12 sm:pl-16 pr-6 sm:pr-8 py-4 sm:py-5 bg-slate-50 dark:bg-slate-800/50 border-2 rounded-2xl sm:rounded-[1.8rem] text-sm font-black outline-none transition-all disabled:opacity-50 ${
+                        errors.quantity
+                          ? "border-rose-500/50"
+                          : "border-transparent focus:border-indigo-600/30"
+                      }`}
+                    />
+                  </div>
+                  {errors.quantity && (
+                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest ml-4 sm:ml-5">
+                      {errors.quantity}
+                    </p>
+                  )}
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+                    Precio total = precio × cantidad
                   </p>
-                )}
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
-                  Vacío = capacidad ilimitada
-                </p>
-              </div>
+                </div>
+              ) : (
+                // ENROLLMENT: Máx. Participantes (Meta)
+                <div className="space-y-2 group">
+                  <label className="flex gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+                    <Users
+                       size={18}
+                       className="text-slate-300 group-focus-within:text-indigo-600 transition-colors"
+                     /> Máx. Participantes (Meta) — Opcional
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      name="maxParticipants"
+                      value={formData.maxParticipants}
+                      onChange={handleChange}
+                      placeholder="Ilimitados"
+                      min="1"
+                      disabled={loading}
+                      className={`w-full pl-12 sm:pl-16 pr-6 sm:pr-8 py-4 sm:py-5 bg-slate-50 dark:bg-slate-800/50 border-2 rounded-2xl sm:rounded-[1.8rem] text-sm font-black outline-none transition-all disabled:opacity-50 ${
+                        errors.maxParticipants
+                          ? "border-rose-500/50"
+                          : "border-transparent focus:border-indigo-600/30"
+                      }`}
+                    />
+                  </div>
+                  {errors.maxParticipants && (
+                    <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest ml-4 sm:ml-5">
+                      {errors.maxParticipants}
+                    </p>
+                  )}
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest ml-4 sm:ml-5">
+                    Vacío = sin límite de cupos. Cantidad por participante siempre = 1.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* ── Fecha de finalización ────────────────────────────────── */}

@@ -227,8 +227,14 @@ const ModalActivityDetails = ({
   const totalPossibleValue = (activity?.price || 0) * (activity?.quantity || 0);
   const totalPriceForQuantity = (activity?.price || 0) * quantity;
   const enrolledCount = balance?.participantCount || 0;
+  
+  // Capacidad real: ENROLLMENT usa maxParticipants, STANDALONE usa quantity
+  const effectiveCapacity = activity?.activityType === "ENROLLMENT"
+    ? activity?.maxParticipants
+    : activity?.quantity;
+  
   const hasCapacity =
-    !activity?.quantity || enrolledCount < activity?.quantity;
+    !effectiveCapacity || enrolledCount < effectiveCapacity;
   const daysLeft = activity?.endDate
     ? Math.ceil(
         (parseLocalDate(activity.endDate) - new Date()) / (1000 * 60 * 60 * 24)
@@ -580,8 +586,8 @@ const ModalActivityDetails = ({
                         },
                         {
                           label: "Cupos / Meta",
-                          value: activity.quantity
-                            ? `${enrolledCount} / ${activity.quantity}`
+                          value: effectiveCapacity
+                            ? `${enrolledCount} / ${effectiveCapacity}`
                             : "ILIMITADO",
                           icon: Users,
                           color: "emerald",
@@ -930,10 +936,10 @@ const ModalActivityDetails = ({
                   </div>
                 )}
 
-                {!hasCapacity && activity.quantity && (
+                {!hasCapacity && effectiveCapacity && (
                   <div className="p-5 bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl text-center">
                     <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">
-                      ⚠️ Capacidad máxima alcanzada ({activity.quantity} cupos)
+                      ⚠️ Capacidad máxima alcanzada ({effectiveCapacity} cupos)
                     </p>
                   </div>
                 )}
