@@ -4,6 +4,8 @@ import PageHero from "../components/PageHero";
 import TicketsTable from "../components/TicketsTable";
 import CreateTicketModal from "../components/CreateTicketModal";
 import useTicketsQuery from "../hooks/queries/useTicketsQuery";
+import useTicketStatsQuery from "../hooks/queries/useTicketStatsQuery";
+import { TicketFilter } from "../services/ticketApi";
 import { 
   Ticket as TicketIcon, 
   Inbox, 
@@ -17,19 +19,35 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+const tabToFilterMap = {
+  reported: TicketFilter.REPORTED,
+  assigned: TicketFilter.ASSIGNED,
+  queue: TicketFilter.QUEUE
+};
+
 export const TicketsPage = () => {
   const { user, hasRole } = useAuth();
   const [currentPage, setCurrentPage] = useState(0);
   const [activeTab, setActiveTab] = useState("reported"); // 'reported', 'assigned', 'queue'
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Obtener tickets desde React Query con paginación
+  const filter = tabToFilterMap[activeTab] || TicketFilter.REPORTED;
+
+  // Obtener tickets desde React Query con paginación y filtro de pestaña en el servidor
   const { 
     data: ticketsData, 
-    isLoading, 
-    isFetching, 
-    refetch 
-  } = useTicketsQuery(currentPage, 10);
+    isLoading: isLoadingTickets, 
+    isFetching: isFetchingTickets, 
+    refetch: refetchTickets 
+  } = useTicketsQuery(filter, currentPage, 10);
+
+  // Obtener estadísticas globales de tickets para los contadores de las pestañas
+  const {
+    data: statsData,
+    isLoading: isLoadingStats,
+    isFetching: isFetchingStats,
+    refetch: refetchStats
+  } = useTicketStatsQuery();
 
   const allTickets = useMemo(() => {
     return ticketsData?.content || [];
@@ -38,40 +56,24 @@ export const TicketsPage = () => {
   const totalPages = ticketsData?.totalPages || 0;
   const totalElements = ticketsData?.totalElements || 0;
 
-  // Filtrado local por pestaña
+  // El backend ya devuelve el listado filtrado por pestaña
   const filteredTickets = useMemo(() => {
-    if (!user) return [];
+    return allTickets;
+  }, [allTickets]);
 
-    switch (activeTab) {
-      case "reported":
-        // Creados por el usuario actual
-        return allTickets.filter(t => t.creatorId === user.id);
-      case "assigned":
-        // Asignados al usuario actual
-        return allTickets.filter(t => t.assignedToId === user.id);
-      case "queue":
-        // Tickets sin asignar (para resolutores y pastores)
-        return allTickets.filter(t => t.assignedToId === null);
-      default:
-        return allTickets;
-    }
-  }, [allTickets, activeTab, user]);
-
-  // Contadores rápidos de la página actual
+  // Contadores rápidos globales desde el servidor
   const stats = useMemo(() => {
-    if (!user) return { reported: 0, assigned: 0, queue: 0 };
     return {
-      reported: allTickets.filter(t => t.creatorId === user.id).length,
-      assigned: allTickets.filter(t => t.assignedToId === user.id).length,
-      queue: allTickets.filter(t => t.assignedToId === null).length
+      reported: statsData?.reported || 0,
+      assigned: statsData?.assigned || 0,
+      queue: statsData?.queue || 0
     };
-  }, [allTickets, user]);
+  }, [statsData]);
 
   // Verificar si el usuario tiene algún rol resolutor o es pastor
   const isPastorOrResolver = useMemo(() => {
     if (!user) return false;
     const isPastor = hasRole("ROLE_PASTORES") || hasRole("ROLE_ADMIN");
-    // Admite lista de strings o de objetos
     const userRoles = user.roles || [];
     const hasResolverRole = userRoles.some(role => {
       const roleName = (typeof role === "object" ? role.name : role) || "";
@@ -80,6 +82,19 @@ export const TicketsPage = () => {
     });
     return isPastor || hasResolverRole;
   }, [user, hasRole]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCurrentPage(0);
+  };
+
+  const refetch = () => {
+    refetchTickets();
+    refetchStats();
+  };
+
+  const isLoading = isLoadingTickets || isLoadingStats;
+  const isFetching = isFetchingTickets || isFetchingStats;
 
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-10 lg:p-14 space-y-12 animate-in fade-in duration-700">
@@ -90,7 +105,7 @@ export const TicketsPage = () => {
         title="Centro de"
         highlight="Solicitudes"
         stats={[
-          { label: `${totalElements} Solicitudes en total`, variant: "indigo", icon: TicketIcon },
+          { label: `${stats.reported + stats.assigned + stats.queue} Solicitudes en total`, variant: "indigo", icon: TicketIcon },
           { label: "Operación en tiempo real", variant: "emerald", icon: RefreshCw },
         ]}
         actions={
@@ -109,7 +124,7 @@ export const TicketsPage = () => {
         <div className="flex flex-wrap gap-2">
           {/* MIS REPORTADOS */}
           <button
-            onClick={() => setActiveTab("reported")}
+            onClick={() => handleTabChange("reported")}
             className={`flex items-center gap-2.5 px-6 py-4 text-sm font-black uppercase tracking-wider rounded-t-2xl transition-all border-b-2 ${
               activeTab === "reported"
                 ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30 dark:bg-indigo-950/10"
@@ -125,7 +140,7 @@ export const TicketsPage = () => {
 
           {/* MIS ASIGNADOS */}
           <button
-            onClick={() => setActiveTab("assigned")}
+            onClick={() => handleTabChange("assigned")}
             className={`flex items-center gap-2.5 px-6 py-4 text-sm font-black uppercase tracking-wider rounded-t-2xl transition-all border-b-2 ${
               activeTab === "assigned"
                 ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30 dark:bg-indigo-950/10"
@@ -142,7 +157,7 @@ export const TicketsPage = () => {
           {/* COLA DE SOPORTE */}
           {isPastorOrResolver && (
             <button
-              onClick={() => setActiveTab("queue")}
+              onClick={() => handleTabChange("queue")}
               className={`flex items-center gap-2.5 px-6 py-4 text-sm font-black uppercase tracking-wider rounded-t-2xl transition-all border-b-2 ${
                 activeTab === "queue"
                   ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50/30 dark:bg-indigo-950/10"

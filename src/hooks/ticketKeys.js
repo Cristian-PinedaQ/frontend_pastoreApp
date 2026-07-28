@@ -3,7 +3,7 @@
 export const ticketKeys = {
   all: ["tickets"],
   lists: () => [...ticketKeys.all, "list"],
-  list: (page, size) => [...ticketKeys.lists(), page, size],
+  list: (filter, page, size) => [...ticketKeys.lists(), filter, page, size],
   details: () => [...ticketKeys.all, "detail"],
   detail: (id) => [...ticketKeys.details(), id],
   configs: () => [...ticketKeys.all, "configs"],

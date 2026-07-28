@@ -3,13 +3,13 @@
 // ✅ Optimizado con staleTime
 
 import { useQuery } from "@tanstack/react-query";
-import { ticketApi } from "../../services/ticketApi";
+import { ticketApi, TicketFilter } from "../../services/ticketApi";
 import { ticketKeys } from "../ticketKeys";
 
-export const useTicketsQuery = (page = 0, size = 10, options = {}) => {
+export const useTicketsQuery = (filter = TicketFilter.REPORTED, page = 0, size = 10, options = {}) => {
   return useQuery({
-    queryKey: ticketKeys.list(page, size),
-    queryFn: () => ticketApi.getTickets(page, size),
+    queryKey: ticketKeys.list(filter, page, size),
+    queryFn: () => ticketApi.getTickets(filter, page, size),
     staleTime: 10000, // 10 segundos de frescura
     refetchInterval: 15000, // Polling de 15 segundos
     refetchIntervalInBackground: false, // Pausar polling si la pestaña está en segundo plano

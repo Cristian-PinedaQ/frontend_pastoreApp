@@ -10,6 +10,12 @@ const validateId = (id, fieldName = 'ID') => {
   }
 };
 
+export const TicketFilter = {
+  REPORTED: "REPORTED",
+  ASSIGNED: "ASSIGNED",
+  QUEUE: "QUEUE"
+};
+
 export const ticketApi = {
   // 1. Obtener todas las categorías de configuración (Solo PASTORES)
   async getTicketConfigs() {
@@ -19,6 +25,11 @@ export const ticketApi = {
   // 2. Obtener categorías activas (para dropdowns de creación)
   async getActiveTicketConfigs() {
     return apiService.request('/tickets/configs/active');
+  },
+
+  // 2b. Obtener estadísticas globales de tickets por pestaña
+  async getTicketStats() {
+    return apiService.request('/tickets/stats');
   },
 
   // 3. Crear categoría de ticket (Solo PASTORES)
@@ -53,8 +64,8 @@ export const ticketApi = {
   },
 
   // 6. Listar todos los tickets visibles (paginado, filtrado por el backend)
-  async getTickets(page = 0, size = 10) {
-    return apiService.request(`/tickets?page=${page}&size=${size}`);
+  async getTickets(filter = TicketFilter.REPORTED, page = 0, size = 10) {
+    return apiService.request(`/tickets?filter=${filter}&page=${page}&size=${size}`);
   },
 
   // 7. Obtener el detalle completo de un ticket
