@@ -54,6 +54,45 @@ function getPanelStyle(bellEl) {
   };
 }
 
+function NotificationItem({ n, markAsRead }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const cfg = getTypeConfig(n.notificationType);
+  const isUnread = n.status === "UNREAD";
+
+  const handleClick = () => {
+    setIsExpanded(!isExpanded);
+    if (isUnread) {
+      markAsRead(n.id);
+    }
+  };
+
+  return (
+    <div onClick={handleClick}
+      className={`p-4 rounded-2xl transition-all duration-200 cursor-pointer flex gap-4 mb-1
+        ${isUnread
+          ? 'bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800'
+          : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
+    >
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${cfg.color} bg-opacity-10 ${cfg.text}`}>
+        {cfg.icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-black uppercase tracking-widest opacity-50">{cfg.label}</span>
+          <span className="text-[9px] font-bold text-slate-400 shrink-0 ml-2">{timeAgo(n.createdAt)}</span>
+        </div>
+        <p className={`text-sm font-bold leading-snug tracking-tight truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
+          {n.subject}
+        </p>
+        <p className={`text-[11px] text-slate-500 font-bold mt-1 whitespace-pre-wrap ${isExpanded ? '' : 'line-clamp-2'}`}>
+          {n.message}
+        </p>
+      </div>
+      {isUnread && <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2 shrink-0 animate-pulse" />}
+    </div>
+  );
+}
+
 export default function NotificationBell({ username, pollInterval = 30_000 }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount,   setUnreadCount]   = useState(0);
@@ -240,33 +279,9 @@ export default function NotificationBell({ username, pollInterval = 30_000 }) {
               </div>
             )}
 
-            {!loading && !error && notifications.map((n) => {
-              const cfg      = getTypeConfig(n.notificationType);
-              const isUnread = n.status === "UNREAD";
-              return (
-                <div key={n.id} onClick={() => isUnread && markAsRead(n.id)}
-                  className={`p-4 rounded-2xl transition-all duration-200 cursor-pointer flex gap-4 mb-1
-                    ${isUnread
-                      ? 'bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      : 'opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0'}`}
-                >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${cfg.color} bg-opacity-10 ${cfg.text}`}>
-                    {cfg.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-50">{cfg.label}</span>
-                      <span className="text-[9px] font-bold text-slate-400 shrink-0 ml-2">{timeAgo(n.createdAt)}</span>
-                    </div>
-                    <p className={`text-sm font-bold leading-snug tracking-tight truncate ${isUnread ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                      {n.subject}
-                    </p>
-                    <p className="text-[11px] text-slate-500 font-bold mt-1 line-clamp-2">{n.message}</p>
-                  </div>
-                  {isUnread && <div className="w-2 h-2 bg-indigo-600 rounded-full mt-2 shrink-0 animate-pulse" />}
-                </div>
-              );
-            })}
+            {!loading && !error && notifications.map((n) => (
+              <NotificationItem key={n.id} n={n} markAsRead={markAsRead} />
+            ))}
           </div>
 
           {/* Footer */}
