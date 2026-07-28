@@ -11,9 +11,12 @@ export const useCreateTicketMutation = (options = {}) => {
   return useMutation({
     mutationFn: (ticketData) => ticketApi.createTicket(ticketData),
     onSuccess: (data, variables, context) => {
-      // Invalidar todas las consultas de listados para forzar recarga
+      // Invalidar todas las consultas de listados y estadísticas para forzar recarga
       queryClient.invalidateQueries({
         queryKey: ticketKeys.lists()
+      });
+      queryClient.invalidateQueries({
+        queryKey: ticketKeys.stats()
       });
       if (options.onSuccess) {
         options.onSuccess(data, variables, context);

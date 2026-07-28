@@ -53,6 +53,7 @@ export const useReassignTicketMutation = (options = {}) => {
       // Forzar recarga desde el backend
       queryClient.invalidateQueries({ queryKey: ticketKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ticketKeys.stats() });
 
       if (options.onSettled) {
         options.onSettled(data, error, { id });

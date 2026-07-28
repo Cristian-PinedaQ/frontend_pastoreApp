@@ -12,9 +12,15 @@ export const useAddCommentMutation = (options = {}) => {
     mutationFn: ({ id, responseData }) => ticketApi.addTicketResponse(id, responseData),
     
     onSuccess: (data, { id }, context) => {
-      // Invalidar y refrescar la vista detallada del ticket para mostrar el comentario inmediatamente
+      // Invalidar y refrescar la vista detallada, listas y estadísticas para mantener sincronizada toda la UI
       queryClient.invalidateQueries({
         queryKey: ticketKeys.detail(id)
+      });
+      queryClient.invalidateQueries({
+        queryKey: ticketKeys.lists()
+      });
+      queryClient.invalidateQueries({
+        queryKey: ticketKeys.stats()
       });
       
       if (options.onSuccess) {

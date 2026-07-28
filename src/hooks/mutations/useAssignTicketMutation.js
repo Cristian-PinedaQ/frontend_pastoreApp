@@ -59,6 +59,7 @@ export const useAssignTicketMutation = (options = {}) => {
       // Reconciliación forzada con el servidor: invalidar caché para descargar el estado real
       queryClient.invalidateQueries({ queryKey: ticketKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ticketKeys.stats() });
       
       if (options.onSettled) {
         options.onSettled(data, error, { id });

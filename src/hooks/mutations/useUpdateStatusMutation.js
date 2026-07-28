@@ -51,6 +51,7 @@ export const useUpdateStatusMutation = (options = {}) => {
       // Reconciliación con el servidor
       queryClient.invalidateQueries({ queryKey: ticketKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: ticketKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ticketKeys.stats() });
       
       if (options.onSettled) {
         options.onSettled(data, error, { id });
