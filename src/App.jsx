@@ -37,6 +37,7 @@ const TicketsPage       = React.lazy(() => import('./pages/TicketsPage'));
 const TicketDetailPage   = React.lazy(() => import('./pages/TicketDetailPage'));
 const TicketConfigsPage  = React.lazy(() => import('./pages/TicketConfigsPage'));
 const MeetingsPage       = React.lazy(() => import('./pages/MeetingsPage'));
+const GeoMapPage         = React.lazy(() => import('./pages/GeoMapPage'));
 
 function App() {
   return (
@@ -107,6 +108,15 @@ function App() {
                   <Suspense fallback={<PageLoader />}>
                     <ProtectedRoute
                       element={<CellGroupsPage />}
+                      requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION','ROLE_DESPLIEGUE']}
+                    />
+                  </Suspense>
+                } />
+
+                <Route path="map" element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ProtectedRoute
+                      element={<GeoMapPage />}
                       requiredRoles={['ROLE_PASTORES', 'ROLE_CONEXION','ROLE_DESPLIEGUE']}
                     />
                   </Suspense>

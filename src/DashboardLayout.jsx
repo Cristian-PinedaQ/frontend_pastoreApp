@@ -31,6 +31,7 @@ import {
   Moon,
   CirclePile,
   Ticket,
+  Map,
 } from "lucide-react";
 import DashboardTopbar from "./components/DashboardTopbar";
 import NotificationBell from "./components/NotificationBell";
@@ -169,6 +170,16 @@ const DashboardLayoutComponent = () => {
         label: "Altares de Vida",
         path: "/dashboard/cellgroups",
         icon: Flame,
+        visible: hasAnyRole([
+          "ROLE_PASTORES",
+          "ROLE_CONEXION",
+          "ROLE_DESPLIEGUE",
+        ]),
+      },
+      {
+        label: "Mapa Geo",
+        path: "/dashboard/map",
+        icon: Map,
         visible: hasAnyRole([
           "ROLE_PASTORES",
           "ROLE_CONEXION",
