@@ -139,4 +139,42 @@ export const geoApi = {
   getMigrationLogs: (signal) => {
     return fetchJson('/geo/migration-logs', { signal });
   },
+
+  /**
+   * Obtiene miembros SIN geolocalización.
+   */
+  getMembersMissing: (signal) => {
+    return fetchJson('/geo/members/missing', { signal });
+  },
+
+  /**
+   * Obtiene miembros con geocodificación FALLIDA.
+   */
+  getMembersFailed: (signal) => {
+    return fetchJson('/geo/members/failed', { signal });
+  },
+
+  /**
+   * Obtiene células SIN geolocalización.
+   */
+  getCellsMissing: (signal) => {
+    return fetchJson('/geo/cells/missing', { signal });
+  },
+
+  /**
+   * Obtiene células con geocodificación FALLIDA.
+   */
+  getCellsFailed: (signal) => {
+    return fetchJson('/geo/cells/failed', { signal });
+  },
+
+  /**
+   * Re-geocodifica una selección de miembros y células.
+   */
+  batchRetry: (memberIds = [], cellIds = []) => {
+    return fetchJson('/geo/batch-retry', {
+      method: 'POST',
+      body: JSON.stringify({ memberIds, cellIds }),
+    });
+  },
 };

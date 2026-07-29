@@ -16,7 +16,7 @@ export const CellMarkerPopup = React.memo(({ cell, onEditLocation }) => {
             <h4 className="font-semibold text-gray-900 leading-tight">{cell.name}</h4>
           </div>
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-            isComplete ? 'bg-emerald-550 text-emerald-800' : 'bg-amber-100 text-amber-800'
+            isComplete ? 'bg-emerald-500 text-emerald-800' : 'bg-amber-100 text-amber-800'
           }`}>
             {cell.status}
           </span>

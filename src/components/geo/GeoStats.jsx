@@ -20,7 +20,9 @@ export const GeoStats = React.memo(() => {
   if (error) return null;
 
   const totalMembers = stats?.totalMembers || 0;
+  const geocodedMembers = stats?.geocodedMembers || 0;
   const totalCells = stats?.totalCells || 0;
+  const geocodedCells = stats?.geocodedCells || 0;
 
   return (
     <div className="flex flex-wrap gap-3 z-[1000] pointer-events-auto">
@@ -33,10 +35,26 @@ export const GeoStats = React.memo(() => {
       </div>
 
       <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-md border border-gray-100 flex items-center space-x-3">
+        <span className="text-xl">📌</span>
+        <div>
+          <p className="text-[10px] uppercase font-bold text-gray-400 leading-none">Miembros Geocodif.</p>
+          <h3 className="text-lg font-extrabold text-emerald-600 leading-tight">{geocodedMembers}</h3>
+        </div>
+      </div>
+
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-md border border-gray-100 flex items-center space-x-3">
         <span className="text-xl">🏠</span>
         <div>
           <p className="text-[10px] uppercase font-bold text-gray-400 leading-none">Células Totales</p>
           <h3 className="text-lg font-extrabold text-gray-800 leading-tight">{totalCells}</h3>
+        </div>
+      </div>
+
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-md border border-gray-100 flex items-center space-x-3">
+        <span className="text-xl">📍</span>
+        <div>
+          <p className="text-[10px] uppercase font-bold text-gray-400 leading-none">Células Geocodif.</p>
+          <h3 className="text-lg font-extrabold text-emerald-600 leading-tight">{geocodedCells}</h3>
         </div>
       </div>
     </div>
