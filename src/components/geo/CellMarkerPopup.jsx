@@ -24,6 +24,7 @@ export const CellMarkerPopup = React.memo(({ cell, onEditLocation }) => {
 
         <div className="space-y-1.5 text-xs text-gray-600">
           <p><strong>Dirección:</strong> {cell.meetingAddress}</p>
+          {cell.city && <p><strong>Ciudad:</strong> {cell.city}</p>}
           <p><strong>Día:</strong> {cell.meetingDay || 'Sin asignar'}</p>
           <p><strong>Líder de Red:</strong> {cell.mainLeaderName}</p>
           <p><strong>Líder de Grupo:</strong> {cell.groupLeaderName}</p>

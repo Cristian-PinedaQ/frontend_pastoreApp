@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CityAutocomplete } from './CityAutocomplete';
 
 /**
  * Panel de filtros avanzados para geolocalización.
@@ -90,29 +91,24 @@ export const MapFilters = React.memo(({ filters, onChange }) => {
           )}
         </div>
 
-        {/* Sección 2: Distritos */}
+        {/* Sección 3: Ciudad */}
         <div className="border border-gray-100 rounded-xl overflow-hidden">
           <button
-            onClick={() => toggleSection('districts')}
+            onClick={() => toggleSection('city')}
             className="w-full bg-gray-50/50 hover:bg-gray-50 px-3 py-2 text-left text-xs font-semibold text-gray-700 flex justify-between items-center"
           >
-            <span>Distritos</span>
-            <span>{openSection === 'districts' ? '▲' : '▼'}</span>
+            <span>Ciudad</span>
+            <span>{openSection === 'city' ? '▲' : '▼'}</span>
           </button>
 
-          {openSection === 'districts' && (
-            <div className="p-3 space-y-2 bg-white">
-              {['PASTORES', 'D1', 'D2', 'D3'].map(d => (
-                <label key={d} className="flex items-center space-x-2 text-xs text-gray-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={(filters.district || []).includes(d)}
-                    onChange={() => handleDistrictChange(d)}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span>{d}</span>
-                </label>
-              ))}
+          {openSection === 'city' && (
+            <div className="p-3 bg-white">
+              <CityAutocomplete
+                value={filters.city || ''}
+                onChange={(val) => handleChange('city', val || undefined)}
+                placeholder="Buscar ciudad..."
+                className="w-full"
+              />
             </div>
           )}
         </div>

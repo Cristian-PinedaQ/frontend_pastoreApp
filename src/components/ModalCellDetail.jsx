@@ -29,6 +29,7 @@ import { useLeaders } from "../hooks/useLeaders";
 import { useAuth } from "../context/AuthContext";
 import { logUserAction } from "../utils/securityLogger";
 import { generateCellDetailPDF } from "../services/cellDetailPdfGenerator";
+import { CityAutocomplete } from "./geo/CityAutocomplete";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -947,6 +948,17 @@ const ModalCellDetail = ({ isOpen, onClose, cell: initialCell, onCellChanged }) 
                     className="w-full h-16 pl-14 pr-6 bg-white dark:bg-[#1a2332] rounded-3xl border-2 border-slate-100 dark:border-white/5 focus:border-indigo-500 outline-none font-black text-sm transition-all"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="flex gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">
+                  <MapPin className="text-indigo-500" size={20} />Ciudad</label>
+                <CityAutocomplete
+                  name="city"
+                  value={editForm.city || ""}
+                  onChange={(val) => setEditForm({ ...editForm, city: val })}
+                  placeholder="Buscar ciudad (ej: Cali)..."
+                />
               </div>
 
               <div className="flex justify-end pt-8">
