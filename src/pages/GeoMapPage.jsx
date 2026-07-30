@@ -187,6 +187,10 @@ export default function GeoMapPage() {
       queryClient.invalidateQueries({ queryKey: ['geo-members'] });
       queryClient.invalidateQueries({ queryKey: ['geo-cells'] });
       queryClient.invalidateQueries({ queryKey: ['geo-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-members-missing'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-members-failed'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-cells-missing'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-cells-failed'] });
 
       setEditingEntity(null);
       setEditingType(null);
