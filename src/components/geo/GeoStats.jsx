@@ -2,7 +2,7 @@ import React from 'react';
 import { useGeoStats } from '../../hooks/useGeoStats';
 
 /**
- * Widget superior que muestra estadísticas del proceso de geocodificación.
+ * Widget de estadísticas generales de geocodificación adaptado a tema Claro/Oscuro.
  */
 export const GeoStats = React.memo(() => {
   const { data: stats, isLoading, error } = useGeoStats();
@@ -10,8 +10,8 @@ export const GeoStats = React.memo(() => {
   if (isLoading) {
     return (
       <div className="flex space-x-2 animate-pulse">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="bg-white/80 backdrop-blur-md rounded-xl p-3 shadow-sm border border-gray-100 w-28 h-12" />
+        {[1, 2].map((i) => (
+          <div key={i} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-2xl p-2.5 shadow-sm border border-slate-100 dark:border-slate-800 w-28 h-10" />
         ))}
       </div>
     );
@@ -25,36 +25,24 @@ export const GeoStats = React.memo(() => {
   const geocodedCells = stats?.geocodedCells || 0;
 
   return (
-    <div className="flex flex-wrap gap-3 z-[1000] pointer-events-auto">
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-md border border-gray-100 flex items-center space-x-3">
-        <span className="text-xl">👥</span>
+    <div className="hidden lg:flex items-center gap-2 z-[1000] font-sans">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl px-3.5 py-1.5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center space-x-2.5">
+        <span className="text-base">👥</span>
         <div>
-          <p className="text-[10px] uppercase font-bold text-gray-400 leading-none">Miembros Totales</p>
-          <h3 className="text-lg font-extrabold text-gray-800 leading-tight">{totalMembers}</h3>
+          <p className="text-[9px] uppercase font-black tracking-wider text-slate-400 leading-none">Miembros Geo</p>
+          <h3 className="text-xs font-black text-indigo-600 dark:text-indigo-400 leading-tight">
+            {geocodedMembers} / {totalMembers}
+          </h3>
         </div>
       </div>
 
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-md border border-gray-100 flex items-center space-x-3">
-        <span className="text-xl">📌</span>
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl px-3.5 py-1.5 shadow-sm border border-slate-200/80 dark:border-slate-800 flex items-center space-x-2.5">
+        <span className="text-base">⛪</span>
         <div>
-          <p className="text-[10px] uppercase font-bold text-gray-400 leading-none">Miembros Geocodif.</p>
-          <h3 className="text-lg font-extrabold text-emerald-600 leading-tight">{geocodedMembers}</h3>
-        </div>
-      </div>
-
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-md border border-gray-100 flex items-center space-x-3">
-        <span className="text-xl">🏠</span>
-        <div>
-          <p className="text-[10px] uppercase font-bold text-gray-400 leading-none">Células Totales</p>
-          <h3 className="text-lg font-extrabold text-gray-800 leading-tight">{totalCells}</h3>
-        </div>
-      </div>
-
-      <div className="bg-white/95 backdrop-blur-md rounded-2xl px-4 py-2.5 shadow-md border border-gray-100 flex items-center space-x-3">
-        <span className="text-xl">📍</span>
-        <div>
-          <p className="text-[10px] uppercase font-bold text-gray-400 leading-none">Células Geocodif.</p>
-          <h3 className="text-lg font-extrabold text-emerald-600 leading-tight">{geocodedCells}</h3>
+          <p className="text-[9px] uppercase font-black tracking-wider text-slate-400 leading-none">Altares Geo</p>
+          <h3 className="text-xs font-black text-purple-600 dark:text-purple-400 leading-tight">
+            {geocodedCells} / {totalCells}
+          </h3>
         </div>
       </div>
     </div>

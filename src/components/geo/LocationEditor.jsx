@@ -1,16 +1,12 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
+import { MapPin, Check, X } from 'lucide-react';
 
-/**
- * Componente que muestra un marcador arrastrable (Draggable Marker) en el mapa
- * para definir de manera exacta las coordenadas de una dirección.
- */
 export const LocationEditor = ({ entity, type, onSave, onCancel }) => {
   const map = useMap();
   const markerRef = useRef(null);
 
-  // Inicializar la posición en las coordenadas actuales de la entidad o en el centro del mapa
   const initialPosition = useMemo(() => {
     if (entity.latitude && entity.longitude) {
       return [entity.latitude, entity.longitude];
@@ -21,8 +17,7 @@ export const LocationEditor = ({ entity, type, onSave, onCancel }) => {
 
   const [position, setPosition] = useState(initialPosition);
 
-  // Centrar el mapa al montar el editor de ubicación
-  React.useEffect(() => {
+  useEffect(() => {
     map.setView(initialPosition, 16);
   }, [initialPosition, map]);
 
@@ -43,20 +38,19 @@ export const LocationEditor = ({ entity, type, onSave, onCancel }) => {
     onSave(entity.id, {
       latitude: position[0],
       longitude: position[1],
-      confidence: 100, // Score máximo para corrección manual humana
+      confidence: 100,
     });
   };
 
-  // Marcador estilizado en rojo para indicar modo edición arrastrable
   const dragIcon = L.divIcon({
     html: `
-      <div class="relative flex items-center justify-center w-9 h-9 rounded-full shadow-xl bg-red-600 border-2 border-white ring-4 ring-red-200 animate-bounce">
-        <span class="text-white text-xs">📍</span>
+      <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl shadow-2xl bg-rose-600 border-2 border-white ring-4 ring-rose-400/50 animate-bounce">
+        <span class="text-white text-base">📍</span>
       </div>
     `,
     className: 'custom-leaflet-marker',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
   });
 
   return (
@@ -68,29 +62,38 @@ export const LocationEditor = ({ entity, type, onSave, onCancel }) => {
         icon={dragIcon}
         ref={markerRef}
       />
-      
-      {/* Contenedor flotante superior con controles */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[2000] w-[90%] max-w-md bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-red-100 p-4 font-sans pointer-events-auto">
+
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[2000] w-[90%] max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-rose-200 dark:border-rose-900/50 p-4 font-sans text-slate-800 dark:text-slate-100 pointer-events-auto">
         <div className="flex justify-between items-start mb-2">
-          <div>
-            <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider">Modo Edición Manual</h4>
-            <h3 className="text-sm font-extrabold text-gray-950 mt-0.5">{entity.name}</h3>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-[10px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-wider">Edición Manual de Ubicación</h4>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white leading-tight">{entity.name}</h3>
+            </div>
           </div>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 text-sm">✕</button>
+          <button onClick={onCancel} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <p className="text-xs text-gray-600 mb-3 leading-relaxed">
-          Arrastra el marcador rojo en el mapa para ubicar la dirección exacta. Una vez posicionado, presiona Guardar.
+
+        <p className="text-xs text-slate-600 dark:text-slate-300 mb-3 leading-relaxed">
+          Arrastra el marcador rojo sobre el punto exacto en el mapa y presiona guardar.
         </p>
-        <div className="flex space-x-2">
+
+        <div className="flex gap-2">
           <button
             onClick={handleSave}
-            className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 px-4 rounded-xl transition-all shadow-md hover:shadow-lg"
+            className="flex-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold py-2 px-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-1.5 focus:ring-2 focus:ring-rose-500 outline-none"
           >
-            Guardar Coordenadas
+            <Check className="w-4 h-4" />
+            <span>Guardar Coordenadas</span>
           </button>
           <button
             onClick={onCancel}
-            className="bg-gray-100 hover:bg-gray-250 text-gray-700 text-xs font-semibold py-2 px-4 rounded-xl transition-all"
+            className="bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold py-2 px-3 rounded-xl transition-all focus:ring-2 focus:ring-indigo-500 outline-none"
           >
             Cancelar
           </button>
