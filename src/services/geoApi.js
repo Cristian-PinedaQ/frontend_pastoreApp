@@ -114,12 +114,32 @@ export const geoApi = {
   },
 
   /**
+   * Actualiza la dirección física de un miembro (PATCH address).
+   */
+  updateMemberAddress: (id, addressData) => {
+    return fetchJson(`/geo/member/${id}/address`, {
+      method: 'PATCH',
+      body: JSON.stringify(addressData),
+    });
+  },
+
+  /**
    * Actualiza la ubicación manual de una célula (PATCH location).
    */
   updateCellLocation: (id, locationData) => {
     return fetchJson(`/geo/cell/${id}/location`, {
       method: 'PATCH',
       body: JSON.stringify(locationData),
+    });
+  },
+
+  /**
+   * Actualiza la dirección física de una célula (PATCH address).
+   */
+  updateCellAddress: (id, addressData) => {
+    return fetchJson(`/geo/cellGroup/${id}/address`, {
+      method: 'PATCH',
+      body: JSON.stringify(addressData),
     });
   },
 

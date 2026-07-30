@@ -122,31 +122,30 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
   const handleSaveEdit = async (row) => {
     try {
       if (isMemberTab) {
-        await geoApi.updateMemberLocation(row.id, { 
+        await geoApi.updateMemberAddress(row.id, { 
           address: editingField === 'address' ? editValue : row.address,
-          city: editingField === 'city' ? editValue : row.city,
-          latitude: null, 
-          longitude: null, 
-          confidence: 0 
+          city: editingField === 'city' ? editValue : row.city
         });
       } else {
-        await geoApi.updateCellLocation(row.id, { 
+        await geoApi.updateCellAddress(row.id, { 
           address: editingField === 'address' ? editValue : row.meetingAddress,
-          city: editingField === 'city' ? editValue : row.city,
-          latitude: null, 
-          longitude: null, 
-          confidence: 0 
+          city: editingField === 'city' ? editValue : row.city
         });
       }
       setEditingRow(null);
       setEditingField(null);
       setEditValue('');
+      
+      // Invalidar todas las queries del mapa y pendientes
+      queryClient.invalidateQueries({ queryKey: ['geo-members'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-cells'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-stats'] });
       queryClient.invalidateQueries({ queryKey: ['geo-members-missing'] });
       queryClient.invalidateQueries({ queryKey: ['geo-members-failed'] });
       queryClient.invalidateQueries({ queryKey: ['geo-cells-missing'] });
       queryClient.invalidateQueries({ queryKey: ['geo-cells-failed'] });
     } catch (err) {
-      alert('Error al guardar: ' + err.message);
+      alert('Error al guardar dirección: ' + err.message);
     }
   };
 

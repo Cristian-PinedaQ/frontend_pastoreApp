@@ -1,7 +1,21 @@
-import React, { useEffect } from 'react';
-import { MapPin, User, Home, ArrowUpRight, Edit, Eye, X, Shield, Award } from 'lucide-react';
+import React, { useEffect, useMemo } from 'react';
+import { MapPin, User, Home, ArrowUpRight, Edit, Eye, X, Shield, Award, Navigation } from 'lucide-react';
 
-export const GeoEntityDetailCard = React.memo(({ entity, type, onClose, onOpenFullDetail, onEditLocation }) => {
+// Función Haversine para calcular distancia aproximada entre dos puntos en km
+const calculateHaversineDistance = (lat1, lon1, lat2, lon2) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371; // Radio de la Tierra en km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
+export const GeoEntityDetailCard = React.memo(({ entity, type, onClose, onOpenFullDetail, onEditLocation, cells = [], mapRef }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
@@ -22,6 +36,40 @@ export const GeoEntityDetailCard = React.memo(({ entity, type, onClose, onOpenFu
   const googleMapsUrl = entity.latitude && entity.longitude
     ? `https://www.google.com/maps/dir/?api=1&destination=${entity.latitude},${entity.longitude}`
     : null;
+
+  // Calcular altar más cercano para miembros usando useMemo
+  const nearestCell = useMemo(() => {
+    if (!isMember || !entity.latitude || !entity.longitude || !cells.length) return null;
+    let closest = null;
+    let minDistance = Infinity;
+
+    cells.forEach((cell) => {
+      if (cell.latitude && cell.longitude) {
+        const dist = calculateHaversineDistance(
+          entity.latitude,
+          entity.longitude,
+          cell.latitude,
+          cell.longitude
+        );
+        if (dist !== null && dist < minDistance) {
+          minDistance = dist;
+          closest = { cell, distance: dist };
+        }
+      }
+    });
+
+    return closest;
+  }, [isMember, entity.latitude, entity.longitude, cells]);
+
+  const handleCenterOnCell = () => {
+    if (mapRef?.current && nearestCell?.cell) {
+      mapRef.current.flyTo(
+        [nearestCell.cell.latitude, nearestCell.cell.longitude],
+        16,
+        { duration: 1.2 }
+      );
+    }
+  };
 
   return (
     <div
@@ -112,6 +160,26 @@ export const GeoEntityDetailCard = React.memo(({ entity, type, onClose, onOpenFu
         )}
       </div>
 
+      {/* Altar Más Cercano (Exclusivo para Miembros) */}
+      {isMember && nearestCell && (
+        <div className="text-xs bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 p-3.5 rounded-2xl mb-4">
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 tracking-wider">⛪ Altar más cercano</span>
+            <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400">{nearestCell.distance.toFixed(2)} km</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-slate-800 dark:text-slate-200">{nearestCell.cell.name}</span>
+            <button
+              onClick={handleCenterOnCell}
+              className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1 bg-white dark:bg-slate-800/80 px-2 py-1 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700/60"
+            >
+              <Navigation className="w-2.5 h-2.5" />
+              <span>Centrar</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Botones de Acción */}
       <div className="flex flex-col gap-2">
         <div className="grid grid-cols-2 gap-2">
@@ -121,7 +189,7 @@ export const GeoEntityDetailCard = React.memo(({ entity, type, onClose, onOpenFu
               className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all focus:ring-2 focus:ring-indigo-500 outline-none"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Ver Ficha</span>
+              <span>Ficha Completa</span>
             </button>
           )}
 

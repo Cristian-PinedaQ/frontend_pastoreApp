@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { geoApi } from '../../services/geoApi';
+import { useQueryClient } from '@tanstack/react-query';
 
 /**
  * Componente panel para administrar las ejecuciones batch de geolocalización.
  * Permite ejecutar migración, continuar desde el último ID fallido (resume) y monitorear errores.
  */
 export const BatchMigrationPanel = ({ onClose }) => {
+  const queryClient = useQueryClient();
   const [logs, setLogs] = useState([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
@@ -69,6 +71,16 @@ export const BatchMigrationPanel = ({ onClose }) => {
     try {
       const result = await geoApi.batchMigrate(type);
       setActiveMigration(result);
+      
+      // Invalidar queries al iniciar la migración
+      queryClient.invalidateQueries({ queryKey: ['geo-members'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-cells'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-members-missing'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-cells-missing'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-members-failed'] });
+      queryClient.invalidateQueries({ queryKey: ['geo-cells-failed'] });
+
       fetchLogs();
     } catch (err) {
       alert('Error al iniciar migración: ' + err.message);

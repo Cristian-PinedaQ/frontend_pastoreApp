@@ -255,15 +255,9 @@ export default function GeoMapPage() {
         eventHandlers={{
           click: () => handleSelectEntity(m, m.isLeader ? 'LEADER' : 'MEMBER'),
         }}
-      >
-        <MemberMarkerPopup
-          member={m}
-          onSelectEntity={handleSelectEntity}
-          onEditLocation={handleEditLocation}
-        />
-      </Marker>
+      />
     ));
-  }, [filteredMembers, selectedEntity, selectedType, handleSelectEntity, handleEditLocation]);
+  }, [filteredMembers, selectedEntity, selectedType, handleSelectEntity]);
 
   // Memoizar Marcadores de Células / Altares
   const cellMarkers = useMemo(() => {
@@ -278,15 +272,9 @@ export default function GeoMapPage() {
         eventHandlers={{
           click: () => handleSelectEntity(c, 'CELL_GROUP'),
         }}
-      >
-        <CellMarkerPopup
-          cell={c}
-          onSelectEntity={handleSelectEntity}
-          onEditLocation={handleEditLocation}
-        />
-      </Marker>
+      />
     ));
-  }, [filteredCells, selectedEntity, selectedType, handleSelectEntity, handleEditLocation]);
+  }, [filteredCells, selectedEntity, selectedType, handleSelectEntity]);
 
   const showLoader = loadingMembers || loadingCells;
   const visibleTotal = filteredMembers.length + filteredCells.length;
@@ -358,6 +346,8 @@ export default function GeoMapPage() {
               onClose={() => setSelectedEntity(null)}
               onOpenFullDetail={handleOpenFullDetail}
               onEditLocation={handleEditLocation}
+              cells={cells}
+              mapRef={mapRef}
             />
           </div>
         )}
