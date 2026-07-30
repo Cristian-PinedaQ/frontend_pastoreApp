@@ -3,6 +3,7 @@ import { useGeoMembersMissing, useGeoMembersFailed } from '../../hooks/useGeoMem
 import { useGeoCellsMissing, useGeoCellsFailed } from '../../hooks/useGeoCellsMissing';
 import { geoApi } from '../../services/geoApi';
 import { useQueryClient } from '@tanstack/react-query';
+import { CityAutocomplete } from './CityAutocomplete';
 
 const TABS = [
   { key: 'members-missing', label: 'Miembros sin geo', entityType: 'member', status: 'missing' },
@@ -26,6 +27,7 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState({ members: [], cells: [] });
   const [editingRow, setEditingRow] = useState(null);
+  const [editingField, setEditingField] = useState(null); // 'address' | 'city'
   const [editValue, setEditValue] = useState('');
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryResult, setRetryResult] = useState(null);
@@ -111,31 +113,33 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
     }
   };
 
-  const handleEditClick = (row) => {
+  const handleEditClick = (row, field = 'address') => {
     setEditingRow(row.id);
-    setEditValue(row.address || row.meetingAddress || '');
+    setEditingField(field);
+    setEditValue(field === 'city' ? (row.city || '') : (row.address || row.meetingAddress || ''));
   };
 
   const handleSaveEdit = async (row) => {
     try {
       if (isMemberTab) {
         await geoApi.updateMemberLocation(row.id, { 
-          address: editValue, 
-          city: row.city,
+          address: editingField === 'address' ? editValue : row.address,
+          city: editingField === 'city' ? editValue : row.city,
           latitude: null, 
           longitude: null, 
           confidence: 0 
         });
       } else {
         await geoApi.updateCellLocation(row.id, { 
-          address: editValue, 
-          city: row.city || row.district,
+          address: editingField === 'address' ? editValue : row.meetingAddress,
+          city: editingField === 'city' ? editValue : row.city,
           latitude: null, 
           longitude: null, 
           confidence: 0 
         });
       }
       setEditingRow(null);
+      setEditingField(null);
       setEditValue('');
       queryClient.invalidateQueries({ queryKey: ['geo-members-missing'] });
       queryClient.invalidateQueries({ queryKey: ['geo-members-failed'] });
@@ -148,6 +152,7 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
 
   const handleCancelEdit = () => {
     setEditingRow(null);
+    setEditingField(null);
     setEditValue('');
   };
 
@@ -354,7 +359,7 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
                       <td className="px-3 py-2 font-medium text-gray-900">{row.name}</td>
                       
                       <td className="px-3 py-2 text-gray-600 max-w-xs truncate">
-                        {isEditing ? (
+                        {isEditing && editingField === 'address' ? (
                           <input
                             type="text"
                             value={editValue}
@@ -370,9 +375,18 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
                       </td>
 
                       <td className="px-3 py-2 text-gray-500 hidden md:table-cell">
-                        {isMemberTab 
-                          ? `${row.city || ''}${row.city && row.district ? ', ' : ''}${row.district || ''}`
-                          : `${row.district || ''}`}
+                        {isEditing && editingField === 'city' && !isMemberTab ? (
+                          <CityAutocomplete
+                            value={editValue}
+                            onChange={setEditValue}
+                            placeholder="Buscar ciudad..."
+                            className="w-full"
+                          />
+                        ) : (
+                          isMemberTab 
+                            ? `${row.city || ''}${row.city && row.district ? ', ' : ''}${row.district || ''}`
+                            : `${row.city || row.district || ''}`
+                        )}
                       </td>
 
                       <td className="px-3 py-2 text-gray-500 hidden lg:table-cell">
@@ -412,14 +426,36 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
                             </>
                           ) : (
                             <>
-                              <button
-                                onClick={() => handleEditClick(row)}
-                                disabled={!row.hasAddress}
-                                className="px-2 py-1 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Editar dirección"
-                              >
-                                ✏️
-                              </button>
+                              {!isMemberTab && (
+                                <>
+                                  <button
+                                    onClick={() => handleEditClick(row, 'address')}
+                                    disabled={!row.hasAddress}
+                                    className="px-2 py-1 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Editar dirección"
+                                  >
+                                    ✏️
+                                  </button>
+                                  <button
+                                    onClick={() => handleEditClick(row, 'city')}
+                                    disabled={!row.hasAddress}
+                                    className="px-2 py-1 text-xs text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Editar ciudad"
+                                  >
+                                    🏙️
+                                  </button>
+                                </>
+                              )}
+                              {isMemberTab && (
+                                <button
+                                  onClick={() => handleEditClick(row, 'address')}
+                                  disabled={!row.hasAddress}
+                                  className="px-2 py-1 text-xs text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Editar dirección"
+                                >
+                                  ✏️
+                                </button>
+                              )}
                               <button
                                 onClick={handleBatchRetry}
                                 disabled={isRetrying}

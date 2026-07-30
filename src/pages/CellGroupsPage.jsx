@@ -8,6 +8,7 @@ import ModalCellDetail from '../components/ModalCellDetail';
 import ModalLeaderDetail from '../components/ModalLeaderDetail';
 import PageHeader from '../components/PageHeader';
 import StatsBar from '../components/StatsBar';
+import { CityAutocomplete } from '../components/geo/CityAutocomplete';
 import {
   Home, House, MapPin, MoreHorizontal, HousePlus,
   FileDown, BarChart3, ShieldCheck, Clock, TrendingUp,
@@ -39,7 +40,7 @@ const CellGroupsPage = () => {
   const [searchTerm, setSearchTerm]           = useState('');
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [viewMode, setViewMode]               = useState('grid');
-  const [filters, setFilters]                 = useState({ status:'ALL', district:'ALL', incompleteOnly:false });
+  const [filters, setFilters]                 = useState({ status:'ALL', district:'ALL', city:'', incompleteOnly:false });
   const [modals, setModals]                   = useState({ create:false, stats:false, detail:false, verify:false, leader:false });
   const [selectedCell, setSelectedCell]       = useState(null);
   const [selectedLeader, setSelectedLeader]   = useState(null);
@@ -66,8 +67,9 @@ const CellGroupsPage = () => {
         const matchesSearch     = !searchTerm || c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.mainLeaderName?.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus     = filters.status   === 'ALL' || c.status   === filters.status;
         const matchesDistrict   = filters.district === 'ALL' || c.district === filters.district;
+        const matchesCity       = !filters.city || (c.city && c.city.toLowerCase().includes(filters.city.toLowerCase()));
         const matchesIncomplete = !filters.incompleteOnly || !c.hasAllLeadersActive;
-        return matchesSearch && matchesStatus && matchesDistrict && matchesIncomplete;
+        return matchesSearch && matchesStatus && matchesDistrict && matchesCity && matchesIncomplete;
       })
       .sort((a, b) => (a.status === 'ACTIVE' ? -1 : 1));
   }, [allCells, searchTerm, filters]);
@@ -209,6 +211,14 @@ const CellGroupsPage = () => {
             <option value="ALL">Todos los distritos</option>
             {Object.entries(DISTRICT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
+
+          {/* City filter */}
+          <CityAutocomplete
+            value={filters.city}
+            onChange={(val) => setFilters({...filters, city: val})}
+            placeholder="Buscar ciudad..."
+            className="flex-1 min-w-0"
+          />
 
           {/* View mode */}
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl shrink-0">

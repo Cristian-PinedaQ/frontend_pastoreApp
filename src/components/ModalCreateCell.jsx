@@ -15,6 +15,7 @@ import ModalHeader from "../components/ModalHeader";
 import { useLeaders } from "../hooks/useLeaders";
 import apiService from "../apiService";
 import { logUserAction } from "../utils/securityLogger";
+import { CityAutocomplete } from "../components/geo/CityAutocomplete";
 
 const MEETING_DAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const DISTRICTS = [
@@ -50,7 +51,7 @@ const ModalCreateCell = ({ isOpen, onClose, onCreateSuccess }) => {
     return leadersList;
   }, [leadersData]);
 
-  const [formData, setFormData] = useState({
+const [formData, setFormData] = useState({
     name: "",
     mainLeaderId: "",
     branchLeaderId: "",
@@ -62,6 +63,7 @@ const ModalCreateCell = ({ isOpen, onClose, onCreateSuccess }) => {
     meetingAddress: "",
     maxCapacity: "15",
     district: "",
+    city: "Cali",
     notes: "",
   });
 
@@ -139,7 +141,7 @@ const ModalCreateCell = ({ isOpen, onClose, onCreateSuccess }) => {
 
   const resetModal = () => {
     setStep(1);
-    setFormData({ name: "", mainLeaderId: "", branchLeaderId: "", groupLeaderId: "", hostId: "", timoteoId: "", meetingDay: "", meetingTime: "", meetingAddress: "", maxCapacity: "15", district: "", notes: "" });
+    setFormData({ name: "", mainLeaderId: "", branchLeaderId: "", groupLeaderId: "", hostId: "", timoteoId: "", meetingDay: "", meetingTime: "", meetingAddress: "", maxCapacity: "15", district: "", city: "Cali", notes: "" });
     setErrors({});
     setCreateResult(null);
     setError("");
@@ -275,6 +277,16 @@ const ModalCreateCell = ({ isOpen, onClose, onCreateSuccess }) => {
                       <option value="">Seleccionar cobertura</option>
                       {DISTRICTS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
                     </select>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] ml-2 flex items-center gap-2"><MapPin size={14} className="text-indigo-500" /> CIUDAD</label>
+                    <CityAutocomplete
+                      name="city"
+                      value={formData.city}
+                      onChange={handleChange}
+                      placeholder="Buscar ciudad (ej: Cali)..."
+                      required={true}
+                    />
                   </div>
                 </div>
               </div>

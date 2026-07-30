@@ -177,4 +177,11 @@ export const geoApi = {
       body: JSON.stringify({ memberIds, cellIds }),
     });
   },
+
+  /**
+   * Autocomplete de ciudades usando Nominatim.
+   */
+  autocompleteCities: (query) => {
+    return fetchJson('/geo/cities', { query: { q: query } });
+  },
 };
