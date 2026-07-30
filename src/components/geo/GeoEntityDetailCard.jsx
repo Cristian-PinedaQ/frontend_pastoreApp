@@ -24,30 +24,21 @@ export const GeoEntityDetailCard = React.memo(({ entity, type, onClose, onOpenFu
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  if (!entity) return null;
-
   const isMember = type === 'MEMBER' || type === 'LEADER';
-  const name = entity.name || 'Sin Nombre';
-  const address = isMember ? entity.address : entity.meetingAddress;
-  const district = entity.district || 'Sin Distrito';
-  const isLeader = entity.isLeader || type === 'LEADER';
-
-  // Enlace para Google Maps "Cómo llegar"
-  const googleMapsUrl = entity.latitude && entity.longitude
-    ? `https://www.google.com/maps/dir/?api=1&destination=${entity.latitude},${entity.longitude}`
-    : null;
+  const lat = entity?.latitude;
+  const lng = entity?.longitude;
 
   // Calcular altar más cercano para miembros usando useMemo
   const nearestCell = useMemo(() => {
-    if (!isMember || !entity.latitude || !entity.longitude || !cells.length) return null;
+    if (!isMember || !lat || !lng || !cells.length) return null;
     let closest = null;
     let minDistance = Infinity;
 
     cells.forEach((cell) => {
       if (cell.latitude && cell.longitude) {
         const dist = calculateHaversineDistance(
-          entity.latitude,
-          entity.longitude,
+          lat,
+          lng,
           cell.latitude,
           cell.longitude
         );
@@ -59,8 +50,19 @@ export const GeoEntityDetailCard = React.memo(({ entity, type, onClose, onOpenFu
     });
 
     return closest;
-  }, [isMember, entity.latitude, entity.longitude, cells]);
+  }, [isMember, lat, lng, cells]);
 
+  if (!entity) return null;
+
+  const name = entity.name || 'Sin Nombre';
+  const address = isMember ? entity.address : entity.meetingAddress;
+  const district = entity.district || 'Sin Distrito';
+  const isLeader = entity.isLeader || type === 'LEADER';
+
+  // Enlace para Google Maps "Cómo llegar"
+  const googleMapsUrl = lat && lng
+    ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+    : null;
   const handleCenterOnCell = () => {
     if (mapRef?.current && nearestCell?.cell) {
       mapRef.current.flyTo(
