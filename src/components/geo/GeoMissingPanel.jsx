@@ -21,7 +21,7 @@ const STATUS_COLORS = {
   MANUAL: 'bg-blue-100 text-blue-800',
 };
 
-export function GeoMissingPanel({ onClose, onRetryComplete }) {
+export function GeoMissingPanel({ onClose, onRetryComplete, onEditLocation }) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('members-missing');
   const [searchQuery, setSearchQuery] = useState('');
@@ -453,6 +453,15 @@ export function GeoMissingPanel({ onClose, onRetryComplete }) {
                                   title="Editar dirección"
                                 >
                                   ✏️
+                                </button>
+                              )}
+                              {onEditLocation && (
+                                <button
+                                  onClick={() => onEditLocation(row, isMemberTab ? 'MEMBER' : 'CELL_GROUP')}
+                                  className="px-2 py-1 text-xs text-rose-600 bg-rose-50 hover:bg-rose-100 rounded transition-colors"
+                                  title="Editar ubicación manual"
+                                >
+                                  📍
                                 </button>
                               )}
                               <button

@@ -428,6 +428,11 @@ export default function GeoMapPage() {
               queryClient.invalidateQueries({ queryKey: ['geo-members'] });
               queryClient.invalidateQueries({ queryKey: ['geo-cells'] });
             }}
+            onEditLocation={(entity, type) => {
+              setEditingEntity(entity);
+              setEditingType(type);
+              setActiveTab('map');
+            }}
           />
         )}
       </div>
