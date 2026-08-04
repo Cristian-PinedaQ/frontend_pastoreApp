@@ -41,8 +41,8 @@ const ModalAddFinance = ({
 }) => {
   const confirm = useConfirmation();
   const { data: membersData, isLoading: loadingMembers } = useMembers();
-  const { filterByLeaderType, isLoadingLeaders } = useLeaderTypeFilter(selectedLeaderType);
   const [selectedLeaderType, setSelectedLeaderType] = useState("ALL");
+  const { filterByLeaderType, isLoadingLeaders } = useLeaderTypeFilter(selectedLeaderType);
   const [formData, setFormData] = useState({
     memberId: "",
     memberName: "",
