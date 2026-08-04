@@ -8,6 +8,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useConfirmation } from "../context/ConfirmationContext";
 import { useMembers } from "../hooks/useMembers";
+import { useLeaderTypeFilter } from "../hooks/useLeaderTypeFilter";
 import {
   CheckCircle2,
   AlertCircle,
@@ -19,9 +20,17 @@ import {
   XCircle,
   Info,
   Gift,
+  Crown,
 } from "lucide-react";
 import ModalHeader from "../components/ModalHeader";
 import { transformForDisplay } from "../services/nameHelper";
+
+const LEADER_TYPE_LABELS = {
+  SERVANT: "Servidor",
+  AUXILIARY_SERVANT: "Servidor auxiliar",
+  LEADER_144: "Líder 144",
+  LEADER_12: "Líder 12",
+};
 
 const ModalAddFinance = ({
   isOpen,
@@ -32,6 +41,8 @@ const ModalAddFinance = ({
 }) => {
   const confirm = useConfirmation();
   const { data: membersData, isLoading: loadingMembers } = useMembers();
+  const { filterByLeaderType, isLoadingLeaders } = useLeaderTypeFilter(selectedLeaderType);
+  const [selectedLeaderType, setSelectedLeaderType] = useState("ALL");
   const [formData, setFormData] = useState({
     memberId: "",
     memberName: "",
@@ -144,6 +155,7 @@ const ModalAddFinance = ({
           isVerified: true,
         });
       }
+      setSelectedLeaderType("ALL");
       setSearchTerm("");
       setShowMemberList(false);
       setErrors({});
@@ -153,20 +165,29 @@ const ModalAddFinance = ({
 
   const handleMemberSearch = (value) => {
     setSearchTerm(value);
-    if (!value?.trim()) {
+  };
+
+  useEffect(() => {
+    let result = members;
+    result = result.filter((m) => filterByLeaderType(m.id));
+
+    if (searchTerm?.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      result = result.filter((member) => {
+        const name = (member?.name || "").toLowerCase();
+        const document = (member?.document || "").toLowerCase();
+        return name.includes(searchLower) || document.includes(searchLower);
+      });
+      setFilteredMembers(result);
+      setShowMemberList(true);
+    } else if (selectedLeaderType !== "ALL") {
+      setFilteredMembers(result);
+      setShowMemberList(true);
+    } else {
       setFilteredMembers([]);
       setShowMemberList(false);
-      return;
     }
-    const searchLower = value.toLowerCase();
-    const filtered = members.filter((member) => {
-      const name = (member?.name || "").toLowerCase();
-      const document = (member?.document || "").toLowerCase();
-      return name.includes(searchLower) || document.includes(searchLower);
-    });
-    setFilteredMembers(filtered);
-    setShowMemberList(true);
-  };
+  }, [searchTerm, selectedLeaderType, members, filterByLeaderType]);
 
   const selectMember = (member) => {
     setFormData((prev) => ({
@@ -315,6 +336,23 @@ const ModalAddFinance = ({
           onSubmit={handleSubmit}
           className="p-6 overflow-y-auto flex-1 space-y-5 custom-scrollbar"
         >
+          {/* Campo Filtro Líder */}
+          <div className="space-y-1 relative">
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              <Crown size={16} className="text-amber-500" /> Filtrar por Liderazgo
+            </label>
+            <select
+              value={selectedLeaderType}
+              onChange={(e) => setSelectedLeaderType(e.target.value)}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-700 focus:border-blue-500 bg-gray-50 dark:bg-[#1e293b] text-gray-800 dark:text-gray-100 outline-none transition-all appearance-none cursor-pointer"
+            >
+              <option value="ALL">Todos los miembros</option>
+              {Object.entries(LEADER_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Campo Miembro */}
           <div className="space-y-1 relative">
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">

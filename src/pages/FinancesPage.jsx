@@ -12,7 +12,7 @@ import React, {
 } from "react";
 import apiService from "../apiService";
 import { useConfirmation } from "../context/ConfirmationContext";
-import { useLeaders } from "../hooks/useLeaders";
+import { useLeaderTypeFilter } from "../hooks/useLeaderTypeFilter";
 import ModalAddFinance from "../components/ModalAddFinance";
 import ModalDailyReportOptions from "../components/ModalDailyReportOptions";
 import {
@@ -42,6 +42,7 @@ import {
   Download,
   Edit3,
   Trash2,
+  Crown,
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 
@@ -154,7 +155,7 @@ const formatLocalDate = (dateString) => {
 
 const FinancesPage = () => {
   const confirm = useConfirmation();
-  const { data: leadersData } = useLeaders();
+  
   const [allFinances, setAllFinances] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -167,10 +168,9 @@ const FinancesPage = () => {
   const [endDate, setEndDate] = useState("");
 
   const [selectedLeaderType, setSelectedLeaderType] = useState("ALL");
+  const { filterByLeaderType } = useLeaderTypeFilter(selectedLeaderType);
 
-  const leaders = useMemo(() => {
-    return Array.isArray(leadersData) ? leadersData : [];
-  }, [leadersData]);
+
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showStatisticsModal, setShowStatisticsModal] = useState(false);
@@ -270,19 +270,7 @@ const FinancesPage = () => {
     }
 
     // Leader Type
-    if (selectedLeaderType !== "ALL") {
-      if (selectedLeaderType === "NO_LEADER") {
-        const allLeaderIds = new Set(leaders.map((l) => l.memberId));
-        filtered = filtered.filter((f) => !allLeaderIds.has(f.memberId));
-      } else {
-        const memberIdsWithType = new Set(
-          leaders
-            .filter((l) => l.leaderType === selectedLeaderType)
-            .map((l) => l.memberId),
-        );
-        filtered = filtered.filter((f) => memberIdsWithType.has(f.memberId));
-      }
-    }
+    filtered = filtered.filter((f) => filterByLeaderType(f.memberId));
 
     // Dates
     if (startDate) {
@@ -306,7 +294,7 @@ const FinancesPage = () => {
     selectedMethod,
     selectedVerification,
     selectedLeaderType,
-    leaders,
+    filterByLeaderType,
     startDate,
     endDate,
   ]);
@@ -689,6 +677,29 @@ const FinancesPage = () => {
                     {CONCEPT_LABELS[c]}
                   </option>
                 ))}
+              </select>
+              <ChevronDown className="absolute right-4 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Filtro Tipo de Líder */}
+          <div className="space-y-1.5 md:space-y-2 flex flex-col">
+            <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-3 md:ml-4">
+              Liderazgo
+            </label>
+            <div className="relative">
+              <Crown className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={selectedLeaderType}
+                onChange={(e) => setSelectedLeaderType(e.target.value)}
+                className="w-full h-12 md:h-14 pl-12 md:pl-14 pr-10 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl md:rounded-3xl text-xs md:text-sm font-bold text-slate-800 dark:text-slate-200 appearance-none focus:outline-none focus:border-indigo-500 transition-all cursor-pointer"
+              >
+                <option value="ALL">Cualquier Miembro</option>
+                <option value="NO_LEADER">Sin Liderazgo</option>
+                <option value="SERVANT">Servidor</option>
+                <option value="AUXILIARY_SERVANT">Servidor Auxiliar</option>
+                <option value="LEADER_144">Líder 144</option>
+                <option value="LEADER_12">Líder 12</option>
               </select>
               <ChevronDown className="absolute right-4 md:right-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
