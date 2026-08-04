@@ -35,5 +35,5 @@ export function useLeaderTypeFilter(selectedLeaderType) {
     };
   }, [leadersData, selectedLeaderType]);
 
-  return { filterByLeaderType, isLoadingLeaders: isLoading };
+  return { filterByLeaderType, isLoadingLeaders: isLoading, leadersData };
 }

@@ -168,7 +168,11 @@ const FinancesPage = () => {
   const [endDate, setEndDate] = useState("");
 
   const [selectedLeaderType, setSelectedLeaderType] = useState("ALL");
-  const { filterByLeaderType } = useLeaderTypeFilter(selectedLeaderType);
+  const { filterByLeaderType, leadersData } = useLeaderTypeFilter(selectedLeaderType);
+  
+  const leaders = useMemo(() => {
+    return Array.isArray(leadersData) ? leadersData : [];
+  }, [leadersData]);
 
 
 
